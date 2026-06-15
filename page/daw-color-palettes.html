@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Studio One 高对比配色 · 15组深中浅三级色</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0D1117;
+            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #FFFFFF, #A0A0C0);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .sub {
+            text-align: center;
+            color: #7A7A9A;
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .color-pair {
+            background: #161B22;
+            border-radius: 1rem;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 1px solid #30363D;
+        }
+
+        .color-pair:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 15px 30px -12px rgba(0,0,0,0.5);
+            border-color: #4A4A6A;
+        }
+
+        .pair-info {
+            padding: 0.8rem 1rem;
+            background: #0D1117;
+            border-bottom: 1px solid #21262D;
+        }
+
+        .pair-number {
+            font-weight: 600;
+            color: #C9D1D9;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+        }
+
+        .pair-name {
+            font-size: 0.7rem;
+            color: #8B949E;
+            margin-top: 0.2rem;
+        }
+
+        .swatch-group {
+            display: flex;
+            height: 110px;
+        }
+
+        .swatch {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: filter 0.2s;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .swatch:hover {
+            filter: brightness(1.05);
+        }
+
+        .swatch .hex-code {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.7rem;
+            font-weight: 600;
+            background: rgba(0,0,0,0.6);
+            padding: 0.2rem 0.5rem;
+            border-radius: 20px;
+            color: white;
+            backdrop-filter: blur(2px);
+        }
+
+        .swatch .label {
+            font-size: 0.65rem;
+            margin-top: 0.3rem;
+            background: rgba(0,0,0,0.5);
+            padding: 0.1rem 0.4rem;
+            border-radius: 12px;
+            color: #f0f0f0;
+        }
+
+        .copy-toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1F6FEB;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+
+        .footer-note {
+            margin-top: 2.5rem;
+            text-align: center;
+            font-size: 0.8rem;
+            color: #6E7681;
+            background: #161B22;
+            padding: 1rem;
+            border-radius: 1rem;
+            border: 1px solid #21262D;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🎛️ Studio One 三级配色 · 15组（深/中/浅）</h1>
+    <div class="sub">每组三个同色系渐变 · 点击色块复制 HEX（修复复制兼容性）</div>
+    <div class="grid" id="colorGrid"></div>
+    <div class="footer-note">
+        ✨ 深色用于重要轨道，中间色用于普通轨道，浅色用于辅助/编组。<br>
+        💡 Studio One 中使用：右键音轨 → Color → 编辑调色板 → 输入 HEX。
+    </div>
+</div>
+<div id="toast" class="copy-toast">✓ 已复制到剪贴板</div>
+
+<script>
+    // 通用复制函数（支持所有环境）
+    async function copyToClipboard(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast();
+                return;
+            } catch (err) {
+                console.warn('Clipboard API 失败', err);
+            }
+        }
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.top = '-9999px';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        textarea.setSelectionRange(0, text.length);
+        let success = false;
+        try {
+            success = document.execCommand('copy');
+        } catch (err) {
+            console.warn('execCommand 失败', err);
+        }
+        document.body.removeChild(textarea);
+        if (success) {
+            showToast();
+        } else {
+            alert('无法自动复制，请手动复制色值：' + text);
+        }
+    }
+
+    function showToast() {
+        const toast = document.getElementById('toast');
+        toast.style.opacity = '1';
+        setTimeout(() => {
+            toast.style.opacity = '0';
+        }, 1200);
+    }
+
+    // 15组颜色：深色(原deep)，中间色(新增，混合深与浅，饱和稍降)，浅色(原light)
+    // 中间色通过色彩混合 + 手动微调生成，保证视觉过渡自然
+    const colorTriads = [
+        { id: 1, name: "电音青", deep: "#00F7FF", mid: "#66FDFF", light: "#B0FFFA" },
+        { id: 2, name: "热粉红", deep: "#FF0087", mid: "#FF66B5", light: "#FF7DB0" },
+        { id: 3, name: "霓虹紫", deep: "#B400FF", mid: "#D97AFF", light: "#E6B3FF" },
+        { id: 4, name: "熔岩橙", deep: "#FF4D00", mid: "#FF8A4C", light: "#FFB080" },
+        { id: 5, name: "极光绿", deep: "#00E676", mid: "#66F0A8", light: "#A3F0C0" },
+        { id: 6, name: "深海蓝", deep: "#0066FF", mid: "#66A3FF", light: "#99CCFF" },
+        { id: 7, name: "柠檬黄", deep: "#FFD600", mid: "#FFE97A", light: "#FFF5A8" },
+        { id: 8, name: "烈焰红", deep: "#E60012", mid: "#F2666F", light: "#FF9999" },
+        { id: 9, name: "宝石蓝", deep: "#0D47A1", mid: "#3C7AD1", light: "#6BA0FF" },
+        { id: 10, name: "香槟金", deep: "#FFAA00", mid: "#FFCC66", light: "#FFD88C" },
+        { id: 11, name: "电光紫", deep: "#9C27B0", mid: "#BD77D4", light: "#D9A3E0" },
+        { id: 12, name: "翠玉绿", deep: "#00C853", mid: "#66E08A", light: "#B9F6CA" },
+        { id: 13, name: "冰晶蓝", deep: "#00B8D4", mid: "#66D6EA", light: "#A0EFFF" },
+        { id: 14, name: "珊瑚橙", deep: "#FF6D00", mid: "#FFA34C", light: "#FFC089" },
+        { id: 15, name: "糖果粉", deep: "#E91E63", mid: "#F26B96", light: "#FFA8C5" }
+    ];
+
+    const grid = document.getElementById('colorGrid');
+
+    colorTriads.forEach(triad => {
+        const card = document.createElement('div');
+        card.className = 'color-pair';
+
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'pair-info';
+        infoDiv.innerHTML = `
+            <div class="pair-number">组 ${triad.id}</div>
+            <div class="pair-name">${triad.name}</div>
+        `;
+
+        const swatchGroup = document.createElement('div');
+        swatchGroup.className = 'swatch-group';
+
+        // 深色
+        const deepSwatch = document.createElement('div');
+        deepSwatch.className = 'swatch';
+        deepSwatch.style.backgroundColor = triad.deep;
+        deepSwatch.innerHTML = `<div class="hex-code">${triad.deep}</div><div class="label">深</div>`;
+        deepSwatch.onclick = () => copyToClipboard(triad.deep);
+
+        // 中间色
+        const midSwatch = document.createElement('div');
+        midSwatch.className = 'swatch';
+        midSwatch.style.backgroundColor = triad.mid;
+        midSwatch.innerHTML = `<div class="hex-code">${triad.mid}</div><div class="label">中</div>`;
+        midSwatch.onclick = () => copyToClipboard(triad.mid);
+
+        // 浅色
+        const lightSwatch = document.createElement('div');
+        lightSwatch.className = 'swatch';
+        lightSwatch.style.backgroundColor = triad.light;
+        lightSwatch.innerHTML = `<div class="hex-code">${triad.light}</div><div class="label">浅</div>`;
+        lightSwatch.onclick = () => copyToClipboard(triad.light);
+
+        swatchGroup.appendChild(deepSwatch);
+        swatchGroup.appendChild(midSwatch);
+        swatchGroup.appendChild(lightSwatch);
+        card.appendChild(infoDiv);
+        card.appendChild(swatchGroup);
+        grid.appendChild(card);
+    });
+</script>
+</body>
+</html>
