@@ -1,20 +1,63 @@
 {
-  "name": "ZEO音乐创作",
-  "description": "阻止访问指定的音乐插件相关网站",
-  "denied-remote-domains": [
-    "barebones.com",
-    "nuroaudio.com",
-    "threebodytech.com",
-    "xferrecords.com",
-    "amplesound.net",
-    "charliemonroe.net",
-    "codeweavers.com",
-    "inmusic.dev",
-    "nektony.com",
-    "rogueamoeba.net",
-    "steinberg.help",
-    "steinberg.net",
-    "tatarenkov.name",
-    "techsmith.com"
+  "description" : "Rules for hacking Audio Plugins",
+  "name" : "ZEO.Music",
+  "rules" : [
+    {
+      "action" : "deny",
+      "remote-domains" : "barebones.com"
+    },
+    {
+      "action" : "deny",
+      "notes" : "NuroAudio 音频插件",
+      "remote-domains" : "nuroaudio.com"
+    },
+    {
+      "action" : "deny",
+      "remote-domains" : "threebodytech.com"
+    },
+    {
+      "action" : "deny",
+      "remote-domains" : "amplesound.net"
+    },
+    {
+      "action" : "deny",
+      "remote-domains" : "charliemonroe.net"
+    },
+    {
+      "action" : "deny",
+      "remote-domains" : "codeweavers.com"
+    },
+    {
+      "action" : "deny",
+      "remote-domains" : "inmusic.dev"
+    },
+    {
+      "action" : "deny",
+      "remote-domains" : "nektony.com"
+    },
+    {
+      "action" : "deny",
+      "remote-domains" : "rogueamoeba.net"
+    },
+    {
+      "action" : "deny",
+      "remote-domains" : "steinberg.help"
+    },
+    {
+      "action" : "deny",
+      "remote-domains" : "steinberg.net"
+    },
+    {
+      "action" : "deny",
+      "remote-domains" : "tatarenkov.name"
+    },
+    {
+      "action" : "deny",
+      "remote-domains" : "techsmith.com"
+    },
+    {
+      "action" : "deny",
+      "remote-domains" : "xferrecords.com"
+    }
   ]
 }
