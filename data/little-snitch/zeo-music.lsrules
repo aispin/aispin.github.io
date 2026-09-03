@@ -57,6 +57,10 @@
     },
     {
       "action" : "deny",
+      "remote-domains" : "blacksaltaudio.com"
+    },
+    {
+      "action" : "deny",
       "remote-domains" : "xferrecords.com"
     }
   ]
