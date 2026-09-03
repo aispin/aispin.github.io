@@ -1,0 +1,20 @@
+{
+  "name": "ZEO音乐创作",
+  "description": "阻止访问指定的音乐插件相关网站",
+  "denied-remote-domains": [
+    "barebones.com",
+    "nuroaudio.com",
+    "threebodytech.com",
+    "xferrecords.com",
+    "amplesound.net",
+    "charliemonroe.net",
+    "codeweavers.com",
+    "inmusic.dev",
+    "nektony.com",
+    "rogueamoeba.net",
+    "steinberg.help",
+    "steinberg.net",
+    "tatarenkov.name",
+    "techsmith.com"
+  ]
+}
