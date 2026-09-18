@@ -29,7 +29,13 @@
     },
     {
       "action" : "deny",
+      "notes" : "DrumSynth",
       "remote-domains" : "inmusic.dev"
+    },
+    {
+      "action" : "deny",
+      "notes" : "DrumSynth",
+      "remote-domains" : "inmusicbrands.com"
     },
     {
       "action" : "deny",
