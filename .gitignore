@@ -12,17 +12,11 @@ dist
 dist-ssr
 *.local
 
-# Agent 工作区 —— 默认不进仓库（体积 200MB+ 且与本机路径强相关）
-.workbuddy-ai/*
-
-# ……但把「删了就没了、且不可重建」的部分纳入版本管理：
-# 长期记忆 / 每日日志、无头验证 harness、已结案文档、本次审计与修复脚本、对联日历生成器。
-!.workbuddy-ai/memory/
-!.workbuddy-ai/harness/
-!.workbuddy-ai/done/
-!.workbuddy-ai/audit-*.md
-!.workbuddy-ai/fix-modify-backup-*.sh
-!.workbuddy-ai/gen-couplet-calendar.mjs
+# Agent 工作区 —— 只属于本机，不进仓库。
+# 里面是构建产物归档（tar.gz）、无头验证 harness、截图、以及 agent 的长期记忆与日志，
+# 体积 120MB+、与本机路径强相关，且换台机器重建即可。
+# 仓库会公开到 GitHub，agent 的工作日志／排障记录也不适合一并公开。
+.workbuddy-ai/
 
 # dotenv environment variables file
 .env
