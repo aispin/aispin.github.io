@@ -1,7 +1,7 @@
 # 工作计划 · aispin.github.io
 
 > 只保留**待做**的事项；做完的从这里删掉（历史看 `git log`，项目已纳入版本管理）。
-> 最近更新：2026-10-07 22:2x
+> 最近更新：2026-10-07 23:0x
 
 ---
 
@@ -9,32 +9,28 @@
 
 | | |
 |---|---|
-| 版本管理 | ✅ git（6 个提交，基线 `259ed2f`）；`.workbuddy-ai/` 已整体排除；**还没有 remote** |
+| 版本管理 | ✅ git（8 个提交，基线 `259ed2f`）；`.workbuddy-ai/` 已整体排除；**还没有 remote** |
 | 写入工具链 | ✅ 正常（「文件备份」开关**按你的决定长期关闭**，改用 git 做备份） |
-| dev server | ✅ `127.0.0.1:5199` |
+| dev server | 用的时候现起：`npx vite --port 5199 --strictPort --host 127.0.0.1`（⚠️ 必须带 `--host`，见文末） |
 | `dist/` | ✅ 本轮构建过（757 modules，冒烟 726 mesh / 0 error） |
 | 部署目标 | **Cloudflare Pages**（`_headers` / `_redirects`，其中 `_redirects` 管着 `/me`） |
+| 体积 | `node_modules` 428M · `.workbuddy-ai` **12M**（今早 211M）· `dist` 6.7M |
 
 ---
 
 ## ① 需要你决定的
 
-| # | 事项 | 情况 | 选项 / 代价 |
-|---|---|---|---|
-| 1 | **114 MB 历史归档要不要清** | `.workbuddy-ai/*.tar.gz` 共 32 个。逐个体检：**每一个都含至少一个已从树中删除的文件**，即唯一副本（`raster-backup` 50M、`dead-textures` 15M、`entrance-textures` 13M、`corridor-textures` 13M…） | (a) 全留；(b) 只留"含已删除内容"的，把纯源码快照类（`pre-*`、`src-backup-*`）删掉约 8M；(c) 全删 —— 会**永久失去**那些已删除的素材与字体 |
-| 2 | **`backup-articles-1791276206`（5.4M）** | 12 个 `src/data/*.json` 的**改前快照**（手写内容，非可重建物） | 留作保险 / 删掉（git 已从今天起覆盖这些文件） |
-| 3 | **`/demos/` 陈列区要不要瘦身** | 里面 430 KB 是别的主题的 demo（`skill-ui/` 194K、`web3d/` 225K、`avatar/*.svg` 8.5K），会被部署（dist 里 728 KB）。⚠️ `door.html` 是美术参考稿不能删 | 保留（它是故意的对外陈列区）/ 只留 `door.html` + `my-3d-site/` |
-| 4 | **夜间模式色调** | 偏冷蓝紫、约 0.46 倍亮度（你说"先按你的，后面体验有需要再调"） | 旋钮在 `src/config/theme.js` 的 `NIGHT` |
-| 5 | **要不要发布上线** | `dist` 最新且全绿 | 我可以先核对 `/me`、`/demos/` 两条路径再发 |
-| 6 | **对联 39 副是否要你审文案** | 按节气/节日动态变换，当时是"草稿"批次 | 需要的话我排成对照表 |
+| # | 事项 | 情况 |
+|---|---|---|
+| 1 | **夜间模式色调** | 偏冷蓝紫、约 0.46 倍亮度（你说"先按你的，后面体验有需要再调"）。旋钮在 `src/config/theme.js` 的 `NIGHT` |
+| 2 | **要不要发布上线** | `dist` 最新且全绿。我可以先核对 `/me`、`/demos/` 两条路径再发 |
+| 3 | **对联 39 副是否要你审文案** | 按节气/节日动态变换，当时是"草稿"批次。需要的话我排成对照表 |
 
 ## ② 需要你点头、我就动手的
 
-| # | 事项 | 量 | 备注 |
-|---|---|---|---|
-| 1 | `.agent/**` 与 HANDOFF/WORKPLAN 是否也移出版本管理 | — | 它们是 agent 文档（`PROJECT.md` 内容是最新的，但与 `HANDOFF.md`／`MEMORY.md` 三处重复）。若你希望仓库只留应用代码，我把它们也加进 `.gitignore` |
-| 2 | `avatar-raw/` + `avatar-window-orig/prev` 是否保留 | 2.0 MB | 角色立绘的 ImageGen 原图与两版历史 webp（重做角色时的溯源） |
-| 3 | 要不要给 `.workbuddy-ai/` 里的**记忆 + harness**找个被跟踪的家 | 约 0.5 MB | 现在它们被 `.gitignore` 排除 → 没有版本备份。可选：挪到 `tools/harness/` + `docs/notes/`（就进仓库了），或加 remote 后靠别的机制 |
+| # | 事项 | 备注 |
+|---|---|---|
+| 1 | **给记忆 + harness 找个被跟踪的家？** | `.workbuddy-ai/`（含 `memory/` 长期笔记与 `harness/` 验证脚本）现在被 `.gitignore` 排除 → **没有版本备份**。可选：把 harness 挪到 `tools/harness/`、笔记挪到 `docs/notes/`（就进仓库了），或保持现状 |
 
 ## ③ 我可以直接推进的（不需要你插手，做完报结果）
 
@@ -42,7 +38,7 @@
 
 | # | 事项 | 现状 | 验收标准 |
 |---|---|---|---|
-| 1 | **低端机进房间卡顿** | `RoomWarmup` 在 LOW 档直接 `return null` → 着色器编译开销全落到进房间那一刻 | 在 LOW 档量一次进房间的掉帧，再决定是否改预热策略 |
+| 1 | **低端机进房间卡顿** | `RoomWarmup` 在 LOW 档直接 `return null` → 着色器编译开销全落到进房间那一刻 | 先在 LOW 档量出进房间那一下的掉帧，再决定是否改预热策略 |
 | 2 | **P5 音频池化**（评审单最后一项没做的） | 42 个 `PositionalAudio` 的 **listener 已合并**（额外 listener = 0），但 **42 个节点本身还在** | 评审原话「一个 listener + 一个共享 Audio 池」。⚠️ 必须先证明**门扇悬停音**（按 `ref.current.isPlaying` 判断"我这一扇响不响"）不被别的门影响 |
 | 3 | **63 个抠图去 `transparent: true`** | 219 → 63；剩下没动是**故意的** | **必须有 A/B 截图**：摘掉会让它们退出透明通道，前后关系可能变 |
 | 4 | **双面材质 435 收敛** | 一直没动 | 逐个确认哪面永远看不到，改回单面；需 A/B 截图 |
@@ -50,9 +46,19 @@
 
 ---
 
-## 最近做完的（已从本表删除，留一行备查）
+## 本日已做完的（已从本表删除）
 
-8 个死文件 · `TODO.md` · `.DS_Store`×9 · 内存目录 5 个快照 · 排障目录 · `shots/` ·
-`dist-old-*` · `loop-verify/` · `fonts-backup/`（共 79 MB）· 建 git + 基线 ·
-外墙藤蔓调绿+去半透明 · **`WALL_PANEL_Z = -0.5` 实测（安全）** ·
-**移动端布局核对（四档视口全绿，FOV 不用改）**。
+建 git + 基线 · 清 8 个死文件 / `TODO.md` / `.DS_Store` / 内存快照（79 MB）·
+外墙藤蔓调绿+去半透明（`a40519f`）· `WALL_PANEL_Z = -0.5` 实测（安全）·
+移动端四档视口核对（全绿，FOV 不用改）· **清理 32 个历史归档 + `avatar-raw`（115.7 MB）**·
+`.agent/` 判定**保留 git 管理**。
+逐条记录见 `.workbuddy-ai/done/archives-deleted-2026-10-07.md`。
+
+## ⚠️ 给下一个会话的三条硬提醒
+
+1. **无头截图必须先起 dev server，且 `--host 127.0.0.1`** —— Vite 默认只监听 IPv6，
+   puppeteer 连 `localhost` 会 `ERR_CONNECTION_REFUSED`；且进程不跨 Bash 调用保留，
+   要把「起 server + 拍图」放进**同一条命令**。
+2. **无头下量窄视口构图必须 `MOBILE_EMU=0`** —— Chrome 的移动模拟会让 3D 场景整个起不来
+   （`Shader Error 0 - VALIDATE_STATUS false`），看着像"真机挂了"，其实不是。
+3. **判图像差异必须解码比像素** —— 拿 PNG 字节比会得到"差异 100%"的假阳性。
