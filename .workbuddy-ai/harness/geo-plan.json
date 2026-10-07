@@ -1,6 +1,0 @@
-[
-  { "out": "/tmp/opt/GEO-1-corr.png",    "pos": [0, 0.2, -2],  "target": [0, 0.4, -14], "waitMs": 6000, "enter": true },
-  { "out": "/tmp/opt/GEO-2-corr2.png",   "pos": [1.2, -1.0, -6],"target": [0.2, -1.5, -13], "waitMs": 6000 },
-  { "out": "/tmp/opt/GEO-3-gallery.png", "snap": "gallery", "waitMs": 8000 },
-  { "out": "/tmp/opt/GEO-4-posts.png",   "snap": "posts",   "waitMs": 8000 }
-]
