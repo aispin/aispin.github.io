@@ -837,7 +837,16 @@ const EntranceDoors = ({
         // at 0.42 landed as 4/255 of chroma and read as a grey smudge. The
         // palette is now mid-tone greens; this is the strength that lets them
         // read. Lower it back towards 0.42 and the vine goes grey again.
-        uInkStrength: { value: 0.86 }
+        //
+        // 0.86 → 0.96 on 2026-10-07 evening, together with the stroke alphas in
+        // `makeWallInkTexture` (leaf fill 0.36..0.74 → 0.58..0.94). The user's
+        // report was "有点半透明的模糊感": the ink layer is composited as
+        // `mix(brick, ink, ink.a × uInkStrength)`, so *both* factors leak the
+        // brick coursing through the foliage. Only the product matters, and it
+        // went 0.31..0.64 → 0.56..0.92. Do not raise this to 1.0: the ink is
+        // supposed to sit on plaster, and at full strength it competes with the
+        // coursing for attention (see the note in entranceTextures.js).
+        uInkStrength: { value: 0.96 }
     }), [facadeCenterY, wallInk, doorCenterY, doorOpeningWidth, doorHeight]);
     // vUv=(0,0) of the rotated walkway plane lands at world z = the plane's
     // centre + half its length (its v axis runs against world +Z). Same frame

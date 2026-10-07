@@ -473,14 +473,14 @@ function drawLeaf(c, x, y, ang, len, wid, fill, rib, alpha) {
     c.closePath();
     c.fillStyle = fill;
     c.fill();
-    c.globalAlpha = alpha * 0.55;
+    c.globalAlpha = alpha * 0.72;
     c.strokeStyle = rib;
     c.lineWidth = Math.max(0.7, wid * 0.11);
     c.beginPath();
     c.moveTo(len * 0.08, 0);
     c.lineTo(len * 0.9, 0);
     c.stroke();
-    c.globalAlpha = alpha * 0.34;
+    c.globalAlpha = alpha * 0.50;
     c.lineWidth = Math.max(0.5, wid * 0.07);
     for (const s of [-1, 1]) {
         c.beginPath();
@@ -962,12 +962,25 @@ export function makeWallInkTexture(worldW = 16, worldH = 8) {
      * Three tones rather than one, because a single fill turns the mass into
      * a flat silhouette. Distribution is biased to the middle: mostly
      * shadowed body, a few deep gaps, a few sunlit leaves on top.
+     *
+     * --- second pass, 2026-10-07 evening (user: "调绿点 / 有点半透明的模糊感")
+     *
+     * "More green" again means *widening G−R*, not darkening: the three tones
+     * moved from G−R of 28 / 41 / 46 to 35 / 59 / 62 out of 255, by dropping
+     * R and B while holding or lifting G. The mass is now unambiguously green
+     * over the blue-grey brick instead of merely "not grey".
+     *
+     * The translucency was a *separate* problem and is fixed separately — see
+     * the per-stroke alphas below and `uInkStrength` in EntranceDoors: the
+     * leaf fill sat at 0.36..0.74 alpha, so the brick coursing showed straight
+     * through the foliage and every edge read as soft. Between the two knobs
+     * the effective compositing factor went from ~0.31..0.64 to ~0.56..0.92.
      */
-    const LEAF_DEEP = '#2E4A1F';   // the gaps between leaves
-    const LEAF_MID = '#4B7431';    // the body of the mass — the dominant tone
-    const LEAF_LIT = '#6E9C46';    // leaves catching the light
+    const LEAF_DEEP = '#274A12';   // the gaps between leaves
+    const LEAF_MID = '#3F7A22';    // the body of the mass — the dominant tone
+    const LEAF_LIT = '#68A634';    // leaves catching the light
     const STEM = '#4C4A29';        // the woody runner: olive-brown, not green
-    const INK_RIB = '#1F3313';     // midrib / veins / stem outline
+    const INK_RIB = '#182E0B';     // midrib / veins / stem outline
 
     /** Pick a leaf tone. `lit` forces the sunlit one for leaves on the crown. */
     const leafTone = (lit) => {
@@ -1022,10 +1035,12 @@ export function makeWallInkTexture(worldW = 16, worldH = 8) {
         spinePts.push([X(wx), Y(TOP - sag)]);
     }
     ctx.save();
-    ctx.globalAlpha = 0.66;
+    // The runner is the vine's backbone: at the old 0.66 it was see-through and
+    // the whole creeper read as a wash rather than as a plant with a stem.
+    ctx.globalAlpha = 0.80;
     limb(ctx, spinePts, 13, STEM, { taper: 0.62 });
     // the doubled line a brush leaves — without it the stem reads as a wire
-    ctx.globalAlpha = 0.26;
+    ctx.globalAlpha = 0.34;
     limb(ctx, spinePts.map(([x, y]) => [x, y + 5]), 5, INK_RIB, { taper: 0.7 });
     ctx.restore();
 
@@ -1066,7 +1081,10 @@ export function makeWallInkTexture(worldW = 16, worldH = 8) {
                 a + (rand() - 0.5) * 0.6,
                 true,
                 leafTone(cy < Y(TOP - worldH * 0.20)),
-                0.44 + rand() * 0.30
+                // 0.66..0.94. Was 0.44..0.74: at those values the tile coursing
+                // read straight through the crown and the mass looked like a
+                // stain rather than foliage.
+                0.66 + rand() * 0.28
             );
         }
     }
@@ -1092,12 +1110,12 @@ export function makeWallInkTexture(worldW = 16, worldH = 8) {
             }
 
             // A strand, not a trunk: thin from the start and thinner at the
-            // tip. Held at 0.66 alpha so the woody part stays darker than the
-            // leaves it carries.
+            // tip. Held at 0.80 alpha so the woody part stays darker than the
+            // leaves it carries *without* going see-through (it was 0.66).
             ctx.save();
-            ctx.globalAlpha = 0.66;
+            ctx.globalAlpha = 0.80;
             limb(ctx, pts, 9, STEM, { taper: 0.34 });
-            ctx.globalAlpha = 0.24;
+            ctx.globalAlpha = 0.32;
             limb(ctx, pts.map(([x, y]) => [x + 5, y]), 3.4, INK_RIB, { taper: 0.5 });
             ctx.restore();
 
@@ -1124,7 +1142,10 @@ export function makeWallInkTexture(worldW = 16, worldH = 8) {
                         a + (rand() - 0.5) * 0.55,
                         false,
                         tone,
-                        0.36 + (1 - t) * 0.32
+                        // 0.58..0.92, thinnest at the tip — the tip SHOULD read
+                        // lighter, but the old 0.36 floor made the upper half of
+                        // every strand a grey smear.
+                        0.58 + (1 - t) * 0.34
                     );
                 }
             }
@@ -1144,7 +1165,7 @@ export function makeWallInkTexture(worldW = 16, worldH = 8) {
                     tpts.push([tx + Math.sin(a) * rr, ty + 10 + (1 - Math.cos(a)) * rr * 0.85]);
                 }
                 ctx.save();
-                ctx.globalAlpha = 0.46;
+                ctx.globalAlpha = 0.58;
                 limb(ctx, tpts, 3.2, STEM, { taper: 0.3 });
                 ctx.restore();
             }
