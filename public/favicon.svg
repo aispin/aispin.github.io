@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="AISPIN">
+  <title>AISPIN</title>
+  <!-- 奶油纸底 + 木色描边（与站内暖色系一致） -->
+  <rect width="512" height="512" rx="104" fill="#FFF6E9"/>
+  <rect x="10" y="10" width="492" height="492" rx="94" fill="none" stroke="#E3CFAF" stroke-width="7"/>
+  <!-- A 字母 + 右下角圆点 = AISPIN 字标 -->
+  <g fill="none" stroke="#5A4636" stroke-width="46" stroke-linecap="butt" stroke-linejoin="miter">
+    <path d="M256 150 L176 356"/>
+    <path d="M256 150 L336 356"/>
+  </g>
+  <path d="M206 292 L306 292" fill="none" stroke="#5A4636" stroke-width="42"/>
+  <circle cx="368" cy="368" r="27" fill="#C89B7B"/>
+</svg>

@@ -1,0 +1,8 @@
+[
+  {"id":"video-01","locale":"zh","title":"短片作品即将上线","description":"此处预留给我的短视频作品。稍后补充 mp4、封面与作品说明。","publishedAt":"","url":""},
+  {"id":"video-02","locale":"zh","title":"幕后与创作过程","description":"后续会放入 AI Skills、应用开发与创作过程相关的短视频。","publishedAt":"","url":""},
+  {"id":"video-03","locale":"zh","title":"视频档案","description":"每支视频将在房间的放映墙上展示。","publishedAt":"","url":""},
+  {"id":"video-01-en","locale":"en","title":"Short videos coming soon","description":"Reserved for my short-form videos. MP4s, cover art, and details will be added later.","publishedAt":"","url":""},
+  {"id":"video-02-en","locale":"en","title":"Behind the scenes","description":"Videos about AI skills, app development, and the creative process will be added here.","publishedAt":"","url":""},
+  {"id":"video-03-en","locale":"en","title":"Video archive","description":"Each clip will have a place on the screening wall in this room.","publishedAt":"","url":""}
+]

@@ -1,0 +1,265 @@
+[
+  {
+    "startDate": "2024-02-01",
+    "company": "轻远科技",
+    "department": "研发部",
+    "position": "技术负责人（CTO）",
+    "location": "西安",
+    "responsibilities": [
+      "负责公司技术组织、技术体系能力的搭建与完善，为公司业务提供技术保障。",
+      "审查公司各项目（核心为西安交通相关部门系统能力国产化）的研发方案、实施计划及研发资源预算。",
+      "负责面试和招聘关键技术成员。",
+      "参与公司与合作伙伴的技术沟通与合作，以及项目竞标。"
+    ],
+    "id": "10.2024.qingyuan",
+    "locale": "zh"
+  },
+  {
+    "startDate": "2022-07-01",
+    "endDate": "2023-11-01",
+    "company": "美团",
+    "department": "歪马终端组, 闪购技术部",
+    "position": "研发管理岗（L9）",
+    "location": "成都",
+    "responsibilities": [
+      "负责歪马送酒业务前端团队（管幅 30+）的建设及研发管理工作，支撑业务从线上营销到线下履约闭环开展。",
+      "负责依据业务团队的全年运营计划，制定合理的前端研发工作计划及资源预算。",
+      "指导和培训团队成员，帮助他们在职业生涯中成长，并进行面试和招聘新成员。",
+      "负责歪马送酒小程序及配套供应链系统的中长期技术路线图和架构设计，以及技术方案的评审和落地。",
+      "负责团队文化及影响力塑造，包括「组织部门技术培训课程」、「横向与其他研发经理合作提升业务整体开发流程和团队文化」等举措。"
+    ],
+    "performance": [
+      "2022 H2 个人绩效考核超过预期。",
+      "带领团队在近一年半的时间里按时保质交付 150+ 高质量的功能特性。",
+      "提升团队研发质量 30%+（美团内部千行代码缺陷率指标）。",
+      "指导 3 名晋升候选人成功晋升，晋升通过率 100%。",
+      "招聘 10+ 新团队成员，支撑业务运营计划落地。"
+    ],
+    "id": "11.2022.meituan",
+    "locale": "zh"
+  },
+  {
+    "startDate": "2015-09-24",
+    "endDate": "2022-04-01",
+    "company": "京东",
+    "department": "设计中台研发组, 平台产品部",
+    "position": "研发管理岗（T9）",
+    "location": "深圳",
+    "responsibilities": [
+      "负责平台业务产品部-设计中台研发组（17人）的产品研发管理工作。",
+      "负责京东羚珑智能设计平台（LING.JD.COM）产品的技术架构及研发工作，从原型孵化、业务支撑到商业化落地。",
+      "担任京东零售前端晋升通道面试官，参与外部招聘、内部人才晋升评估工作。",
+      "负责团队文化及影响力塑造，创办「凹凸实验室」技术品牌，带领团队围绕技术品牌输出原创技术文章及开源项目。",
+      "指导和培训团队成员，帮助他们在职业生涯中成长，并进行面试和招聘新成员。"
+    ],
+    "performance": [
+      "2017年、2019年京东零售集团年度优秀舵手（优秀管理干部）。",
+      "羚珑智能设计平台荣获京东零售集团 2018 年年度优秀项目奖。"
+    ],
+    "id": "12.2015.jd",
+    "locale": "zh"
+  },
+  {
+    "startDate": "2011-04-18",
+    "endDate": "2015-09-01",
+    "company": "腾讯",
+    "department": "互动娱乐事业群市场部、 社交网络事业群设计部",
+    "position": "高级前端开发工程师",
+    "location": "深圳",
+    "responsibilities": [
+      "负责互动娱乐事业群市场部各类游戏线上营销活动的前端开发。",
+      "负责 QQ 会员业务的前端开发工作，涵盖会员游戏、QQ 团购 APP 等项目。",
+      "主导腾讯电商平台易迅网（YIXUN.COM）的前端架构和开发工作。",
+      "负责部门任务排期系统、H5 活动可视化制作平台等降本增效平台工具的前后端架构设计和开发。"
+    ],
+    "performance": [
+      "2012-2014 连续 3 年获得腾讯优秀员工称号。"
+    ],
+    "id": "13.2011.tencent",
+    "locale": "zh"
+  },
+  {
+    "startDate": "2010-12-22",
+    "endDate": "2011-03-31",
+    "company": "百度",
+    "department": "百度用户产品部",
+    "position": "前端开发工程师",
+    "location": "北京",
+    "responsibilities": [
+      "负责百度知道（zhidao.baidu.com）的前端开发工作。"
+    ],
+    "id": "14.2010.baidu",
+    "locale": "zh"
+  },
+  {
+    "startDate": "2010-07-01",
+    "endDate": "2010-12-15",
+    "company": "搜狐",
+    "department": "媒体设计中心，市场部",
+    "position": "前端开发工程师",
+    "location": "北京",
+    "responsibilities": [
+      "负责搜狐大视野（pic.sohu.com）的前端开发工作。"
+    ],
+    "id": "15.2010.sohu",
+    "locale": "zh"
+  },
+  {
+    "startDate": "2006-04-25",
+    "endDate": "2010-06-01",
+    "company": "麦网（M18.COM）",
+    "department": "研发部",
+    "position": "软件开发工程师",
+    "location": "上海",
+    "responsibilities": [
+      "负责呼叫中心系统、订单系统、麦网（M18.COM）、金蝶 ERP 对接实施等项目的前后端开发工作。"
+    ],
+    "id": "16.2006.m18",
+    "locale": "zh"
+  },
+  {
+    "startDate": "2005-09-01",
+    "endDate": "2006-04-01",
+    "company": "高知特中国",
+    "department": "研发部",
+    "position": "软件开发实习生",
+    "location": "上海",
+    "responsibilities": [
+      "参与公司海外相关软件项目的开发。"
+    ],
+    "id": "17.2005.cognizant",
+    "locale": "zh"
+  },
+  {
+    "startDate": "2024-02-01",
+    "company": "Qingyuan Tech Co., Ltd.",
+    "department": "R&D Department",
+    "position": "CTO",
+    "location": "Xi'An",
+    "responsibilities": [
+      "Responsible for the construction and improvement of the company's technical organization and technical system capabilities, providing technical support for the company's business.",
+      "Review the company's various projects (core being the localization of system capabilities for Xi'an transportation-related departments) development plans, implementation plans, and research and development resource budgets.",
+      "Responsible for interviewing and recruiting key technical members.",
+      "Participate in technical communication and cooperation with partners, as well as project bidding."
+    ],
+    "id": "10.2024.qingyuan",
+    "locale": "en"
+  },
+  {
+    "startDate": "2022-07-01",
+    "endDate": "2023-11-01",
+    "company": "Meituan",
+    "department": "Waima Frontend Team, Shangou Technology Department",
+    "position": "R&D Manager",
+    "location": "Chengdu, China",
+    "responsibilities": [
+      "Led a team of over 30 frontend developers to develop and manage the web applications for Meituan's new “Waima Songjiu” business.",
+      "Define the technical roadmap and architecture for the web applications, with the core applications being the Waima wechat mini program and the accompanying Supply Chain System.",
+      "Work closely with product managers, designers, and backend engineers to deliver high-quality features.",
+      "Mentor and coach team members to help them grow in their careers, and also interview and hire new team members.",
+      "Participate in the company's internal tech community and organize the technical training courses for the department.",
+      "Collaborate with other R&D managers to improve the overall development process and team culture."
+    ],
+    "performance": [
+      "Outstanding Manager Award in H2 2022.",
+      "Led the team to deliver 100+ high-quality features on time and within budget.",
+      "Improved the team's code quality by 30%, mainly measured by the Defects per Thousand Lines Of Code.",
+      "Mentored and coached 3 team members to help them grow in their careers.",
+      "Hired 10 new team members who have made significant contributions to the team."
+    ],
+    "id": "11.2022.meituan",
+    "locale": "en"
+  },
+  {
+    "startDate": "2015-09-24",
+    "endDate": "2022-04-01",
+    "company": "JD",
+    "department": "Design Center R&D Team, The Platform Business Products Department",
+    "position": "R&D Manager",
+    "location": "Shenzhen, China",
+    "responsibilities": [
+      "Led a team of 17 developers to develop and manage the web applications for JD's platform business.",
+      "Mainly led the product development work for the JD Linglong Intelligent Design Platform (LING.JD.COM), from prototype incubation and business support to successful commercial implementation.",
+      "Define the technical roadmap and architecture for the Linglong project.",
+      "Work closely with product managers, designers, and backend engineers to deliver high-quality features.",
+      "Mentor and coach team members to help them grow in their careers, and also interview and hire new team members.",
+      "Conduct regular performance reviews and provide feedback to team members."
+    ],
+    "performance": [
+      "Outstanding Manager Award of the Year 2017 and 2019.",
+      "JD Linglong Intelligent Design Platform won the Annual Excellent Project Award of JD Retail Group in 2018."
+    ],
+    "id": "12.2015.jd",
+    "locale": "en"
+  },
+  {
+    "startDate": "2011-04-18",
+    "endDate": "2015-09-01",
+    "company": "Tencent",
+    "department": "Marketing Department, IEG Business Group",
+    "position": "Senior Frontend Developer",
+    "location": "Shenzhen, China",
+    "responsibilities": [
+      "Responsible for various front-end development work in Tencent, covering projects related to QQ member games, QQ group-buying app, IEG Game marketing activities, and more.",
+      "Led front-end architecture and development work for Tencent's e-commerce platform YIXUN.COM.",
+      "Responsible for the front-end and back-end architecture design and development of department's task scheduling system, H5 activity visual production platform, and other cost-reducing and efficiency-enhancing platform tools."
+    ],
+    "performance": [
+      "2012-2014 Awarded as Tencent's Outstanding Employee for 3 Consecutive Years."
+    ],
+    "id": "13.2011.tencent",
+    "locale": "en"
+  },
+  {
+    "startDate": "2010-12-22",
+    "endDate": "2011-03-31",
+    "company": "Baidu",
+    "department": "Baidu Zhidao",
+    "position": "Frontend Developer",
+    "location": "Beijing, China",
+    "responsibilities": [
+      "Responsible for the front-end development of Baidu Zhidao（zhidao.baidu.com）."
+    ],
+    "id": "14.2010.baidu",
+    "locale": "en"
+  },
+  {
+    "startDate": "2010-07-01",
+    "endDate": "2010-12-15",
+    "company": "Sohu",
+    "department": "Media Design Center",
+    "position": "Frontend Developer",
+    "location": "Beijing, China",
+    "responsibilities": [
+      "Responsible for the front-end development of pic.sohu.com."
+    ],
+    "id": "15.2010.sohu",
+    "locale": "en"
+  },
+  {
+    "startDate": "2006-04-25",
+    "endDate": "2010-06-01",
+    "company": "M18.COM",
+    "department": "R&D Department",
+    "position": "Software Developer",
+    "location": "Shanghai, China",
+    "responsibilities": [
+      "Responsible for the development of the Call Center system, M18.COM website, and Kingdee ERP integration implementation projects, etc."
+    ],
+    "id": "16.2006.m18",
+    "locale": "en"
+  },
+  {
+    "startDate": "2005-09-01",
+    "endDate": "2006-04-01",
+    "company": "Cognizant",
+    "department": "R&D",
+    "position": "Software Development Intern",
+    "location": "Shanghai",
+    "responsibilities": [
+      "Participated in the development of overseas software projects."
+    ],
+    "id": "17.2005.cognizant",
+    "locale": "en"
+  }
+]

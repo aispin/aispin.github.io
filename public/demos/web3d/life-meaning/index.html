@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>人生的意义 · v0.0.1 · AI Matrix</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{
+    margin:0;height:100%;background:#08090a;overflow:hidden;
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  }
+  #stage{
+    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  }
+  #frame{
+    position:relative;background:#e9e0cd;overflow:hidden;
+    box-shadow:0 0 80px rgba(0,0,0,.9), 0 0 0 1px rgba(255,255,255,.05);
+  }
+  #gl{display:block;width:100%;height:100%;}
+
+  /* 胶片颗粒 & 暗角 */
+  .overlay{position:absolute;inset:0;pointer-events:none;}
+  #grain{
+    opacity:.055;mix-blend-mode:multiply;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation:grainShift .6s steps(3) infinite;
+  }
+  @keyframes grainShift{
+    0%{transform:translate(0,0)}33%{transform:translate(-3%,2%)}66%{transform:translate(2%,-3%)}100%{transform:translate(0,0)}
+  }
+  #vignette{
+    background:radial-gradient(ellipse 78% 78% at 50% 48%, rgba(0,0,0,0) 42%, rgba(60,42,20,.28) 100%);
+  }
+  #flicker{
+    background:#fff;opacity:0;mix-blend-mode:overlay;
+  }
+
+  /* 字幕 */
+  #subs{
+    position:absolute;left:0;right:0;bottom:9%;
+    text-align:center;pointer-events:none;
+  }
+  .sub{
+    position:absolute;left:0;right:0;
+    font-size:clamp(13px,2.05vw,25px);
+    letter-spacing:.16em;
+    color:#3b342c;
+    text-shadow:0 1px 0 rgba(255,255,255,.55);
+    opacity:0;transform:translateY(10px);
+    transition:opacity .9s ease,transform .9s ease;
+    font-weight:500;
+  }
+  .sub.on{opacity:.92;transform:translateY(0)}
+
+  /* 片头 & 重播 */
+  #startScreen{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:22px;
+    background:#efe7d6;z-index:20;cursor:pointer;
+    transition:opacity .8s ease;
+  }
+  #startScreen .t{
+    font-size:clamp(20px,3.4vw,44px);letter-spacing:.34em;color:#3b342c;font-weight:600;
+    padding-left:.34em;
+  }
+  #startScreen .s{
+    font-size:clamp(10px,1.25vw,15px);letter-spacing:.32em;color:#8a7b66;padding-left:.32em;
+  }
+  #startScreen .btn{
+    margin-top:8px;padding:12px 34px;border:1.5px solid #8a7b66;border-radius:999px;
+    font-size:clamp(11px,1.3vw,15px);letter-spacing:.28em;color:#5c5142;
+    transition:.35s;padding-left:calc(34px + .28em);
+  }
+  #startScreen:hover .btn{background:#3b342c;color:#efe7d6;border-color:#3b342c}
+  #startScreen.hide{opacity:0;pointer-events:none}
+
+  #replay{
+    position:absolute;left:50%;bottom:7%;transform:translate(-50%,14px);
+    padding:10px 26px;border:1.5px solid rgba(60,52,42,.45);border-radius:999px;
+    font-size:12px;letter-spacing:.3em;color:#4a4136;background:transparent;
+    cursor:pointer;opacity:0;pointer-events:none;transition:.5s;z-index:15;
+    font-family:inherit;
+  }
+  #replay.on{opacity:1;pointer-events:auto;transform:translate(-50%,0)}
+  #replay:hover{background:#3b342c;color:#efe7d6;border-color:#3b342c}
+
+  #hud{
+    position:absolute;left:14px;bottom:10px;font-size:10px;letter-spacing:.18em;
+    color:rgba(60,52,42,.4);z-index:12;pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="frame">
+    <canvas id="gl"></canvas>
+    <div class="overlay" id="grain"></div>
+    <div class="overlay" id="flicker"></div>
+    <div class="overlay" id="vignette"></div>
+
+    <div id="subs">
+      <div class="sub" data-a="1.35" data-b="4.75">人生的意义，是什么？</div>
+      <div class="sub" data-a="10.8" data-b="14.9">我们走过山川，也走过人海。</div>
+      <div class="sub" data-a="17.2" data-b="21.0">后来才明白，意义不在远方。</div>
+      <div class="sub" data-a="22.3" data-b="26.8">它就在你走过的，每一步里。</div>
+    </div>
+
+    <button id="replay">重新播放</button>
+    <div id="hud">AI MATRIX · v0.0.1 · 100% PROCEDURAL</div>
+
+    <div id="startScreen">
+      <div class="t">人生的意义</div>
+      <div class="s">A WEB3D SHORT · 30" · 16:9</div>
+      <div class="btn">点击开始</div>
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ============================================================
+   AI MATRIX · 《人生的意义》v0.0.1
+   全部素材 / 动画 / 音效 / 配乐 均由程序化生成
+   ============================================================ */
+
+/* ---------- 0. 数学 & 工具 ---------- */
+const clamp=(v,a=0,b=1)=>v<a?a:(v>b?b:v);
+const lerp=(a,b,t)=>a+(b-a)*t;
+const easeInOut=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+const easeOutCubic=t=>1-Math.pow(1-t,3);
+const easeOutQuint=t=>1-Math.pow(1-t,5);
+const easeInCubic=t=>t*t*t;
+const easeOutBack=(t,s=1.70158)=>1+(s+1)*Math.pow(t-1,3)+s*Math.pow(t-1,2);
+const seg=(t,a,b)=>clamp((t-a)/(b-a),0,1);
+
+function mulberry32(a){
+  return function(){
+    a|=0;a=a+0x6D2B79F5|0;
+    let t=Math.imul(a^a>>>15,1|a);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return ((t^t>>>14)>>>0)/4294967296;
+  };
+}
+function C(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;return c;}
+
+/* ---------- 1. 手绘笔触工具 ---------- */
+function densify(pts,step=6){
+  const out=[];
+  for(let i=0;i<pts.length-1;i++){
+    const a=pts[i],b=pts[i+1];
+    const d=Math.hypot(b[0]-a[0],b[1]-a[1]);
+    const n=Math.max(1,Math.round(d/step));
+    for(let j=0;j<n;j++){const t=j/n;out.push([lerp(a[0],b[0],t),lerp(a[1],b[1],t)]);}
+  }
+  out.push(pts[pts.length-1]);
+  return out;
+}
+function jitterPts(pts,rnd,amp,step=6){
+  return densify(pts,step).map(p=>[p[0]+(rnd()-.5)*amp,p[1]+(rnd()-.5)*amp]);
+}
+function pathProgress(pts,p){
+  let total=0;const segs=[];
+  for(let i=0;i<pts.length-1;i++){
+    const d=Math.hypot(pts[i+1][0]-pts[i][0],pts[i+1][1]-pts[i][1]);
+    segs.push(d);total+=d;
+  }
+  const target=total*clamp(p);
+  let acc=0;const out=[pts[0]];
+  for(let i=0;i<segs.length;i++){
+    if(acc+segs[i]>=target){
+      const t=(target-acc)/segs[i];
+      out.push([lerp(pts[i][0],pts[i+1][0],t),lerp(pts[i][1],pts[i+1][1],t)]);
+      return out;
+    }
+    acc+=segs[i];out.push(pts[i+1]);
+  }
+  return out;
+}
+function strokePts(ctx,pts,{color='#333',w=3,alpha=1}={}){
+  if(pts.length<2)return;
+  ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=w;
+  ctx.lineCap='round';ctx.lineJoin='round';ctx.globalAlpha=alpha;
+  ctx.moveTo(pts[0][0],pts[0][1]);
+  for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i][0],pts[i][1]);
+  ctx.stroke();ctx.globalAlpha=1;
+}
+/* 画一个"撕纸拼贴"形状：填充 + 米白毛边 + 深色轮廓 */
+function cutout(ctx,pts,rnd,{fill='#e8dcc3',edge='#fdfaf2',edgeW=8,ink='rgba(45,42,38,.6)',inkW=1.6,amp=3}={}){
+  const j=jitterPts(pts,rnd,amp,5);
+  ctx.beginPath();
+  ctx.moveTo(j[0][0],j[0][1]);
+  for(let i=1;i<j.length;i++)ctx.lineTo(j[i][0],j[i][1]);
+  ctx.closePath();
+  ctx.fillStyle=fill;ctx.fill();
+  ctx.lineJoin='round';ctx.lineCap='round';
+  ctx.strokeStyle=edge;ctx.lineWidth=edgeW;ctx.stroke();
+  ctx.strokeStyle=ink;ctx.lineWidth=inkW;ctx.stroke();
+}
+/* 铅笔线 */
+function pencil(ctx,pts,rnd,{amp=3,w=5,color='rgba(58,56,54,',passes=3,step=6}={}){
+  const j=jitterPts(pts,rnd,amp,step);
+  for(let p=0;p<passes;p++){
+    const a=p===0?.9:.22;
+    const ww=p===0?w:w*1.9;
+    const off=p===0?amp:amp*2.0;
+    ctx.beginPath();
+    ctx.strokeStyle=color+a+')';
+    ctx.lineWidth=ww;ctx.lineCap='round';ctx.lineJoin='round';
+    for(let i=0;i<j.length;i++){
+      const x=j[i][0]+(rnd()-.5)*off;
+      const y=j[i][1]+(rnd()-.5)*off;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+}
+
+/* ---------- 2. 程序化材质生成 ---------- */
+const PAPER_W=60, PAPER_H=33.75;
+const PAPER_CW=2048, PAPER_CH=1152;
+const PXU=PAPER_CW/PAPER_W;          // 34.133 px / world unit
+const PAPER_Z=-30;
+
+function worldToPaperXY(x,y){
+  return [(x+PAPER_W/2)*PXU,(PAPER_H/2-y)*PXU];
+}
+
+/* --- 纸张底 --- */
+function createPaperCanvas(){
+  const c=C(PAPER_CW,PAPER_CH),ctx=c.getContext('2d');
+  const rnd=mulberry32(20240501);
+
+  const g=ctx.createLinearGradient(0,0,PAPER_CW,PAPER_CH);
+  g.addColorStop(0,'#f8f2e5');
+  g.addColorStop(.42,'#f3ebda');
+  g.addColorStop(.78,'#efe5d1');
+  g.addColorStop(1,'#e9dcc4');
+  ctx.fillStyle=g;ctx.fillRect(0,0,PAPER_CW,PAPER_CH);
+
+  // 纸纤维
+  for(let i=0;i<16000;i++){
+    const x=rnd()*PAPER_CW,y=rnd()*PAPER_CH;
+    const a=.02+rnd()*.045;
+    ctx.strokeStyle=`rgba(${150+rnd()*55|0},${135+rnd()*50|0},${110+rnd()*50|0},${a})`;
+    ctx.lineWidth=.5+rnd()*1.1;
+    ctx.beginPath();ctx.moveTo(x,y);
+    ctx.lineTo(x+(rnd()-.5)*22,y+(rnd()-.5)*22);
+    ctx.stroke();
+  }
+  // 水渍 / 陈旧斑
+  for(let i=0;i<70;i++){
+    const x=rnd()*PAPER_CW,y=rnd()*PAPER_CH,r=40+rnd()*230;
+    const rg=ctx.createRadialGradient(x,y,0,x,y,r);
+    rg.addColorStop(0,`rgba(196,174,140,${.015+rnd()*.045})`);
+    rg.addColorStop(1,'rgba(196,174,140,0)');
+    ctx.fillStyle=rg;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+  }
+  // 折痕
+  ctx.globalAlpha=.06;ctx.strokeStyle='#8b7a5f';
+  for(let i=0;i<4;i++){
+    const y=rnd()*PAPER_CH;
+    ctx.lineWidth=1+rnd()*2;
+    ctx.beginPath();ctx.moveTo(0,y);
+    for(let x=0;x<=PAPER_CW;x+=48)ctx.lineTo(x,y+Math.sin(x*.004+i)*3+(rnd()-.5)*4);
+    ctx.stroke();
+  }
+  ctx.globalAlpha=1;
+
+  // 暗角
+  const vg=ctx.createRadialGradient(PAPER_CW/2,PAPER_CH/2,PAPER_CH*.3,PAPER_CW/2,PAPER_CH/2,PAPER_CW*.62);
+  vg.addColorStop(0,'rgba(120,98,64,0)');
+  vg.addColorStop(.72,'rgba(120,98,64,.06)');
+  vg.addColorStop(1,'rgba(92,72,44,.30)');
+  ctx.fillStyle=vg;ctx.fillRect(0,0,PAPER_CW,PAPER_CH);
+
+  return c;
+}
+
+/* --- 问号 --- */
+const QS=512;
+const Q_STROKE=[[.30,.70],[.29,.52],[.33,.34],[.44,.26],[.57,.24],[.68,.31],[.71,.43],[.65,.54],[.55,.62],[.51,.71]];
+function drawQuestion(progress,breath){
+  const c=C(QS,QS),ctx=c.getContext('2d');
+  const rnd=mulberry32(707);
+  const S=QS;
+  const pts=Q_STROKE.map(([x,y])=>[x*S,y*S]);
+  const dense=densify(pts,3);
+  const shown=pathProgress(dense,easeOutCubic(progress));
+  const wob=1+Math.sin(breath*2.1)*.012;
+  ctx.save();
+  ctx.translate(S/2,S/2);ctx.scale(wob,wob);ctx.translate(-S/2,-S/2);
+  if(shown.length>1) pencil(ctx,shown,rnd,{amp:6,w:11,color:'rgba(56,54,52,',passes:3,step:8});
+  if(progress>.90){
+    const a=clamp((progress-.90)/.10);
+    const cx=.505*S,cy=.865*S,r=15*a;
+    // 手绘圆点
+    const dot=[];
+    for(let i=0;i<=26;i++){
+      const t=i/26*Math.PI*2;
+      dot.push([cx+Math.cos(t)*r*(1+(rnd()-.5)*.16),cy+Math.sin(t)*r*(1+(rnd()-.5)*.16)]);
+    }
+    ctx.beginPath();ctx.fillStyle='#383634';
+    ctx.moveTo(dot[0][0],dot[0][1]);
+    for(let i=1;i<dot.length;i++)ctx.lineTo(dot[i][0],dot[i][1]);
+    ctx.closePath();ctx.fill();
+  }
+  // 铅笔屑
+  for(let i=0;i<40;i++){
+    const x=rnd()*S,y=rnd()*S;
+    if(Math.random()<.5)continue;
+    ctx.fillStyle=`rgba(70,66,60,${.03+rnd()*.07})`;
+    ctx.fillRect(x,y,1+rnd()*2.5,1+rnd()*2);
+  }
+  ctx.restore();
+  return c;
+}
+
+/* --- 小人 --- */
+function drawFigure(phase,walking){
+  const W=320,H=512;
+  const c=C(W,H),ctx=c.getContext('2d');
+  const ink='#37424f';
+  const sw=walking?Math.sin(phase):0;
+  const sw2=walking?Math.sin(phase+Math.PI):0;
+  const bob=walking?Math.abs(Math.sin(phase))*-6:0;
+
+  ctx.save();
+  ctx.translate(0,bob);
+  ctx.lineCap='round';ctx.lineJoin='round';
+
+  // 影子
+  ctx.save();
+  ctx.globalAlpha=.13;ctx.fillStyle='#3a2f1f';
+  ctx.beginPath();ctx.ellipse(160,486,62,13,0,0,7);ctx.fill();
+  ctx.restore();
+
+  const drawLimb=(pts,w)=>{
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0],pts[0][1]);
+    for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i][0],pts[i][1]);
+    ctx.strokeStyle='#f4ead6';ctx.lineWidth=w+7;ctx.stroke();
+    ctx.strokeStyle=ink;ctx.lineWidth=w;ctx.stroke();
+  };
+
+  // 腿
+  drawLimb([[160,300],[160-18+sw*34,382],[160-8+sw*46,462]],30);
+  drawLimb([[160,300],[160+18+sw2*34,382],[160+8+sw2*46,462]],30);
+  // 身体
+  drawLimb([[160,140],[160,306]],44);
+  // 手臂
+  drawLimb([[160,168],[160-26+sw2*30,232],[160-14+sw2*44,292]],24);
+  drawLimb([[160,168],[160+26+sw*30,232],[160+14+sw*44,292]],24);
+
+  // 头
+  ctx.beginPath();ctx.arc(160,86,42,0,7);
+  ctx.fillStyle='#f4ead6';ctx.fill();
+  ctx.strokeStyle=ink;ctx.lineWidth=9;ctx.stroke();
+  // 高光
+  ctx.beginPath();ctx.arc(146,74,12,0,7);
+  ctx.fillStyle='rgba(255,255,255,.5)';ctx.fill();
+
+  ctx.restore();
+  return c;
+}
+
+/* --- 建筑 --- */
+const BUILDING_PALETTE=['#3d4a56','#5c4a3d','#6d5544','#39434d','#4f4438'];
+function makeBuilding(seed,w,h){
+  const c=C(w,h),ctx=c.getContext('2d');
+  const rnd=mulberry32(seed);
+  const ink='rgba(40,36,32,.55)';
+  const fill=BUILDING_PALETTE[Math.floor(rnd()*BUILDING_PALETTE.length)];
+  const roofUp=4+rnd()*14;
+
+  const pts=[
+    [6,h-4],[6,h*0.16+roofUp],[w*0.28,h*0.05],
+    [w*0.72,h*0.05],[w-6,h*0.16+roofUp],[w-6,h-4]
+  ];
+  cutout(ctx,pts,rnd,{fill,edge:'#fdf8ec',edgeW:9,ink,inkW:1.5,amp:4});
+
+  // 窗
+  const cols=Math.max(2,Math.floor(w/44));
+  const rows=Math.max(3,Math.floor(h/70));
+  const padX=w*0.2,padY=h*0.22;
+  const cw=(w-padX*2)/cols, ch=(h-padY-h*0.12)/rows;
+  for(let r=0;r<rows;r++){
+    for(let col=0;col<cols;col++){
+      if(rnd()<0.35)continue;
+      const x=padX+col*cw+cw*0.24;
+      const y=padY+r*ch+ch*0.24;
+      const ww=cw*0.5, hh=ch*0.46;
+      ctx.fillStyle=`rgba(252,238,196,${0.5+rnd()*0.5})`;
+      ctx.fillRect(x,y,ww,hh);
+      ctx.strokeStyle='rgba(40,36,32,.35)';
+      ctx.lineWidth=1.2;ctx.strokeRect(x,y,ww,hh);
+    }
+  }
+  return c;
+}
+
+/* --- 地面（撕纸山丘） --- */
+function makeGround(){
+  const W=3072,H=340;
+  const c=C(W,H),ctx=c.getContext('2d');
+  const rnd=mulberry32(31337);
+  const pts=[];
+  for(let x=0;x<=W;x+=24){
+    const y=42+Math.sin(x*0.0016)*26+Math.sin(x*0.0051+1.4)*15+(rnd()-.5)*7;
+    pts.push([x,y]);
+  }
+  pts.push([W,H],[0,H]);
+  ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);
+  for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i][0],pts[i][1]);
+  ctx.closePath();
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'rgba(176,146,106,.62)');
+  g.addColorStop(.35,'rgba(190,160,118,.42)');
+  g.addColorStop(1,'rgba(206,178,138,.18)');
+  ctx.fillStyle=g;ctx.fill();
+
+  // 撕边毛边
+  ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);
+  for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i][0],pts[i][1]);
+  ctx.strokeStyle='rgba(255,250,238,.85)';ctx.lineWidth=9;ctx.stroke();
+  ctx.strokeStyle='rgba(92,74,50,.5)';ctx.lineWidth=2.2;ctx.stroke();
+
+  // 草叶
+  for(let i=0;i<420;i++){
+    const x=rnd()*W;
+    const base=42+Math.sin(x*0.0016)*26+Math.sin(x*0.0051+1.4)*15;
+    const hh=6+rnd()*20;
+    ctx.strokeStyle=`rgba(96,88,58,${.12+rnd()*.28})`;
+    ctx.lineWidth=1+rnd()*1.6;
+    ctx.beginPath();ctx.moveTo(x,base);
+    ctx.quadraticCurveTo(x+(rnd()-.5)*10,base-hh*.6,x+(rnd()-.5)*16,base-hh);
+    ctx.stroke();
+  }
+  return c;
+}
+
+/* --- 光点 / 星 --- */
+function makeSpark(seed){
+  const S=128;
+  const c=C(S,S),ctx=c.getContext('2d');
+  const rnd=mulberry32(seed);
+  const cx=S/2,cy=S/2;
+  const rg=ctx.createRadialGradient(cx,cy,0,cx,cy,S/2);
+  rg.addColorStop(0,'rgba(255,238,190,.95)');
+  rg.addColorStop(.35,'rgba(255,214,130,.45)');
+  rg.addColorStop(1,'rgba(255,200,110,0)');
+  ctx.fillStyle=rg;ctx.fillRect(0,0,S,S);
+  ctx.strokeStyle='rgba(120,92,44,.42)';ctx.lineWidth=1.4;
+  for(let i=0;i<8;i++){
+    const a=i/8*Math.PI*2+rnd()*.2;
+    const r1=S*0.14,r2=S*0.14+rnd()*S*0.26;
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.cos(a)*r1,cy+Math.sin(a)*r1);
+    ctx.lineTo(cx+Math.cos(a)*r2,cy+Math.sin(a)*r2);
+    ctx.stroke();
+  }
+  return c;
+}
+
+/* --- 纸飞机 / 花瓣 --- */
+function makePetal(seed){
+  const S=128;
+  const c=C(S,S),ctx=c.getContext('2d');
+  const rnd=mulberry32(seed);
+  const pts=[[.5,.08],[.88,.42],[.72,.86],[.5,.96],[.28,.86],[.12,.42]];
+  cutout(ctx,pts.map(([x,y])=>[x*S,y*S]),rnd,{
+    fill:['#e9b7a4','#e3c88a','#a9c3b5','#c9b6d8'][Math.floor(rnd()*4)],
+    edge:'#fffaf0',edgeW:7,ink:'rgba(70,60,50,.42)',inkW:1.2,amp:4
+  });
+  return c;
+}
+
+/* ---------- 3. 音频引擎 ---------- */
+const Audio_ = {
+  ctx:null,ready:false,
+  init(){
+    if(this.ctx)return;
+    const AC=window.AudioContext||window.webkitAudioContext;
+    this.ctx=new AC();
+    const ctx=this.ctx;
+
+    this.master=ctx.createGain();
+    this.master.gain.value=0;
+    this.master.connect(ctx.destination);
+
+    this.verb=ctx.createConvolver();
+    this.verb.buffer=this.impulse(3.0,3.2);
+    this.verbGain=ctx.createGain();
+    this.verbGain.gain.value=.42;
+    this.verb.connect(this.verbGain);
+    this.verbGain.connect(this.master);
+
+    this.music=ctx.createGain();this.music.gain.value=.5;
+    this.music.connect(this.master);this.music.connect(this.verb);
+
+    this.sfx=ctx.createGain();this.sfx.gain.value=.55;
+    this.sfx.connect(this.master);this.sfx.connect(this.verb);
+
+    this.narr=ctx.createGain();this.narr.gain.value=.16;
+    const nlp=ctx.createBiquadFilter();
+    nlp.type='lowpass';nlp.frequency.value=2600;
+    this.narr.connect(nlp);nlp.connect(this.master);nlp.connect(this.verb);
+
+    this.noise=this.makeNoise(3.0);
+    this.ready=true;
+  },
+  impulse(dur,decay){
+    const ctx=this.ctx,sr=ctx.sampleRate;
+    const len=Math.floor(sr*dur);
+    const buf=ctx.createBuffer(2,len,sr);
+    for(let ch=0;ch<2;ch++){
+      const d=buf.getChannelData(ch);
+      for(let i=0;i<len;i++){
+        d[i]=(Math.random()*2-1)*Math.pow(1-i/len,decay);
+      }
+    }
+    return buf;
+  },
+  makeNoise(dur){
+    const ctx=this.ctx,sr=ctx.sampleRate;
+    const len=Math.floor(sr*dur);
+    const buf=ctx.createBuffer(1,len,sr);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<len;i++)d[i]=Math.random()*2-1;
+    return buf;
+  },
+  /* --- 音色 --- */
+  tone(t,freq,dur,{type='triangle',vol=.2,atk=.04,rel=true,detune=0}={}){
+    const ctx=this.ctx;
+    const o=ctx.createOscillator();
+    o.type=type;o.frequency.value=freq;o.detune.value=detune;
+    const g=ctx.createGain();
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.linearRampToValueAtTime(vol,t+atk);
+    if(rel)g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    else g.gain.setValueAtTime(vol,t+dur);
+    o.connect(g);g.connect(this.music);
+    o.start(t);o.stop(t+dur+.1);
+  },
+  /* --- 音效 --- */
+  pencilScratch(t,dur=.09,vol=.12){
+    const ctx=this.ctx;
+    const s=ctx.createBufferSource();s.buffer=this.noise;
+    s.playbackRate.value=.9+Math.random()*.6;
+    const bp=ctx.createBiquadFilter();bp.type='bandpass';
+    bp.frequency.value=1800+Math.random()*2600;bp.Q.value=2.4;
+    const hp=ctx.createBiquadFilter();hp.type='highpass';hp.frequency.value=900;
+    const g=ctx.createGain();
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(vol,t+dur*.25);
+    g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    s.connect(bp);bp.connect(hp);hp.connect(g);g.connect(this.sfx);
+    s.start(t);s.stop(t+dur+.05);
+  },
+  paperWhoosh(t,dur=1.0,vol=.22,f0=300,f1=2600){
+    const ctx=this.ctx;
+    const s=ctx.createBufferSource();s.buffer=this.noise;
+    s.playbackRate.value=.7+Math.random()*.4;
+    const bp=ctx.createBiquadFilter();bp.type='bandpass';bp.Q.value=1.1;
+    bp.frequency.setValueAtTime(f0,t);
+    bp.frequency.exponentialRampToValueAtTime(f1,t+dur*.55);
+    bp.frequency.exponentialRampToValueAtTime(f0*.8,t+dur);
+    const g=ctx.createGain();
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(vol,t+dur*.2);
+    g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    s.connect(bp);bp.connect(g);g.connect(this.sfx);
+    s.start(t);s.stop(t+dur+.1);
+  },
+  paperCrunch(t,vol=.3){
+    const ctx=this.ctx;
+    for(let i=0;i<14;i++){
+      const tt=t+Math.random()*.28;
+      const s=ctx.createBufferSource();s.buffer=this.noise;
+      s.playbackRate.value=1.2+Math.random()*1.6;
+      const bp=ctx.createBiquadFilter();bp.type='bandpass';
+      bp.frequency.value=2200+Math.random()*4200;bp.Q.value=3;
+      const g=ctx.createGain();
+      const d=.02+Math.random()*.05;
+      g.gain.setValueAtTime(0,tt);
+      g.gain.linearRampToValueAtTime(vol*(.3+Math.random()*.7),tt+d*.3);
+      g.gain.exponentialRampToValueAtTime(.0001,tt+d);
+      s.connect(bp);bp.connect(g);g.connect(this.sfx);
+      s.start(tt);s.stop(tt+d+.02);
+    }
+  },
+  boom(t,vol=.35){
+    const ctx=this.ctx;
+    const o=ctx.createOscillator();o.type='sine';
+    o.frequency.setValueAtTime(120,t);
+    o.frequency.exponentialRampToValueAtTime(34,t+1.4);
+    const g=ctx.createGain();
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(vol,t+.05);
+    g.gain.exponentialRampToValueAtTime(.0001,t+1.6);
+    o.connect(g);g.connect(this.sfx);g.connect(this.verb);
+    o.start(t);o.stop(t+1.8);
+  },
+  sparkle(t,vol=.14){
+    const ctx=this.ctx;
+    [1,1.5,2.25,3].forEach((m,i)=>{
+      const o=ctx.createOscillator();o.type='sine';
+      o.frequency.value=(880+i*140)*m;
+      const g=ctx.createGain();
+      const d=.5+i*.16;
+      g.gain.setValueAtTime(0,t);
+      g.gain.linearRampToValueAtTime(vol/(i+1),t+.012);
+      g.gain.exponentialRampToValueAtTime(.0001,t+d);
+      o.connect(g);g.connect(this.sfx);g.connect(this.verb);
+      o.start(t);o.stop(t+d+.05);
+    });
+  },
+  /* --- 低语式"人声"（TTS 占位） --- */
+  whisperLine(t0,dur,n){
+    const ctx=this.ctx;
+    const step=dur/n;
+    for(let i=0;i<n;i++){
+      const t=t0+i*step+Math.random()*.02;
+      const d=step*(.62+Math.random()*.3);
+      const base=96+Math.random()*46;
+      const o=ctx.createOscillator();o.type='sawtooth';
+      o.frequency.setValueAtTime(base,t);
+      o.frequency.linearRampToValueAtTime(base*(.86+Math.random()*.3),t+d);
+      const f1=ctx.createBiquadFilter();
+      f1.type='bandpass';f1.Q.value=7;
+      f1.frequency.setValueAtTime(360+Math.random()*380,t);
+      f1.frequency.linearRampToValueAtTime(320+Math.random()*420,t+d);
+      const f2=ctx.createBiquadFilter();
+      f2.type='bandpass';f2.Q.value=9;
+      f2.frequency.setValueAtTime(1350+Math.random()*950,t);
+      f2.frequency.linearRampToValueAtTime(1250+Math.random()*1100,t+d);
+      const mix=ctx.createGain();mix.gain.value=.5;
+      const g=ctx.createGain();
+      g.gain.setValueAtTime(0,t);
+      g.gain.linearRampToValueAtTime(1,t+d*.22);
+      g.gain.setValueAtTime(1,t+d*.6);
+      g.gain.exponentialRampToValueAtTime(.001,t+d);
+      o.connect(f1);o.connect(f2);
+      f1.connect(mix);f2.connect(mix);
+      mix.connect(g);g.connect(this.narr);
+      o.start(t);o.stop(t+d+.06);
+    }
+  }
+};
+
+/* ---------- 4. Three 场景 ---------- */
+const canvas=document.getElementById('gl');
+const frame=document.getElementById('frame');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.setClearColor(0xe9e0cd,1);
+
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(35,16/9,0.1,600);
+camera.position.set(0,0,0);
+camera.lookAt(0,0,-1);
+
+let MAXA=4;
+try{MAXA=renderer.capabilities.getMaxAnisotropy();}catch(e){}
+
+function makeTex(cv){
+  const t=new THREE.CanvasTexture(cv);
+  t.colorSpace=THREE.SRGBColorSpace;
+  t.anisotropy=MAXA;
+  t.minFilter=THREE.LinearFilter;
+  t.magFilter=THREE.LinearFilter;
+  t.generateMipmaps=false;
+  return t;
+}
+function makeMesh(cv,wUnits,order=1,opacity=1){
+  const tex=makeTex(cv);
+  const mat=new THREE.MeshBasicMaterial({
+    map:tex,transparent:true,depthTest:false,depthWrite:false,opacity
+  });
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(wUnits,wUnits*cv.height/cv.width),mat);
+  m.renderOrder=order;
+  m.userData.tex=tex;
+  return m;
+}
+function updateMesh(m,cv){
+  m.material.map.image=cv;
+  m.material.map.needsUpdate=true;
+}
+
+/* ---- 纸张背景（含轨迹层） ---- */
+const paperCanvas=createPaperCanvas();
+const paperMesh=makeMesh(paperCanvas,PAPER_W,0);
+paperMesh.position.z=PAPER_Z;
+paperMesh.material.transparent=false;
+scene.add(paperMesh);
+const paperCtx=paperCanvas.getContext('2d');
+
+/* ---- 太阳 ---- */
+const sunCanvas=(()=>{
+  const S=512,c=C(S,S),ctx=c.getContext('2d');
+  const rnd=mulberry32(9001);
+  const cx=S/2,cy=S/2;
+  const rg=ctx.createRadialGradient(cx,cy,0,cx,cy,S*.5);
+  rg.addColorStop(0,'rgba(255,236,180,.95)');
+  rg.addColorStop(.30,'rgba(255,214,132,.65)');
+  rg.addColorStop(.58,'rgba(246,186,108,.28)');
+  rg.addColorStop(1,'rgba(240,170,90,0)');
+  ctx.fillStyle=rg;ctx.beginPath();ctx.arc(cx,cy,S*.5,0,7);ctx.fill();
+  // 手绘放射线
+  for(let i=0;i<26;i++){
+    const a=i/26*Math.PI*2+rnd()*.08;
+    const r1=S*.26,r2=S*.30+rnd()*S*.16;
+    ctx.strokeStyle=`rgba(196,142,72,${.15+rnd()*.22})`;
+    ctx.lineWidth=1.4+rnd()*2.2;ctx.lineCap='round';
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.cos(a)*r1,cy+Math.sin(a)*r1);
+    ctx.lineTo(cx+Math.cos(a)*r2,cy+Math.sin(a)*r2);
+    ctx.stroke();
+  }
+  ctx.beginPath();ctx.arc(cx,cy,S*.235,0,7);
+  ctx.strokeStyle='rgba(186,132,64,.35)';ctx.lineWidth=2;ctx.stroke();
+  return c;
+})();
+const sunMesh=makeMesh(sunCanvas,26,1,.95);
+sunMesh.position.set(2.5,7.2,-28);
+scene.add(sunMesh);
+
+/* ---- 远山 ---- */
+const hillsCanvas=(()=>{
+  const W=2048,H=560,c=C(W,H),ctx=c.getContext('2d');
+  const rnd=mulberry32(5150);
+  const layers=[
+    {y:200,amp:70,col:'rgba(174,164,150,.30)',off:0},
+    {y:290,amp:56,col:'rgba(150,140,124,.38)',off:130},
+    {y:380,amp:40,col:'rgba(120,110,94,.34)',off:300}
+  ];
+  layers.forEach(L=>{
+    ctx.beginPath();ctx.moveTo(0,H);
+    for(let x=0;x<=W;x+=16){
+      const y=L.y+Math.sin((x+L.off)*0.0031)*L.amp+Math.sin((x+L.off)*0.0087)*L.amp*.4+(rnd()-.5)*6;
+      ctx.lineTo(x,y);
+    }
+    ctx.lineTo(W,H);ctx.closePath();
+    ctx.fillStyle=L.col;ctx.fill();
+    ctx.strokeStyle='rgba(90,78,58,.22)';ctx.lineWidth=1.6;ctx.stroke();
+  });
+  return c;
+})();
+const hillsMesh=makeMesh(hillsCanvas,72,2,.85);
+hillsMesh.position.set(0,-0.5,-27.5);
+scene.add(hillsMesh);
+
+/* ---- 建筑群 ---- */
+const buildings=[];
+const BSEEDS=[11,23,37,53,71,89,97,113,131];
+(function buildCity(){
+  const rnd=mulberry32(4242);
+  const N=22;
+  for(let i=0;i<N;i++){
+    const t=i/(N-1);
+    const x=lerp(-19,19,t)+ (rnd()-.5)*.9;
+    const w=1.6+rnd()*2.0;
+    const h=2.2+Math.pow(rnd(),1.35)*7.5;
+    const seed=BSEEDS[i%BSEEDS.length]+i*13;
+    const px=Math.round(90+ w*46), py=Math.round(120+ h*62);
+    const cv=makeBuilding(seed,px,py);
+    const m=makeMesh(cv,w,4+rnd()*2);
+    m.userData={baseX:x,baseY:-4.2+ (rnd()-.5)*.5,h,delay:rnd()*.9,wob:rnd()*6.28};
+    m.position.set(x,-4.2,-26+rnd()*1.4);
+    m.scale.set(1,0.001,1);
+    m.visible=false;
+    scene.add(m);
+    buildings.push(m);
+  }
+})();
+
+/* ---- 地面 ---- */
+const groundMesh=makeMesh(makeGround(),64,6,.95);
+groundMesh.position.set(0,-9.6,-25);
+scene.add(groundMesh);
+
+/* ---- 问号 ---- */
+const qMesh=makeMesh(drawQuestion(0,0),9,20);
+qMesh.position.set(0,1.1,-24);
+scene.add(qMesh);
+
+/* ---- 人物 ---- */
+const figCanvas0=drawFigure(0,false);
+const figMesh=makeMesh(figCanvas0,3.5,15);
+figMesh.position.set(-8.5,-6.1,-23.5);
+scene.add(figMesh);
+let figTexDirty=true;
+
+/* ---- 光点池 ---- */
+const sparkMeshes=[];
+(function(){
+  for(let i=0;i<26;i++){
+    const cv=makeSpark(1000+i*7);
+    const m=makeMesh(cv,1.6,16,0);
+    m.visible=false;
+    scene.add(m);
+    sparkMeshes.push(m);
+  }
+})();
+
+/* ---- 花瓣池 ---- */
+const petalMeshes=[];
+(function(){
+  for(let i=0;i<14;i++){
+    const cv=makePetal(2000+i*11);
+    const m=makeMesh(cv,1.5,17,0);
+    m.visible=false;
+    scene.add(m);
+    petalMeshes.push(m);
+  }
+})();
+
+/* ---- 标题字（结尾） ---- */
+const titleCanvas=(()=>{
+  const W=1400,H=420,c=C(W,H),ctx=c.getContext('2d');
+  const rnd=mulberry32(8888);
+  // 手写体：用笔画路径模拟
+  const chars=[
+    [[.06,.62],[.14,.30],[.22,.62]],           // 人
+    [[.28,.30],[.28,.62]],                      // 生 竖
+    [[.24,.46],[.32,.46]],                      // 生 横
+    [[.36,.62],[.44,.30],[.52,.62]],           // 的 近似
+  ];
+  // 直接用描边绘制艺术字
+  ctx.save();
+  ctx.strokeStyle='rgba(58,52,44,.85)';
+  ctx.lineCap='round';ctx.lineJoin='round';
+  const words='人生的意义';
+  ctx.font='600 168px "PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  // 抖动重描
+  for(let p=0;p<3;p++){
+    ctx.globalAlpha=p===0?.92:.2;
+    ctx.lineWidth=p===0?4:7;
+    const jx=(rnd()-.5)*(p===0?2:5);
+    const jy=(rnd()-.5)*(p===0?2:5);
+    ctx.strokeText(words,W/2+jx,H/2+jy);
+  }
+  ctx.globalAlpha=1;
+  ctx.restore();
+  return c;
+})();
+const titleMesh=makeMesh(titleCanvas,15,30,0);
+titleMesh.position.set(0,0.4,-24);
+titleMesh.visible=false;
+scene.add(titleMesh);
+
+/* ---- 轨迹绘制（画进纸面） ---- */
+const trailState={drawn:false,lastIdx:-1,pts:[]};
+function paintTrail(worldPts){
+  paperCtx.save();
+  paperCtx.lineCap='round';paperCtx.lineJoin='round';
+  for(let pass=0;pass<2;pass++){
+    paperCtx.beginPath();
+    paperCtx.strokeStyle=pass===0?'rgba(88,80,66,.42)':'rgba(120,108,88,.20)';
+    paperCtx.lineWidth=pass===0?3.2:7.5;
+    const rnd=mulberry32(1717+pass);
+    for(let i=0;i<worldPts.length;i++){
+      const [px,py]=worldToPaperXY(worldPts[i].x,worldPts[i].y);
+      const jx=(rnd()-.5)*2.4,jy=(rnd()-.5)*2.4;
+      i===0?paperCtx.moveTo(px+jx,py+jy):paperCtx.lineTo(px+jx,py+jy);
+    }
+    paperCtx.stroke();
+  }
+  paperCtx.restore();
+  paperMesh.material.map.needsUpdate=true;
+}
+function clearTrail(){
+  // 重画整张纸
+  const fresh=createPaperCanvas();
+  paperCtx.clearRect(0,0,PAPER_CW,PAPER_CH);
+  paperCtx.drawImage(fresh,0,0);
+  paperMesh.material.map.needsUpdate=true;
+  trailState.pts=[];trailState.drawn=false;
+}
+
+/* ---------- 5. 时间轴 ---------- */
+const DUR=30.0;
+const T={
+  fadeIn:[0.0,1.1],
+  qDraw:[1.05,4.55],
+  qHold:[4.55,5.55],
+  qBreak:[5.55,7.05],
+  cityUp:[6.35,9.6],
+  figIn:[9.35,10.5],
+  walk:[10.5,16.6],
+  bloom:[16.6,21.2],
+  pull:[21.2,26.6],
+  out:[26.6,30.0]
+};
+
+const subs=[...document.querySelectorAll('.sub')];
+const replayBtn=document.getElementById('replay');
+const flickerEl=document.getElementById('flicker');
+
+let clock=0,playing=false,audioStartTime=0,finished=false;
+const camTarget=new THREE.Vector3();
+const camPos=new THREE.Vector3();
+let figPhase=0;
+let walkSegments=[];
+
+/* --- 预计算行走路径 --- */
+(function(){
+  const N=120;
+  for(let i=0;i<=N;i++){
+    const t=i/N;
+    const x=lerp(-8.5,8.6,t);
+    const y=-6.1+Math.sin(t*Math.PI*1.6)*0.35+Math.sin(t*9.2)*0.10;
+    walkSegments.push({x,y,t});
+  }
+})();
+
+/* --- 音频：调度整条时间线 --- */
+function scheduleAudio(){
+  const A=Audio_;
+  const t0=A.ctx.currentTime+0.12;
+  audioStartTime=t0;
+
+  // 淡入
+  A.master.gain.setValueAtTime(0,t0);
+  A.master.gain.linearRampToValueAtTime(.9,t0+2.2);
+  A.master.gain.setValueAtTime(.9,t0+DUR-3.4);
+  A.master.gain.linearRampToValueAtTime(0.0001,t0+DUR-0.15);
+
+  // ---------- 配乐 ----------
+  const ROOT=146.83; // D3
+  const PENTA=[0,2,4,7,9,12,14,16,19,21,24,26];
+  const f=i=>ROOT*Math.pow(2,i/12);
+  const mrnd=mulberry32(31415);
+
+  // 低音持续音
+  const bassEvents=[[0.2,0,9],[8.0,-5,8],[15.0,-3,7],[21.0,-5,9],[26.5,0,4]];
+  bassEvents.forEach(([t,iv,d])=>{
+    A.tone(t0+t,f(iv-12),d,{type:'sine',vol:.20,atk:1.2});
+    A.tone(t0+t,f(iv-12),d,{type:'triangle',vol:.05,atk:1.4,detune:7});
+  });
+
+  // 稀疏旋律
+  const mel=[[2.0,4,2.6],[4.4,7,2.0],[6.8,9,1.8],[8.4,7,2.2],
+             [10.6,4,1.6],[11.9,2,1.4],[13.2,4,1.8],[14.5,7,2.4],
+             [16.6,9,2.0],[18.0,12,2.6],[19.6,9,2.2],[21.4,7,3.0],
+             [23.6,9,2.4],[25.4,12,3.4],[27.4,7,4.0]];
+  mel.forEach(([t,iv,d])=>{
+    A.tone(t0+t,f(iv),d,{type:'triangle',vol:.085,atk:.35});
+    A.tone(t0+t,f(iv+12),d*.7,{type:'sine',vol:.026,atk:.5});
+  });
+
+  // 和声垫
+  [[0.6,[0,7,14],11],[10.8,[-5,-1,7],7],[17.0,[-3,4,11],7],[22.6,[-5,2,9],6.5],[27.0,[0,7,14],3.2]]
+  .forEach(([t,ivs,d])=>{
+    ivs.forEach(iv=>A.tone(t0+t,f(iv-5),d,{type:'sine',vol:.055,atk:1.8}));
+  });
+
+  // 高频闪烁
+  const spk=[3.0,7.2,12.6,17.4,19.2,22.0,24.6,27.6];
+  spk.forEach((t,i)=>A.sparkle(t0+t,.06+i*.004));
+
+  // ---------- 音效 ----------
+  // 铅笔绘制
+  let pt=1.05;
+  const prnd=mulberry32(606);
+  while(pt<4.55){
+    A.pencilScratch(t0+pt,.06+prnd()*.09,.055+prnd()*.05);
+    pt+=.045+prnd()*.075;
+  }
+  // 碎裂
+  A.paperCrunch(t0+5.55,.30);
+  A.boom(t0+5.62,.22);
+  // 城市升起
+  A.paperWhoosh(t0+6.4,2.9,.16,220,1500);
+  for(let i=0;i<10;i++){
+    A.paperCrunch(t0+6.5+i*.28,.055);
+  }
+  A.boom(t0+6.4,.16);
+  // 人物出场
+  A.paperWhoosh(t0+9.4,.7,.12,700,2200);
+  // 行走脚步
+  for(let t=10.55;t<16.6;t+=.42){
+    A.pencilScratch(t0+t,.045,.035);
+  }
+  // 绽放
+  A.paperWhoosh(t0+16.7,1.6,.16,400,3200);
+  for(let i=0;i<8;i++)A.sparkle(t0+17.0+i*.55,.05);
+  // 拉远
+  A.paperWhoosh(t0+21.3,3.2,.14,1400,260);
+  A.boom(t0+21.4,.14);
+  // 结尾
+  A.paperWhoosh(t0+26.6,2.4,.12,900,200);
+
+  // ---------- 旁白（Web Audio 占位，后续替换 TTS） ----------
+  A.whisperLine(t0+1.35,3.4,7);
+  A.whisperLine(t0+10.9,3.9,9);
+  A.whisperLine(t0+17.2,3.6,8);
+  A.whisperLine(t0+22.4,4.2,9);
+}
+
+/* ---------- 6. 每帧更新 ---------- */
+function projectToPaper(x,y,z){
+  const C=camera.position;
+  const t=(PAPER_Z-C.z)/(z-C.z);
+  return {x:C.x+t*(x-C.x), y:C.y+t*(y-C.y)};
+}
+
+function updateScene(t){
+  /* ===== 相机 ===== */
+  let cx=0,cy=0.2,cz=0,tx=0,ty=0.2,tz=-10;
+  const qd=seg(t,...T.qDraw);
+  const wl=seg(t,...T.walk);
+  const pb=seg(t,...T.pull);
+  const bl=seg(t,...T.bloom);
+
+  // 开场：缓缓推近问号
+  cx=lerp(0,0.4,qd); cy=lerp(0.2,0.9,qd); cz=lerp(0,-1.6,qd);
+
+  // 城市升起：拉远
+  const cu=easeInOut(seg(t,...T.cityUp));
+  cx=lerp(cx,0.3,cu*0.8); cy=lerp(cy,0.1,cu); cz=lerp(cz,2.2,cu);
+
+  // 行走：跟随人物
+  if(t>T.walk[0]){
+    const wp=easeInOut(wl);
+    const figX=lerp(-8.5,8.6,wp);
+    const followX=figX*0.62;
+    const k=seg(t,T.walk[0],T.walk[0]+1.4);
+    cx=lerp(cx,followX,k);
+    cy=lerp(cy,-0.7,k);
+    cz=lerp(cz,1.0,k);
+  }
+  // 绽放
+  if(t>T.bloom[0]){
+    const k=easeInOut(bl);
+    cy=lerp(cy,0.2,k);
+    cz=lerp(cz,2.6,k);
+  }
+  // 拉远
+  if(t>T.pull[0]){
+    const k=easeOutQuint(pb);
+    cx=lerp(cx,0,k);
+    cy=lerp(cy,0.55,k);
+    cz=lerp(cz,4.6,k);
+  }
+  // 收尾
+  const oe=seg(t,...T.out);
+  cy=lerp(cy,0.3,easeInOut(oe)*.6);
+  cz=lerp(cz,4.6,easeInOut(oe)*.25);
+
+  camera.position.set(cx,cy,cz);
+  camera.lookAt(tx,ty,tz);
+
+  /* ===== 问号 ===== */
+  const qp=easeOutCubic(seg(t,...T.qDraw));
+  const qb=easeInOut(seg(t,...T.qBreak));
+  const qVis=(t>T.qDraw[0]-0.15)&&(t<T.qBreak[1]+0.3);
+  qMesh.visible=qVis;
+  if(qVis){
+    const breath=t*1.6;
+    updateMesh(qMesh,drawQuestion(qp,breath));
+    const pop=1+qb*0.35;
+    const shr=1-qb*0.55;
+    qMesh.scale.set(pop*shr,pop*shr,1);
+    qMesh.rotation.z=Math.sin(t*0.9)*0.012+qb*0.55*(Math.random()-.5);
+    qMesh.material.opacity=1-qb;
+    qMesh.position.y=1.1+qb*1.4;
+  }
+
+  /* ===== 太阳 ===== */
+  sunMesh.visible=t>2.0;
+  const sunIn=easeOutCubic(seg(t,2.0,8.0));
+  sunMesh.material.opacity=sunIn*0.95*(1-seg(t,26.8,30)*0.9);
+  sunMesh.scale.setScalar(lerp(0.55,1.0,sunIn));
+  sunMesh.position.y=lerp(7.6,6.4,sunIn);
+  sunMesh.rotation.z=t*0.012;
+
+  /* ===== 远山 ===== */
+  hillsMesh.material.opacity=0.85*(1-seg(t,27,30)*0.7);
+  hillsMesh.position.x=-cx*0.22;
+  hillsMesh.position.y=-0.5-cy*0.1;
+
+  /* ===== 建筑 ===== */
+  buildings.forEach((b,i)=>{
+    const idx=i/buildings.length;
+    const local=clamp((t-T.cityUp[0]-b.userData.delay*0.85)/(T.cityUp[1]-T.cityUp[0]-b.userData.delay*0.85));
+    const grow=easeOutBack(local,1.2);
+    b.visible=local>0;
+    if(!b.visible)return;
+    b.scale.set(1,Math.max(0.001,grow),1);
+    const h=b.userData.h;
+    // 从地面往上长
+    b.position.y=b.userData.baseY - (1-grow)*h*0.5;
+    b.position.x=b.userData.baseX - cx*0.55;
+    // 呼吸
+    b.position.y+=Math.sin(t*0.9+b.userData.wob)*0.03;
+    b.material.opacity=1-seg(t,27.2,30)*0.85;
+  });
+
+  /* ===== 地面 ===== */
+  groundMesh.material.opacity=0.95*(1-seg(t,27.4,30)*0.8);
+  groundMesh.position.x=-cx*0.78;
+  groundMesh.position.y=-9.6-cy*0.35;
+
+  /* ===== 人物 ===== */
+  const figVisible=t>T.figIn[0];
+  figMesh.visible=figVisible;
+  if(figVisible){
+    const inK=easeOutBack(seg(t,...T.figIn));
+    figMesh.scale.setScalar(Math.max(0.001,inK));
+    figMesh.material.opacity=inK;
+
+    let fx,fy;
+    if(t<T.walk[0]){ fx=-8.5; fy=-6.1; }
+    else{
+      const wp=easeInOut(seg(t,...T.walk));
+      fx=lerp(-8.5,8.6,wp);
+      fy=-6.1+Math.sin(wp*Math.PI*1.6)*0.35;
+    }
+    const walking=(t>T.walk[0]&&t<T.walk[1]);
+    figPhase+=walking?(0.30):(0.09);
+    figMesh.position.set(fx,fy,-23.5);
+    // 轻微摇曳
+    figMesh.rotation.z=Math.sin(figPhase*0.5)*0.02;
+
+    updateMesh(figMesh,drawFigure(figPhase,walking));
+
+    /* ---- 轨迹 ---- */
+    if(t>T.walk[0]+0.2 && t<T.walk[1]+0.6){
+      const need=Math.floor(seg(t,T.walk[0]+0.2,T.walk[1])*walkSegments.length);
+      if(need>trailState.pts.length){
+        for(let i=trailState.pts.length;i<need;i++){
+          const p=walkSegments[i];
+          const pp=projectToPaper(p.x,p.y,-23.5);
+          trailState.pts.push({x:pp.x,y:pp.y});
+        }
+        paintTrail(trailState.pts);
+      }
+    }
+  }
+
+  /* ===== 光点 ===== */
+  const bloomK=seg(t,...T.bloom);
+  const bloomOut=seg(t,27.5,30);
+  sparkMeshes.forEach((s,i)=>{
+    const seed=i*0.618;
+    const appear=clamp((bloomK-seed*0.55)/0.42);
+    const fadeOut=1-bloomOut;
+    s.visible=appear>0&&fadeOut>0.01;
+    if(!s.visible)return;
+    const ang=seed*Math.PI*2;
+    const rad=2.4+ (i%7)*0.85;
+    const px=Math.sin(t*0.35+ang)*rad*0.55 + lerp(-7,8,seed);
+    const py=-2.2+Math.cos(t*0.5+ang)*0.7 + (i%5)*0.55;
+    s.position.set(px,py,-23+((i%3)*0.5));
+    const pulse=0.55+0.45*Math.sin(t*2.4+ang*3);
+    const sc=(0.6+ (i%4)*0.22)*appear*(0.75+pulse*0.55);
+    s.scale.setScalar(sc);
+    s.material.opacity=Math.min(1,appear)*fadeOut*(0.55+pulse*0.45);
+    s.rotation.z=t*(0.15+ (i%5)*0.06);
+  });
+
+  /* ===== 花瓣 ===== */
+  petalMeshes.forEach((p,i)=>{
+    const seed=i*0.37;
+    const appear=clamp((bloomK-seed*0.6)/0.45);
+    const fadeOut=1-bloomOut;
+    p.visible=appear>0&&fadeOut>0.01;
+    if(!p.visible)return;
+    const a=seed*Math.PI*2+t*0.16;
+    const r=3.0+(i%6)*1.15;
+    const px=Math.cos(a)*r + lerp(-6,7,seed);
+    const py=1.4+Math.sin(a*1.3)*1.5 + Math.sin(t*0.6+i)*0.4;
+    p.position.set(px,py,-23.4);
+    p.rotation.z=a*1.7;
+    p.scale.setScalar((0.5+(i%3)*0.22)*appear);
+    p.material.opacity=appear*fadeOut*0.92;
+  });
+
+  /* ===== 结尾标题 ===== */
+  const tIn=seg(t,26.9,28.6);
+  titleMesh.visible=tIn>0;
+  if(titleMesh.visible){
+    const e=easeOutCubic(tIn);
+    titleMesh.material.opacity=e*(1-seg(t,29.4,30)*0.9);
+    titleMesh.scale.setScalar(lerp(0.94,1.0,e));
+  }
+
+  /* ===== 画面整体淡入淡出 ===== */
+  const fi=seg(t,...T.fadeIn);
+  const fo=seg(t,29.3,30);
+  const totalOp=fi*(1-fo);
+  paperMesh.material.opacity=totalOp;
+  // 开场时纸张从近处推进
+  if(t<T.fadeIn[1]+0.6){
+    const k=seg(t,...T.fadeIn);
+    paperMesh.scale.setScalar(lerp(1.16,1.0,easeOutCubic(k)));
+  }else{
+    paperMesh.scale.setScalar(1);
+  }
+
+  /* ===== 胶片闪动 ===== */
+  const fl=Math.max(0,Math.sin(t*27.3)*0.5+Math.sin(t*11.7)*0.5);
+  flickerEl.style.opacity=(fl*0.018*(1-fo)).toFixed(4);
+}
+
+/* ---------- 7. 主循环 ---------- */
+let last=performance.now();
+function loop(now){
+  requestAnimationFrame(loop);
+  const dt=Math.min(0.05,(now-last)/1000);
+  last=now;
+
+  if(playing&&!finished){
+    clock+=dt;
+    if(clock>=DUR){
+      clock=DUR;
+      finished=true;
+      playing=false;
+      replayBtn.classList.add('on');
+    }
+    updateScene(clock);
+    updateSubs(clock);
+  }
+  renderer.render(scene,camera);
+}
+
+function updateSubs(t){
+  subs.forEach(el=>{
+    const a=parseFloat(el.dataset.a),b=parseFloat(el.dataset.b);
+    const on=t>=a&&t<=b;
+    el.classList.toggle('on',on);
+  });
+}
+
+/* ---------- 8. 布局 ---------- */
+function layout(){
+  const vw=window.innerWidth,vh=window.innerHeight;
+  const s=Math.min(vw/16,vh/9);
+  const w=Math.floor(16*s),h=Math.floor(9*s);
+  frame.style.width=w+'px';
+  frame.style.height=h+'px';
+  renderer.setSize(w,h,false);
+  camera.aspect=16/9;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize',layout);
+layout();
+
+/* ---------- 9. 播放控制 ---------- */
+const startScreen=document.getElementById('startScreen');
+
+function resetAll(){
+  clock=0;finished=false;figPhase=0;
+  trailState.pts=[];
+  clearTrail();
+  buildings.forEach(b=>{b.visible=false;b.scale.set(1,0.001,1);b.material.opacity=1;});
+  sparkMeshes.forEach(s=>{s.visible=false;s.material.opacity=0;});
+  petalMeshes.forEach(p=>{p.visible=false;p.material.opacity=0;});
+  qMesh.visible=false;qMesh.material.opacity=1;qMesh.scale.set(1,1,1);
+  titleMesh.visible=false;titleMesh.material.opacity=0;
+  figMesh.visible=false;
+  paperMesh.material.opacity=1;paperMesh.scale.setScalar(1.16);
+  subs.forEach(el=>el.classList.remove('on'));
+  replayBtn.classList.remove('on');
+  flickerEl.style.opacity=0;
+  camera.position.set(0,0.2,0);
+  camera.lookAt(0,0.2,-10);
+}
+
+function start(){
+  Audio_.init();
+  if(Audio_.ctx.state==='suspended')Audio_.ctx.resume();
+  resetAll();
+  scheduleAudio();
+  playing=true;finished=false;
+  last=performance.now();
+}
+
+startScreen.addEventListener('click',()=>{
+  startScreen.classList.add('hide');
+  setTimeout(()=>{startScreen.style.display='none';},850);
+  start();
+},{once:false});
+
+replayBtn.addEventListener('click',()=>{
+  if(Audio_.ctx){
+    try{Audio_.ctx.close();}catch(e){}
+    Audio_.ctx=null;Audio_.ready=false;
+  }
+  start();
+});
+
+/* 首帧渲染 */
+resetAll();
+updateScene(0);
+renderer.render(scene,camera);
+requestAnimationFrame(loop);
+
+console.log('%c AI MATRIX · 《人生的意义》v0.0.1 ','background:#3b342c;color:#f3ebda;padding:4px 10px;border-radius:3px;');
+console.log('全部素材 / 动画 / 音效 / 配乐 —— 100% 程序化生成');
+</script>
+</body>
+</html>

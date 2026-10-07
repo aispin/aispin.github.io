@@ -1,0 +1,8 @@
+[
+  { "out": "/tmp/opt/BEFORE-1-gate.png",    "pos": [0, 0.2, 28],   "target": [0, 0.6, 22],  "waitMs": 6000 },
+  { "out": "/tmp/opt/BEFORE-2-wide.png",    "pos": [8.5, 4.2, 34], "target": [0, 1.2, 20],  "waitMs": 6000 },
+  { "out": "/tmp/opt/BEFORE-3-corr.png",    "pos": [0, 0.2, -2],   "target": [0, 0.4, -14], "waitMs": 6000, "enter": true },
+  { "out": "/tmp/opt/BEFORE-4-gallery.png", "snap": "gallery",                               "waitMs": 8000 },
+  { "out": "/tmp/opt/BEFORE-5-contact.png", "snap": "contact",                               "waitMs": 8000 },
+  { "out": "/tmp/opt/BEFORE-6-posts.png",   "snap": "posts",                                 "waitMs": 8000 }
+]

@@ -1,0 +1,67 @@
+// SiteControls — only the bits specific to this cluster.
+//
+// The button chrome itself lives in HudControls.scss (`.hud-btn`), shared with
+// the back button in NavigationUI so every on-screen control is one design.
+
+.site-controls {
+  // Layout (fixed, top-right, vertical) comes from `.hud-cluster`.
+}
+
+// The burger is only used here; it morphs into an X while the map is open.
+.site-controls__burger {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  width: 15px;
+
+  span {
+    display: block;
+    height: 2px;
+    border-radius: 2px;
+    background: currentColor;
+    transition: transform .18s ease, opacity .18s ease;
+  }
+}
+
+.site-controls .hud-btn.is-open .site-controls__burger {
+  span:nth-child(1) { transform: translateY(5px) rotate(45deg); }
+  span:nth-child(2) { opacity: 0; }
+  span:nth-child(3) { transform: translateY(-5px) rotate(-45deg); }
+}
+
+// PWA update prompt: sits above the column, warm orange to stand apart from the
+// neutral controls, and pulses so it is noticed without being modal.
+.site-controls__update-wrap {
+  position: fixed;
+  z-index: 1001;
+  top: max(18px, env(safe-area-inset-top));
+  right: max(72px, calc(env(safe-area-inset-right) + 54px));
+  pointer-events: none;
+}
+
+.site-controls__update {
+  background: #FFD9C0;
+  border-color: rgba(200, 155, 123, .6);
+  animation: hudDropIn .42s cubic-bezier(.2, .8, .2, 1) both,
+             site-controls-pulse 1.6s ease-in-out infinite;
+
+  &:hover { background: #FFC9A8; }
+}
+
+@keyframes site-controls-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(200, 155, 123, .45); }
+  50% { box-shadow: 0 0 0 6px rgba(200, 155, 123, 0); }
+}
+
+html[data-theme='dark'] .site-controls__update {
+  background: #655044;
+  border-color: rgba(255, 246, 233, .5);
+}
+
+@media (max-width: 640px) {
+  .site-controls__update-wrap {
+    top: max(12px, env(safe-area-inset-top));
+    right: max(62px, calc(env(safe-area-inset-right) + 46px));
+  }
+}

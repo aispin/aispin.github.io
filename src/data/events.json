@@ -1,0 +1,126 @@
+[
+  {
+    "startDate": "2014-05-16",
+    "company": "腾讯",
+    "location": "深圳",
+    "details": [
+      "主办腾讯首届 TGIdeas 移动前端峰会，并在 tgideas.github.io/motion 开源 MOTION.JS 移动应用组件库。"
+    ],
+    "id": "2014",
+    "locale": "zh"
+  },
+  {
+    "startDate": "2015-09-24",
+    "company": "京东",
+    "location": "深圳",
+    "details": [
+      "创建京东 `凹凸实验室` 技术品牌（aotu.io），构建品牌运营生态，包括：官网、微信公众号、Github 组织、掘金账号、凹凸公开课、Taro 项目。"
+    ],
+    "id": "2015",
+    "locale": "zh"
+  },
+  {
+    "startDate": "2016-09-01",
+    "company": "京东",
+    "location": "深圳",
+    "details": [
+      "主办凹凸极客沙龙（geeks.aotu.io），在业内传播技术影响力。"
+    ],
+    "id": "2016",
+    "locale": "zh"
+  },
+  {
+    "startDate": "2017-01-01",
+    "company": "京东",
+    "location": "深圳",
+    "details": [
+      "开源 AT-UI Vue.js UI 框架（github.com/AT-UI/at-ui），2.2K Star，现已整合至 Taro-UI 项目。",
+      "开源 ELF HTML5 构建工具（elf.aotu.io），466 Star。",
+      "开源基于 Github Issue 的 Gitalk 评论组件（gitalk.github.io），6K+ Star。"
+    ],
+    "id": "2017",
+    "locale": "zh"
+  },
+  {
+    "startDate": "2018-03-01",
+    "company": "京东",
+    "location": "深圳",
+    "details": [
+      "探索凹凸实验室的技术变现，策划凹凸小书（books.aotu.io），在掘金上发布京东首个付费的掘金小册《大厂H5开发实战手册》。"
+    ],
+    "id": "2018",
+    "locale": "zh"
+  },
+  {
+    "startDate": "2023-05-01",
+    "company": "美团",
+    "location": "成都",
+    "details": [
+      "组织和评审美团闪购技术部 23 年《闪耀技术培训》供应链领域的课程。"
+    ],
+    "id": "2023",
+    "locale": "zh"
+  },
+  {
+    "startDate": "2014-05-16",
+    "company": "Tencent",
+    "location": "Shenzhen",
+    "details": [
+      "Hosted Tencent's first TGIdeas Mobile Frontend Summit and open-sourced the MOTION.JS mobile application component library at tgideas.github.io/motion."
+    ],
+    "id": "2014",
+    "locale": "en"
+  },
+  {
+    "startDate": "2015-09-24",
+    "company": "JD.com",
+    "location": "Shenzhen",
+    "details": [
+      "Created JD.com's `Aotu Lab` technology brand (aotu.io), building a brand operation ecosystem including official website, WeChat public account, Github organization, Juejin account, Aotu public courses, and Taro project."
+    ],
+    "id": "2015",
+    "locale": "en"
+  },
+  {
+    "startDate": "2016-09-01",
+    "company": "JD.com",
+    "location": "Shenzhen",
+    "details": [
+      "Hosted Aotu Geek Salon (geeks.aotu.io), spreading technical influence within the industry."
+    ],
+    "id": "2016",
+    "locale": "en"
+  },
+  {
+    "startDate": "2017-01-01",
+    "company": "JD.com",
+    "location": "Shenzhen",
+    "details": [
+      "Open-sourced AT-UI Vue.js UI framework (github.com/AT-UI/at-ui), 2.2K Stars, now integrated into Taro-UI project.",
+      "Open-sourced ELF HTML5 build tool (elf.aotu.io), 466 Stars.",
+      "Open-sourced Gitalk comment component based on Github Issues (gitalk.github.io), 6K+ Stars."
+    ],
+    "id": "2017",
+    "locale": "en"
+  },
+  {
+    "startDate": "2018-03-01",
+    "company": "JD.com",
+    "location": "Shenzhen",
+    "details": [
+      "Explored Aotu Lab's technology monetization, planned Aotu Books (books.aotu.io), and published JD.com's first paid Juejin booklet \"Enterprise H5 Development Practical Manual\" on Juejin platform."
+    ],
+    "id": "2018",
+    "locale": "en"
+  },
+  {
+    "startDate": "2023-05-01",
+    "company": "Meituan",
+    "location": "Chengdu",
+    "details": [
+      "Organized and reviewed Meituan Flash Purchase Technology Department's 2023 \"Shining Technology Training\" supply chain domain courses."
+    ],
+    "id": "2023",
+    "locale": "en"
+  }
+]

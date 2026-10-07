@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Northwind — 设置</title>
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+<style>
+:root{
+  color-scheme:light;
+  --n-0:#fff;--n-50:#f8f9fb;--n-100:#f1f3f7;--n-200:#e4e7ee;--n-300:#cdd2dd;
+  --n-400:#9aa2b1;--n-500:#6b7280;--n-600:#4a5262;--n-700:#333a48;--n-800:#1f2530;--n-900:#12161d;
+  --brand:#3b5bfd;--brand-h:#2f4ce0;--brand-bg:#eef1ff;
+  --ok:#12855f;--ok-bg:#e6f6f0;--err:#c0392b;--err-bg:#fdecea;--err-bd:#f4c7c3;
+  --warn:#a86a00;--warn-bg:#fff4e0;
+  --sh-sm:0 1px 2px rgba(18,22,29,.05);
+  --sh-md:0 1px 2px rgba(18,22,29,.04),0 2px 8px rgba(18,22,29,.06);
+  --sh-lg:0 2px 6px rgba(18,22,29,.04),0 12px 32px rgba(18,22,29,.10);
+  --bar:rgba(255,255,255,.9);
+}
+[data-theme="dark"]{
+  color-scheme:dark;
+  --n-0:#1a1f28;--n-50:#0f1319;--n-100:#232a35;--n-200:#2d3542;--n-300:#3a4351;
+  --n-400:#6b7280;--n-500:#9aa2b1;--n-600:#b8bfcc;--n-700:#cdd2dd;--n-800:#e4e7ee;--n-900:#f1f3f7;
+  --brand:#6b85ff;--brand-h:#8499ff;--brand-bg:rgba(107,133,255,.14);
+  --ok:#34d399;--ok-bg:rgba(52,211,153,.14);
+  --err:#f87171;--err-bg:rgba(248,113,113,.14);--err-bd:rgba(248,113,113,.35);
+  --warn:#fbbf24;--warn-bg:rgba(251,191,36,.14);
+  --sh-sm:0 1px 2px rgba(0,0,0,.4);
+  --sh-md:0 1px 2px rgba(0,0,0,.3),0 2px 8px rgba(0,0,0,.4);
+  --sh-lg:0 2px 6px rgba(0,0,0,.3),0 12px 32px rgba(0,0,0,.5);
+  --bar:rgba(15,19,25,.9);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --n-0:#1a1f28;--n-50:#0f1319;--n-100:#232a35;--n-200:#2d3542;--n-300:#3a4351;
+    --n-400:#6b7280;--n-500:#9aa2b1;--n-600:#b8bfcc;--n-700:#cdd2dd;--n-800:#e4e7ee;--n-900:#f1f3f7;
+    --brand:#6b85ff;--brand-h:#8499ff;--brand-bg:rgba(107,133,255,.14);
+    --ok:#34d399;--ok-bg:rgba(52,211,153,.14);
+    --err:#f87171;--err-bg:rgba(248,113,113,.14);--err-bd:rgba(248,113,113,.35);
+    --warn:#fbbf24;--warn-bg:rgba(251,191,36,.14);
+    --sh-sm:0 1px 2px rgba(0,0,0,.4);
+    --sh-md:0 1px 2px rgba(0,0,0,.3),0 2px 8px rgba(0,0,0,.4);
+    --sh-lg:0 2px 6px rgba(0,0,0,.3),0 12px 32px rgba(0,0,0,.5);
+    --bar:rgba(15,19,25,.9);
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--n-50);color:var(--n-800);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums;
+  transition:background-color .18s,color .18s}
+a{color:inherit;text-decoration:none}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:4px}
+
+.page{max-width:1000px;margin:0 auto;padding:32px 24px 120px}
+
+.topbar{display:flex;align-items:center;gap:12px;margin-bottom:32px}
+.back{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  color:var(--n-500);border:1px solid var(--n-200);background:var(--n-0);transition:all .15s}
+.back:hover{color:var(--n-900);border-color:var(--n-300)}
+.page-title{font-size:20px;font-weight:600;letter-spacing:-.015em;color:var(--n-900);margin:0}
+.theme-toggle{margin-left:auto;width:34px;height:34px;border-radius:9px;display:flex;
+  align-items:center;justify-content:center;color:var(--n-500);border:1px solid var(--n-200);
+  background:var(--n-0);transition:all .15s}
+.theme-toggle:hover{color:var(--n-900);border-color:var(--n-300)}
+.theme-toggle .sun{display:none}
+[data-theme="dark"] .theme-toggle .sun{display:block}
+[data-theme="dark"] .theme-toggle .moon{display:none}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .theme-toggle .sun{display:block}
+  :root:not([data-theme="light"]) .theme-toggle .moon{display:none}
+}
+
+.layout{display:grid;grid-template-columns:200px 1fr;gap:48px;align-items:start}
+
+.tabs{position:sticky;top:24px;display:flex;flex-direction:column;gap:2px}
+.tab{display:flex;align-items:center;gap:10px;height:36px;padding:0 12px;border-radius:8px;
+  font-size:13.5px;color:var(--n-600);transition:all .12s;text-align:left}
+.tab:hover{background:var(--n-100);color:var(--n-900)}
+.tab.on{background:var(--brand-bg);color:var(--brand);font-weight:500}
+.tab svg{flex-shrink:0;opacity:.8}
+.tab.on svg{opacity:1}
+
+.section{display:none}
+.section.on{display:block}
+.sec-head{margin-bottom:24px}
+.sec-head h2{font-size:16px;font-weight:600;color:var(--n-900);margin:0 0 4px}
+.sec-head p{font-size:13px;color:var(--n-500);margin:0}
+
+.field{padding:20px 0;border-bottom:1px solid var(--n-200)}
+.field:last-of-type{border-bottom:0}
+.field-row{display:grid;grid-template-columns:1fr 380px;gap:32px;align-items:start}
+.field-label{font-size:13.5px;font-weight:500;color:var(--n-800);margin-bottom:4px}
+.field-hint{font-size:12.5px;color:var(--n-500);line-height:1.55}
+.field-req{color:var(--err);margin-left:2px}
+
+.input,.select,.textarea{width:100%;height:38px;padding:0 12px;border-radius:8px;
+  border:1px solid var(--n-200);background:var(--n-0);font:inherit;font-size:13.5px;
+  color:var(--n-800);transition:all .15s}
+.textarea{height:auto;padding:10px 12px;min-height:88px;resize:vertical;line-height:1.55}
+.input::placeholder,.textarea::placeholder{color:var(--n-400)}
+.input:hover,.select:hover,.textarea:hover{border-color:var(--n-300)}
+.input:focus,.select:focus,.textarea:focus{outline:none;border-color:var(--brand);
+  box-shadow:0 0 0 3px var(--brand-bg)}
+.input.err{border-color:var(--err)}
+.input.err:focus{box-shadow:0 0 0 3px var(--err-bg)}
+.input:disabled{background:var(--n-100);color:var(--n-400);cursor:not-allowed}
+.select{appearance:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat:no-repeat;background-position:right 10px center;padding-right:34px}
+.err-msg{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--err);margin-top:6px}
+.err-msg svg{flex-shrink:0}
+
+/* switch */
+.switch-row{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;
+  padding:16px 0;border-bottom:1px solid var(--n-200)}
+.switch-row:last-of-type{border-bottom:0}
+.switch{position:relative;flex-shrink:0;width:40px;height:24px;border-radius:999px;
+  background:var(--n-300);cursor:pointer;transition:background .18s;border:0;padding:0}
+.switch::after{content:"";position:absolute;left:2px;top:2px;width:20px;height:20px;
+  border-radius:50%;background:#fff;box-shadow:var(--sh-sm);transition:transform .18s}
+.switch[aria-checked="true"]{background:var(--brand)}
+.switch[aria-checked="true"]::after{transform:translateX(16px)}
+
+/* radio cards */
+.radio-group{display:grid;gap:8px}
+.radio{display:flex;align-items:flex-start;gap:12px;padding:14px;border-radius:10px;
+  border:1px solid var(--n-200);cursor:pointer;transition:all .12s;background:var(--n-0)}
+.radio:hover{border-color:var(--n-300);background:var(--n-50)}
+.radio.on{border-color:var(--brand);background:var(--brand-bg)}
+.radio-dot{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--n-300);
+  flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;
+  transition:all .12s;background:var(--n-0)}
+.radio.on .radio-dot{border-color:var(--brand);border-width:6px}
+.radio-body{flex:1}
+.radio-title{font-size:13.5px;font-weight:500;color:var(--n-800);margin-bottom:2px}
+.radio-desc{font-size:12px;color:var(--n-500);line-height:1.5}
+
+/* danger zone */
+.danger{margin-top:32px;border:1px solid var(--err-bd);border-radius:12px;
+  background:var(--err-bg);overflow:hidden}
+.danger-head{padding:14px 20px;border-bottom:1px solid var(--err-bd);
+  display:flex;align-items:center;gap:8px}
+.danger-head svg{color:var(--err)}
+.danger-head h3{font-size:13.5px;font-weight:600;color:var(--err);margin:0}
+.danger-row{display:flex;align-items:center;justify-content:space-between;gap:24px;
+  padding:16px 20px}
+.danger-row + .danger-row{border-top:1px solid var(--err-bd)}
+.danger-row .t{font-size:13.5px;font-weight:500;color:var(--n-800);margin-bottom:2px}
+.danger-row .d{font-size:12.5px;color:var(--n-600);line-height:1.5}
+.btn-danger{height:32px;padding:0 14px;border-radius:8px;background:var(--n-0);
+  color:var(--err);border:1px solid var(--err-bd);font-size:12.5px;font-weight:500;
+  transition:all .12s;white-space:nowrap}
+.btn-danger:hover{background:var(--err-bg);border-color:var(--err)}
+
+/* action bar */
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--bar);
+  backdrop-filter:blur(12px);border-top:1px solid var(--n-200);
+  padding:12px 24px;display:flex;align-items:center;justify-content:center;gap:12px;z-index:5}
+.bar-in{width:100%;max-width:1000px;display:flex;align-items:center;
+  justify-content:flex-end;gap:10px}
+.bar-msg{flex:1;font-size:12.5px;color:var(--n-500);display:flex;align-items:center;gap:6px}
+.bar-msg .dot-ok{width:6px;height:6px;border-radius:50%;background:var(--ok)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:36px;
+  padding:0 16px;border-radius:8px;font-size:13.5px;font-weight:500;transition:all .15s;
+  white-space:nowrap}
+.btn-pri{background:var(--brand);color:var(--n-50)}
+[data-theme="dark"] .btn-pri{color:#0f1319}
+.btn-pri:hover{background:var(--brand-h);box-shadow:var(--sh-md)}
+.btn-sec{background:var(--n-0);color:var(--n-700);border:1px solid var(--n-200)}
+.btn-sec:hover{background:var(--n-50);border-color:var(--n-300)}
+
+@media(max-width:820px){
+  .layout{grid-template-columns:1fr;gap:20px}
+  .tabs{position:static;flex-direction:row;overflow-x:auto;padding-bottom:8px;
+    border-bottom:1px solid var(--n-200);gap:6px}
+  .tab{white-space:nowrap}
+  .field-row{grid-template-columns:1fr;gap:10px}
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="topbar">
+    <a class="back" href="#" aria-label="返回">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+    </a>
+    <h1 class="page-title">设置</h1>
+    <button class="theme-toggle" id="theme-toggle" aria-label="切换主题">
+      <svg class="moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/></svg>
+      <svg class="sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+  </div>
+
+  <div class="layout">
+
+    <nav class="tabs" role="tablist">
+      <button class="tab on" role="tab">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>
+        个人资料
+      </button>
+      <button class="tab" role="tab">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        通知
+      </button>
+      <button class="tab" role="tab">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 4.5-3.2 8.2-8 9-4.8-.8-8-4.5-8-9V7l8-4z"/></svg>
+        安全
+      </button>
+      <button class="tab" role="tab">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/></svg>
+        账单
+      </button>
+    </nav>
+
+    <div>
+      <!-- 个人资料 -->
+      <section class="section on">
+        <div class="sec-head">
+          <h2>个人资料</h2>
+          <p>这些信息会展示给团队成员和外部协作方。</p>
+        </div>
+
+        <div class="field">
+          <div class="field-row">
+            <div>
+              <div class="field-label">显示名称<span class="field-req">*</span></div>
+              <div class="field-hint">建议使用真实姓名，方便团队识别</div>
+            </div>
+            <div>
+              <input class="input" type="text" value="杨凌">
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-row">
+            <div>
+              <div class="field-label">邮箱<span class="field-req">*</span></div>
+              <div class="field-hint">用于登录和接收通知，更改后需要验证</div>
+            </div>
+            <div>
+              <input class="input err" type="email" value="yangling@northwind" aria-invalid="true">
+              <div class="err-msg">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.01"/></svg>
+                邮箱格式不正确，请检查域名部分
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-row">
+            <div>
+              <div class="field-label">职位</div>
+              <div class="field-hint">选填，会显示在你的名片上</div>
+            </div>
+            <div>
+              <input class="input" type="text" placeholder="例如：产品设计师">
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-row">
+            <div>
+              <div class="field-label">时区</div>
+              <div class="field-hint">影响日程、提醒和协作时间显示</div>
+            </div>
+            <div>
+              <select class="select">
+                <option>Asia/Shanghai (UTC+8)</option>
+                <option>Asia/Tokyo (UTC+9)</option>
+                <option>Europe/London (UTC+0)</option>
+                <option>America/Los_Angeles (UTC-8)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-row">
+            <div>
+              <div class="field-label">个人简介</div>
+              <div class="field-hint">最多 200 字，支持纯文本和换行</div>
+            </div>
+            <div>
+              <textarea class="textarea" placeholder="用一两句话介绍你正在做的事…">负责 Northwind 移动端体验，关注设计与工程效率的交叉领域。</textarea>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 通知 -->
+      <section class="section">
+        <div class="sec-head">
+          <h2>通知</h2>
+          <p>控制你希望接收哪些通知，以及通过什么渠道接收。</p>
+        </div>
+
+        <div class="switch-row">
+          <div>
+            <div class="field-label">任务指派</div>
+            <div class="field-hint">当有人把任务指派给你时通知</div>
+          </div>
+          <button class="switch" role="switch" aria-checked="true"></button>
+        </div>
+
+        <div class="switch-row">
+          <div>
+            <div class="field-label">评论与提及</div>
+            <div class="field-hint">当有人在评论中 @ 你，或回复你的评论时通知</div>
+          </div>
+          <button class="switch" role="switch" aria-checked="true"></button>
+        </div>
+
+        <div class="switch-row">
+          <div>
+            <div class="field-label">截止日期提醒</div>
+            <div class="field-hint">任务截止前 24 小时和 1 小时各提醒一次</div>
+          </div>
+          <button class="switch" role="switch" aria-checked="true"></button>
+        </div>
+
+        <div class="switch-row">
+          <div>
+            <div class="field-label">周报摘要</div>
+            <div class="field-hint">每周一早上发送上周的项目进展摘要</div>
+          </div>
+          <button class="switch" role="switch" aria-checked="false"></button>
+        </div>
+
+        <div class="switch-row">
+          <div>
+            <div class="field-label">营销邮件</div>
+            <div class="field-hint">产品更新、活动邀请和行业资讯</div>
+          </div>
+          <button class="switch" role="switch" aria-checked="false"></button>
+        </div>
+
+        <div class="field" style="border-top:1px solid var(--n-200);padding-top:24px">
+          <div class="field-label" style="margin-bottom:12px">通知渠道</div>
+          <div class="radio-group">
+            <label class="radio on">
+              <span class="radio-dot"></span>
+              <div class="radio-body">
+                <div class="radio-title">仅应用内</div>
+                <div class="radio-desc">只在 Northwind 内显示通知，不打扰你的其他应用</div>
+              </div>
+            </label>
+            <label class="radio">
+              <span class="radio-dot"></span>
+              <div class="radio-body">
+                <div class="radio-title">应用内 + 邮件</div>
+                <div class="radio-desc">重要通知同时发送到你的注册邮箱</div>
+              </div>
+            </label>
+            <label class="radio">
+              <span class="radio-dot"></span>
+              <div class="radio-body">
+                <div class="radio-title">全部渠道</div>
+                <div class="radio-desc">应用内 + 邮件 + 桌面推送，第一时间知晓所有动态</div>
+              </div>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- 安全 -->
+      <section class="section">
+        <div class="sec-head">
+          <h2>安全</h2>
+          <p>管理登录方式、会话与账户安全策略。</p>
+        </div>
+
+        <div class="field">
+          <div class="field-row">
+            <div>
+              <div class="field-label">当前密码</div>
+              <div class="field-hint">修改密码前需要验证当前密码</div>
+            </div>
+            <div><input class="input" type="password" value="••••••••••"></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-row">
+            <div>
+              <div class="field-label">新密码</div>
+              <div class="field-hint">至少 12 位，包含大小写字母和数字</div>
+            </div>
+            <div><input class="input" type="password" placeholder="输入新密码"></div>
+          </div>
+        </div>
+
+        <div class="switch-row" style="border-top:1px solid var(--n-200);padding-top:20px">
+          <div>
+            <div class="field-label">两步验证</div>
+            <div class="field-hint">登录时除了密码，还需要输入动态验证码</div>
+          </div>
+          <button class="switch" role="switch" aria-checked="true"></button>
+        </div>
+
+        <div class="switch-row">
+          <div>
+            <div class="field-label">登录提醒</div>
+            <div class="field-hint">在新设备登录时发送邮件提醒</div>
+          </div>
+          <button class="switch" role="switch" aria-checked="true"></button>
+        </div>
+
+        <div class="danger">
+          <div class="danger-head">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 16H3l9-16z"/><path d="M12 10v4M12 17.5v.01"/></svg>
+            <h3>危险操作</h3>
+          </div>
+          <div class="danger-row">
+            <div>
+              <div class="t">退出所有设备</div>
+              <div class="d">立即终止所有已登录会话，包括当前设备</div>
+            </div>
+            <button class="btn-danger">退出全部</button>
+          </div>
+          <div class="danger-row">
+            <div>
+              <div class="t">注销账户</div>
+              <div class="d">删除账户及其全部数据，此操作不可撤销</div>
+            </div>
+            <button class="btn-danger">注销账户</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 账单 -->
+      <section class="section">
+        <div class="sec-head">
+          <h2>账单</h2>
+          <p>查看套餐、发票和付款方式。</p>
+        </div>
+
+        <div class="field">
+          <div class="field-row">
+            <div>
+              <div class="field-label">当前套餐</div>
+              <div class="field-hint">下次续费日期：2025年11月4日</div>
+            </div>
+            <div>
+              <select class="select">
+                <option>Pro — ¥98 / 月</option>
+                <option>Team — ¥198 / 月</option>
+                <option>Enterprise — 联系销售</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-row">
+            <div>
+              <div class="field-label">发票抬头</div>
+              <div class="field-hint">用于开具增值税普通发票</div>
+            </div>
+            <div><input class="input" type="text" placeholder="公司或个人姓名"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div class="bar">
+  <div class="bar-in">
+    <div class="bar-msg">
+      <span class="dot-ok"></span>
+      所有更改已自动保存
+    </div>
+    <button class="btn btn-sec">取消</button>
+    <button class="btn btn-pri">保存更改</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var r=document.documentElement,b=document.getElementById('theme-toggle');
+  b&&b.addEventListener('click',function(){
+    var cur=r.dataset.theme||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
+    var next=cur==='dark'?'light':'dark';
+    r.dataset.theme=next;try{localStorage.setItem('theme',next)}catch(e){}
+  });
+
+  document.querySelectorAll('.tab').forEach(function(t){
+    t.addEventListener('click',function(){
+      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+      document.querySelectorAll('.section').forEach(x=>x.classList.remove('on'));
+      t.classList.add('on');
+      var i=[].indexOf.call(document.querySelectorAll('.tab'),t);
+      document.querySelectorAll('.section')[i].classList.add('on');
+    });
+  });
+
+  document.querySelectorAll('.radio').forEach(function(el){
+    el.addEventListener('click',function(){
+      el.parentNode.querySelectorAll('.radio').forEach(x=>x.classList.remove('on'));
+      el.classList.add('on');
+    });
+  });
+
+  document.querySelectorAll('.switch').forEach(function(el){
+    el.addEventListener('click',function(){
+      el.setAttribute('aria-checked', el.getAttribute('aria-checked')==='true'?'false':'true');
+    });
+  });
+
+  document.querySelectorAll('.checklist li, .box').forEach(function(el){
+    el.addEventListener('click',function(e){
+      var li=el.closest('li'); if(!li) return;
+      li.classList.toggle('done');
+      var bx=li.querySelector('.box'); if(bx) bx.classList.toggle('done');
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+[
+  {
+    "title": "Bb - Rooftop's rain",
+    "id": "01.Rooftops-rain",
+    "file": "https://music.163.com/song/media/outer/url?id=1896609096.mp3",
+    "album": "Phrygian",
+    "platform": "Netease Music",
+    "publishedAt": "2021-11-20",
+    "author": "柏雯",
+    "locale": "zh"
+  },
+  {
+    "title": "Unreasonable",
+    "id": "02.Unreasonable",
+    "file": "https://music.163.com/song/media/outer/url?id=2090922639.mp3",
+    "album": "黑暗中的黎明",
+    "platform": "Netease Music",
+    "publishedAt": "2023-10-15",
+    "author": "柏雯",
+    "locale": "zh"
+  },
+  {
+    "title": "Spinach girl（波菜女孩）",
+    "id": "03.Spinach-Girl",
+    "file": "https://music.163.com/song/media/outer/url?id=2118906263.mp3",
+    "album": "Dancing",
+    "platform": "Netease Music",
+    "publishedAt": "2024-01-10",
+    "author": "柏雯",
+    "locale": "zh"
+  },
+  {
+    "title": "你会在下一个夏天等我吗(Plastic Memories)",
+    "id": "04.Plastic-Memories",
+    "file": "https://music.163.com/song/media/outer/url?id=2073594296.mp3",
+    "album": "Chill Waves",
+    "platform": "Netease Music",
+    "publishedAt": "2023-08-15",
+    "author": "柏雯",
+    "locale": "zh"
+  },
+  {
+    "title": "Goodbye",
+    "id": "05.Goodbye",
+    "file": "https://music.163.com/song/media/outer/url?id=2113453159.mp3",
+    "album": "Round 2",
+    "platform": "Netease Music",
+    "publishedAt": "2023-12-31",
+    "author": "柏雯",
+    "locale": "zh"
+  },
+  {
+    "title": "Levin Thunder",
+    "id": "06.levin-thunder",
+    "file": "https://music.163.com/song/media/outer/url?id=2115612224.mp3",
+    "album": "Focusing",
+    "platform": "Netease Music",
+    "publishedAt": "2024-01-06",
+    "author": "柏雯",
+    "locale": "zh"
+  }
+]

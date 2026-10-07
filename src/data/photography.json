@@ -1,0 +1,10 @@
+[
+  {"id":"photo-morning","title":{"zh":"晨光小屋","en":"A House in Morning Light"},"description":{"zh":"晨光里的乡间小屋。","en":"A cottage in the morning light."},"placeholder":"morning","url":""},
+  {"id":"photo-garden","title":{"zh":"花园深处","en":"Deep in the Garden"},"description":{"zh":"拱门之后，花丛深处。","en":"Past the arch, deep in the flowers."},"placeholder":"garden","url":""},
+  {"id":"photo-rain","title":{"zh":"雨中的窗","en":"A Window in the Rain"},"description":{"zh":"雨点落在窗玻璃上。","en":"Rain falling against the window."},"placeholder":"rain","url":""},
+  {"id":"photo-seaside","title":{"zh":"海边散步","en":"Walk by the Sea"},"description":{"zh":"沿着海岸慢慢走。","en":"A slow walk along the shore."},"placeholder":"seaside","url":""},
+  {"id":"photo-evening","title":{"zh":"傍晚回家","en":"Coming Home at Dusk"},"description":{"zh":"天色将暗，灯亮起来。","en":"The lights come on as dusk falls."},"placeholder":"evening","url":""},
+  {"id":"photo-green","title":{"zh":"雨后新绿","en":"New Green after Rain"},"description":{"zh":"雨后的一抹新绿。","en":"Fresh green after the rain."},"placeholder":"green","url":""},
+  {"id":"photo-night","title":{"zh":"夜色小镇","en":"A Town at Night"},"description":{"zh":"小镇的灯，一直亮到深夜。","en":"The town keeps its lights on late."},"placeholder":"night","url":""},
+  {"id":"photo-coast","title":{"zh":"海风","en":"Sea Breeze"},"description":{"zh":"风吹过草坡与海面。","en":"Wind over the grass and the sea."},"placeholder":"coast","url":""}
+]

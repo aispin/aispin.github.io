@@ -1,0 +1,199 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 800" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FAFBFC"/>
+      <stop offset="100%" stop-color="#EEF2F6"/>
+    </linearGradient>
+    <clipPath id="cp1"><rect x="35" y="110" width="190" height="400" rx="14"/></clipPath>
+    <clipPath id="cp2"><rect x="245" y="110" width="190" height="400" rx="14"/></clipPath>
+    <clipPath id="cp3"><rect x="455" y="110" width="190" height="400" rx="14"/></clipPath>
+    <clipPath id="cp4"><rect x="665" y="110" width="190" height="400" rx="14"/></clipPath>
+    <clipPath id="cp5"><rect x="875" y="110" width="190" height="400" rx="14"/></clipPath>
+  </defs>
+
+  <rect width="1100" height="800" fill="url(#bg)"/>
+
+  <!-- 标题 -->
+  <text x="35" y="48" font-size="26" font-weight="700" fill="#0F172A">Web3D 技术栈能力对比与场景选型</text>
+  <text x="35" y="76" font-size="13" fill="#64748B">浏览器与硬件成熟度已就位 · 以 3D 应用为例的选型参考</text>
+
+  <!-- ============ 卡片 1: SVG ============ -->
+  <rect x="35" y="110" width="190" height="400" rx="14" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5"/>
+  <rect x="35" y="110" width="190" height="5" fill="#F59E0B" clip-path="url(#cp1)"/>
+  <text x="53" y="146" font-size="19" font-weight="700" fill="#0F172A">SVG</text>
+  <rect x="53" y="160" width="76" height="22" rx="11" fill="#FEF3C7"/>
+  <text x="91" y="175" font-size="11" fill="#B45309" text-anchor="middle">矢量 2D</text>
+  <line x1="53" y1="198" x2="207" y2="198" stroke="#F1F5F9" stroke-width="1"/>
+
+  <text x="53" y="222" font-size="11" fill="#64748B">3D 表达力</text>
+  <rect x="119" y="214.5" width="88" height="7" rx="3.5" fill="#F1F5F9"/>
+  <rect x="119" y="214.5" width="35.2" height="7" rx="3.5" fill="#F59E0B"/>
+
+  <text x="53" y="260" font-size="11" fill="#64748B">运行性能</text>
+  <rect x="119" y="252.5" width="88" height="7" rx="3.5" fill="#F1F5F9"/>
+  <rect x="119" y="252.5" width="52.8" height="7" rx="3.5" fill="#F59E0B"/>
+
+  <text x="53" y="298" font-size="11" fill="#64748B">开发效率</text>
+  <rect x="119" y="290.5" width="88" height="7" rx="3.5" fill="#F1F5F9"/>
+  <rect x="119" y="290.5" width="88" height="7" rx="3.5" fill="#F59E0B"/>
+
+  <text x="53" y="336" font-size="11" fill="#64748B">生态成熟度</text>
+  <rect x="119" y="328.5" width="88" height="7" rx="3.5" fill="#F1F5F9"/>
+  <rect x="119" y="328.5" width="88" height="7" rx="3.5" fill="#F59E0B"/>
+
+  <rect x="53" y="360" width="154" height="110" rx="10" fill="#FFFBEB"/>
+  <text x="65" y="382" font-size="11" font-weight="600" fill="#B45309">适用场景</text>
+  <text x="65" y="404" font-size="11.5" fill="#78350F">图标 · Logo · UI 装饰</text>
+  <text x="65" y="424" font-size="11.5" fill="#78350F">轻量插图 · 矢量动效</text>
+  <text x="65" y="444" font-size="11.5" fill="#78350F">可无限缩放图形</text>
+
+  <!-- ============ 卡片 2: Canvas 2D ============ -->
+  <rect x="245" y="110" width="190" height="400" rx="14" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5"/>
+  <rect x="245" y="110" width="190" height="5" fill="#3B82F6" clip-path="url(#cp2)"/>
+  <text x="263" y="146" font-size="19" font-weight="700" fill="#0F172A">Canvas 2D</text>
+  <rect x="263" y="160" width="76" height="22" rx="11" fill="#DBEAFE"/>
+  <text x="301" y="175" font-size="11" fill="#1D4ED8" text-anchor="middle">栅格 2D</text>
+  <line x1="263" y1="198" x2="417" y2="198" stroke="#F1F5F9" stroke-width="1"/>
+
+  <text x="263" y="222" font-size="11" fill="#64748B">3D 表达力</text>
+  <rect x="329" y="214.5" width="88" height="7" rx="3.5" fill="#F1F5F9"/>
+  <rect x="329" y="214.5" width="35.2" height="7" rx="3.5" fill="#3B82F6"/>
+
+  <text x="263" y="260" font-size="11" fill="#64748B">运行性能</text>
+  <rect x="329" y="252.5" width="88" height="7" rx="3.5" fill="#F1F5F9"/>
+  <rect x="329" y="252.5" width="52.8" height="7" rx="3.5" fill="#3B82F6"/>
+
+  <text x="263" y="298" font-size="11" fill="#64748B">开发效率</text>
+  <rect x="329" y="290.5" width="88" height="7" rx="3.5" fill="#F1F5F9"/>
+  <rect x="329" y="290.5" width="70.4" height="7" rx="3.5" fill="#3B82F6"/>
+
+  <text x="263" y="336" font-size="11" fill="#64748B">生态成熟度</text>
+  <rect x="329" y="328.5" width="88" height="7" rx="3.5" fill="#F1F5F9"/>
+  <rect x="329" y="328.5" width="70.4" height="7" rx="3.5" fill="#3B82F6"/>
+
+  <rect x="263" y="360" width="154" height="110" rx="10" fill="#EFF6FF"/>
+  <text x="275" y="382" font-size="11" font-weight="600" fill="#1D4ED8">适用场景</text>
+  <text x="275" y="404" font-size="11.5" fill="#1E3A8A">数据图表 · 粒子背景</text>
+  <text x="275" y="424" font-size="11.5" fill="#1E3A8A">2D 小游戏 · 图像处理</text>
+  <text x="275" y="444" font-size="11.5" fill="#1E3A8A">伪 3D 等距视图</text>
+
+  <!-- ============ 卡片 3: WebGL ============ -->
+  <rect x="455" y="110" width="190" height="400" rx="14" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5"/>
+  <rect x="455" y="110" width="190" height="5" fill="#EF4444" clip-path="url(#cp3)"/>
+  <text x="473" y="146" font-size="19" font-weight="700" fill="#0F172A">WebGL</text>
+  <rect x="473" y="160" width="88" height="22" rx="11" fill="#FEE2E2"/>
+  <text x="517" y="175" font-size="11" fill="#B91C1C" text-anchor="middle">底层图形 API</text>
+  <line x1="473" y1="198" x2="627" y2="198" stroke="#F1F5F9" stroke-width="1"/>
+
+  <text x="473" y="222" font-size="11" fill="#64748B">3D 表达力</text>
+  <rect x="539" y="214.5" width="88" height="7" rx="3.5" fill="#F1F5F9"/>
+  <rect x="539" y="214.5" width="88" height="7" rx="3.5" fill="#EF4444"/>
+
+  <text x="473" y="260" font-size="11" fill="#64748B">运行性能</text>
+  <rect x="539" y="252.5" width="88" height="7" rx="3.5" fill="#F1F5F9"/>
+  <rect x="539" y="252.5" width="88" height="7" rx="3.5" fill="#EF4444"/>
+
+  <text x="473" y="298" font-size="11" fill="#64748B">开发效率</text>
+  <rect x="539" y="290.5" width="88" height="7" rx="3.5" fill="#F1F5F9"/>
+  <rect x="539" y="290.5" width="35.2" height="7" rx="3.5" fill="#EF4444"/>
+
+  <text x="473" y="336" font-size="11" fill="#64748B">生态成熟度</text>
+  <rect x="539" y="328.5" width="88" height="7" rx="3.5" fill="#F1F5F9"/>
+  <rect x="539" y="328.5" width="52.8" height="7" rx="3.5" fill="#EF4444"/>
+
+  <rect x="473" y="360" width="154" height="110" rx="10" fill="#FEF2F2"/>
+  <text x="485" y="382" font-size="11" font-weight="600" fill="#B91C1C">适用场景</text>
+  <text x="485" y="404" font-size="11.5" fill="#7F1D1D">自定义渲染管线</text>
+  <text x="485" y="424" font-size="11.5" fill="#7F1D1D">极致性能优化</text>
+  <text x="485" y="444" font-size="11.5" fill="#7F1D1D">特殊图形算法</text>
+
+  <!-- ============ 卡片 4: Three.js ============ -->
+  <rect x="665" y="110" width="190" height="400" rx="14" fill="#FFFFFF" stroke="#10B981" stroke-width="2.5"/>
+  <rect x="665" y="110" width="190" height="5" fill="#10B981" clip-path="url(#cp4)"/>
+  <text x="683" y="146" font-size="19" font-weight="700" fill="#0F172A">Three.js</text>
+  <rect x="683" y="160" width="76" height="22" rx="11" fill="#D1FAE5"/>
+  <text x="721" y="175" font-size="11" fill="#047857" text-anchor="middle">3D 应用框架</text>
+  <line x1="683" y1="198" x2="837" y2="198" stroke="#F1F5F9" stroke-width="1"/>
+
+  <text x="683" y="222" font-size="11" fill="#64748B">3D 表达力</text>
+  <rect x="749" y="214.5" width="88" height="7" rx="3.5" fill="#F1F5F9"/>
+  <rect x="749" y="214.5" width="88" height="7" rx="3.5" fill="#10B981"/>
+
+  <text x="683" y="260" font-size="11" fill="#64748B">运行性能</text>
+  <rect x="749" y="252.5" width="88" height="7" rx="3.5" fill="#F1F5F9"/>
+  <rect x="749" y="252.5" width="88" height="7" rx="3.5" fill="#10B981"/>
+
+  <text x="683" y="298" font-size="11" fill="#64748B">开发效率</text>
+  <rect x="749" y="290.5" width="88" height="7" rx="3.5" fill="#F1F5F9"/>
+  <rect x="749" y="290.5" width="88" height="7" rx="3.5" fill="#10B981"/>
+
+  <text x="683" y="336" font-size="11" fill="#64748B">生态成熟度</text>
+  <rect x="749" y="328.5" width="88" height="7" rx="3.5" fill="#F1F5F9"/>
+  <rect x="749" y="328.5" width="88" height="7" rx="3.5" fill="#10B981"/>
+
+  <rect x="683" y="360" width="154" height="110" rx="10" fill="#ECFDF5"/>
+  <text x="695" y="382" font-size="11" font-weight="600" fill="#047857">适用场景</text>
+  <text x="695" y="404" font-size="11.5" fill="#064E3B">3D 场景 · 模型 · 光照</text>
+  <text x="695" y="424" font-size="11.5" fill="#064E3B">产品展示 · 数字孪生</text>
+  <text x="695" y="444" font-size="11.5" fill="#064E3B">Web 3D 游戏</text>
+
+  <!-- ============ 卡片 5: GLSL ============ -->
+  <rect x="875" y="110" width="190" height="400" rx="14" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5"/>
+  <rect x="875" y="110" width="190" height="5" fill="#8B5CF6" clip-path="url(#cp5)"/>
+  <text x="893" y="146" font-size="19" font-weight="700" fill="#0F172A">GLSL</text>
+  <rect x="893" y="160" width="76" height="22" rx="11" fill="#EDE9FE"/>
+  <text x="931" y="175" font-size="11" fill="#6D28D9" text-anchor="middle">着色器程序</text>
+  <line x1="893" y1="198" x2="1047" y2="198" stroke="#F1F5F9" stroke-width="1"/>
+
+  <text x="893" y="222" font-size="11" fill="#64748B">3D 表达力</text>
+  <rect x="959" y="214.5" width="88" height="7" rx="3.5" fill="#F1F5F9"/>
+  <rect x="959" y="214.5" width="70.4" height="7" rx="3.5" fill="#8B5CF6"/>
+
+  <text x="893" y="260" font-size="11" fill="#64748B">运行性能</text>
+  <rect x="959" y="252.5" width="88" height="7" rx="3.5" fill="#F1F5F9"/>
+  <rect x="959" y="252.5" width="88" height="7" rx="3.5" fill="#8B5CF6"/>
+
+  <text x="893" y="298" font-size="11" fill="#64748B">开发效率</text>
+  <rect x="959" y="290.5" width="88" height="7" rx="3.5" fill="#F1F5F9"/>
+  <rect x="959" y="290.5" width="35.2" height="7" rx="3.5" fill="#8B5CF6"/>
+
+  <text x="893" y="336" font-size="11" fill="#64748B">生态成熟度</text>
+  <rect x="959" y="328.5" width="88" height="7" rx="3.5" fill="#F1F5F9"/>
+  <rect x="959" y="328.5" width="52.8" height="7" rx="3.5" fill="#8B5CF6"/>
+
+  <rect x="893" y="360" width="154" height="110" rx="10" fill="#F5F3FF"/>
+  <text x="905" y="382" font-size="11" font-weight="600" fill="#6D28D9">适用场景</text>
+  <text x="905" y="404" font-size="11.5" fill="#4C1D95">材质 · 水面 · 天空</text>
+  <text x="905" y="424" font-size="11.5" fill="#4C1D95">后处理 · 程序化纹理</text>
+  <text x="905" y="444" font-size="11.5" fill="#4C1D95">顶点动画 · 粒子特效</text>
+
+  <!-- ============ 选型建议 ============ -->
+  <text x="35" y="558" font-size="16" font-weight="700" fill="#0F172A">选型速查</text>
+
+  <rect x="35" y="578" width="330" height="170" rx="14" fill="#FFFBEB" stroke="#FDE68A" stroke-width="1.5"/>
+  <rect x="35" y="578" width="5" height="170" rx="2.5" fill="#F59E0B"/>
+  <text x="58" y="610" font-size="14" font-weight="700" fill="#92400E">装饰 / 2D / 伪 3D</text>
+  <text x="58" y="638" font-size="12" fill="#78350F">图标、Logo、分隔线、图表、粒子背景</text>
+  <text x="58" y="660" font-size="12" fill="#78350F">等距插图、矢量动效</text>
+  <rect x="58" y="686" width="150" height="28" rx="14" fill="#F59E0B"/>
+  <text x="133" y="705" font-size="12.5" font-weight="600" fill="#FFFFFF" text-anchor="middle">SVG · Canvas 2D</text>
+  <text x="58" y="735" font-size="11" fill="#A16207">轻量、可访问、无需 GPU</text>
+
+  <rect x="385" y="578" width="330" height="170" rx="14" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1.5"/>
+  <rect x="385" y="578" width="5" height="170" rx="2.5" fill="#10B981"/>
+  <text x="408" y="610" font-size="14" font-weight="700" fill="#047857">真 3D 场景与应用 ★ 推荐</text>
+  <text x="408" y="638" font-size="12" fill="#064E3B">3D 展示、产品配置器、数字孪生</text>
+  <text x="408" y="660" font-size="12" fill="#064E3B">Web 3D 游戏、空间导览</text>
+  <rect x="408" y="686" width="170" height="28" rx="14" fill="#10B981"/>
+  <text x="493" y="705" font-size="12.5" font-weight="600" fill="#FFFFFF" text-anchor="middle">Three.js + GLSL</text>
+  <text x="408" y="735" font-size="11" fill="#059669">覆盖 90% 以上的 3D 需求</text>
+
+  <rect x="735" y="578" width="330" height="170" rx="14" fill="#FEF2F2" stroke="#FECACA" stroke-width="1.5"/>
+  <rect x="735" y="578" width="5" height="170" rx="2.5" fill="#EF4444"/>
+  <text x="758" y="610" font-size="14" font-weight="700" fill="#B91C1C">极致性能 / 自定义管线</text>
+  <text x="758" y="638" font-size="12" fill="#7F1D1D">自研引擎、特殊渲染算法</text>
+  <text x="758" y="660" font-size="12" fill="#7F1D1D">超大规模实例化、后处理链</text>
+  <rect x="758" y="686" width="160" height="28" rx="14" fill="#EF4444"/>
+  <text x="838" y="705" font-size="12.5" font-weight="600" fill="#FFFFFF" text-anchor="middle">WebGL + GLSL</text>
+  <text x="758" y="735" font-size="11" fill="#DC2626">开发成本高，仅在必要时下沉</text>
+</svg>

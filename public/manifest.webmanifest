@@ -1,0 +1,46 @@
+{
+  "name": "AISPIN · 3D 个人主页",
+  "short_name": "AISPIN",
+  "description": "温馨动漫风的 3D 个人主页：档案、摄影、项目、文章、视频、音乐、AI Skills 与联系方式，一条走廊串起八个房间。",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#FFF6E9",
+  "theme_color": "#FFF6E9",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "categories": ["portfolio", "personal"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/app-icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "文章 · Posts",
+      "url": "/posts",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "摄影 · Gallery",
+      "url": "/gallery",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "AI+ · Skills",
+      "url": "/ai",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+// ContentRoom — the room content is now a wall of procedural 3D cards drawn on
+// <canvas> (see ContentRoom.jsx). There is deliberately NO DOM panel any more:
+// the old drei <Html center> panel carried its own `translate(-50%, -50%)` on
+// top of drei's own centring transform, which pushed it half a panel to the
+// left and clipped ~105px off the left edge on a 1600x900 viewport.
+//
+// What is left here is the screen-reader mirror of the card wall, rendered
+// through a portal so assistive tech can still read (and open) every item.
+
+.content-room-a11y {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+
+  ul {
+    list-style: none;
+  }
+
+  a {
+    color: inherit;
+  }
+}

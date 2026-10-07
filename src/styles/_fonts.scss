@@ -1,0 +1,46 @@
+// =============================================================================
+// WEBFONTS
+// =============================================================================
+//
+// MapleUI is the DOM/CSS face, built by scripts/build-scene-fonts.py from
+// MapleMono-CN-Regular.ttf — a single Regular weight, subset to every
+// character that appears anywhere in src/ so the UI never has to fall back
+// mid-string.
+//
+// This @font-face was MISSING, and its absence was visible in three ways at
+// once:
+//
+//   1. index.html preloads /fonts/maple-ui.woff2 at high priority and sw.js
+//      precaches it, so 89 KB was downloaded on every first visit —
+//   2. ...and then never used, which is exactly what Chrome was warning about
+//      ("preloaded using link preload but not used within a few seconds");
+//   3. the three stylesheets that ask for 'MapleUI' (HudControls,
+//      MarkdownBody, NavigationUI) plus theme.js had no such family to
+//      resolve, so every one of them silently fell through to the generic
+//      `monospace` keyword.
+//
+// The font stacks deliberately put 'Maple Mono' FIRST: a visitor who has the
+// real Maple Mono installed gets the full font, and everyone else gets this
+// subset instead of a generic monospace. That only works if 'MapleUI' exists.
+//
+// `font-weight: 400 500` rather than a single value: the source has one real
+// weight, and the sheets above ask for both 400 and 500. Declaring the range
+// maps both to the real Regular face instead of letting the browser fake a
+// semi-bold for the 500s.
+//
+// `font-display: swap` is right here — the file is preloaded, so it normally
+// arrives before first paint, but a slow link should still show text rather
+// than a blank HUD.
+//
+// The .woff is the same subset in the older flavour, kept as the fallback for
+// browsers without woff2 support.
+
+@font-face {
+    font-family: 'MapleUI';
+    src:
+        url('/fonts/maple-ui.woff2') format('woff2'),
+        url('/fonts/maple-ui.woff') format('woff');
+    font-weight: 400 500;
+    font-style: normal;
+    font-display: swap;
+}

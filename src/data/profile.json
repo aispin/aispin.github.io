@@ -1,0 +1,36 @@
+{
+  "name": "黄泽昊",
+  "alias": "mamboer",
+  "nameEn": "Levin Wong",
+  "location": "中国深圳",
+  "locationEn": "Shenzhen, China",
+  "tagline": "研发管理 · Web 开发 · 独立音乐人",
+  "taglineEn": "Engineering Manager · Web Developer · Indie Musician",
+  "summary": "15+ 年互联网大厂研发经验，其中 7 年研发管理。现专注于 AI Skills 与 AI 应用开发，也持续创作原创音乐。",
+  "summaryEn": "15+ years in engineering, including 7 years leading teams. Now focused on AI skills and applications, while continuing to write original music.",
+  "education": {
+    "school": "东华大学",
+    "period": "2002–2006",
+    "major": "信息管理与信息系统"
+  },
+  "educationEn": {
+    "school": "Donghua University",
+    "period": "2002–2006",
+    "major": "Information Management and Information Systems"
+  },
+  "email": "mamboer@gmail.com",
+  "wechat": "mamboer",
+  "github": "https://github.com/aispin",
+  "skills": [
+    "AI Skills",
+    "AI Application Development",
+    "Engineering Management",
+    "React",
+    "Vue",
+    "Nuxt",
+    "Node.js",
+    "TypeScript",
+    "Swift",
+    "SwiftUI"
+  ]
+}

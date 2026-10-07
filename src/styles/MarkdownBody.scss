@@ -1,0 +1,74 @@
+.markdown-body {
+  overflow-wrap: anywhere;
+  color: #5A4636;
+  font: 400 14px/1.8 'Maple Mono', 'MapleUI', monospace;
+
+  h1, h2, h3, h4 { margin: 1.4em 0 .55em; color: #5A4636; font-weight: 500; line-height: 1.35; }
+  h1 { font-size: 1.45em; }
+  h2 { font-size: 1.3em; }
+  h3 { font-size: 1.15em; }
+  p { margin: .7em 0; }
+  ul { padding-left: 1.4em; }
+  li { margin: .35em 0; }
+  blockquote { margin: 1em 0; padding: .1em 1em; border-left: 3px solid #C89B7B; background: rgba(200,155,123,.12); }
+  a { color: #8A5C3D; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  code { padding: .12em .35em; border-radius: 4px; background: rgba(200,155,123,.16); font-size: .9em; }
+  pre { overflow: auto; padding: 1em; border-radius: 10px; background: #F1E8DA; white-space: pre; }
+  pre code { padding: 0; background: none; }
+
+  /* Tables. The OKR article is largely tables, and the article column is
+   * narrow, so the wrapper scrolls horizontally instead of letting a wide
+   * table blow the column out. */
+  .markdown-table-wrap {
+    overflow-x: auto;
+    margin: 1.15em 0;
+    border: 1px solid rgba(200, 155, 123, .38);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, .45);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: .95em; }
+  th, td {
+    padding: .5em .8em;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid rgba(200, 155, 123, .28);
+  }
+  th {
+    background: rgba(200, 155, 123, .18);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+
+  /* Article figures. The Docker diagrams are 950-1283 px wide and the
+   * overlay is narrower, so they always scale down; `display: block` keeps
+   * a standalone figure on its own row and centres it. */
+  .markdown-image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 1.15em auto;
+    border-radius: 10px;
+    border: 1px solid rgba(200, 155, 123, .38);
+    background: #fff;
+    box-shadow: 0 2px 10px rgba(90, 70, 54, .07);
+  }
+}
+
+html[data-theme='dark'] .markdown-body {
+  color: #F5E8D9;
+  h1, h2, h3, h4 { color: #F5E8D9; }
+  a { color: #FFD9C0; }
+  pre { background: #211D1A; }
+  .markdown-table-wrap {
+    border-color: rgba(255, 217, 192, .22);
+    background: rgba(255, 255, 255, .04);
+  }
+  th, td { border-bottom-color: rgba(255, 217, 192, .16); }
+  th { background: rgba(255, 217, 192, .10); }
+  .markdown-image {
+    border-color: rgba(255, 217, 192, .22);
+    background: #F1E8DA;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .35);
+  }
+}

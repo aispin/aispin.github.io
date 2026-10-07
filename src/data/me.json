@@ -1,0 +1,108 @@
+{
+  "_comment": [
+    "/me 页面的编辑性文案。所有会变的内容都放这里，代码里不留硬编码字符串。",
+    "纯数据（姓名、邮箱、作品、曲目）不重复写在这里 —— meData.js 会去 profile.json /",
+    "projects.json / music.json 里取，避免同一个事实存两份、改一处漏一处。",
+    "items[].projectId 对应 projects.json 的 id；改作品只改这个 id。"
+  ],
+
+  "brand": "ZEO",
+
+  "badge": {
+    "zh": "现在在做 AI Skills 与原创音乐",
+    "en": "Currently building AI skills and writing music"
+  },
+
+  "heroTagline": {
+    "zh": "在代码、像素和声音之间游走。做一些安静的、需要耐心的东西。",
+    "en": "Drifting between code, pixels and sound — quiet things that take patience."
+  },
+
+  "nav": [
+    { "id": "roles", "zh": "身份", "en": "Roles" },
+    { "id": "works", "zh": "作品", "en": "Works" },
+    { "id": "music", "zh": "音乐", "en": "Music" },
+    { "id": "contact", "zh": "联系", "en": "Contact" }
+  ],
+
+  "roles": {
+    "eyebrow": { "zh": "三种身份", "en": "Three roles" },
+    "title": { "zh": "三件事，一直在做", "en": "Three things, kept at it" },
+    "desc": {
+      "zh": "它们不是三个标签，而是同一种好奇心的三种表达方式。",
+      "en": "Not three labels — three expressions of the same curiosity."
+    },
+    "items": [
+      {
+        "key": "dev",
+        "icon": "code",
+        "title": { "zh": "研发管理", "en": "Engineering Manager" },
+        "desc": {
+          "zh": "15+ 年互联网研发，其中 7 年带队。做过地铁系统国产化替代、歪马送酒小程序、京东羚珑智能设计平台。喜欢把复杂的事拆简单，再交给合适的人。",
+          "en": "15+ years in engineering, 7 of them leading teams — metro system localisation, the Waima liquor mini-program, JD's Linglong design platform. I like making complex things simple, then handing them to the right people."
+        },
+        "tags": ["Engineering Management", "React", "Vue", "Node.js"]
+      },
+      {
+        "key": "ai",
+        "icon": "spark",
+        "title": { "zh": "AI Skills 与应用", "en": "AI Skills & Apps" },
+        "desc": {
+          "zh": "把重复劳动写成技能：视频剪辑、热点选题、文案、UI 验收、图标生成……开源的 iskill- 系列已经能跑完整条内容流水线。这个站点本身也是它们的产物。",
+          "en": "Turning repetitive work into skills — video clipping, topic scouting, copywriting, UI verification, icon generation. The open-source iskill- series already runs a full content pipeline, and this very site is one of its outputs."
+        },
+        "tags": ["AI Skills", "TypeScript", "Three.js", "WebGL"]
+      },
+      {
+        "key": "music",
+        "icon": "wave",
+        "title": { "zh": "独立音乐人", "en": "Indie Musician" },
+        "desc": {
+          "zh": "用模拟合成器和采样做 lo-fi 与氛围音乐，在网易云发了 6 首。这个页面的背景音也是现场合成的 —— 没有一个音频文件。",
+          "en": "Lo-fi and ambient music made with analog synths and samples — six tracks on Netease. Even the sound on this page is synthesised live; there is not a single audio file."
+        },
+        "tags": ["Lo-fi", "Ambient", "Modular", "Netease"]
+      }
+    ]
+  },
+
+  "works": {
+    "eyebrow": { "zh": "作品", "en": "Works" },
+    "title": { "zh": "近期在做的事", "en": "What I've been building" },
+    "desc": {
+      "zh": "一些做完了、一些还在做、一些永远不会做完。",
+      "en": "Some finished, some still going, some that will never be done."
+    },
+    "items": [
+      { "projectId": "105.aifire", "kind": { "zh": "产品", "en": "Product" }, "visual": "orbit", "span": "lg" },
+      { "projectId": "106.gitalk", "kind": { "zh": "开源", "en": "Open source" }, "visual": "chart", "span": "sm" },
+      { "projectId": "103.linglong-01", "kind": { "zh": "平台", "en": "Platform" }, "visual": "rings", "span": "sm" }
+    ]
+  },
+
+  "music": {
+    "eyebrow": { "zh": "音乐", "en": "Music" },
+    "title": { "zh": "深夜写的旋律", "en": "Melodies written late" },
+    "desc": {
+      "zh": "点一下播放试试 —— 这段声音是浏览器现场合成的，没有任何音频文件。下面是我真正发行过的曲子。",
+      "en": "Press play — this sound is synthesised live in your browser, with no audio file involved. Below are the tracks I have actually released."
+    },
+    "proceduralTitle": { "zh": "程序化氛围曲", "en": "Procedural ambient" },
+    "proceduralMeta": { "zh": "Web Audio · 现场合成 · 循环", "en": "Web Audio · live synthesis · loop" },
+    "listTitle": { "zh": "已发行", "en": "Released" }
+  },
+
+  "contact": {
+    "eyebrow": { "zh": "联系", "en": "Contact" },
+    "title": { "zh": "有想法，聊聊？", "en": "Got something in mind?" },
+    "desc": {
+      "zh": "接受独立项目、AI 技能合作与音乐交流。也欢迎来 3D 房子里坐坐。",
+      "en": "Open to indie projects, AI-skill collaborations and music talk. You are also welcome to step into the 3D house."
+    }
+  },
+
+  "footerNote": {
+    "zh": "用一种更慢的方式做事",
+    "en": "A slower way of doing things"
+  }
+}

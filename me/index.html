@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>ZEO — 研发管理 · Web 开发 · 独立音乐人</title>
+  <meta name="description"
+    content="ZEO（黄泽昊）的个人名片页：研发管理与 AI Skills 开发者、Web 工程师、独立音乐人。15+ 年互联网研发经验，开源 iskill- 系列 AI 技能。" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://aispin.github.io/me/" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="profile" />
+  <meta property="og:title" content="ZEO — 研发管理 · Web 开发 · 独立音乐人" />
+  <meta property="og:description"
+    content="15+ 年互联网研发，7 年带队。现在做 AI Skills 与原创音乐。也欢迎走进我的 3D 房子。" />
+  <meta property="og:url" content="https://aispin.github.io/me/" />
+  <meta property="og:site_name" content="AISPIN" />
+  <meta property="og:image" content="https://aispin.github.io/og-image.webp" />
+  <meta property="og:locale" content="zh_CN" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="ZEO — 研发管理 · Web 开发 · 独立音乐人" />
+  <meta name="twitter:description" content="15+ 年互联网研发，7 年带队。现在做 AI Skills 与原创音乐。" />
+  <meta name="twitter:image" content="https://aispin.github.io/og-image.webp" />
+
+  <!-- 主题在 CSS 之前落定，避免刷新时闪一下浅色 -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('aispin-theme');
+        if (t !== 'light' && t !== 'dark') {
+          t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.dataset.theme = t;
+        document.documentElement.lang =
+          localStorage.getItem('aispin-language') === 'en' ? 'en' : 'zh-CN';
+      } catch (e) { /* 隐私模式下 localStorage 会抛，忽略即可 */ }
+    })();
+  </script>
+</head>
+
+<body>
+
+  <!-- WebGL 流体背景 -->
+  <canvas id="gl" aria-hidden="true"></canvas>
+  <div class="grain" aria-hidden="true"></div>
+
+  <!-- 导航 -->
+  <nav>
+    <div class="nav-in">
+      <a class="brand" href="#top">
+        <span class="brand-mark" id="nav-brand-text">Z</span>
+      </a>
+      <div class="nav-links" id="nav-links"></div>
+      <div class="nav-actions">
+        <button class="nav-btn" id="lang-toggle" type="button" aria-label="切换语言">EN</button>
+        <button class="nav-btn theme-toggle" id="theme-toggle" type="button" aria-label="切换主题">
+          <svg class="moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" />
+          </svg>
+          <svg class="sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main id="top">
+
+    <!-- Hero -->
+    <header class="hero">
+      <div class="hero-badge">
+        <span class="dot"></span>
+        <span id="hero-badge-text"></span>
+      </div>
+
+      <h1 class="hero-name" id="hero-name">Z<em>EO</em></h1>
+
+      <div class="hero-roles" id="hero-roles"></div>
+
+      <p class="hero-tagline" id="hero-tagline"></p>
+
+      <div class="hero-actions" id="hero-actions"></div>
+
+      <div class="scroll-hint">
+        <span>Scroll</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </div>
+    </header>
+
+    <!-- 身份 -->
+    <section class="block" id="roles">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow" id="roles-eyebrow"></span>
+          <h2 id="roles-title"></h2>
+          <p id="roles-desc"></p>
+        </div>
+        <div class="role-grid" id="role-grid"></div>
+      </div>
+    </section>
+
+    <!-- 作品 -->
+    <section class="block" id="works">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow" id="works-eyebrow"></span>
+          <h2 id="works-title"></h2>
+          <p id="works-desc"></p>
+        </div>
+        <div class="works-grid" id="works-grid"></div>
+      </div>
+    </section>
+
+    <!-- 音乐 -->
+    <section class="music-section" id="music">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow" id="music-eyebrow"></span>
+          <h2 id="music-title"></h2>
+          <p id="music-desc"></p>
+        </div>
+
+        <div class="player">
+          <button class="player-btn" id="play-btn" type="button" aria-label="播放">
+            <svg class="icon-play" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M8 5.5v13c0 .4.5.7.9.5l10.2-6.5a.6.6 0 0 0 0-1L8.9 5A.6.6 0 0 0 8 5.5z" />
+            </svg>
+            <svg class="icon-pause" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <rect x="7" y="5" width="3.5" height="14" rx="1.2" />
+              <rect x="13.5" y="5" width="3.5" height="14" rx="1.2" />
+            </svg>
+          </button>
+
+          <div class="player-body">
+            <div class="player-head">
+              <span class="player-title" id="player-title"></span>
+              <span class="player-meta" id="player-meta"></span>
+            </div>
+            <div class="player-wave" id="wave-wrap">
+              <canvas id="wave" aria-hidden="true"></canvas>
+            </div>
+          </div>
+
+          <div class="player-side">
+            <div class="player-time" id="elapsed">0:00</div>
+            <select class="theme-select" id="theme-select" aria-label="选择主题"></select>
+          </div>
+        </div>
+
+        <div class="track-list">
+          <div class="track-list-head" id="track-list-head"></div>
+          <div id="track-list"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 联系 -->
+  <footer id="contact">
+    <div class="container">
+      <div class="foot-grid">
+        <div>
+          <span class="eyebrow" id="contact-eyebrow"></span>
+          <h3 id="contact-title"></h3>
+          <p id="contact-desc"></p>
+        </div>
+        <div class="foot-links" id="foot-links"></div>
+      </div>
+
+      <div class="stats" id="stats"></div>
+
+      <div class="foot-bottom">
+        <span id="foot-copy"></span>
+        <span class="mono">Designed &amp; built from scratch · <a href="/">3D house</a></span>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module" src="/src/me/main.js"></script>
+</body>
+
+</html>

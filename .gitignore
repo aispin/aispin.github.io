@@ -1,0 +1,41 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Agent 工作区 —— 默认不进仓库（体积 200MB+ 且与本机路径强相关）
+.workbuddy-ai/*
+
+# ……但把「删了就没了、且不可重建」的部分纳入版本管理：
+# 长期记忆 / 每日日志、无头验证 harness、已结案文档、本次审计与修复脚本、对联日历生成器。
+!.workbuddy-ai/memory/
+!.workbuddy-ai/harness/
+!.workbuddy-ai/done/
+!.workbuddy-ai/audit-*.md
+!.workbuddy-ai/fix-modify-backup-*.sh
+!.workbuddy-ai/gen-couplet-calendar.mjs
+
+# dotenv environment variables file
+.env
+.env.*
+!.env.example
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

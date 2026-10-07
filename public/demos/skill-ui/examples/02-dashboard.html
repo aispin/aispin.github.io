@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pulse — 数据概览</title>
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+<style>
+:root{
+  color-scheme:light;
+  --n-0:#fff;--n-50:#f8f9fb;--n-100:#f1f3f7;--n-200:#e4e7ee;--n-300:#cdd2dd;
+  --n-400:#9aa2b1;--n-500:#6b7280;--n-600:#4a5262;--n-700:#333a48;--n-800:#1f2530;--n-900:#12161d;
+  --brand:#3b5bfd;--brand-h:#2f4ce0;--brand-bg:#eef1ff;
+  --ok:#12855f;--ok-bg:#e6f6f0;--err:#c0392b;--err-bg:#fdecea;--warn:#a86a00;--warn-bg:#fff4e0;
+  --sh-sm:0 1px 2px rgba(18,22,29,.05);
+  --sh-md:0 1px 2px rgba(18,22,29,.04),0 2px 8px rgba(18,22,29,.06);
+  --topbar-bg:rgba(248,249,251,.85);
+}
+[data-theme="dark"]{
+  color-scheme:dark;
+  --n-0:#1a1f28;--n-50:#0f1319;--n-100:#232a35;--n-200:#2d3542;--n-300:#3a4351;
+  --n-400:#6b7280;--n-500:#9aa2b1;--n-600:#b8bfcc;--n-700:#cdd2dd;--n-800:#e4e7ee;--n-900:#f1f3f7;
+  --brand:#6b85ff;--brand-h:#8499ff;--brand-bg:rgba(107,133,255,.14);
+  --ok:#34d399;--ok-bg:rgba(52,211,153,.14);
+  --err:#f87171;--err-bg:rgba(248,113,113,.14);
+  --warn:#fbbf24;--warn-bg:rgba(251,191,36,.14);
+  --sh-sm:0 1px 2px rgba(0,0,0,.4);
+  --sh-md:0 1px 2px rgba(0,0,0,.3),0 2px 8px rgba(0,0,0,.35);
+  --topbar-bg:rgba(15,19,25,.85);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --n-0:#1a1f28;--n-50:#0f1319;--n-100:#232a35;--n-200:#2d3542;--n-300:#3a4351;
+    --n-400:#6b7280;--n-500:#9aa2b1;--n-600:#b8bfcc;--n-700:#cdd2dd;--n-800:#e4e7ee;--n-900:#f1f3f7;
+    --brand:#6b85ff;--brand-h:#8499ff;--brand-bg:rgba(107,133,255,.14);
+    --ok:#34d399;--ok-bg:rgba(52,211,153,.14);
+    --err:#f87171;--err-bg:rgba(248,113,113,.14);
+    --warn:#fbbf24;--warn-bg:rgba(251,191,36,.14);
+    --sh-sm:0 1px 2px rgba(0,0,0,.4);
+    --sh-md:0 1px 2px rgba(0,0,0,.3),0 2px 8px rgba(0,0,0,.35);
+    --topbar-bg:rgba(15,19,25,.85);
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--n-50);color:var(--n-800);line-height:1.5;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;font-size:14px;
+  transition:background-color .18s,color .18s}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:4px}
+button{font:inherit;cursor:pointer;color:inherit}
+
+.app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+.side{background:var(--n-0);border-right:1px solid var(--n-200);
+  padding:20px 12px;display:flex;flex-direction:column;gap:4px;
+  position:sticky;top:0;height:100vh;transition:background-color .18s,border-color .18s}
+.brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px;
+  color:var(--n-900);padding:8px 12px;margin-bottom:16px}
+.brand svg{color:var(--brand)}
+.nav-label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--n-400);padding:12px 12px 6px}
+.nav-item{display:flex;align-items:center;gap:10px;height:36px;padding:0 12px;
+  border-radius:8px;color:var(--n-600);font-size:13.5px;transition:background .12s,color .12s}
+.nav-item svg{flex-shrink:0;opacity:.75}
+.nav-item:hover{background:var(--n-100);color:var(--n-900)}
+.nav-item.on{background:var(--brand-bg);color:var(--brand);font-weight:500}
+.nav-item.on svg{opacity:1}
+.nav-badge{margin-left:auto;font-size:11px;font-weight:600;padding:1px 6px;
+  border-radius:999px;background:var(--err-bg);color:var(--err)}
+.side-foot{margin-top:auto;padding-top:16px;border-top:1px solid var(--n-200)}
+.user{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;cursor:pointer}
+.user:hover{background:var(--n-100)}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--brand);color:var(--n-50);
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}
+[data-theme="dark"] .avatar{color:#0f1319}
+.user-meta{font-size:12.5px;line-height:1.3;overflow:hidden}
+.user-meta b{display:block;font-weight:500;color:var(--n-800)}
+.user-meta span{color:var(--n-400);font-size:11.5px}
+
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;z-index:5;background:var(--topbar-bg);
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--n-200);
+  padding:0 28px;height:60px;display:flex;align-items:center;gap:16px;
+  transition:background-color .18s,border-color .18s}
+.topbar h1{font-size:16px;font-weight:600;margin:0;color:var(--n-900);letter-spacing:-.01em}
+.seg{display:flex;background:var(--n-100);border-radius:8px;padding:2px;margin-left:auto}
+.seg button{border:0;background:transparent;padding:6px 14px;border-radius:6px;
+  font-size:13px;color:var(--n-500);transition:all .15s}
+.seg button.on{background:var(--n-0);color:var(--n-900);box-shadow:var(--sh-sm);font-weight:500}
+.seg button:hover:not(.on){color:var(--n-800)}
+
+.theme-toggle{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;
+  justify-content:center;color:var(--n-500);border:1px solid var(--n-200);
+  background:var(--n-0);cursor:pointer;transition:all .15s;flex-shrink:0}
+.theme-toggle:hover{color:var(--n-900);border-color:var(--n-300)}
+.theme-toggle .sun{display:none}
+[data-theme="dark"] .theme-toggle .sun{display:block}
+[data-theme="dark"] .theme-toggle .moon{display:none}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .theme-toggle .sun{display:block}
+  :root:not([data-theme="light"]) .theme-toggle .moon{display:none}
+}
+
+.content{padding:24px 28px 48px;display:flex;flex-direction:column;gap:20px}
+
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.kpi{background:var(--n-0);border:1px solid var(--n-200);border-radius:12px;padding:18px 20px;
+  transition:border-color .2s,box-shadow .2s,background-color .18s}
+.kpi:hover{border-color:var(--n-300);box-shadow:var(--sh-md)}
+.kpi-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.kpi-label{font-size:12.5px;color:var(--n-500);font-weight:500}
+.kpi-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;
+  justify-content:center;background:var(--n-100);color:var(--n-500)}
+.kpi-val{font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--n-900);
+  line-height:1;margin-bottom:10px}
+.kpi-val small{font-size:14px;font-weight:500;color:var(--n-400);margin-left:2px}
+.delta{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:500;
+  padding:2px 8px;border-radius:999px}
+.delta.up{background:var(--ok-bg);color:var(--ok)}
+.delta.down{background:var(--err-bg);color:var(--err)}
+.delta.flat{background:var(--n-100);color:var(--n-500)}
+
+.row{display:grid;grid-template-columns:1.55fr 1fr;gap:20px}
+.panel{background:var(--n-0);border:1px solid var(--n-200);border-radius:12px;overflow:hidden;
+  transition:background-color .18s,border-color .18s}
+.panel-head{display:flex;align-items:center;justify-content:space-between;
+  padding:16px 20px;border-bottom:1px solid var(--n-200)}
+.panel-head h2{font-size:14px;font-weight:600;margin:0;color:var(--n-900)}
+.panel-head .hint{font-size:12px;color:var(--n-400)}
+.panel-body{padding:20px}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--n-500)}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;
+  vertical-align:middle}
+.chart{width:100%;height:auto;display:block}
+
+.rank{display:flex;flex-direction:column;gap:2px}
+.rank-row{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;
+  padding:10px 8px;border-radius:8px;transition:background .12s}
+.rank-row:hover{background:var(--n-50)}
+.rank-path{font-size:13px;color:var(--n-700);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rank-bar{width:64px;height:4px;border-radius:2px;background:var(--n-100);overflow:hidden}
+.rank-bar i{display:block;height:100%;background:var(--brand);border-radius:2px}
+.rank-num{font-size:13px;font-weight:500;color:var(--n-800);min-width:52px;text-align:right}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:11.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--n-400);padding:10px 20px;border-bottom:1px solid var(--n-200);background:var(--n-50)}
+td{padding:14px 20px;border-bottom:1px solid var(--n-200);color:var(--n-700)}
+tbody tr{transition:background .12s}
+tbody tr:hover{background:var(--n-50)}
+tbody tr:last-child td{border-bottom:0}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;
+  padding:2px 8px;border-radius:999px}
+.tag.ok{background:var(--ok-bg);color:var(--ok)}
+.tag.warn{background:var(--warn-bg);color:var(--warn)}
+.tag.err{background:var(--err-bg);color:var(--err)}
+.tag i{width:5px;height:5px;border-radius:50%;background:currentColor}
+.lat{font-weight:500;color:var(--n-800)}
+
+@media(max-width:1080px){
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .row{grid-template-columns:1fr}
+}
+@media(max-width:720px){
+  .app{grid-template-columns:1fr}
+  .side{display:none}
+  .content{padding:16px}
+  .topbar{padding:0 16px}
+  th,td{padding-left:16px;padding-right:16px}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6 4 12L16 12h5"/></svg>
+      Pulse
+    </div>
+    <div class="nav-label">监控</div>
+    <a class="nav-item on" href="#">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      概览
+    </a>
+    <a class="nav-item" href="#">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6 4 12L16 12h5"/></svg>
+      指标
+    </a>
+    <a class="nav-item" href="#">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h14"/></svg>
+      日志
+      <span class="nav-badge">12</span>
+    </a>
+    <a class="nav-item" href="#">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H14a4 4 0 0 1 4 4v5.5"/></svg>
+      链路追踪
+    </a>
+    <a class="nav-item" href="#">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 4.5-3.2 8.2-8 9-4.8-.8-8-4.5-8-9V7l8-4z"/></svg>
+      告警
+    </a>
+    <div class="nav-label">配置</div>
+    <a class="nav-item" href="#">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      设置
+    </a>
+    <div class="side-foot">
+      <div class="user">
+        <div class="avatar">YL</div>
+        <div class="user-meta"><b>杨凌</b><span>Pro 套餐</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>概览</h1>
+      <button class="theme-toggle" id="theme-toggle" aria-label="切换主题">
+        <svg class="moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/></svg>
+        <svg class="sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+      <div class="seg">
+        <button>1h</button><button>24h</button><button class="on">7d</button><button>30d</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <section class="kpis">
+        <div class="kpi">
+          <div class="kpi-top"><span class="kpi-label">请求总量</span>
+            <span class="kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+          </div>
+          <div class="kpi-val">18.4<small>M</small></div>
+          <span class="delta up"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 14l5-5 5 5"/></svg>12.4%</span>
+        </div>
+        <div class="kpi">
+          <div class="kpi-top"><span class="kpi-label">P95 延迟</span>
+            <span class="kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg></span>
+          </div>
+          <div class="kpi-val">247<small>ms</small></div>
+          <span class="delta up"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 10l-5 5-5-5"/></svg>8.1%</span>
+        </div>
+        <div class="kpi">
+          <div class="kpi-top"><span class="kpi-label">错误率</span>
+            <span class="kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.01"/></svg></span>
+          </div>
+          <div class="kpi-val">0.42<small>%</small></div>
+          <span class="delta down"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 14l5-5 5 5"/></svg>0.13pt</span>
+        </div>
+        <div class="kpi">
+          <div class="kpi-top"><span class="kpi-label">活跃用户</span>
+            <span class="kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 11a3 3 0 1 0 0-6M21 20a6 6 0 0 0-4.5-5.8"/></svg></span>
+          </div>
+          <div class="kpi-val">3,847</div>
+          <span class="delta flat">与上周持平</span>
+        </div>
+      </section>
+
+      <section class="row">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>请求趋势</h2>
+            <div class="legend">
+              <span><i style="background:var(--brand)"></i>成功</span>
+              <span><i style="background:var(--err)"></i>失败</span>
+            </div>
+          </div>
+          <div class="panel-body">
+            <svg class="chart" viewBox="0 0 720 240" preserveAspectRatio="none" aria-label="七日请求趋势">
+              <g stroke="var(--n-200)" stroke-width="1">
+                <line x1="0" y1="40" x2="720" y2="40"/>
+                <line x1="0" y1="90" x2="720" y2="90"/>
+                <line x1="0" y1="140" x2="720" y2="140"/>
+                <line x1="0" y1="190" x2="720" y2="190"/>
+              </g>
+              <path d="M0 168 L103 142 L206 156 L309 108 L412 124 L515 78 L618 96 L720 62 L720 200 L0 200 Z"
+                    fill="var(--brand)" opacity=".12"/>
+              <path d="M0 168 L103 142 L206 156 L309 108 L412 124 L515 78 L618 96 L720 62"
+                    fill="none" stroke="var(--brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M0 190 L103 186 L206 192 L309 182 L412 188 L515 178 L618 184 L720 180"
+                    fill="none" stroke="var(--err)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity=".8"/>
+              <circle cx="720" cy="62" r="4" fill="var(--brand)"/>
+              <circle cx="720" cy="62" r="8" fill="var(--brand)" opacity=".18"/>
+            </svg>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--n-400);margin-top:12px;padding:0 2px">
+              <span>9月29日</span><span>9月30日</span><span>10月1日</span><span>10月2日</span>
+              <span>10月3日</span><span>10月4日</span><span>今天</span>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>慢接口 Top 5</h2><span class="hint">按 P95</span></div>
+          <div class="panel-body rank">
+            <div class="rank-row"><span class="rank-path">/api/v2/search</span><span class="rank-bar"><i style="width:100%"></i></span><span class="rank-num">1,240ms</span></div>
+            <div class="rank-row"><span class="rank-path">/api/v2/reports/export</span><span class="rank-bar"><i style="width:78%"></i></span><span class="rank-num">968ms</span></div>
+            <div class="rank-row"><span class="rank-path">/api/v1/users/:id</span><span class="rank-bar"><i style="width:52%"></i></span><span class="rank-num">645ms</span></div>
+            <div class="rank-row"><span class="rank-path">/api/v2/analytics</span><span class="rank-bar"><i style="width:37%"></i></span><span class="rank-num">459ms</span></div>
+            <div class="rank-row"><span class="rank-path">/api/v1/webhooks</span><span class="rank-bar"><i style="width:24%"></i></span><span class="rank-num">298ms</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><h2>最近事件</h2><span class="hint">过去 2 小时 · 12 条</span></div>
+        <table>
+          <thead><tr><th>时间</th><th>接口</th><th>状态</th><th>延迟</th><th>区域</th></tr></thead>
+          <tbody>
+            <tr><td class="mono" style="color:var(--n-400)">14:32:08</td><td class="mono">/api/v2/search</td><td><span class="tag err"><i></i>超时</span></td><td class="lat">5,001ms</td><td>ap-southeast-1</td></tr>
+            <tr><td class="mono" style="color:var(--n-400)">14:31:42</td><td class="mono">/api/v1/users/8412</td><td><span class="tag ok"><i></i>200</span></td><td class="lat">142ms</td><td>us-east-1</td></tr>
+            <tr><td class="mono" style="color:var(--n-400)">14:30:15</td><td class="mono">/api/v2/reports/export</td><td><span class="tag warn"><i></i>重试</span></td><td class="lat">2,318ms</td><td>eu-west-1</td></tr>
+            <tr><td class="mono" style="color:var(--n-400)">14:28:51</td><td class="mono">/api/v2/analytics</td><td><span class="tag ok"><i></i>200</span></td><td class="lat">387ms</td><td>ap-southeast-1</td></tr>
+            <tr><td class="mono" style="color:var(--n-400)">14:27:03</td><td class="mono">/api/v1/webhooks</td><td><span class="tag err"><i></i>503</span></td><td class="lat">1,024ms</td><td>us-west-2</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  var r=document.documentElement,b=document.getElementById('theme-toggle');
+  b&&b.addEventListener('click',function(){
+    var cur=r.dataset.theme||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
+    var next=cur==='dark'?'light':'dark';
+    r.dataset.theme=next;try{localStorage.setItem('theme',next)}catch(e){}
+  });
+})();
+</script>
+</body>
+</html>

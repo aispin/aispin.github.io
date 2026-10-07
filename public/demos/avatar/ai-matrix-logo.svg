@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </radialGradient>
+    <linearGradient id="edge" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22d3ee"/>
+      <stop offset="50%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#f472b6"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowSoft">
+      <feGaussianBlur stdDeviation="12" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse" patternTransform="translate(8,8)">
+      <circle cx="12" cy="12" r="2" fill="#475569"/>
+    </pattern>
+    <clipPath id="diamond">
+      <polygon points="200,70 330,200 200,330 70,200"/>
+    </clipPath>
+  </defs>
+
+  <!-- 背景圆 -->
+  <circle cx="200" cy="200" r="185" fill="url(#bg)"/>
+  <circle cx="200" cy="200" r="185" fill="none" stroke="#1e293b" stroke-width="1"/>
+
+  <!-- 菱形内部点阵（矩阵） -->
+  <rect x="0" y="0" width="400" height="400" fill="url(#dots)" clip-path="url(#diamond)" opacity="0.85"/>
+
+  <!-- 菱形边缘 -->
+  <polygon points="200,70 330,200 200,330 70,200"
+           fill="none" stroke="url(#edge)" stroke-width="3"
+           stroke-linejoin="round" filter="url(#glow)"/>
+
+  <!-- 中心到顶点的辐射线 -->
+  <line x1="200" y1="200" x2="200" y2="70" stroke="url(#edge)" stroke-width="2" opacity="0.6" filter="url(#glow)"/>
+  <line x1="200" y1="200" x2="330" y2="200" stroke="url(#edge)" stroke-width="2" opacity="0.6" filter="url(#glow)"/>
+  <line x1="200" y1="200" x2="200" y2="330" stroke="url(#edge)" stroke-width="2" opacity="0.6" filter="url(#glow)"/>
+  <line x1="200" y1="200" x2="70" y2="200" stroke="url(#edge)" stroke-width="2" opacity="0.6" filter="url(#glow)"/>
+
+  <!-- 顶点节点 -->
+  <circle cx="200" cy="70" r="8" fill="#22d3ee" filter="url(#glow)"/>
+  <circle cx="330" cy="200" r="8" fill="#a78bfa" filter="url(#glow)"/>
+  <circle cx="200" cy="330" r="8" fill="#f472b6" filter="url(#glow)"/>
+  <circle cx="70" cy="200" r="8" fill="#22d3ee" filter="url(#glow)"/>
+
+  <!-- 中心核心 -->
+  <circle cx="200" cy="200" r="35" fill="#22d3ee" opacity="0.12" filter="url(#glowSoft)"/>
+  <circle cx="200" cy="200" r="14" fill="#22d3ee" opacity="0.5" filter="url(#glow)"/>
+  <circle cx="200" cy="200" r="5" fill="#ffffff" filter="url(#glow)"/>
+
+  <!-- 轨道环 -->
+  <ellipse cx="200" cy="200" rx="170" ry="50"
+           fill="none" stroke="#22d3ee" stroke-width="1"
+           opacity="0.25" transform="rotate(-25,200,200)"/>
+  <ellipse cx="200" cy="200" rx="170" ry="50"
+           fill="none" stroke="#a78bfa" stroke-width="1"
+           opacity="0.25" transform="rotate(25,200,200)"/>
+
+  <!-- 轨道粒子 -->
+  <circle cx="120" cy="140" r="3" fill="#22d3ee" filter="url(#glow)" opacity="0.85"/>
+  <circle cx="290" cy="270" r="2.5" fill="#a78bfa" filter="url(#glow)" opacity="0.85"/>
+  <circle cx="310" cy="150" r="2" fill="#f472b6" filter="url(#glow)" opacity="0.75"/>
+  <circle cx="90" cy="260" r="2" fill="#22d3ee" filter="url(#glow)" opacity="0.75"/>
+</svg>

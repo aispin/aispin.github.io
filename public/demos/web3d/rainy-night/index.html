@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>雨夜古镇 v0.0.1 — AI Matrix</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#05040a;overflow:hidden;}
+  #c{
+    position:absolute;
+    display:block;
+    image-rendering:pixelated;
+    image-rendering:crisp-edges;
+  }
+  #tag{
+    position:absolute;
+    left:14px;bottom:12px;
+    font:11px/1 ui-monospace,Menlo,Consolas,monospace;
+    color:rgba(255,190,140,.28);
+    letter-spacing:.14em;
+    pointer-events:none;
+    user-select:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="tag">AI MATRIX · 雨夜古镇 · v0.0.1</div>
+
+<script>
+/* ============================================================
+   雨夜古镇  v0.0.1
+   AI Matrix — Web3D / 程序化像素场景
+   纯 GLSL 实时生成 · 零依赖 · 8 秒无缝循环
+   ============================================================ */
+
+const VW = 480;
+const VH = 270;
+const LOOP = 8.0;
+
+const canvas = document.getElementById('c');
+canvas.width  = VW;
+canvas.height = VH;
+
+const gl = canvas.getContext('webgl2', {
+  antialias: false,
+  alpha: false,
+  preserveDrawingBuffer: false,
+  powerPreference: 'high-performance'
+});
+
+if (!gl) {
+  document.body.innerHTML = '<p style="color:#fff;font:14px monospace;padding:20px">WebGL2 不可用</p>';
+  throw new Error('WebGL2 not supported');
+}
+
+/* ---------------- 着色器源码 ---------------- */
+
+const VS = `#version 300 es
+in vec2 aPos;
+void main(){ gl_Position = vec4(aPos, 0.0, 1.0); }`;
+
+const FS = `#version 300 es
+precision highp float;
+
+out vec4 fragColor;
+
+uniform vec2  uRes;
+uniform float uTime;
+
+#define PI      3.141592653589793
+#define TAU     6.283185307179586
+#define LOOP    8.0
+#define HORIZON 0.55
+#define VPX     0.50
+
+/* ============================================================
+   0. 工具函数
+   ============================================================ */
+
+float hash11(float p){
+    p = fract(p * 0.1031);
+    p *= p + 33.33;
+    p *= p + p;
+    return fract(p);
+}
+
+float hash21(vec2 p){
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
+float noise21(vec2 p){
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = hash21(i);
+    float b = hash21(i + vec2(1.0, 0.0));
+    float c = hash21(i + vec2(0.0, 1.0));
+    float d = hash21(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+float fbm(vec2 p){
+    float v = 0.0;
+    float a = 0.5;
+    for(int i = 0; i < 4; i++){
+        v += a * noise21(p);
+        p *= 2.03;
+        a *= 0.5;
+    }
+    return v;
+}
+
+/* ============================================================
+   1. 场景几何
+   ============================================================ */
+
+float streetHalfW(float y){
+    float t = clamp(y / HORIZON, 0.0, 1.0);
+    return max(0.265 * (1.0 - t), 0.018);
+}
+
+float roofL(float x){ return 1.05 - x; }
+float roofR(float x){ return 0.05 + x; }
+
+/* ============================================================
+   2. 湿地面反光
+   ============================================================ */
+
+float smear(vec2 uv, float lx, float w){
+    float dx   = abs(uv.x - lx);
+    float band = exp(-pow(dx / w, 1.7));
+    float vf   = exp(-(HORIZON - uv.y) * 3.4);
+    return band * vf;
+}
+
+/* ============================================================
+   3. 地面
+   ============================================================ */
+
+vec3 groundColor(vec2 uv, float t){
+    float yb = HORIZON - uv.y;
+    float z  = 1.0 / max(yb, 0.012);
+
+    vec3 g = vec3(0.050, 0.048, 0.072);
+
+    float wx   = (uv.x - VPX) * z * 2.0;
+    float rowZ = z * 0.40;
+    float rowF = fract(rowZ);
+    float rowI = floor(rowZ);
+    float colF = fract(wx * 2.5 + rowI * 0.5);
+
+    float stoneH = hash21(vec2(floor(wx * 2.5), rowI));
+    g *= 0.78 + 0.44 * stoneH;
+
+    float seamC = step(0.93, colF);
+    float seamR = step(0.90, rowF);
+    g *= 1.0 - 0.34 * seamR;
+    g  = mix(g, g * 2.4, seamC * 0.35);
+
+    vec3 refl = vec3(0.0);
+    refl += vec3(1.00, 0.44, 0.14) * smear(uv, 0.13, 0.078) * 0.90;
+    refl += vec3(1.00, 0.38, 0.11) * smear(uv, 0.20, 0.050) * 0.45;
+    refl += vec3(1.00, 0.44, 0.14) * smear(uv, 0.87, 0.078) * 0.90;
+    refl += vec3(1.00, 0.38, 0.11) * smear(uv, 0.80, 0.050) * 0.45;
+
+    float far = exp(-yb * 14.0) * exp(-pow((uv.x - VPX) * 6.0, 2.0));
+    refl += vec3(1.00, 0.62, 0.30) * far * 1.35;
+
+    g += refl;
+
+    float rip = noise21(vec2(uv.x * 145.0, uv.y * 72.0 - t * 3.2));
+    g += vec3(0.035, 0.040, 0.058) * smoothstep(0.78, 0.98, rip);
+
+    float sp = noise21(vec2(uv.x * 260.0, uv.y * 130.0 + t * 26.0));
+    g += vec3(0.10, 0.12, 0.16) * step(0.993, sp) * exp(-yb * 5.0);
+
+    return g;
+}
+
+/* ============================================================
+   4. 窗户
+   ============================================================ */
+
+vec3 windowOne(vec2 uv, vec2 pos, vec2 sz, float intensity){
+    vec2 q = (uv - pos) / sz;
+
+    float inside = step(abs(q.x), 1.0) * step(abs(q.y), 1.0);
+
+    float mull = step(abs(q.x), 0.10) + step(abs(q.y), 0.10);
+    float glass = inside * (1.0 - clamp(mull, 0.0, 1.0) * 0.78);
+
+    vec3 warm = vec3(1.00, 0.74, 0.38);
+    vec3 c = warm * glass * intensity * 1.7;
+
+    float d = length(q * vec2(1.0, 1.25));
+    c += warm * exp(-d * 1.35) * 0.115 * intensity;
+
+    return c;
+}
+
+vec3 windowLights(vec2 uv){
+    vec3 acc = vec3(0.0);
+    acc += windowOne(uv, vec2(0.115, 0.470), vec2(0.030, 0.044), 1.00);
+    acc += windowOne(uv, vec2(0.205, 0.418), vec2(0.019, 0.030), 0.62);
+    acc += windowOne(uv, vec2(0.875, 0.512), vec2(0.032, 0.046), 1.00);
+    acc += windowOne(uv, vec2(0.782, 0.432), vec2(0.018, 0.029), 0.58);
+    return acc;
+}
+
+/* ============================================================
+   5. 建筑
+   ============================================================ */
+
+vec3 buildingColor(vec2 uv, float t, float isLeft){
+    vec3 wall = vec3(0.185, 0.176, 0.226);
+
+    wall *= 0.84 + 0.32 * fbm(uv * vec2(26.0, 38.0));
+
+    float fp   = fract(uv.x * 13.0);
+    float post = step(fp, 0.085) + step(0.915, fp);
+    wall = mix(wall, wall * 0.42, post);
+
+    float fpy = fract(uv.y * 7.0);
+    float beamY = step(fpy, 0.055);
+    wall = mix(wall, wall * 0.55, beamY * 0.7);
+
+    /* 屋顶带 */
+    float rl = roofL(uv.x);
+    float rr = roofR(uv.x);
+    float dRoof = mix(rr - uv.y, rl - uv.y, isLeft);
+
+    float roofBand = 1.0 - smoothstep(0.0, 0.072, dRoof);
+    vec3 roofCol = vec3(0.072, 0.068, 0.098);
+
+    float tile = step(0.5, fract(uv.x * 92.0 + uv.y * 8.0));
+    roofCol *= 0.68 + 0.52 * tile;
+    roofCol += vec3(0.05, 0.05, 0.08) * smoothstep(0.55, 1.0, tile);
+
+    wall = mix(wall, roofCol, roofBand);
+
+    /* 檐口阴影带 */
+    float eave = (1.0 - smoothstep(0.058, 0.072, dRoof))
+               * smoothstep(0.042, 0.058, dRoof);
+    wall *= 1.0 - 0.55 * eave;
+
+    wall += windowLights(uv);
+
+    /* 墙角潮湿变暗 —— 修正：三目条件必须是 bool */
+    float cornerDist = (isLeft > 0.5)
+        ? (0.5 - streetHalfW(uv.y) - uv.x)
+        : (uv.x - 0.5 - streetHalfW(uv.y));
+    wall *= mix(0.62, 1.0, smoothstep(-0.02, 0.10, cornerDist));
+
+    /* 灯笼 · 左近 */
+    {
+        vec2 pos = vec2(0.130, 0.610);
+        vec2 q = (uv - pos) / vec2(0.020, 0.026);
+        float body = 1.0 - smoothstep(0.0, 1.0, length(q));
+        float stripe = 0.7 + 0.3 * step(0.5, fract((uv.y - pos.y) * 120.0));
+        float sway = sin(t * TAU / LOOP * 2.0 + 0.6) * 0.0022;
+        vec2 gq = (uv - pos - vec2(sway, 0.0));
+        float halo = exp(-length(gq * vec2(1.0, 1.05)) * 26.0);
+        wall += vec3(1.00, 0.36, 0.14) * body * stripe * 1.35;
+        wall += vec3(1.00, 0.42, 0.16) * halo * 0.72;
+    }
+    /* 灯笼 · 右近 */
+    {
+        vec2 pos = vec2(0.872, 0.640);
+        vec2 q = (uv - pos) / vec2(0.020, 0.026);
+        float body = 1.0 - smoothstep(0.0, 1.0, length(q));
+        float stripe = 0.7 + 0.3 * step(0.5, fract((uv.y - pos.y) * 120.0));
+        float sway = sin(t * TAU / LOOP * 2.0 + 2.1) * 0.0022;
+        vec2 gq = (uv - pos - vec2(sway, 0.0));
+        float halo = exp(-length(gq * vec2(1.0, 1.05)) * 26.0);
+        wall += vec3(1.00, 0.36, 0.14) * body * stripe * 1.35;
+        wall += vec3(1.00, 0.42, 0.16) * halo * 0.72;
+    }
+    /* 灯笼 · 左远 */
+    {
+        vec2 pos = vec2(0.232, 0.472);
+        float body = 1.0 - smoothstep(0.0, 1.0, length((uv - pos) / vec2(0.013, 0.017)));
+        float halo = exp(-length(uv - pos) * 34.0);
+        wall += vec3(1.00, 0.34, 0.13) * body * 1.1;
+        wall += vec3(1.00, 0.40, 0.15) * halo * 0.45;
+    }
+
+    return wall;
+}
+
+/* ============================================================
+   6. 雨
+   ============================================================ */
+
+float rainLayer(vec2 uv, float t, float scale, float speed, float density, float seed){
+    vec2 p = uv * vec2(200.0, 80.0) * scale;
+    p.x += p.y * 0.20;
+    p.y -= t * speed;
+    p  += seed * 37.0;
+
+    vec2 id = floor(p);
+    vec2 f  = fract(p);
+
+    float h  = hash21(id + seed);
+    float on = step(h, density);
+
+    float lx = 0.18 + 0.64 * fract(h * 13.7);
+    float dx = abs((f.x - lx) - (f.y - 0.5) * 0.35);
+
+    float line = smoothstep(0.30, 0.0, dx);
+    float tail = pow(1.0 - f.y, 1.25);
+    float bright = 0.45 + 0.55 * fract(h * 7.13);
+
+    return on * line * tail * bright;
+}
+
+/* ============================================================
+   7. 主场景
+   ============================================================ */
+
+vec3 renderScene(vec2 uv, float t){
+
+    /* 7.1 夜空 */
+    vec3 skyTop = vec3(0.032, 0.028, 0.062);
+    vec3 skyMid = vec3(0.082, 0.062, 0.112);
+    vec3 skyBot = vec3(0.178, 0.108, 0.126);
+
+    vec3 col = mix(skyBot, skyMid, smoothstep(HORIZON - 0.14, HORIZON + 0.16, uv.y));
+    col = mix(col, skyTop, smoothstep(HORIZON + 0.04, 0.96, uv.y));
+
+    vec2 cp = uv * vec2(4.2, 6.0);
+    cp.x += sin(t * TAU / LOOP) * 0.16;
+    float cl = fbm(cp);
+    col += vec3(0.055, 0.046, 0.078)
+         * smoothstep(0.44, 0.86, cl)
+         * smoothstep(HORIZON - 0.04, 0.62, uv.y);
+
+    float hg = exp(-abs(uv.y - HORIZON) * 9.5)
+             * exp(-pow((uv.x - VPX) * 3.1, 2.0));
+    col += vec3(0.21, 0.095, 0.036) * hg;
+
+    /* 7.2 建筑 */
+    float shw  = streetHalfW(uv.y);
+    float inL  = VPX - shw;
+    float inR  = VPX + shw;
+
+    float mL = step(uv.x, inL) * step(uv.y, roofL(uv.x));
+    float mR = step(inR, uv.x) * step(uv.y, roofR(uv.x));
+    float mB = max(mL, mR);
+
+    vec3 bcol = buildingColor(uv, t, mL);
+    col = mix(col, bcol, mB);
+
+    /* 7.3 地面 */
+    float mG = step(uv.y, HORIZON) * (1.0 - mB);
+    vec3 gcol = groundColor(uv, t);
+    col = mix(col, gcol, mG);
+
+    /* 7.4 雨 */
+    float rainAmt = 0.0;
+    rainAmt += rainLayer(uv, t, 1.00, 50.0, 0.150, 0.0) * 1.00;
+    rainAmt += rainLayer(uv, t, 1.60, 75.0, 0.095, 1.7) * 0.68;
+    rainAmt += rainLayer(uv, t, 2.40, 100.0, 0.048, 3.3) * 0.42;
+
+    vec3 rainCol = vec3(0.56, 0.63, 0.80);
+    col += rainCol * rainAmt * 0.55;
+
+    float mist = fbm(vec2(uv.x * 3.4, uv.y * 2.2 - t * 0.12));
+    col += vec3(0.052, 0.055, 0.078)
+         * smoothstep(0.34, 0.82, mist)
+         * smoothstep(0.06, 0.50, HORIZON - uv.y + 0.30);
+
+    /* 7.5 空气透视 */
+    float depthFog = smoothstep(HORIZON + 0.16, HORIZON - 0.02, uv.y);
+    col = mix(col, col * 0.80 + vec3(0.045, 0.040, 0.062), depthFog * 0.28);
+
+    /* 7.6 调色 */
+    col = pow(col, vec3(0.94, 0.96, 1.02));
+    col *= vec3(1.02, 0.99, 0.98);
+
+    float lum = dot(col, vec3(0.299, 0.587, 0.114));
+    col += vec3(0.030, 0.016, 0.004) * smoothstep(0.25, 0.9, lum);
+
+    /* 7.7 暗角 */
+    vec2 vq = (uv - vec2(0.5, 0.52)) * vec2(1.06, 1.00);
+    float vig = 1.0 - 1.05 * dot(vq, vq);
+    vig = clamp(vig, 0.0, 1.0);
+    vig = pow(vig, 0.85);
+    col *= vig;
+
+    /* 7.8 胶片颗粒 */
+    float grainT = floor(t * 8.0);
+    float g = hash21(gl_FragCoord.xy + grainT * 137.13);
+    col += (g - 0.5) * 0.026;
+
+    col = col * 1.07 - 0.014;
+    return max(col, 0.0);
+}
+
+void main(){
+    vec2 uv = gl_FragCoord.xy / uRes;
+    vec3 col = renderScene(uv, uTime);
+    fragColor = vec4(col, 1.0);
+}
+`;
+
+/* ---------------- WebGL 初始化 ---------------- */
+
+function compile(type, src){
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    console.error('Shader compile error:\n' + gl.getShaderInfoLog(s));
+    throw new Error('shader');
+  }
+  return s;
+}
+
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+  console.error('Program link error:\n' + gl.getProgramInfoLog(prog));
+  throw new Error('link');
+}
+gl.useProgram(prog);
+
+/* 全屏三角形 */
+const vbo = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+
+const aPos = gl.getAttribLocation(prog, 'aPos');
+gl.enableVertexAttribArray(aPos);
+gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+const uRes  = gl.getUniformLocation(prog, 'uRes');
+const uTime = gl.getUniformLocation(prog, 'uTime');
+
+gl.uniform2f(uRes, VW, VH);
+gl.viewport(0, 0, VW, VH);
+
+/* ---------------- 自适应缩放 ---------------- */
+
+function resize(){
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  const scale = Math.max(1, Math.floor(Math.min(w / VW, h / VH)));
+  const sw = VW * scale;
+  const sh = VH * scale;
+
+  canvas.style.width  = sw + 'px';
+  canvas.style.height = sh + 'px';
+  canvas.style.left   = Math.floor((w - sw) / 2) + 'px';
+  canvas.style.top    = Math.floor((h - sh) / 2) + 'px';
+}
+
+window.addEventListener('resize', resize);
+resize();
+
+/* ---------------- 主循环 ---------------- */
+
+const startTime = performance.now();
+
+function frame(){
+  const elapsed = (performance.now() - startTime) / 1000;
+  const t = elapsed % LOOP;
+
+  gl.uniform1f(uTime, t);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  requestAnimationFrame(frame);
+}
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

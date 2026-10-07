@@ -1,0 +1,1288 @@
+import { useRef, useState, useEffect, useMemo } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
+import { Text, useTexture } from '@react-three/drei';
+import * as THREE from 'three';
+import gsap from 'gsap';
+import '../shaders/RevealMaterial'; // Registers alpha-discard reveal shader
+import { playBackgroundMusic } from '../../../utils/audioManager';
+import { useAchievements } from '../../../context/AchievementsContext';
+import { isTouchDevice } from '../../../utils/deviceDetect';
+import { setGuitarCursor } from '../../../utils/guitarCursor';
+import { SURFACE_VERT, SONG_WALL_FRAG, STONE_FRAG, makeSurfaceUniforms } from '../../../shaders/entranceTextures';
+import GateBase from './GateBase';
+import { WindChime, WhiteDog, WoodenPlanter, WoodenWindowFrame, WindowCurtain, SwallowNest } from './EntranceProps';
+import { SCENE_FONTS } from '../../../config/theme';
+import {
+    makeDoorFaceTexture,
+    makeDoorFrameTexture,
+    makeDoorBackTexture,
+    makeDoorEdgeTexture,
+    makeHandleTexture,
+} from '../../../utils/doorArt';
+import {
+    makeTreeTexture,
+    makeWallInkTexture,
+    makeLadybirdTexture,
+    makeSpeechBubbleTexture,
+    makeInkSplashTexture,
+} from '../../../utils/entranceArt';
+import {
+    makeDoorGodTexture,
+    makeFuDiamondTexture,
+    makeDoorKnockerTexture,
+    makeCoupletTexture,
+    DOOR_GOD_ASPECT,
+    KNOCKER_ASPECT,
+    COUPLET_STRIP_ASPECT,
+} from '../../../utils/gateArt';
+// 门联文案（39 副）与「今天挂哪一副」的解析器。
+import { resolveCoupletSet, coupletOverride } from '../../../config/couplets';
+import {
+    FLOOR_Y,
+    DOOR_WIDTH,
+    DOOR_HEIGHT,
+    DOOR_OPENING_W,
+    DOOR_CENTER_Y,
+    FRAME_W,
+    FRAME_H,
+    FRAME_ASPECT,
+    FACADE_W,
+    FACADE_H,
+    FACADE_CENTER_Y,
+    BANNER_W,
+    BANNER_H,
+    BANNER_Y,
+    OUTDOOR_Y,
+    PATH_Y,
+    STEP_FRONT_Z,
+} from '../../../config/entranceMetrics';
+import { sharedGeometry } from '../../../engine/resources';
+
+/* ------------------------------------------------------------------ */
+/* Ornament placement on a leaf                                         */
+/* ------------------------------------------------------------------ */
+/*
+ * makeDoorFaceTexture authors the leaf on a 512 x 1310 canvas with two recessed
+ * panels at y 109..682 and y 775..1228. Against the 2.4-unit-tall leaf that puts
+ * their centres at +0.475 and -0.635, with the rail between them at -0.135 — so
+ * the 年画 drops into the upper panel, 倒福 into the lower one and the 门环 onto
+ * the rail.
+ *
+ * All three sit on the leaf's centre line, which reads as one deliberate column
+ * (门神 / 门环 / 倒福). The 门环 is deliberately NOT at the seam: the lever handle
+ * (local X 0.827) and the lock plate already crowd that edge.
+ */
+const ORNAMENT_Z = 0.098;
+
+const GOD_W = 0.68;
+const GOD_H = GOD_W / DOOR_GOD_ASPECT;
+const GOD_Y = 0.4754;
+
+const FU_SIZE = 0.50;
+const FU_Y = -0.6348;
+
+const KNOCKER_W = 0.24;
+const KNOCKER_H = KNOCKER_W / KNOCKER_ASPECT;
+const KNOCKER_Y = -0.135;
+
+/**
+ * 门神 (年画) + 倒福 + 门环 for one leaf, stacked down the leaf's centre line.
+ *
+ * @param {'guanyu'|'zhangfei'} god   which god is painted on this leaf
+ * @param {number} leafX              local X of the leaf centre (±0.47)
+ */
+const DoorOrnaments = ({ god, leafX }) => {
+    const godTexture = makeDoorGodTexture(god);
+    const fuTexture = makeFuDiamondTexture();
+    const knockerTexture = makeDoorKnockerTexture();
+
+    return (
+        <>
+            {/* 门神 年画 — upper panel */}
+            <mesh position={[leafX, GOD_Y, ORNAMENT_Z]} renderOrder={5}>
+                <primitive object={sharedGeometry('plane', GOD_W, GOD_H)} attach="geometry" />
+                <meshBasicMaterial map={godTexture} toneMapped={false} />
+            </mesh>
+
+            {/* 倒福 — lower panel. The 福 is drawn rotated 180° on the sheet. */}
+            <mesh position={[leafX, FU_Y, ORNAMENT_Z]} renderOrder={5}>
+                <primitive object={sharedGeometry('plane', FU_SIZE, FU_SIZE)} attach="geometry" />
+                <meshBasicMaterial map={fuTexture} toneMapped={false} transparent alphaTest={0.5} />
+            </mesh>
+
+            {/* 门环 — 铺首衔环 on the rail between the two panels */}
+            <mesh position={[leafX, KNOCKER_Y, ORNAMENT_Z]} renderOrder={5}>
+                <primitive object={sharedGeometry('plane', KNOCKER_W, KNOCKER_H)} attach="geometry" />
+                <meshBasicMaterial map={knockerTexture} toneMapped={false} transparent alphaTest={0.5} />
+            </mesh>
+        </>
+    );
+};
+
+/* ------------------------------------------------------------------ */
+/* 春联 / 横批                                                           */
+/* ------------------------------------------------------------------ */
+
+const COUPLET_X = 1.28;
+// A 春联 hangs the height of the gate it flanks, and its centre lines up with
+// the gate's. Derived from the door so it follows the gate.
+const COUPLET_H = 2.15;
+const COUPLET_W = COUPLET_H * COUPLET_STRIP_ASPECT;
+const COUPLET_Y = DOOR_CENTER_Y;
+
+// BANNER_W / BANNER_H / BANNER_Y (the 横批 above the lintel) live in
+// config/entranceMetrics, because SignSystem has to clear the banner and must
+// not hardcode a lintel height of its own to do it.
+
+const COUPLET_Z = 0.17;
+
+/**
+ * 春联 pasted on the brick either side of the door, plus the 横批 above the
+ * lintel.
+ *
+ * WHICH SET IS UP
+ * ---------------
+ * The date decides. resolveCoupletSet() maps today onto one of 39 sets
+ * (24 节气 + 11 传统节日 + 3 法定假期 + 兜底), honouring the multi-day windows
+ * for 春节 / 国庆 / 劳动节 / 清明. Hovering any piece still cross-fades to the
+ * 搞笑 easter egg, exactly as it always did.
+ *
+ * ?couplet=<id|中文名> forces a set (see config/couplets.js) so the other 38
+ * are reachable without changing the system clock.
+ *
+ * WHY ONLY TWO SETS ARE EVER BAKED
+ * --------------------------------
+ * This used to be `COUPLET_SETS.map(...)`: EVERY set baked and EVERY set left
+ * mounted, stacked on 0.002 z steps with opacity doing the cross-fade. At two
+ * sets that was 6 textures and 6 meshes — free. At 39 it would be 117 textures
+ * of 200x1420 (≈95 MB of VRAM) and 117 extra meshes, which would both blow up
+ * a phone and break the scene's mesh budget.
+ *
+ * So only the active set and the easter egg are baked, and the two of them are
+ * rebuilt when the date rolls over. Re-baking is cheap because the red paper
+ * is cached separately in gateArt (see paperCanvas) — a rollover costs one
+ * drawImage plus seven fillText per piece, not a fresh gradient/fibre/age-spot
+ * pass.
+ *
+ * Resolved once per mount rather than on a midnight timer: re-baking the gate
+ * mid-session would be a visible pop, and a tab left open across midnight is
+ * not worth a pop for. Reload and it is correct.
+ */
+const CoupletWall = () => {
+    const [alt, setAlt] = useState(false);
+    const mats = useRef([]);
+
+    // The date-driven set, or whatever ?couplet= forced.
+    const activeId = useMemo(() => (coupletOverride() || resolveCoupletSet().set).id, []);
+
+    // Exactly two: [0] the active set, [1] the easter egg. `alt` picks one.
+    const ids = useMemo(() => [activeId, 'funny'], [activeId]);
+
+    const textures = useMemo(
+        () => ids.map((id) => ({
+            upper: makeCoupletTexture(id, 'upper'),
+            lower: makeCoupletTexture(id, 'lower'),
+            banner: makeCoupletTexture(id, 'banner'),
+        })),
+        [ids]
+    );
+
+    useEffect(() => {
+        mats.current.forEach((m, i) => {
+            if (!m) return;
+            const isAlt = Math.floor(i / 3) === 1;
+            gsap.to(m, {
+                opacity: isAlt === alt ? 1 : 0,
+                duration: 0.34,
+                ease: 'power2.out',
+                overwrite: true,
+            });
+        });
+    }, [alt]);
+
+    const pieces = [
+        { key: 'upper', x: COUPLET_X, y: COUPLET_Y, w: COUPLET_W, h: COUPLET_H },
+        { key: 'lower', x: -COUPLET_X, y: COUPLET_Y, w: COUPLET_W, h: COUPLET_H },
+        { key: 'banner', x: 0, y: BANNER_Y, w: BANNER_W, h: BANNER_H },
+    ];
+
+    const enter = () => { setAlt(true); setGuitarCursor('pointer'); };
+    const leave = () => { setAlt(false); setGuitarCursor('auto'); };
+
+    return (
+        <group>
+            {textures.map((set, si) => (
+                <group key={si}>
+                    {pieces.map((p, pi) => (
+                        <mesh
+                            key={p.key}
+                            position={[p.x, p.y, COUPLET_Z + si * 0.002]}
+                            renderOrder={6}
+                            onPointerEnter={enter}
+                            onPointerLeave={leave}
+                        >
+                            <primitive object={sharedGeometry('plane', p.w, p.h)} attach="geometry" />
+                            <meshBasicMaterial
+                                ref={(m) => { mats.current[si * 3 + pi] = m; }}
+                                map={set[p.key]}
+                                transparent
+                                opacity={si === 0 ? 1 : 0}
+                                depthWrite={false}
+                                toneMapped={false}
+                            />
+                        </mesh>
+                    ))}
+                </group>
+            ))}
+        </group>
+    );
+};
+
+// Maple is the only scene face left — local file, no external dependency
+// (PWA offline + headless-safe). See config/theme.js.
+const FONT_URL = SCENE_FONTS.maple;
+
+
+
+/**
+ * EntranceDoors Component - 3D Entrance to the Corridor
+ * 
+ * Doors that open and camera flies through.
+ * EmptyCorridor provides the surrounding corridor context.
+ */
+const EntranceDoors = ({
+    position = [0, 0, 22],
+    onComplete
+}) => {
+    // The facade is sized against the GATE, not against the corridor — the
+    // tunnel behind it is only 7 x 3.5 (see CorridorWalls), so these walls
+    // were never the corridor's walls. All the vertical metrics come from
+    // config/entranceMetrics so the architrave, the 横批 and the hanging sign
+    // above them cannot drift apart again.
+    const corridorWidth = FACADE_W;
+    const corridorHeight = FACADE_H;
+    const leftDoorRef = useRef();
+    const rightDoorRef = useRef();
+    const leftHandleRef = useRef();
+    const rightHandleRef = useRef();
+    const rightDoorMaterialRef = useRef(); // GSAP shader control
+    const leftDoorMaterialRef = useRef(); // Left door reveal control
+    const leftHandleMaterialRef = useRef(); // Left handle reveal control
+    const rightHandleMaterialRef = useRef(); // Right handle reveal control
+    const leftHandlePaintedRef = useRef(); // Painted handle mesh visibility
+    const rightHandlePaintedRef = useRef(); // Painted handle mesh visibility
+    const groupRef = useRef();
+    const [isOpen, setIsOpen] = useState(false);
+    const [isHovered, setIsHovered] = useState(false);
+    const [isAnimating, setIsAnimating] = useState(false);
+    const [isWindowHovered, setIsWindowHovered] = useState(false);
+    const windowAvatarRef = useRef();
+    const { camera } = useThree();
+    const { unlockAchievement } = useAchievements();
+
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        setIsMobile(isTouchDevice() || window.innerWidth < 1000);
+    }, []);
+
+    // Dla hooków tekstur musimy obliczyć to raz na starcie
+    const isMobileDevice = typeof window !== 'undefined' && (isTouchDevice() || window.innerWidth < 1000);
+
+    // --- Doors: 100% procedural canvas art (see utils/doorArt.js) ---
+    // The wood grain, stiles, recessed panels, architrave, hinges and the
+    // lock plate are all drawn in code; the tech stickers that used to be
+    // baked into the door bitmap are gone and replaced by DoorStickers below.
+    // `sketch` is the light line-art variant used on touch devices, `painted`
+    // the saturated one desktop reveals on hover.
+    const doorVariant = isMobileDevice ? 'sketch' : 'painted';
+    // The frame texture is built further down, once the door dimensions that
+    // decide its aspect are known.
+    const doorLeftTexture = makeDoorFaceTexture('left', 'sketch');
+    const doorRightTexture = makeDoorFaceTexture('right', 'sketch');
+    const doorRightPaintedTexture = makeDoorFaceTexture('right', 'painted');
+    const doorLeftPaintedTexture = makeDoorFaceTexture('left', 'painted');
+    const doorBackTexture = makeDoorBackTexture(doorVariant);
+    const edgeTexture = makeDoorEdgeTexture(doorVariant);
+
+    // Lever handles — drawn in code too (utils/doorArt.js). They ride on a
+    // plane the size of the leaf so the rose lands where the old bitmaps put
+    // it; `sketch` is the layer hover wipes away to show the brass beneath.
+    const handleLeftTexture = makeHandleTexture('left', false);
+    const handleLeftPaintedTexture = makeHandleTexture('left', true);
+    const handleRightTexture = makeHandleTexture('right', false);
+    const handleRightPaintedTexture = makeHandleTexture('right', true);
+
+    // Bricks + stone path are now procedural GPU shaders (see shaders/entranceTextures.js)
+    // Window / pot / mouse / cat pictures replaced by 3D props (see EntranceProps.jsx)
+    // The tree, ladybird, speech bubble and bug-click ink splash are procedural
+    // canvas art — see utils/entranceArt.js.
+    //
+    // The window character is the ONE bitmap in the entrance. It was procedural
+    // until 2026-10-07; it is now a generated illustration so it matches the
+    // corridor IP sprite (public/textures/corridor/avatar_zeo.webp) — the two
+    // are the same person and used to look nothing alike. Path is in
+    // ENTRANCE_TEXTURES, so App.jsx has already warmed it behind the loader.
+    const avatarWindowTexture = useTexture('/textures/entrance/avatar-window.webp');
+    avatarWindowTexture.colorSpace = THREE.SRGBColorSpace;
+
+    const treeTexture = makeTreeTexture();
+    const bugTexture = makeLadybirdTexture();
+    const inkSplashTexture = makeInkSplashTexture();
+    const speechBubbleTexture = makeSpeechBubbleTexture();
+
+    // Bug Ref
+    const bugRef = useRef();
+
+    // Bug Click Animation State
+    const [isBugClicked, setIsBugClicked] = useState(false);
+    const [textVisible, setTextVisible] = useState(false);
+    const [clipProgress, setClipProgress] = useState(0); // 0-1 for pencil drawing reveal
+    const inkSplashRef = useRef();
+    const handleHideDelayRef = useRef(); // Track pending gsap.delayedCall for handle visibility
+    const bugFixedTextRef = useRef();
+    const bugClickPos = useRef({ x: 0, y: 0 }); // Store click position
+
+    // Duck Speech Bubble State (Rubber Duck Debugging)
+    const [isDuckSpeaking, setIsDuckSpeaking] = useState(false);
+    const [duckQuote, setDuckQuote] = useState('');
+    const speechBubbleRef = useRef();
+
+    // Rubber Duck Debugging Quotes
+    const duckQuotes = [
+        "Have you tried console.log()?",
+        "Did you clear the cache?",
+        "It works on my machine!",
+        "Have you turned it off and on again?",
+        "Maybe it's a CSS issue?",
+        "Check for missing semicolons!",
+        "Did you read the error message?",
+        "Have you tried Stack Overflow?",
+        "Is it plugged in?",
+        "Works in production!",
+    ];
+
+    // Bug Click Handler
+    const handleBugClick = (e) => {
+        e.stopPropagation();
+        if (isBugClicked) return; // Already clicked
+
+        // Store bug position at click time
+        if (bugRef.current) {
+            bugClickPos.current = {
+                x: bugRef.current.position.x,
+                y: bugRef.current.position.y
+            };
+        }
+
+        setIsBugClicked(true);
+        setGuitarCursor('auto');
+
+        // Animate ink splash scale up
+        if (inkSplashRef.current) {
+            // Position ink splash at bug's last position
+            inkSplashRef.current.position.x = bugClickPos.current.x;
+            inkSplashRef.current.position.y = bugClickPos.current.y;
+            inkSplashRef.current.scale.set(0, 0, 0);
+            inkSplashRef.current.material.opacity = 1;
+
+            gsap.to(inkSplashRef.current.scale, {
+                x: 0.8,
+                y: 0.8,
+                z: 1,
+                duration: 0.4,
+                ease: 'back.out(1.7)'
+            });
+        }
+
+        // Pencil drawing effect - smooth reveal from left to right
+        setTextVisible(true);
+        setClipProgress(0);
+
+        if (bugFixedTextRef.current) {
+            bugFixedTextRef.current.position.x = bugClickPos.current.x;
+            bugFixedTextRef.current.position.y = bugClickPos.current.y;
+        }
+
+        // Animate clip progress from 0 to 1 (reveals text like pencil drawing)
+        gsap.to({ progress: 0 }, {
+            progress: 1,
+            duration: 0.8,
+            ease: 'power1.inOut',
+            onUpdate: function () {
+                setClipProgress(this.targets()[0].progress);
+            },
+            onComplete: () => {
+                // Fade out after a delay
+                setTimeout(() => {
+                    if (inkSplashRef.current) {
+                        gsap.to(inkSplashRef.current.material, {
+                            opacity: 0,
+                            duration: 1,
+                            ease: 'power2.out'
+                        });
+                    }
+                }, 1500);
+            }
+        });
+    };
+
+    // Duck Click Handler (Rubber Duck Debugging)
+    const handleDuckClick = (e) => {
+        e.stopPropagation();
+        if (isDuckSpeaking) return; // Already speaking
+
+        // Pick random quote
+        const randomQuote = duckQuotes[Math.floor(Math.random() * duckQuotes.length)];
+        setDuckQuote(randomQuote);
+        setIsDuckSpeaking(true);
+
+        // Scale in animation for speech bubble
+        if (speechBubbleRef.current) {
+            speechBubbleRef.current.scale.set(0, 0, 0);
+            gsap.to(speechBubbleRef.current.scale, {
+                x: 1,
+                y: 1,
+                z: 1,
+                duration: 0.3,
+                ease: 'back.out(1.7)'
+            });
+        }
+
+        // Hide after 3 seconds
+        setTimeout(() => {
+            if (speechBubbleRef.current) {
+                gsap.to(speechBubbleRef.current.scale, {
+                    x: 0,
+                    y: 0,
+                    z: 0,
+                    duration: 0.2,
+                    ease: 'power2.in',
+                    onComplete: () => setIsDuckSpeaking(false)
+                });
+            } else {
+                setIsDuckSpeaking(false);
+            }
+        }, 3000);
+    };
+
+    // ... (lines omitted)
+
+
+
+    // Door dimensions.
+    //
+    // The leaf art is authored at 512 x 1310 (DOOR_FACE_ASPECT ≈ 0.391) and is
+    // mapped onto a 0.90 x 2.55 plane, so it is stretched ~11% vertically.
+    // That is deliberate and cheap: 11% is under the threshold where the
+    // handle's brass rose stops reading as a circle, and it buys a leaf at
+    // 1:2.83 instead of 1:2.55. A traditional 大门 leaf is 1:3 or narrower —
+    // the old 0.94 x 2.4 opening came out at 1:1.28 across both leaves, which
+    // is a shop front, not a gate. This is 1:1.42.
+    const doorWidth = DOOR_WIDTH;
+    const doorHeight = DOOR_HEIGHT;
+    const doorOpeningWidth = DOOR_OPENING_W; // Both doors together
+    const wallThickness = 0.07;
+
+    // Frame dimensions.
+    //
+    // The architrave must be TALLER than the leaves it surrounds, or the leaves
+    // poke out over its head rail. Sizing it from the old bitmap's aspect
+    // (718/877) pinned frameHeight to 1.22 * frameWidth, which quietly made the
+    // frame 2.39 against a 2.55-tall door — the leaves overshot it by 0.16 and
+    // the 匾额 ended up covering the overhang. Size it from the door instead and
+    // hand the resulting aspect to the drawing, which is all fractions anyway.
+    const frameWidth = FRAME_W;
+    const frameHeight = FRAME_H;      // 0.30 taller than the leaves, ALL of it above them
+    const frameAspect = FRAME_ASPECT;
+    // The 上槛 has to span the whole distance from the top of the leaves to the
+    // top of the frame. The frame's bottom edge sits ON the floor with the
+    // leaves, so that distance is the entire 0.30 of extra height — not the thin
+    // 2.4% moulding the other three rails use.
+    //
+    // Left as a moulding it filled only the top sliver of the canvas, and the
+    // brick's door cut-out (half-height doorHeight/2 + 0.06, so it reaches 6 cm
+    // above the leaves) had nothing behind it: you saw straight through into the
+    // corridor, whose walls are warm white. That was the bright band across the
+    // top of the gate — worst right over the 门楣, which is where the eye goes.
+    const frameHeadFrac = (frameHeight - doorHeight) / frameHeight;
+    const frameTexture = makeDoorFrameTexture(doorVariant, frameAspect, frameHeadFrac);
+
+    // Floor Y must remain at standard level regardless of wall height
+    const floorY = FLOOR_Y;
+    const doorBottomY = floorY;
+    const doorCenterY = doorBottomY + doorHeight / 2;
+    const wallCenterY = floorY + corridorHeight / 2;
+    const topWallHeight = corridorHeight - doorHeight;
+    const topWallCenterY = doorBottomY + doorHeight + topWallHeight / 2;
+    const sideWallWidth = (corridorWidth - doorOpeningWidth) / 2;
+
+    // The lever's rose sits at (0.8795, 0.5413) of the leaf — HANDLE_PIVOT in
+    // utils/doorArt.js — so the handle group is parked that far off the leaf
+    // centre. Derived rather than written as literals: the old 0.357 / 0.099
+    // were those same fractions evaluated for a 0.94 x 2.4 leaf, and they go
+    // silently stale the moment the leaf changes.
+    const handleDx = 0.3795 * doorWidth;
+    const handleDy = -0.0413 * doorHeight;
+
+
+
+    // Cat Interaction State
+
+
+    // Handle click
+    const handleClick = (e) => {
+        e.stopPropagation();
+        if (isOpen || isAnimating) return;
+
+        // Reset cursor immediately on transition start
+        setGuitarCursor('auto');
+
+        setIsOpen(true);
+        setIsAnimating(true);
+        playBackgroundMusic();
+        unlockAchievement('corridor_enter');
+
+        const tl = gsap.timeline({
+            onComplete: () => {
+                onComplete?.();
+            }
+        });
+
+        // Press handles down fully (like really opening)
+        if (leftHandleRef.current) {
+            tl.to(leftHandleRef.current.rotation, {
+                z: 0.4,
+                duration: 0.15,
+                ease: 'power2.out'
+            }, 0);
+        }
+        if (rightHandleRef.current) {
+            tl.to(rightHandleRef.current.rotation, {
+                z: -0.4,
+                duration: 0.15,
+                ease: 'power2.out'
+            }, 0);
+        }
+
+        // Open doors - smoother angle (matches SegmentDoors)
+        tl.to(leftDoorRef.current.rotation, {
+            y: -Math.PI * 0.55,
+            duration: 0.9,
+            ease: 'power2.out'
+        }, 0.1);
+
+        tl.to(rightDoorRef.current.rotation, {
+            y: Math.PI * 0.55,
+            duration: 0.9,
+            ease: 'power2.out'
+        }, 0.1);
+
+        // Camera flies through - STOP CLOSER to avatar/ZEO
+        tl.to(camera.position, {
+            z: 11,  // Closer stop point (was 11)
+            y: 0.2, // Match hook's base Y position
+            duration: 1.8,
+            ease: 'power2.inOut'
+        }, 0.3);
+    };
+
+    // Handle hover - doors slightly open to indicate interactivity
+    const handlePointerEnter = () => {
+        if (isOpen || isAnimating || isMobile) return;
+        setIsHovered(true);
+        setGuitarCursor('pointer');
+
+        // Slightly open doors on hover
+        gsap.to(leftDoorRef.current.rotation, {
+            y: -0.08,
+            duration: 0.3,
+            ease: 'power2.out',
+            overwrite: true
+        });
+        gsap.to(rightDoorRef.current.rotation, {
+            y: 0.08,
+            duration: 0.3,
+            ease: 'power2.out',
+            overwrite: true
+        });
+
+        // Rotate handles down slightly (hint effect)
+        if (leftHandleRef.current) {
+            gsap.to(leftHandleRef.current.rotation, {
+                z: 0.1,
+                duration: 0.2,
+                ease: 'power2.out',
+                overwrite: true
+            });
+        }
+        if (rightHandleRef.current) {
+            gsap.to(rightHandleRef.current.rotation, {
+                z: -0.1,
+                duration: 0.2,
+                ease: 'power2.out',
+                overwrite: true
+            });
+        }
+
+        // Brush-stroke reveal: discard sketch pixels to show painted door beneath
+        if (rightDoorMaterialRef.current) {
+            gsap.to(rightDoorMaterialRef.current, {
+                uProgress: 1.0,
+                duration: 0.8,
+                ease: 'power2.out',
+                overwrite: true
+            });
+        }
+        if (leftDoorMaterialRef.current) {
+            gsap.to(leftDoorMaterialRef.current, {
+                uProgress: 1.0,
+                duration: 0.8,
+                ease: 'power2.out',
+                overwrite: true
+            });
+        }
+        if (leftHandleMaterialRef.current) {
+            gsap.to(leftHandleMaterialRef.current, {
+                uProgress: 1.0,
+                duration: 0.8,
+                ease: 'power2.out',
+                overwrite: true
+            });
+        }
+        if (rightHandleMaterialRef.current) {
+            gsap.to(rightHandleMaterialRef.current, {
+                uProgress: 1.0,
+                duration: 0.8,
+                ease: 'power2.out',
+                overwrite: true
+            });
+        }
+        // Show painted handles (kill any pending hide from previous leave)
+        if (handleHideDelayRef.current) handleHideDelayRef.current.kill();
+        if (leftHandlePaintedRef.current) leftHandlePaintedRef.current.visible = true;
+        if (rightHandlePaintedRef.current) rightHandlePaintedRef.current.visible = true;
+    };
+
+    const handlePointerLeave = () => {
+        if (isOpen || isAnimating || isMobile) return;
+        setIsHovered(false);
+        setGuitarCursor('auto');
+
+        // Close doors back
+        gsap.to(leftDoorRef.current.rotation, {
+            y: 0,
+            duration: 0.3,
+            ease: 'power2.out',
+            overwrite: true
+        });
+        gsap.to(rightDoorRef.current.rotation, {
+            y: 0,
+            duration: 0.3,
+            ease: 'power2.out',
+            overwrite: true
+        });
+
+        // Reset handles
+        if (leftHandleRef.current) {
+            gsap.to(leftHandleRef.current.rotation, {
+                z: 0,
+                duration: 0.2,
+                ease: 'power2.out',
+                overwrite: true
+            });
+        }
+        if (rightHandleRef.current) {
+            gsap.to(rightHandleRef.current.rotation, {
+                z: 0,
+                duration: 0.2,
+                ease: 'power2.out',
+                overwrite: true
+            });
+        }
+
+        // Doors stay painted by default now — no reverse reveal needed
+    };
+
+
+
+    // --- Bug Wandering Animation ---
+    useFrame(({ clock }) => {
+        // --- Bug Animation ---
+        if (bugRef.current) {
+            const time = clock.elapsedTime;
+            // Wandering logic: slightly complex sine waves for "random" walking felt
+            // Initial Pos: [2.5, floorY + 3.0, 0.16] (Above window)
+            // Range: +/- 0.3 in X, +/- 0.3 in Y
+
+            const xOffset = Math.sin(time * 0.8) * 0.3 + Math.sin(time * 1.5) * 0.1;
+            const yOffset = Math.cos(time * 0.6) * 0.2 + Math.cos(time * 1.1) * 0.1;
+
+            bugRef.current.position.x = 3 + xOffset;
+            bugRef.current.position.y = (floorY + 3.8) + yOffset;
+
+            // Random rotation jitter
+            bugRef.current.rotation.z = Math.sin(time * 5) * 0.1 + Math.atan2(yOffset, xOffset) * 0.2;
+        }
+    });
+
+
+
+    // The three tunnel wall panels (see the JSX below) sit behind this, so
+    // they cannot occlude the window's interior or its curtains.
+    const WALL_PANEL_Z = -0.5;
+
+    // --- Window hover ---------------------------------------------------
+    // The opening is centred on x = 2.5 and is 1.4 wide, so its right edge is
+    // at 3.2. The avatar plane is 1.5 wide, so parking its CENTRE at 3.75 puts
+    // its LEFT edge at 3.0 — 0.2 *inside* the opening. That used to be safe
+    // because the old sprite's ink sat centred in its canvas, but the current
+    // one is a leaning pose with the waving hand pressed against the canvas's
+    // left edge (ink starts at 10.6% of the canvas = 0.16 world left of the
+    // plane centre). At 3.75 the fingertips poked through the panes even at
+    // rest. 3.90 clears the opening edge by 0.11 — enough for the pose, and
+    // still a short hop in from the left.
+    //
+    // AVATAR_SHOWN_X cannot simply be nudged right to centre the figure: the
+    // ink is 1.28 wide against a 1.4 opening, so 2.5 is already within 0.02 of
+    // the position that would clip the hand on the left jamb.
+    const WINDOW_X = 2.5;
+    const AVATAR_REST_X = 3.90;
+    const AVATAR_SHOWN_X = WINDOW_X;
+
+    // Helper for window hover
+    const handleWindowEnter = (e) => {
+        e.stopPropagation();
+        setIsWindowHovered(true);
+        setGuitarCursor('pointer');
+
+        if (windowAvatarRef.current) {
+            gsap.to(windowAvatarRef.current.position, {
+                x: AVATAR_SHOWN_X,
+                duration: 0.5,
+                ease: 'back.out(1.7)',
+                overwrite: true
+            });
+            gsap.to(windowAvatarRef.current.rotation, {
+                z: 0.1,
+                duration: 0.5,
+                ease: 'power2.out',
+                overwrite: true
+            });
+        }
+    };
+
+    const handleWindowLeave = (e) => {
+        e.stopPropagation();
+        setIsWindowHovered(false);
+        setGuitarCursor('auto');
+
+        if (windowAvatarRef.current) {
+            gsap.to(windowAvatarRef.current.position, {
+                x: AVATAR_REST_X,
+                duration: 0.4,
+                ease: 'power2.in',
+                overwrite: true
+            });
+            gsap.to(windowAvatarRef.current.rotation, {
+                z: 0,
+                duration: 0.4,
+                ease: 'power2.in',
+                overwrite: true
+            });
+        }
+    };
+
+    // Frame center Y - aligned with doors
+    const frameCenterY = doorBottomY + frameHeight / 2;
+
+    // Walkway (甬路). Wider than the door frame so the stone band the shader
+    // actually shows (the middle 60% — the rest is verge grass) lands at
+    // ~1.84, i.e. the width of the gate opening. At +0.4 the visible slabs
+    // were only 1.46 wide, so the path was visibly narrower than the gate it
+    // leads to. The extra width is grass, not stone, so nothing else moves.
+    const pathWidth = frameWidth + 1.1;
+    // New texture is 1005x2317 (approx 1:2.3 ratio). 
+    // Width 3.06 * 2.3 = ~5.6 height.
+    const pathLength = 5.62;
+    // 甬路从踏跺前缘开始，不再从门平面开始 —— 门前那 1.7 米现在是抬高的
+    // 台明和踏跺（见 GateBase），铺装接着它们往外走。
+    const pathCenterZ = STEP_FRONT_Z + pathLength / 2;
+
+    // Procedural GPU textures (zero image assets — replaces AI-generated webp)
+    // The hole rects are authored in WORLD XY (same frame as the door group and
+    // the [2.5, 0] window prop), so the facade shader needs its bottom-left
+    // world corner to convert vUv -> world. Without it the openings never cut
+    // and the brick plane (z=0.15) hides the doors (z=0.06) completely.
+    // The facade's bottom edge sits ON the floor — that is the whole contract
+    // with the wall shader, which measures every band (plinth, brick courses,
+    // tile coping) upward from uOrigin.y. It used to be expressed as
+    // `wallCenterY + facadeYOffset + 1.65`, where the -1.65 and +1.65 cancelled
+    // and the result only equalled the floor because FACADE_H happened to be
+    // exactly corridorHeight. Say it directly instead.
+    const facadeCenterY = FACADE_CENTER_Y;
+    const wallInk = makeWallInkTexture(FACADE_W, FACADE_H);
+    // The cut-outs are the opening plus a small margin, so the doors and the
+    // frame show through without the brick clipping their edges.
+    const brickUniforms = useMemo(() => ({
+        ...makeSurfaceUniforms(FACADE_W, FACADE_H, [-FACADE_W / 2, facadeCenterY - FACADE_H / 2]),
+        uHoleDoor: { value: [0, doorCenterY, doorOpeningWidth / 2 + 0.07, doorHeight / 2 + 0.06] },
+        uHoleWindow: { value: [WINDOW_X, 0.02, 0.7, 0.73] },
+        uInk: { value: wallInk },
+        // ⚠️ This is one half of a pair — the other half is the palette in
+        // `makeWallInkTexture`. The effective mix is
+        // `leafAlpha × uInkStrength`, and the value that matters is whether
+        // the ink's G−R difference survives it. See the long note on the
+        // creeper's palette in utils/entranceArt.js: the old near-black green
+        // at 0.42 landed as 4/255 of chroma and read as a grey smudge. The
+        // palette is now mid-tone greens; this is the strength that lets them
+        // read. Lower it back towards 0.42 and the vine goes grey again.
+        uInkStrength: { value: 0.86 }
+    }), [facadeCenterY, wallInk, doorCenterY, doorOpeningWidth, doorHeight]);
+    // vUv=(0,0) of the rotated walkway plane lands at world z = the plane's
+    // centre + half its length (its v axis runs against world +Z). Same frame
+    // as the grass field, so the two surfaces are continuous at the seam.
+    const stoneUniforms = useMemo(() => makeSurfaceUniforms(
+        pathWidth, pathLength, [-pathWidth / 2, position[2] + pathCenterZ + pathLength / 2]
+    ), [pathWidth, pathLength, pathCenterZ, position]);
+
+    return (
+        <group ref={groupRef} position={[position[0], 0, position[2]]}>
+
+            {/* === STONE PATH FLOOR (甬路 — from the 踏跺 outwards) === */}
+            <mesh
+                position={[0, PATH_Y, pathCenterZ]}
+                rotation={[-Math.PI / 2, 0, 0]}
+            >
+                <primitive object={sharedGeometry('plane', pathWidth, pathLength)} attach="geometry" />
+                <shaderMaterial
+                    vertexShader={SURFACE_VERT}
+                    fragmentShader={STONE_FRAG}
+                    uniforms={stoneUniforms}
+                />
+            </mesh>
+
+            {/* === GATE BASE (台基 / 台明 / 踏跺 / 门槛 / 门枕石) ===
+                标高全部由 config/entranceMetrics 派生，见 GateBase 的注释。 */}
+            <GateBase worldZ={position[2]} />
+
+
+            {/* === TUNNEL WALL PANELS (Z-BACKED) ===
+                这三块板是"门洞周围那圈墙"，从入口还是一条纯走廊的时候就留在这里。
+                现在 10×6 的青砖门脸（z = 0.15）把它们**完全盖住**了 —— 除了通过
+                门洞和窗洞看进去的那一格。
+
+                ⚠️ 这正是"窗户后面是一块惨白的板子、窗帘只剩几条细线"的成因：
+                右侧板（x 0.9..5.0）就横在窗洞后面，是一块不透明白板（#e0e0e0），
+                把窗内景（z 21.89）和窗帘（z 21.99）全遮掉了。之前以为是窗帘
+                本身画错了，查了两轮才发现是这块挡板。
+
+                修法：把它们挪到**窗内景之后**（世界 z = 21.5）。它们在该在的
+                地方（门洞两侧），但不再是窗洞里离相机最近的东西。位置由
+                WALL_PANEL_Z 表达，别再回到 0。 */}
+            {/* LEFT WALL PANEL */}
+            <mesh position={[-(doorOpeningWidth / 2 + sideWallWidth / 2), wallCenterY, WALL_PANEL_Z]}>
+                <primitive object={sharedGeometry('box', sideWallWidth, corridorHeight, wallThickness)} attach="geometry" />
+                <meshBasicMaterial color="#e0e0e0" roughness={0.95} />
+            </mesh>
+
+            {/* RIGHT WALL PANEL */}
+            <mesh position={[(doorOpeningWidth / 2 + sideWallWidth / 2), wallCenterY, WALL_PANEL_Z]}>
+                <primitive object={sharedGeometry('box', sideWallWidth, corridorHeight, wallThickness)} attach="geometry" />
+                <meshBasicMaterial color="#e0e0e0" roughness={0.95} />
+            </mesh>
+
+            {/* TOP WALL PANEL */}
+            <mesh position={[0, topWallCenterY, WALL_PANEL_Z]}>
+                <primitive object={sharedGeometry('box', doorOpeningWidth, topWallHeight, wallThickness)} attach="geometry" />
+                <meshBasicMaterial color="#e0e0e0" roughness={0.95} />
+            </mesh>
+
+            {/* === SONG-DYNASTY WALL FACADE === */}
+            {/* 
+                DOSTOSOWANIE OBRAZKA (TEXTURE ADJUSTMENT):
+                1. args={[FACADE_W, FACADE_H]} - rozmiar elewacji; oba idą za
+                   corridorWidth / corridorHeight, więc zmieniaj je tam.
+                2. Pozycja pionowa NIE jest już osobna: `facadeCenterY` trzyma
+                   dolną krawędź elewacji na podłodze, bo shader mierzy od niej
+                   każdy pas (cokół, wątki cegły, gzyms). Przesunięcie jej w górę
+                   wsunęłoby cokół pod ziemię.
+                The surface itself (brick / plinth / tile coping / weathering)
+                is authored in shaders/entranceTextures.js; the ink creeper it
+                is overlaid with is drawn in utils/entranceArt.js.
+            */}
+            <mesh position={[0, facadeCenterY, 0.15]}>
+                {/* args={[Szerokość, Wysokość]} - Zmieniaj te liczby (np. 7, 8) */}
+                <primitive object={sharedGeometry('plane', FACADE_W, FACADE_H)} attach="geometry" />
+                <shaderMaterial
+                    vertexShader={SURFACE_VERT}
+                    fragmentShader={SONG_WALL_FRAG}
+                    uniforms={brickUniforms}
+                    transparent={true}
+                />
+            </mesh>
+
+            {/* === TEXTURED FRAME === */}
+            <mesh position={[0, frameCenterY, 0.12]}>
+                <primitive object={sharedGeometry('plane', frameWidth, frameHeight)} attach="geometry" />
+                <meshBasicMaterial color="#e0e0e0"
+                    map={frameTexture}
+                    transparent={true}
+                    alphaTest={0.1}
+                    roughness={0.9}
+                    depthWrite={false}
+                />
+            </mesh>
+
+            {/* LEFT DOOR */}
+            <group ref={leftDoorRef} position={[-doorWidth, doorCenterY, 0]}>
+                {/* Solid 3D Door Body with edge texture */}
+                <mesh
+                    position={[doorWidth / 2, 0, 0.06]}
+                    onClick={handleClick}
+                    onPointerEnter={handlePointerEnter}
+                    onPointerLeave={handlePointerLeave}
+                >
+                    <primitive object={sharedGeometry('box', doorWidth, doorHeight, 0.04)} attach="geometry" />
+                    <meshBasicMaterial color="#e0e0e0" map={edgeTexture} roughness={0.9} />
+                </mesh>
+
+                {/* Painted layer (behind sketch) - left door */}
+                {!isMobile && (
+                    <mesh position={[doorWidth / 2, 0, 0.088]}>
+                        <primitive object={sharedGeometry('plane', doorWidth, doorHeight)} attach="geometry" />
+                        <meshBasicMaterial color="#e0e0e0"
+                            map={doorLeftPaintedTexture}
+                            alphaTest={0.5}
+                            roughness={0.8}
+                        />
+                    </mesh>
+                )}
+
+                {/* Sketch overlay (front) - left door brush-stroke reveal */}
+                <mesh position={[doorWidth / 2, 0, 0.09]}>
+                    <primitive object={sharedGeometry('plane', doorWidth, doorHeight)} attach="geometry" />
+                    <revealMaterial color="#e0e0e0"
+                        ref={leftDoorMaterialRef}
+                        map={doorLeftTexture}
+                        transparent={true}
+                        alphaTest={0.5}
+                        roughness={0.8}
+                        depthWrite={false}
+                        uProgress={isMobileDevice ? 0.0 : 1.0}
+                    />
+                </mesh>
+
+                {/* Back Texture Face (mirrored) */}
+                <mesh position={[doorWidth / 2, 0, 0.03]} rotation={[0, Math.PI, 0]} scale={[-1, 1, 1]}>
+                    <primitive object={sharedGeometry('plane', doorWidth, doorHeight)} attach="geometry" />
+                    <meshBasicMaterial color="#e0e0e0"
+                        map={doorBackTexture}
+                        alphaTest={0.5}
+                        roughness={0.8}
+                        side={2}
+                    />
+                </mesh>
+
+                {/* Handle Layer (animated) - pivot at screw center (292,459 on 332x848 texture) */}
+                <group ref={leftHandleRef} position={[doorWidth / 2 + handleDx, handleDy, 0.10]}>
+                    {/* Painted handle (behind) - hidden until hover */}
+                    {!isMobile && (
+                        <mesh ref={leftHandlePaintedRef} position={[-handleDx, -handleDy - 0.009, -0.001]}>
+                            <primitive object={sharedGeometry('plane', doorWidth, doorHeight)} attach="geometry" />
+                            <meshBasicMaterial color="#e0e0e0"
+                                map={handleLeftPaintedTexture}
+                                transparent={true}
+                                alphaTest={0.5}
+                                depthWrite={false}
+                            />
+                        </mesh>
+                    )}
+                    {/* Sketch handle overlay (front) */}
+                    <mesh position={[-handleDx, -handleDy, 0]}>
+                        <primitive object={sharedGeometry('plane', doorWidth, doorHeight)} attach="geometry" />
+                        <revealMaterial color="#e0e0e0"
+                            ref={leftHandleMaterialRef}
+                            map={handleLeftTexture}
+                            transparent={true}
+                            alphaTest={0.5}
+                            depthWrite={false}
+                            uProgress={isMobileDevice ? 0.0 : 1.0}
+                        />
+                    </mesh>
+                </group>
+
+                {/* 门神 关公 / 倒福 / 门环 */}
+                <DoorOrnaments god="guanyu" leafX={doorWidth / 2} />
+            </group>
+
+            {/* RIGHT DOOR */}
+            <group ref={rightDoorRef} position={[doorWidth, doorCenterY, 0]}>
+                {/* Solid 3D Door Body with edge texture */}
+                <mesh
+                    position={[-doorWidth / 2, 0, 0.06]}
+                    onClick={handleClick}
+                    onPointerEnter={handlePointerEnter}
+                    onPointerLeave={handlePointerLeave}
+                >
+                    <primitive object={sharedGeometry('box', doorWidth, doorHeight, 0.04)} attach="geometry" />
+                    <meshBasicMaterial color="#e0e0e0" map={edgeTexture} roughness={0.9} />
+                </mesh>
+
+                {/* Painted layer (behind sketch) - revealed when sketch fades out on hover */}
+                {!isMobile && (
+                    <mesh position={[-doorWidth / 2, 0, 0.088]}>
+                        <primitive object={sharedGeometry('plane', doorWidth, doorHeight)} attach="geometry" />
+                        <meshBasicMaterial color="#e0e0e0"
+                            map={doorRightPaintedTexture}
+                            alphaTest={0.5}
+                            roughness={0.8}
+                        />
+                    </mesh>
+                )}
+
+                {/* Sketch overlay (front) - brush-stroke discard reveals painted beneath */}
+                <mesh position={[-doorWidth / 2, 0, 0.09]}>
+                    <primitive object={sharedGeometry('plane', doorWidth, doorHeight)} attach="geometry" />
+                    <revealMaterial color="#e0e0e0"
+                        ref={rightDoorMaterialRef}
+                        map={doorRightTexture}
+                        transparent={true}
+                        alphaTest={0.5}
+                        roughness={0.8}
+                        depthWrite={false}
+                        uProgress={isMobileDevice ? 0.0 : 1.0}
+                    />
+                </mesh>
+
+                {/* Back Texture Face */}
+                <mesh position={[-doorWidth / 2, 0, 0.03]} rotation={[0, Math.PI, 0]}>
+                    <primitive object={sharedGeometry('plane', doorWidth, doorHeight)} attach="geometry" />
+                    <meshBasicMaterial color="#e0e0e0"
+                        map={doorBackTexture}
+                        alphaTest={0.5}
+                        roughness={0.8}
+                    />
+                </mesh>
+
+                {/* Handle Layer (animated) - pivot at screw center (40,459 on 332x848 texture) */}
+                <group ref={rightHandleRef} position={[-doorWidth / 2 - handleDx, handleDy, 0.10]}>
+                    {/* Painted handle (behind) - hidden until hover */}
+                    {!isMobile && (
+                        <mesh ref={rightHandlePaintedRef} position={[handleDx, -handleDy - 0.009, -0.001]}>
+                            <primitive object={sharedGeometry('plane', doorWidth, doorHeight)} attach="geometry" />
+                            <meshBasicMaterial color="#e0e0e0"
+                                map={handleRightPaintedTexture}
+                                transparent={true}
+                                alphaTest={0.5}
+                                depthWrite={false}
+                            />
+                        </mesh>
+                    )}
+                    {/* Sketch handle overlay (front) */}
+                    <mesh position={[handleDx, -handleDy, 0]}>
+                        <primitive object={sharedGeometry('plane', doorWidth, doorHeight)} attach="geometry" />
+                        <revealMaterial color="#e0e0e0"
+                            ref={rightHandleMaterialRef}
+                            map={handleRightTexture}
+                            transparent={true}
+                            alphaTest={0.5}
+                            depthWrite={false}
+                            uProgress={isMobileDevice ? 0.0 : 1.0}
+                        />
+                    </mesh>
+                </group>
+
+                {/* 门神 张飞 / 倒福 / 门环 */}
+                <DoorOrnaments god="zhangfei" leafX={-doorWidth / 2} />
+            </group>
+
+            {/* === 春联 + 横批 (hover to swap word sets) === */}
+            <CoupletWall />
+
+            {/* === 燕子窝 — perched above the right of the lintel === */}
+            <SwallowNest position={[0.86, 1.14, 0.22]} />
+
+            {/* Warm lighting - WYLACZONE */}
+            {/* <pointLight
+                position={[0, doorBottomY + doorHeight + 1, 1]}
+                intensity={0.8}
+                color="#fff8e8"
+                distance={10}
+            /> */}
+            {/* AVATAR - separate from the window group, parked behind the bricks.
+                `depthWrite={false}` stops its transparent margin from punching a
+                depth hole through the curtain behind it, and z = 0.06 puts the
+                figure in front of the curtain panels (-0.01) while staying
+                behind the brick facade (0.15) so the wall hides it at rest. */}
+            <mesh
+                ref={windowAvatarRef}
+                position={[AVATAR_REST_X, 0.04, 0.06]}
+                rotation={[0, 0, 0]}
+            >
+                <primitive object={sharedGeometry('plane', 1.5, 1.5)} attach="geometry" />
+                <meshBasicMaterial color="#e0e0e0"
+                    map={avatarWindowTexture}
+                    transparent={true}
+                    depthWrite={false}
+                />
+            </mesh>
+
+            {/* WINDOW - rustic wooden frame, positioned to the right of doors */}
+            <WoodenWindowFrame position={[WINDOW_X, 0, 0.25]} />
+
+            {/* Stable hover target for the window.
+                The enter/leave handlers used to live on WoodenWindowFrame's
+                group, whose raycast target is only the four planks plus the thin
+                cross mullions. Crossing one of the four open panes dropped the
+                hit, fired onPointerLeave and yanked the avatar straight back out
+                — the "peeks out for a split second then runs back" flicker.
+                One invisible plane covering the whole opening keeps the hover
+                state rock solid. */}
+            <mesh
+                position={[WINDOW_X, 0.06, 0.45]}
+                onPointerEnter={handleWindowEnter}
+                onPointerLeave={handleWindowLeave}
+            >
+                <primitive object={sharedGeometry('plane', 1.9, 1.9)} attach="geometry" />
+                <meshBasicMaterial color="#e0e0e0" transparent opacity={0} depthWrite={false} />
+            </mesh>
+
+            {/* Curtain + interior, seen through the window opening (behind the
+                brick plane). Pulled back to z = -0.03 so the character can stand
+                in front of the fabric panels instead of being swallowed by them. */}
+            <WindowCurtain position={[WINDOW_X, 0, -0.03]} />
+
+            {/* DUCK PLANTER (Right Side - Under Window) — rustic wood, green plant, 3D duck.
+                Sits on the OUTDOOR grade (the lawn), not on the floor — the lawn
+                is 0.30 below the floor now, so anything standing on it has to
+                move with OUTDOOR_Y or it floats. */}
+            <group position={[2.5, OUTDOOR_Y, 0.4]}>
+                <WoodenPlanter position={[0, 0, 0]} />
+
+                {/* Invisible hitbox just for the duck (right side of planter) */}
+                <mesh
+                    position={[0.38, 0.6, 0.12]}
+                    onClick={handleDuckClick}
+                    onPointerEnter={() => { setGuitarCursor('pointer'); }}
+                    onPointerLeave={() => { setGuitarCursor('auto'); }}
+                >
+                    <primitive object={sharedGeometry('plane', 0.55, 0.55)} attach="geometry" />
+                    <meshBasicMaterial color="#e0e0e0" transparent opacity={0} />
+                </mesh>
+
+                {/* Speech Bubble */}
+                <group
+                    ref={speechBubbleRef}
+                    position={[0.95, 1.15, 0.1]}
+                    scale={[0, 0, 0]}
+                >
+                    <mesh>
+                        <primitive object={sharedGeometry('plane', 1.8, 1.2)} attach="geometry" />
+                        <meshBasicMaterial color="#e0e0e0"
+                            map={speechBubbleTexture}
+                            transparent={true}
+                            alphaTest={0.01}
+                            depthWrite={false}
+                        />
+                    </mesh>
+
+                    {/* Quote Text */}
+                    {/* ROZMIAR TEKSTU: fontSize - mniejsza = mniejszy tekst */}
+                    {/* ZAWIJANIE: maxWidth - mniejsza = wcześniejsze zawijanie */}
+                    <Text
+                        position={[0, 0.1, 0.01]}
+                        fontSize={0.07}
+                        color="#1a1a1a"
+                        anchorX="center"
+                        anchorY="middle"
+                        font={FONT_URL}
+                        maxWidth={1.4}
+                        textAlign="center"
+                        visible={isDuckSpeaking} // Toggle visibility instead of mounting/unmounting
+                    >
+                        {duckQuote || " "}
+                    </Text>
+                </group>
+            </group>
+
+            {/* ANIMATED BUG (Right Side - Above Window) */}
+            {!isBugClicked && (
+                <mesh
+                    ref={bugRef}
+                    position={[2.5, floorY + 2.8, 0.16]}
+                    onClick={handleBugClick}
+                    onPointerEnter={() => { setGuitarCursor('pointer'); }}
+                    onPointerLeave={() => { setGuitarCursor('auto'); }}
+                >
+                    <primitive object={sharedGeometry('plane', 0.4, 0.4)} attach="geometry" />
+                    <meshBasicMaterial color="#e0e0e0"
+                        map={bugTexture}
+                        transparent={true}
+                        alphaTest={0.01}
+                        depthWrite={false}
+                    />
+                </mesh>
+            )}
+
+            {/* INK SPLASH - always mounted to preload texture/shader */}
+            <mesh
+                ref={inkSplashRef}
+                position={[2.5, floorY + 2.8, 0.17]}
+                scale={[0, 0, 0]}
+            // Removed conditional 'visible' to ensure GPU upload
+            >
+                <primitive object={sharedGeometry('plane', 2, 2)} attach="geometry" />
+                <meshBasicMaterial color="#e0e0e0"
+                    map={inkSplashTexture}
+                    transparent={true}
+                    alphaTest={0.01}
+                    depthWrite={false}
+                />
+            </mesh>
+
+            {/* BUG FIXED! Text - always mounted to preload font */}
+            <Text
+                ref={bugFixedTextRef}
+                position={[2.5, floorY + 2.8, 0.35]} // Default pos, updated on click
+                fontSize={0.25}
+                color="#1a1a1a"
+                anchorX="center"
+                anchorY="middle"
+                font={SCENE_FONTS.maple}
+                outlineWidth={0.015}
+                outlineColor="#ffffff"
+                clipRect={[-1, -0.5, -1 + (clipProgress * 2.5), 0.5]}
+            >
+                BUG FIXED!
+            </Text>
+
+
+
+
+
+            {/* TREE & WIND CHIME (Left Side) */}
+            <group position={[-2.9, floorY + 2.7, 1]}>
+                {/* Tree */}
+                <mesh position={[0, 0, 0]}>
+                    <primitive object={sharedGeometry('plane', 6, 8)} attach="geometry" />
+                    <meshBasicMaterial color="#e0e0e0"
+                        map={treeTexture}
+                        transparent={true}
+                        alphaTest={0.01}
+                        depthWrite={false}
+                    />
+                </mesh>
+                {/* Wind chime hanging from a branch (replaces the mouse picture) */}
+                <WindChime position={[0.45, 0.15, 0.05]} />
+            </group>
+
+            {/* WHITE DOG (Front Facing) — 3D procedural, blinking eyes, wagging tail.
+                On the lawn, clear of the 台明 (which is only APRON_W wide). */}
+            <WhiteDog position={[-1.5, OUTDOOR_Y, 0.8]} />
+
+        </group>
+    );
+};
+
+export default EntranceDoors;

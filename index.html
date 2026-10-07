@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <!-- The paper sheet used to be preloaded here at fetchpriority=high. It is
+       drawn on canvas at boot now (src/utils/paperArt.js), so the only asset
+       still worth a preload is the UI font. -->
+  <link rel="preload" as="font" href="/fonts/maple-ui.woff2" type="font/woff2" crossorigin="anonymous" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#FFF6E9" />
+
+  <!-- PWA -->
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="AISPIN" />
+
+  <!-- SEO Meta Tags -->
+  <title>AISPIN · 温馨的 3D 个人主页</title>
+  <meta name="description"
+    content="AISPIN 的温馨动漫风 3D 个人主页：一条手绘走廊串起八个房间——档案、摄影、项目与实验室、文章、短视频、原创音乐、AI Skills 与联系方式。A warm anime-styled 3D personal site." />
+  <meta name="author" content="aispin" />
+  <meta name="keywords" content="aispin, 3D portfolio, React Three Fiber, 个人主页, AI Skills, 摄影, 音乐, 随笔" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://aispin.github.io/" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="AISPIN · 温馨的 3D 个人主页" />
+  <meta property="og:description"
+    content="一条手绘走廊串起八个房间：档案、摄影、项目、文章、视频、音乐、AI Skills 与联系方式。Walk the warm hand-drawn corridor and step into each room." />
+  <meta property="og:url" content="https://aispin.github.io/" />
+  <meta property="og:site_name" content="AISPIN" />
+  <meta property="og:image" content="https://aispin.github.io/og-image.webp" />
+  <meta property="og:locale" content="zh_CN" />
+  <meta property="og:locale:alternate" content="en_US" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="AISPIN · 温馨的 3D 个人主页" />
+  <meta name="twitter:description" content="温馨动漫风的 3D 个人主页，八个房间等你推门而入。" />
+  <meta name="twitter:image" content="https://aispin.github.io/og-image.webp" />
+
+  <style>
+    /* SEO text hidden from users, fully accessible to crawlers (WebGL SPA fallback) */
+    .sr-only-seo {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      padding: 0 !important;
+      margin: -1px !important;
+      overflow: hidden !important;
+      clip: rect(0, 0, 0, 0) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- SEO Fallback for WebGL SPA -->
+  <div id="seo-content" class="sr-only-seo">
+    <header>
+      <h1>AISPIN | 温馨动漫风的 3D 个人主页</h1>
+      <p>
+        这是一个用 React Three Fiber 构建的沉浸式 3D 个人网站：你将走进一条手绘风格的温暖走廊，
+        沿途的八扇门通向八个房间——ABOUT 档案、GALLERY 摄影、STUDIO 项目与实验室、POSTS 文章、
+        VIDEOS 短视频、MUSIC 原创、AI+ 技能，以及 CONTACT 联系方式。走廊尽头还挂着一枚通往小说站
+        ZeoBooks 的书签挂件。
+      </p>
+    </header>
+
+    <nav aria-label="站点导航">
+      <ul>
+        <li><a href="/about">关于我 / About</a></li>
+        <li><a href="/gallery">摄影 / Gallery</a></li>
+        <li><a href="/studio">项目与实验室 / Studio</a></li>
+        <li><a href="/posts">文章 / Posts</a></li>
+        <li><a href="/videos">短视频 / Videos</a></li>
+        <li><a href="/music">音乐 / Music</a></li>
+        <li><a href="/ai">AI Skills / AI+</a></li>
+        <li><a href="/contact">联系 / Contact</a></li>
+        <li><a href="https://zeobooks.app.workbuddy.host">小说 / Novels (ZeoBooks)</a></li>
+      </ul>
+    </nav>
+
+    <main>
+      <article id="about">
+        <h2>关于 AISPIN</h2>
+        <p>
+          AISPIN 是一名开发者与创作者：写代码、做 AI 技能、拍照片、写文章、做音乐。
+          这个网站本身就是一份作品——整站基于 React Three Fiber 与 Three.js，
+          搭配 GSAP 动画与 Maple Mono 字体，支持中英双语、明暗模式与 PWA 离线安装。
+        </p>
+      </article>
+
+      <article id="ai-plus">
+        <h2>AI+ 房间：AI Skills 与应用</h2>
+        <p>
+          AI+ 房间陈列 AISPIN 在 GitHub 上开源的 iskill- 系列技能包与 ai- 前缀应用，
+          数据由 GitHub Actions 每周自动刷新，欢迎在房间里逐个翻阅。
+        </p>
+      </article>
+
+      <article id="contact">
+        <h2>联系方式</h2>
+        <p>
+          欢迎通过 CONTACT 房间里的漂流瓶与我联系，或访问
+          <a href="https://github.com/aispin" target="_blank" rel="noopener noreferrer">GitHub 主页</a>。
+        </p>
+      </article>
+    </main>
+  </div>
+
+  <noscript>
+    本站是一段 3D 互动体验，需要启用 JavaScript 才能走进走廊。This interactive 3D experience requires JavaScript.
+  </noscript>
+
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+
+</html>

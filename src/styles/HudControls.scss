@@ -1,0 +1,164 @@
+// =============================================================================
+// HUD controls — the one button style used by every on-screen control.
+//
+// Before this file there were two competing looks:
+//   - SiteControls (map / language / theme): flat cream pill, `#5A4636` ink
+//   - NavigationUI (back / audio / achievements): `.nav-btn`, a 50x55 torn-paper
+//     card with a hand-drawn SVG border and a hard-coded `#1a1a1a` stroke
+// The second set only appeared after entering the house, so the two were rarely
+// compared side by side — but together they read as two different products.
+// Everything now uses `.hud-btn`, which is the language button's original style.
+//
+// Loaded globally from main.scss so the rules land before per-component sheets
+// and neither component has to depend on the other's import order.
+// =============================================================================
+
+:root {
+  --hud-btn: 42px;
+  /**
+   * Horizontal band reserved by ONE icon column: edge inset + button + a
+   * breathing gap.
+   *
+   * Top-anchored dropdowns (map / audio / achievements) were all pinned to
+   * `top: 0; right: 24px`, which put them straight underneath the right-hand icon
+   * column — the audio card (220px) and the achievements panel (280px) both reach
+   * well past the column, so they covered its top few icons, and the near
+   * full-width map panel on narrow screens covered BOTH columns. Any panel that
+   * drops from the top now offsets itself by this band instead.
+   */
+  --hud-band: calc(18px + var(--hud-btn) + 14px);
+}
+
+.hud-cluster {
+  position: fixed;
+  z-index: 1000;
+  top: max(18px, env(safe-area-inset-top));
+  display: flex;
+
+  // Icons stack VERTICALLY and drop in one after another, so the corner reads
+  // as a single column that pulls down out of the top edge.
+  flex-direction: column;
+  gap: 8px;
+
+  // The container must not swallow clicks; each button re-enables them.
+  pointer-events: none;
+
+  &--right { right: max(18px, env(safe-area-inset-right)); }
+  &--left { left: max(18px, env(safe-area-inset-left)); }
+}
+
+.hud-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 42px;
+  height: 42px;
+  padding: 0 12px;
+
+  border: 1px solid rgba(90, 70, 54, .35);
+  border-radius: 999px;
+  color: #5A4636;
+  background: rgba(255, 246, 233, .94);
+
+  font: 500 13px/1 'Maple Mono', 'MapleUI', monospace;
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+
+  transition: transform .18s ease, background .18s ease, border-color .18s ease;
+
+  // One shared stagger: every button plays the same drop, and the cluster
+  // spaces them out with an inline animation-delay.
+  animation: hudDropIn .42s cubic-bezier(.2, .8, .2, 1) both;
+
+  svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  &:hover { transform: translateY(-2px); background: #FFD9C0; }
+  &:focus-visible { outline: 3px solid #A8C69F; outline-offset: 2px; }
+
+  // Unavailable right now — e.g. the back button while a corridor door is
+  // mid-animation and therefore owns the camera. Dimmed rather than hidden, so
+  // the corner does not visibly reshuffle and the user gets a reason for the
+  // click doing nothing.
+  &:disabled {
+    opacity: .45;
+    cursor: default;
+    transform: none;
+
+    &:hover { transform: none; background: rgba(255, 246, 233, .94); }
+  }
+
+  // Toggled state (map / audio / achievements panels)
+  &.is-open {
+    background: #FFD9C0;
+    border-color: rgba(200, 155, 123, .7);
+  }
+}
+
+// The language button carries a word instead of an icon, so it needs a touch
+// more room and a slightly tighter face.
+.hud-btn--text {
+  font-size: 12px;
+  letter-spacing: .02em;
+}
+
+@keyframes hudDropIn {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// The back button also slides back up out of the top edge on the way out.
+.hud-btn.is-leaving {
+  opacity: 0;
+  transform: translateY(-14px);
+  pointer-events: none;
+  transition: transform .3s ease, opacity .3s ease;
+}
+
+html[data-theme='dark'] .hud-btn {
+  border-color: rgba(255, 246, 233, .32);
+  color: #F5E8D9;
+  background: rgba(48, 41, 35, .94);
+
+  &:hover { background: #655044; }
+  &.is-open { background: #655044; border-color: rgba(255, 246, 233, .5); }
+
+  &:disabled:hover { background: rgba(48, 41, 35, .94); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-btn { animation: none; }
+  .hud-btn.is-leaving { transition: none; }
+}
+
+@media (max-width: 640px) {
+  .hud-cluster {
+    top: max(12px, env(safe-area-inset-top));
+    gap: 6px;
+
+    &--right { right: max(12px, env(safe-area-inset-right)); }
+    &--left { left: max(12px, env(safe-area-inset-left)); }
+  }
+
+  .hud-btn { min-width: 38px; height: 38px; }
+
+  // Keep --hud-band in step with the smaller button, or the dropdowns drift
+  // back under the icons on phones.
+  :root { --hud-btn: 38px; --hud-band: calc(12px + var(--hud-btn) + 12px); }
+}

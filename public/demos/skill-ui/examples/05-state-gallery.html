@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>State Gallery — 状态陈列</title>
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+<style>
+:root{
+  color-scheme:light;
+  --n-0:#fff;--n-50:#f8f9fb;--n-100:#f1f3f7;--n-200:#e4e7ee;--n-300:#cdd2dd;
+  --n-400:#9aa2b1;--n-500:#6b7280;--n-600:#4a5262;--n-700:#333a48;--n-800:#1f2530;--n-900:#12161d;
+  --brand:#3b5bfd;--brand-h:#2f4ce0;--brand-bg:#eef1ff;
+  --ok:#12855f;--ok-bg:#e6f6f0;--err:#c0392b;--err-bg:#fdecea;
+  --warn:#a86a00;--warn-bg:#fff4e0;
+  --sh-sm:0 1px 2px rgba(18,22,29,.05);
+  --sh-md:0 1px 2px rgba(18,22,29,.04),0 2px 8px rgba(18,22,29,.06);
+  --skel:linear-gradient(90deg,var(--n-100) 25%,var(--n-200) 37%,var(--n-100) 63%);
+}
+[data-theme="dark"]{
+  color-scheme:dark;
+  --n-0:#1a1f28;--n-50:#0f1319;--n-100:#232a35;--n-200:#2d3542;--n-300:#3a4351;
+  --n-400:#6b7280;--n-500:#9aa2b1;--n-600:#b8bfcc;--n-700:#cdd2dd;--n-800:#e4e7ee;--n-900:#f1f3f7;
+  --brand:#6b85ff;--brand-h:#8499ff;--brand-bg:rgba(107,133,255,.14);
+  --ok:#34d399;--ok-bg:rgba(52,211,153,.14);
+  --err:#f87171;--err-bg:rgba(248,113,113,.14);
+  --warn:#fbbf24;--warn-bg:rgba(251,191,36,.14);
+  --sh-sm:0 1px 2px rgba(0,0,0,.4);
+  --sh-md:0 1px 2px rgba(0,0,0,.3),0 2px 8px rgba(0,0,0,.4);
+  --skel:linear-gradient(90deg,var(--n-100) 25%,var(--n-300) 37%,var(--n-100) 63%);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --n-0:#1a1f28;--n-50:#0f1319;--n-100:#232a35;--n-200:#2d3542;--n-300:#3a4351;
+    --n-400:#6b7280;--n-500:#9aa2b1;--n-600:#b8bfcc;--n-700:#cdd2dd;--n-800:#e4e7ee;--n-900:#f1f3f7;
+    --brand:#6b85ff;--brand-h:#8499ff;--brand-bg:rgba(107,133,255,.14);
+    --ok:#34d399;--ok-bg:rgba(52,211,153,.14);
+    --err:#f87171;--err-bg:rgba(248,113,113,.14);
+    --warn:#fbbf24;--warn-bg:rgba(251,191,36,.14);
+    --sh-sm:0 1px 2px rgba(0,0,0,.4);
+    --sh-md:0 1px 2px rgba(0,0,0,.3),0 2px 8px rgba(0,0,0,.4);
+    --skel:linear-gradient(90deg,var(--n-100) 25%,var(--n-300) 37%,var(--n-100) 63%);
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--n-50);color:var(--n-800);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums;
+  transition:background-color .18s,color .18s}
+a{color:inherit;text-decoration:none}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:4px}
+
+.page{max-width:1240px;margin:0 auto;padding:32px 24px 64px}
+
+.topbar{display:flex;align-items:flex-end;gap:16px;margin-bottom:8px}
+.topbar h1{font-size:22px;font-weight:600;margin:0;color:var(--n-900);letter-spacing:-.02em}
+.theme-toggle{margin-left:auto;width:36px;height:36px;border-radius:9px;display:flex;
+  align-items:center;justify-content:center;color:var(--n-500);border:1px solid var(--n-200);
+  background:var(--n-0);transition:all .15s}
+.theme-toggle:hover{color:var(--n-900);border-color:var(--n-300)}
+.theme-toggle .sun{display:none}
+[data-theme="dark"] .theme-toggle .sun{display:block}
+[data-theme="dark"] .theme-toggle .moon{display:none}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .theme-toggle .sun{display:block}
+  :root:not([data-theme="light"]) .theme-toggle .moon{display:none}
+}
+.lead{font-size:13px;color:var(--n-500);margin:0 0 32px;max-width:64ch}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:20px}
+
+.demo{background:var(--n-0);border:1px solid var(--n-200);border-radius:14px;overflow:hidden;
+  display:flex;flex-direction:column;transition:background-color .18s,border-color .18s}
+.demo-head{padding:14px 18px;border-bottom:1px solid var(--n-200);display:flex;
+  align-items:center;gap:10px;background:var(--n-50)}
+.demo-head .idx{font-size:11px;font-weight:600;color:var(--n-400);
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.demo-head h3{font-size:13.5px;font-weight:600;margin:0;color:var(--n-900);letter-spacing:-.01em}
+.demo-head p{font-size:12px;color:var(--n-500);margin:2px 0 0;grid-column:2}
+.demo-head>div:last-child{flex:1;min-width:0}
+.demo-body{padding:24px;flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;min-height:220px;position:relative}
+
+/* empty */
+.empty{text-align:center;max-width:280px}
+.empty svg{color:var(--n-300);margin-bottom:16px}
+.empty h4{font-size:14px;font-weight:600;color:var(--n-800);margin:0 0 6px}
+.empty p{font-size:12.5px;color:var(--n-500);margin:0 0 18px;line-height:1.6}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:34px;
+  padding:0 14px;border-radius:8px;font-size:13px;font-weight:500;transition:all .15s}
+.btn-pri{background:var(--brand);color:var(--n-50)}
+[data-theme="dark"] .btn-pri{color:#0f1319}
+.btn-pri:hover{background:var(--brand-h)}
+.btn-sec{background:var(--n-0);color:var(--n-700);border:1px solid var(--n-200)}
+.btn-sec:hover{background:var(--n-50);border-color:var(--n-300)}
+
+/* skeleton */
+.skel{width:100%;display:flex;flex-direction:column;gap:14px}
+.sk-row{display:flex;gap:12px;align-items:center}
+.sk{background:var(--skel);background-size:200% 100%;border-radius:6px;
+  animation:sk 1.4s ease-in-out infinite}
+@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.sk.av{width:36px;height:36px;border-radius:50%;flex-shrink:0}
+.sk.l{height:10px}.sk.m{height:12px}.sk.xl{height:16px}
+.w60{width:60%}.w80{width:80%}.w40{width:40%}.w30{width:30%}.w100{width:100%}
+
+/* error */
+.state-icon{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;margin-bottom:14px}
+.state-icon.err{background:var(--err-bg);color:var(--err)}
+.state-icon.warn{background:var(--warn-bg);color:var(--warn)}
+.state-icon.n{background:var(--n-100);color:var(--n-500)}
+.state-icon.ok{background:var(--ok-bg);color:var(--ok)}
+.state-meta{font-size:11.5px;color:var(--n-400);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  margin-top:12px;padding:6px 10px;background:var(--n-100);border-radius:6px;max-width:100%}
+
+/* offline banner */
+.banner{width:100%;display:flex;align-items:center;gap:10px;padding:10px 14px;
+  border-radius:10px;font-size:12.5px;margin-bottom:16px}
+.banner.warn{background:var(--warn-bg);color:var(--warn)}
+.banner.err{background:var(--err-bg);color:var(--err)}
+.banner .t{font-weight:500;color:var(--n-800);flex:1}
+.banner .t small{display:block;color:var(--n-500);font-weight:400;font-size:11.5px;
+  margin-top:2px;line-height:1.45}
+.banner a{color:currentColor;font-weight:500;text-decoration:underline;
+  text-underline-offset:2px;white-space:nowrap}
+
+/* long content */
+.long-list{width:100%;display:flex;flex-direction:column;gap:0}
+.ll-row{display:flex;align-items:center;gap:12px;padding:12px 0;
+  border-bottom:1px solid var(--n-200);min-width:0}
+.ll-row:last-child{border-bottom:0}
+.ll-av{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;
+  align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff}
+.ll-body{flex:1;min-width:0}
+.ll-title{font-size:13px;font-weight:500;color:var(--n-800);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ll-sub{font-size:11.5px;color:var(--n-500);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ll-tag{font-size:10.5px;font-weight:500;padding:2px 7px;border-radius:5px;
+  background:var(--n-100);color:var(--n-500);flex-shrink:0}
+
+/* partial fail */
+.partial{width:100%}
+.partial-bar{height:6px;background:var(--n-100);border-radius:3px;overflow:hidden;
+  display:flex;margin-bottom:16px}
+.partial-bar i{display:block;height:100%}
+.partial-bar .ok{background:var(--ok);width:78%}
+.partial-bar .err{background:var(--err);width:22%}
+.partial-stat{display:flex;gap:16px;font-size:12px;margin-bottom:16px}
+.partial-stat b{color:var(--n-800);font-weight:600}
+.partial-stat span{color:var(--n-500)}
+
+/* permission */
+.lock{text-align:center;max-width:280px}
+.lock .ic{width:52px;height:52px;border-radius:14px;background:var(--n-100);
+  color:var(--n-500);display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+.lock h4{font-size:14px;font-weight:600;color:var(--n-800);margin:0 0 6px}
+.lock p{font-size:12.5px;color:var(--n-500);margin:0 0 18px;line-height:1.6}
+
+@media(max-width:600px){
+  .grid{grid-template-columns:1fr}
+  .page{padding:24px 16px 48px}
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="topbar">
+    <h1>State Gallery</h1>
+    <button class="theme-toggle" id="theme-toggle" aria-label="切换主题">
+      <svg class="moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/></svg>
+      <svg class="sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+  </div>
+  <p class="lead">页面交付时必须一并给出这些状态，而不是让开发去猜。每张卡展示一个具体场景，含文案与行动出口。</p>
+
+  <div class="grid">
+
+    <!-- 01 空态 -->
+    <div class="demo">
+      <div class="demo-head">
+        <span class="idx">01</span>
+        <div>
+          <h3>空态 · 首次进入</h3>
+          <p>没有数据不是错误，要有行动出口</p>
+        </div>
+      </div>
+      <div class="demo-body">
+        <div class="empty">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 9h18M9 14l2 2 4-4"/></svg>
+          <h4>还没有项目</h4>
+          <p>创建一个项目，把想法、任务和文档放到一处。</p>
+          <button class="btn btn-pri">新建项目</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 02 加载骨架 -->
+    <div class="demo">
+      <div class="demo-head">
+        <span class="idx">02</span>
+        <div>
+          <h3>加载 · 骨架屏</h3>
+          <p>结构同真实内容一致，避免跳版</p>
+        </div>
+      </div>
+      <div class="demo-body">
+        <div class="skel">
+          <div class="sk-row"><div class="sk av"></div><div style="flex:1"><div class="sk m w60" style="margin-bottom:6px"></div><div class="sk l w40"></div></div></div>
+          <div class="sk xl w80"></div>
+          <div class="sk l w100"></div>
+          <div class="sk l w100"></div>
+          <div class="sk l w60"></div>
+          <div style="display:flex;gap:8px;margin-top:4px"><div class="sk m" style="width:80px"></div><div class="sk m" style="width:60px"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 03 错误 -->
+    <div class="demo">
+      <div class="demo-head">
+        <span class="idx">03</span>
+        <div>
+          <h3>错误 · 请求失败</h3>
+          <p>给出原因、行动出口、错误码</p>
+        </div>
+      </div>
+      <div class="demo-body">
+        <div class="empty" style="text-align:center">
+          <div class="state-icon err" style="margin:0 auto 14px">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.01"/></svg>
+          </div>
+          <h4 style="font-size:14px;font-weight:600;color:var(--n-800);margin:0 0 6px">加载失败</h4>
+          <p style="font-size:12.5px;color:var(--n-500);margin:0 0 18px;line-height:1.6">服务器暂时无法响应，请稍后重试。</p>
+          <div style="display:flex;gap:8px;justify-content:center">
+            <button class="btn btn-sec">查看状态页</button>
+            <button class="btn btn-pri">重试</button>
+          </div>
+          <div class="state-meta">ERR_NETWORK · 请求 ID: req_9f3a…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 04 无权限 -->
+    <div class="demo">
+      <div class="demo-head">
+        <span class="idx">04</span>
+        <div>
+          <h3>无权限</h3>
+          <p>明确是权限问题，不是内容不存在</p>
+        </div>
+      </div>
+      <div class="demo-body">
+        <div class="lock">
+          <div class="ic">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+          </div>
+          <h4>你没有访问权限</h4>
+          <p>这个项目仅限受邀成员查看。你可以联系管理员开通访问。</p>
+          <button class="btn btn-pri">申请访问</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 05 离线 -->
+    <div class="demo">
+      <div class="demo-head">
+        <span class="idx">05</span>
+        <div>
+          <h3>离线 · 顶部提示</h3>
+          <p>不阻断操作，明确说明数据状态</p>
+        </div>
+      </div>
+      <div class="demo-body" style="display:block">
+        <div class="banner warn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+          <div class="t">
+            你处于离线状态
+            <small>更改会保存在本地，恢复网络后自动同步</small>
+          </div>
+          <a href="#">详情</a>
+        </div>
+        <div class="skel" style="gap:10px">
+          <div class="sk-row"><div class="sk av"></div><div style="flex:1"><div class="sk m w60" style="margin-bottom:6px"></div><div class="sk l w40"></div></div></div>
+          <div class="sk xl w80"></div>
+          <div class="sk l w100"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 06 超长内容 -->
+    <div class="demo">
+      <div class="demo-head">
+        <span class="idx">06</span>
+        <div>
+          <h3>超长内容 · 截断</h3>
+          <p>中英文混排、emoji、无空格长串</p>
+        </div>
+      </div>
+      <div class="demo-body" style="display:block">
+        <div class="long-list">
+          <div class="ll-row">
+            <div class="ll-av" style="background:var(--brand)">Z</div>
+            <div class="ll-body">
+              <div class="ll-title">周会纪要 · 关于移动端重构的第三轮讨论</div>
+              <div class="ll-sub">陈微 · 2 小时前</div>
+            </div>
+            <span class="ll-tag">讨论</span>
+          </div>
+          <div class="ll-row">
+            <div class="ll-av" style="background:var(--err)">A</div>
+            <div class="ll-body">
+              <div class="ll-title">aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</div>
+              <div class="ll-sub">无空格长串不会撑破容器，用 ellipsis 截断</div>
+            </div>
+            <span class="ll-tag">异常</span>
+          </div>
+          <div class="ll-row">
+            <div class="ll-av" style="background:var(--ok)">文</div>
+            <div class="ll-body">
+              <div class="ll-title">🎉 上线庆祝活动策划案 v2 🚀 附预算表</div>
+              <div class="ll-sub">Emoji 与中文混排，行高保持稳定</div>
+            </div>
+            <span class="ll-tag">活动</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 07 部分失败 -->
+    <div class="demo">
+      <div class="demo-head">
+        <span class="idx">07</span>
+        <div>
+          <h3>部分失败</h3>
+          <p>局部报错不应让整个页面归零</p>
+        </div>
+      </div>
+      <div class="demo-body" style="display:block">
+        <div class="partial">
+          <div class="partial-bar"><i class="ok"></i><i class="err"></i></div>
+          <div class="partial-stat">
+            <div><b>14</b> <span>个面板加载成功</span></div>
+            <div><b style="color:var(--err)">4</b> <span>个加载失败</span></div>
+          </div>
+          <div class="banner err" style="margin-bottom:12px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.01"/></svg>
+            <div class="t">
+              4 个数据源暂时不可用
+              <small>错误：ap-southeast-1 区域连接超时</small>
+            </div>
+            <a href="#">重试失败项</a>
+          </div>
+          <div class="skel" style="gap:8px">
+            <div class="sk l w100"></div>
+            <div class="sk l w80"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 08 成功反馈 -->
+    <div class="demo">
+      <div class="demo-head">
+        <span class="idx">08</span>
+        <div>
+          <h3>成功 · 轻提示</h3>
+          <p>不打扰操作流，3 秒自动消失</p>
+        </div>
+      </div>
+      <div class="demo-body">
+        <div class="empty">
+          <div class="state-icon ok" style="margin:0 auto 14px">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>
+          </div>
+          <h4 style="font-size:14px;font-weight:600;color:var(--n-800);margin:0 0 6px">保存成功</h4>
+          <p style="font-size:12.5px;color:var(--n-500);margin:0;line-height:1.6">你的更改已同步到所有设备。</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  var r=document.documentElement,b=document.getElementById('theme-toggle');
+  b&&b.addEventListener('click',function(){
+    var cur=r.dataset.theme||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
+    var next=cur==='dark'?'light':'dark';
+    r.dataset.theme=next;try{localStorage.setItem('theme',next)}catch(e){}
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,192 @@
+.achievement-popup {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    opacity: 0;
+    pointer-events: none; // It's just a visual popup
+    z-index: 110;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+
+    // --- Simple frosted glass -------------------------------------------
+    // No clip-path, no paper texture, no jagged SVG border: a plain
+    // rounded panel that blurs whatever is behind it.
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(14px) saturate(150%);
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    box-shadow:
+        0 8px 24px rgba(40, 30, 20, 0.16),
+        inset 0 1px 0 rgba(255, 255, 255, 0.7);
+
+    // Entry animation
+    animation: popupEnter 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+
+    // Fallback for browsers without backdrop-filter: keep the panel
+    // readable rather than transparent.
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        background: rgba(255, 255, 255, 0.92);
+    }
+
+    &.hiding {
+        animation: popupExit 0.4s ease forwards;
+    }
+
+    .popup-content {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .checkbox {
+        width: 24px;
+        height: 24px;
+        border: 2px solid #1a1a1a;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        flex: none;
+
+        &.checked {
+            animation: bounceCheck 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .checkmark {
+            width: 18px;
+            height: 18px;
+            background: transparent;
+            // Draw animation
+            stroke-dasharray: 24;
+            stroke-dashoffset: 24;
+            animation: drawCheck 0.3s ease forwards 0.1s;
+        }
+    }
+
+    .text-content {
+        display: flex;
+        flex-direction: column;
+
+        .title {
+            font-family: 'Patrick Hand', cursive, sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            color: #1a1a1a;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 2px;
+        }
+
+        .description {
+            font-size: 13px;
+            color: #3a3a3a;
+            line-height: 1.4;
+
+            .inline-sound-toggle {
+                background: none;
+                border: none;
+                padding: 0;
+                margin-left: 4px;
+                font-family: 'Patrick Hand', cursive, sans-serif;
+                font-size: 13px;
+                font-weight: 700;
+                cursor: pointer;
+                text-decoration: underline;
+                text-decoration-style: dashed;
+                text-underline-offset: 3px;
+                transition: opacity 0.2s ease, transform 0.2s ease;
+                display: inline-flex;
+                align-items: center;
+
+                &.on {
+                    color: #1a1a1a;
+                }
+
+                &.off {
+                    color: #888;
+                }
+
+                &:hover {
+                    opacity: 0.7;
+                    transform: scale(1.05);
+                }
+            }
+        }
+    }
+
+    @keyframes popupEnter {
+        from {
+            opacity: 0;
+            transform: translateX(-50%) translateY(50px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+    }
+
+    @keyframes popupExit {
+        from {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        to {
+            opacity: 0;
+            transform: translateX(-50%) translateY(20px);
+        }
+    }
+
+    @keyframes drawCheck {
+        to {
+            stroke-dashoffset: 0;
+        }
+    }
+
+    @keyframes bounceCheck {
+        0% {
+            transform: scale(1);
+        }
+
+        50% {
+            transform: scale(1.2);
+        }
+
+        100% {
+            transform: scale(1);
+        }
+    }
+
+    @media (max-width: 768px) {
+        bottom: 24px;
+        padding: 10px 16px;
+        max-width: calc(100vw - 32px);
+        border-radius: 12px;
+
+        .text-content {
+            .title {
+                font-size: 13px;
+            }
+
+            .description {
+                font-size: 12px;
+            }
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        animation-duration: 0.01ms;
+
+        &.hiding {
+            animation-duration: 0.01ms;
+        }
+    }
+}

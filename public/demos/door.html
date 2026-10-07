@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大展宏图 · 门神</title>
+<style>
+  html,body{margin:0;padding:0;}
+  body{
+    min-height:100vh;box-sizing:border-box;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:24px 12px;
+    background:radial-gradient(ellipse at 50% 14%, #3a2a19 0%, #1a1008 55%, #080502 100%);
+    font-family:"Songti SC","STSong","SimSun","Noto Serif SC",serif;
+  }
+  svg{
+    width:min(94vw, 920px);height:auto;display:block;
+    filter:drop-shadow(0 24px 56px rgba(0,0,0,.88));
+  }
+  .door-god .eye-group{
+    transform-box: fill-box;
+    transform-origin: center;
+    transition: transform .18s ease;
+  }
+  .door-god:hover .eye-group{
+    animation: blink .65s ease-in-out;
+  }
+  @keyframes blink{
+    0%   { transform: scaleY(1); }
+    40%  { transform: scaleY(.08); }
+    55%  { transform: scaleY(.08); }
+    100% { transform: scaleY(1); }
+  }
+</style>
+</head>
+<body>
+
+<svg viewBox="0 0 1000 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <pattern id="brick" width="150" height="76" patternUnits="userSpaceOnUse">
+      <rect width="150" height="76" fill="#c6b496"/>
+      <path d="M0 0H150M0 76H150M0 38H150" stroke="#b5a383" stroke-width="1.6" fill="none"/>
+      <path d="M0 0V38M75 38V76M150 0V38" stroke="#b5a383" stroke-width="1.6" fill="none"/>
+    </pattern>
+
+    <radialGradient id="vignette" cx="50%" cy="42%" r="76%">
+      <stop offset="50%" stop-color="#000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000" stop-opacity=".55"/>
+    </radialGradient>
+
+    <linearGradient id="doorL" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"  stop-color="#742718"/>
+      <stop offset="26%" stop-color="#a03d28"/>
+      <stop offset="56%" stop-color="#8a311e"/>
+      <stop offset="100%" stop-color="#5f1e10"/>
+    </linearGradient>
+    <linearGradient id="doorR" x1="1" y1="0" x2="0" y2="0">
+      <stop offset="0%"  stop-color="#742718"/>
+      <stop offset="26%" stop-color="#a03d28"/>
+      <stop offset="56%" stop-color="#8a311e"/>
+      <stop offset="100%" stop-color="#5f1e10"/>
+    </linearGradient>
+
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#f8eed4"/>
+      <stop offset="100%" stop-color="#e2cda2"/>
+    </linearGradient>
+
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#f4e09a"/>
+      <stop offset="45%" stop-color="#c9a227"/>
+      <stop offset="100%" stop-color="#8a6a12"/>
+    </linearGradient>
+
+    <linearGradient id="bladeGradA" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#eef3f5"/>
+      <stop offset="40%" stop-color="#c3ced4"/>
+      <stop offset="100%" stop-color="#8496a2"/>
+    </linearGradient>
+    <linearGradient id="goldGradA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f4e09a"/>
+      <stop offset="50%" stop-color="#c9a227"/>
+      <stop offset="100%" stop-color="#8a6a12"/>
+    </linearGradient>
+
+    <linearGradient id="steel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"  stop-color="#f0f5f8"/>
+      <stop offset="40%" stop-color="#c8d4dc"/>
+      <stop offset="100%" stop-color="#8496a2"/>
+    </linearGradient>
+
+    <linearGradient id="couplet" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#de3d2e"/>
+      <stop offset="100%" stop-color="#a81e16"/>
+    </linearGradient>
+
+    <linearGradient id="fupaper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"  stop-color="#e04434"/>
+      <stop offset="100%" stop-color="#b0251b"/>
+    </linearGradient>
+
+    <radialGradient id="knocker" cx="38%" cy="32%" r="72%">
+      <stop offset="0%"  stop-color="#f2dd95"/>
+      <stop offset="55%" stop-color="#b8912a"/>
+      <stop offset="100%" stop-color="#6b5210"/>
+    </radialGradient>
+
+    <filter id="innerShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000" flood-opacity=".55"/>
+    </filter>
+  </defs>
+
+  <!-- 墙面 -->
+  <rect width="1000" height="900" fill="url(#brick)"/>
+  <rect width="1000" height="900" fill="url(#vignette)"/>
+
+  <!-- 横批：大展宏图 -->
+  <rect x="368" y="10" width="264" height="78" rx="3" fill="url(#couplet)" stroke="#7d140d" stroke-width="2.5"/>
+  <rect x="376" y="18" width="248" height="62" rx="1" fill="none" stroke="#f2d98a" stroke-width="1.2" opacity=".6"/>
+  <g font-family="'Songti SC','STSong','SimSun','Noto Serif SC',serif"
+     font-weight="700" font-size="42" fill="#f7e3a1" text-anchor="middle" dominant-baseline="middle">
+    <text x="416" y="50">大</text>
+    <text x="472" y="50">展</text>
+    <text x="528" y="50">宏</text>
+    <text x="584" y="50">图</text>
+  </g>
+
+  <!-- 门楣（ZEO STUDIO 已去掉） -->
+  <rect x="196" y="108" width="608" height="62" rx="3" fill="#3d1c12"/>
+  <rect x="196" y="108" width="608" height="62" rx="3" fill="none" stroke="#1a0a05" stroke-width="2"/>
+  <rect x="196" y="108" width="608" height="6" fill="#5c2c1c" opacity=".7"/>
+
+  <!-- 门框 -->
+  <rect x="200" y="170" width="600" height="710" rx="3" fill="#3d1c12"/>
+  <rect x="200" y="170" width="600" height="710" rx="3" fill="none" stroke="#1a0a05" stroke-width="2.2"/>
+  <rect x="216" y="184" width="568" height="682" fill="#2a1109" filter="url(#innerShadow)"/>
+
+  <!-- 门扇 -->
+  <rect x="216" y="184" width="284" height="682" fill="url(#doorL)"/>
+  <rect x="500" y="184" width="284" height="682" fill="url(#doorR)"/>
+  <rect x="228" y="196" width="260" height="658" fill="none" stroke="#5a1e10" stroke-width="2" rx="2"/>
+  <rect x="512" y="196" width="260" height="658" fill="none" stroke="#5a1e10" stroke-width="2" rx="2"/>
+  <line x1="500" y1="184" x2="500" y2="866" stroke="#3a1108" stroke-width="4.5"/>
+  <line x1="503" y1="184" x2="503" y2="866" stroke="#b04a33" stroke-width="1" opacity=".45"/>
+
+  <!-- 年画纸 -->
+  <rect x="232" y="196" width="252" height="316" fill="url(#paper)" stroke="#b3241a" stroke-width="4"/>
+  <rect x="240" y="204" width="236" height="300" fill="none" stroke="#b3241a" stroke-width="1" opacity=".5"/>
+  <rect x="516" y="196" width="252" height="316" fill="url(#paper)" stroke="#b3241a" stroke-width="4"/>
+  <rect x="524" y="204" width="236" height="300" fill="none" stroke="#b3241a" stroke-width="1" opacity=".5"/>
+
+  <!-- ============================================ -->
+  <!--              关 公 · 左 门                  -->
+  <!-- ============================================ -->
+  <g class="door-god" transform="translate(101.4, 72.1) scale(0.78)">
+    <g id="guanyu">
+      <g transform="translate(292, 303) scale(0.65) translate(-100, -236)">
+        <rect x="95" y="360" width="10" height="240" fill="#3a2a18" rx="3"/>
+        <rect x="95" y="360" width="10" height="240" fill="none" stroke="#20140a" stroke-width="1.5"/>
+        <rect x="90" y="240" width="20" height="120" fill="url(#goldGradA)" rx="4"/>
+        <g stroke="#7d5f0e" stroke-width="1.5" opacity="0.6">
+          <line x1="90" y1="260" x2="110" y2="250"/>
+          <line x1="90" y1="280" x2="110" y2="270"/>
+          <line x1="90" y1="300" x2="110" y2="290"/>
+          <line x1="90" y1="320" x2="110" y2="310"/>
+          <line x1="90" y1="340" x2="110" y2="330"/>
+        </g>
+        <rect x="78" y="231" width="44" height="10" fill="url(#goldGradA)" rx="2" stroke="#7d5f0e" stroke-width="1.5"/>
+        <path d="M 78 236 Q 66 236 62 231 Q 70 239 78 241 Z" fill="url(#goldGradA)"/>
+        <path d="M 122 236 Q 132 236 135 231 Q 128 239 122 241 Z" fill="url(#goldGradA)"/>
+        <path d="M 82 231 C 86 223, 90 223, 94 231 Z" fill="url(#goldGradA)"/>
+        <path d="M 106 231 C 110 223, 114 223, 118 231 Z" fill="url(#goldGradA)"/>
+        <path d="M 84 230
+                 C 54 190, 58 100, 132 50
+                 C 111 100, 114 180, 116 230 Z"
+              fill="url(#bladeGradA)" stroke="#5a6a75" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M 94 220 C 65 180, 70 105, 125 60" fill="none" stroke="#8a9aa5" stroke-width="2" opacity="0.6"/>
+        <path d="M 102 220 C 75 180, 80 105, 120 65" fill="none" stroke="#8a9aa5" stroke-width="1.5" opacity="0.4"/>
+        <path d="M 95 242 C 85 255, 80 270, 85 285" stroke="#c0392b" stroke-width="5" fill="none" stroke-linecap="round"/>
+        <path d="M 100 245 C 92 260, 90 275, 95 290" stroke="#e74c3c" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <path d="M 105 242 C 100 255, 100 270, 105 280" stroke="#c0392b" stroke-width="4" fill="none" stroke-linecap="round"/>
+      </g>
+
+      <path d="M 330 330 C 316 348, 306 366, 300 382"
+            stroke="#1f6b4a" stroke-width="19" fill="none" stroke-linecap="round"/>
+      <ellipse cx="298" cy="390" rx="14" ry="11" fill="#b03a2e"/>
+      <path d="M 290 386 Q 296 382 302 386" stroke="#8a2a20" stroke-width="1.5" fill="none"/>
+      <path d="M 396 330 C 410 348, 416 370, 414 392"
+            stroke="#1f6b4a" stroke-width="19" fill="none" stroke-linecap="round"/>
+      <ellipse cx="414" cy="398" rx="12" ry="11" fill="#b03a2e"/>
+
+      <path d="M 358 298
+               C 322 298, 304 324, 302 362
+               L 292 510 L 424 510 L 414 362
+               C 412 324, 394 298, 358 298 Z"
+            fill="#1f6b4a"/>
+      <path d="M 306 318 C 294 328, 290 348, 294 366 L 326 356 L 330 324 Z" fill="#17573c"/>
+      <path d="M 410 318 C 422 328, 426 348, 422 366 L 390 356 L 386 324 Z" fill="#17573c"/>
+      <path d="M 342 306 L 358 344 L 374 306" fill="none" stroke="#f0e2c4" stroke-width="4" stroke-linejoin="round"/>
+      <rect x="300" y="404" width="116" height="22" rx="3" fill="url(#gold)" stroke="#7d5f0e" stroke-width="1.4"/>
+      <rect x="350" y="408" width="18" height="14" rx="2" fill="#2d6b4f" stroke="#8a6a12" stroke-width="1.2"/>
+      <path d="M 292 498 L 424 498" stroke="#c9a227" stroke-width="5"/>
+      <path d="M 293 506 L 423 506" stroke="#c9a227" stroke-width="2" opacity=".65"/>
+
+      <path d="M 322 510 L 318 534 Q 318 540 327 540 L 347 540 Q 354 540 354 534 L 354 510 Z" fill="#1a1a1a"/>
+      <path d="M 362 510 L 362 534 Q 362 540 369 540 L 389 540 Q 398 540 398 534 L 394 510 Z" fill="#1a1a1a"/>
+
+      <ellipse cx="358" cy="200" rx="18" ry="10" fill="#17573c"/>
+      <path d="M 320 252 C 317 210, 334 192, 358 192 C 382 192, 399 210, 396 252
+               C 390 234, 382 226, 358 226 C 334 226, 326 234, 320 252 Z"
+            fill="#1f6b4a"/>
+      <ellipse cx="358" cy="256" rx="34" ry="41" fill="#b03a2e"/>
+      <ellipse cx="324" cy="260" rx="6.5" ry="11" fill="#9c3226"/>
+      <ellipse cx="392" cy="260" rx="6.5" ry="11" fill="#9c3226"/>
+      <path d="M 332 244 C 340 236, 350 237, 356 244" stroke="#141414" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M 384 244 C 376 236, 366 237, 360 244" stroke="#141414" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <g class="eye-group">
+        <path d="M 334 258 Q 344 251 354 258" stroke="#141414" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <circle cx="344" cy="257" r="2.4" fill="#141414"/>
+      </g>
+      <g class="eye-group">
+        <path d="M 382 258 Q 372 251 362 258" stroke="#141414" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <circle cx="372" cy="257" r="2.4" fill="#141414"/>
+      </g>
+      <path d="M 358 263 L 358 275" stroke="#8a2a20" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M 350 285 Q 358 289 366 285" stroke="#6f1d15" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <path d="M 340 278 C 328 310, 332 344, 346 362
+               C 353 371, 363 371, 370 362
+               C 384 344, 388 310, 376 278
+               C 372 294, 366 302, 358 302
+               C 350 302, 344 294, 340 278 Z"
+            fill="#141414"/>
+      <path d="M 346 280 C 340 287, 338 296, 342 302" stroke="#141414" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <path d="M 370 280 C 376 287, 378 296, 374 302" stroke="#141414" stroke-width="4" fill="none" stroke-linecap="round"/>
+    </g>
+  </g>
+
+  <!-- ============================================ -->
+  <!--              张 飞 · 右 门                  -->
+  <!-- ============================================ -->
+  <g class="door-god" transform="translate(135.8, 72.1) scale(0.78)">
+    <g id="zhangfei">
+      <rect x="708" y="318" width="9" height="222" rx="2" fill="#3a2a18"/>
+      <rect x="708" y="318" width="9" height="222" rx="2" fill="none" stroke="#20140a" stroke-width="1"/>
+      <path d="M 712 190
+               C 702 212, 700 234, 708 250
+               C 716 266, 704 286, 702 306
+               C 700 316, 702 320, 706 322
+               L 716 322
+               C 720 320, 722 316, 720 306
+               C 718 286, 706 266, 714 250
+               C 722 234, 720 212, 712 190 Z"
+            fill="url(#steel)" stroke="#6e7f8a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M 712 190
+               C 706 212, 706 234, 712 250
+               C 718 266, 710 286, 708 306
+               C 707 314, 708 318, 710 322"
+            fill="none" stroke="#a8b6c0" stroke-width="1.6" opacity=".7"/>
+      <rect x="690" y="314" width="44" height="10" rx="2" fill="url(#goldGradA)" stroke="#7d5f0e" stroke-width="1.5"/>
+      <path d="M 708 324 C 700 336, 696 350, 702 364" stroke="#c0392b" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M 712 326 C 706 340, 704 354, 710 368" stroke="#e74c3c" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <path d="M 716 324 C 714 338, 714 352, 718 362" stroke="#c0392b" stroke-width="4" fill="none" stroke-linecap="round"/>
+
+      <path d="M 596 330 C 584 348, 580 368, 582 386"
+            stroke="#2f2f33" stroke-width="19" fill="none" stroke-linecap="round"/>
+      <ellipse cx="582" cy="392" rx="12" ry="11" fill="#3a3a40"/>
+      <path d="M 670 330 C 684 346, 692 362, 698 376"
+            stroke="#2f2f33" stroke-width="19" fill="none" stroke-linecap="round"/>
+      <ellipse cx="700" cy="382" rx="13" ry="11" fill="#3a3a40"/>
+      <path d="M 692 378 Q 698 374 704 378" stroke="#1c1c20" stroke-width="1.5" fill="none"/>
+
+      <path d="M 642 298
+               C 606 298, 588 324, 586 362
+               L 576 510 L 708 510 L 698 362
+               C 696 324, 678 298, 642 298 Z"
+            fill="#2f2f33"/>
+      <g stroke="#4d4d57" stroke-width="1.6" fill="none" opacity=".85">
+        <path d="M 594 384 H 690"/>
+        <path d="M 590 422 H 694"/>
+        <path d="M 586 460 H 698"/>
+        <path d="M 582 498 H 702"/>
+      </g>
+      <path d="M 590 318 C 576 328, 572 348, 576 366 L 610 356 L 614 324 Z" fill="#1c1c20"/>
+      <path d="M 694 318 C 708 328, 712 348, 708 366 L 674 356 L 670 324 Z" fill="#1c1c20"/>
+      <circle cx="642" cy="376" r="22" fill="url(#gold)" stroke="#8a6a12" stroke-width="2"/>
+      <circle cx="642" cy="376" r="12" fill="#f0d98a"/>
+      <circle cx="642" cy="376" r="12" fill="none" stroke="#a8841c" stroke-width="1.4"/>
+      <circle cx="642" cy="376" r="5" fill="#c9a227"/>
+      <rect x="584" y="404" width="116" height="22" rx="3" fill="#a8841c" stroke="#6b5210" stroke-width="1.4"/>
+      <rect x="634" y="408" width="18" height="14" rx="2" fill="#3a3a40" stroke="#6b5210" stroke-width="1.2"/>
+
+      <path d="M 606 510 L 602 534 Q 602 540 611 540 L 631 540 Q 638 540 638 534 L 638 510 Z" fill="#141414"/>
+      <path d="M 646 510 L 646 534 Q 646 540 653 540 L 673 540 Q 682 540 682 534 L 678 510 Z" fill="#141414"/>
+
+      <path d="M 604 252 C 601 208, 618 190, 642 190 C 666 190, 683 208, 680 252
+               C 674 234, 666 226, 642 226 C 618 226, 610 234, 604 252 Z"
+            fill="#c0392b"/>
+      <path d="M 604 252 C 614 242, 626 238, 642 238 C 658 238, 670 242, 680 252"
+            stroke="#c9a227" stroke-width="3" fill="none"/>
+      <circle cx="642" cy="196" r="7" fill="url(#gold)" stroke="#8a6a12" stroke-width="1.2"/>
+      <ellipse cx="642" cy="256" rx="34" ry="41" fill="#3a3a40"/>
+      <ellipse cx="608" cy="260" rx="6.5" ry="11" fill="#2e2e34"/>
+      <ellipse cx="676" cy="260" rx="6.5" ry="11" fill="#2e2e34"/>
+      <path d="M 614 244 C 624 232, 634 234, 640 242" stroke="#0d0d0d" stroke-width="6.5" fill="none" stroke-linecap="round"/>
+      <path d="M 670 244 C 660 232, 650 234, 644 242" stroke="#0d0d0d" stroke-width="6.5" fill="none" stroke-linecap="round"/>
+      <g class="eye-group">
+        <circle cx="626" cy="258" r="9.5" fill="#f4f0e6"/>
+        <circle cx="626" cy="258" r="5" fill="#0d0d0d"/>
+        <circle cx="628" cy="256" r="1.6" fill="#fff"/>
+      </g>
+      <g class="eye-group">
+        <circle cx="658" cy="258" r="9.5" fill="#f4f0e6"/>
+        <circle cx="658" cy="258" r="5" fill="#0d0d0d"/>
+        <circle cx="660" cy="256" r="1.6" fill="#fff"/>
+      </g>
+      <path d="M 642 264 L 642 277" stroke="#1c1c20" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M 633 288 Q 642 292 651 288" stroke="#1c1c20" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <path d="M 614 278 C 594 290, 584 310, 590 330
+               C 604 316, 616 308, 628 304 Z" fill="#0d0d0d"/>
+      <path d="M 670 278 C 690 290, 700 310, 694 330
+               C 680 316, 668 308, 656 304 Z" fill="#0d0d0d"/>
+      <path d="M 624 294 C 616 320, 618 348, 632 364
+               C 638 370, 646 370, 652 364
+               C 666 348, 668 320, 660 294
+               C 654 304, 650 308, 642 308
+               C 634 308, 630 304, 624 294 Z"
+            fill="#0d0d0d"/>
+    </g>
+  </g>
+
+  <!-- ============================================ -->
+  <!--         燕子窝（底部与门楣顶部相触）         -->
+  <!-- ============================================ -->
+  <g id="swallowNest">
+    <path d="M 678 35 Q 666 71 680 93 Q 710 108 740 93 Q 754 71 742 35 Z"
+          fill="#8a6a4a" stroke="#6b5238" stroke-width="1.5"/>
+    <ellipse cx="710" cy="41" rx="28" ry="11" fill="#4a3020"/>
+    <path d="M 678 35 Q 710 24 742 35" fill="none" stroke="#a8845e" stroke-width="2.2"/>
+    <path d="M 682 63 Q 692 69 702 65" fill="none" stroke="#6b5238" stroke-width="1.2" opacity=".55"/>
+    <path d="M 720 67 Q 730 70 740 63" fill="none" stroke="#6b5238" stroke-width="1.2" opacity=".55"/>
+    <path d="M 688 83 Q 698 87 708 83" fill="none" stroke="#6b5238" stroke-width="1" opacity=".45"/>
+    <ellipse cx="710" cy="27" rx="12" ry="9" fill="#1a1a1a"/>
+    <circle cx="700" cy="16" r="7" fill="#1a1a1a"/>
+    <ellipse cx="710" cy="29" rx="7" ry="5.5" fill="#f0e8d8"/>
+    <path d="M 693 16 L 685 18 L 693 20 Z" fill="#e8a020"/>
+    <circle cx="698" cy="14" r="1.3" fill="#fff"/>
+    <path d="M 720 29 L 734 35 L 729 26 Z" fill="#1a1a1a"/>
+  </g>
+
+  <!-- 倒福 -->
+  <g>
+    <path d="M 358 618 L 442 700 L 358 782 L 274 700 Z"
+          fill="url(#fupaper)" stroke="#c9a227" stroke-width="4.5" stroke-linejoin="round"/>
+    <path d="M 358 630 L 430 700 L 358 770 L 286 700 Z"
+          fill="none" stroke="#f2d98a" stroke-width="1.2" opacity=".55"/>
+    <g transform="rotate(180, 358, 700)">
+      <text x="358" y="700" font-family="'Songti SC','STSong','SimSun','Noto Serif SC',serif"
+            font-size="72" font-weight="700" fill="#f7e3a1" text-anchor="middle"
+            dominant-baseline="central">福</text>
+    </g>
+    <g stroke="#f2d98a" stroke-width="1.8" fill="none" opacity=".55">
+      <path d="M 358 626 Q 366 634 358 642"/>
+      <path d="M 434 700 Q 426 708 418 700"/>
+      <path d="M 358 774 Q 350 766 358 758"/>
+      <path d="M 282 700 Q 290 692 298 700"/>
+    </g>
+  </g>
+  <g>
+    <path d="M 642 618 L 726 700 L 642 782 L 558 700 Z"
+          fill="url(#fupaper)" stroke="#c9a227" stroke-width="4.5" stroke-linejoin="round"/>
+    <path d="M 642 630 L 714 700 L 642 770 L 570 700 Z"
+          fill="none" stroke="#f2d98a" stroke-width="1.2" opacity=".55"/>
+    <g transform="rotate(180, 642, 700)">
+      <text x="642" y="700" font-family="'Songti SC','STSong','SimSun','Noto Serif SC',serif"
+            font-size="72" font-weight="700" fill="#f7e3a1" text-anchor="middle"
+            dominant-baseline="central">福</text>
+    </g>
+    <g stroke="#f2d98a" stroke-width="1.8" fill="none" opacity=".55">
+      <path d="M 642 626 Q 650 634 642 642"/>
+      <path d="M 718 700 Q 710 708 702 700"/>
+      <path d="M 642 774 Q 634 766 642 758"/>
+      <path d="M 566 700 Q 574 692 582 700"/>
+    </g>
+  </g>
+
+  <!-- 门环 -->
+  <g>
+    <circle cx="460" cy="572" r="24" fill="url(#knocker)" stroke="#6b5210" stroke-width="2.2"/>
+    <circle cx="460" cy="572" r="14" fill="#c9a227"/>
+    <circle cx="460" cy="572" r="5" fill="#4a3708"/>
+    <circle cx="460" cy="572" r="14" fill="none" stroke="#8a6a12" stroke-width="1"/>
+    <circle cx="460" cy="608" r="16" fill="none" stroke="url(#gold)" stroke-width="5.5"/>
+  </g>
+  <g>
+    <circle cx="540" cy="572" r="24" fill="url(#knocker)" stroke="#6b5210" stroke-width="2.2"/>
+    <circle cx="540" cy="572" r="14" fill="#c9a227"/>
+    <circle cx="540" cy="572" r="5" fill="#4a3708"/>
+    <circle cx="540" cy="572" r="14" fill="none" stroke="#8a6a12" stroke-width="1"/>
+    <circle cx="540" cy="608" r="16" fill="none" stroke="url(#gold)" stroke-width="5.5"/>
+  </g>
+
+  <!-- 门底金边 -->
+  <line x1="220" y1="860" x2="496" y2="860" stroke="#c9a227" stroke-width="3" opacity=".8"/>
+  <line x1="504" y1="860" x2="780" y2="860" stroke="#c9a227" stroke-width="3" opacity=".8"/>
+
+  <!-- 春联 -->
+  <rect x="820" y="100" width="84" height="650" rx="3" fill="url(#couplet)" stroke="#7d140d" stroke-width="2.2"/>
+  <rect x="827" y="107" width="70" height="636" rx="1" fill="none" stroke="#f2d98a" stroke-width="1" opacity=".55"/>
+  <g id="rightCouplet" font-family="'Songti SC','STSong','SimSun','Noto Serif SC',serif"
+     font-weight="700" font-size="46" fill="#f7e3a1" text-anchor="middle" dominant-baseline="central"></g>
+
+  <rect x="96" y="100" width="84" height="650" rx="3" fill="url(#couplet)" stroke="#7d140d" stroke-width="2.2"/>
+  <rect x="103" y="107" width="70" height="636" rx="1" fill="none" stroke="#f2d98a" stroke-width="1" opacity=".55"/>
+  <g id="leftCouplet" font-family="'Songti SC','STSong','SimSun','Noto Serif SC',serif"
+     font-weight="700" font-size="46" fill="#f7e3a1" text-anchor="middle" dominant-baseline="central"></g>
+</svg>
+
+<script>
+(function(){
+  var NS = 'http://www.w3.org/2000/svg';
+
+  function vCol(str, cx, y0, gap, size, fill){
+    var g = document.createElementNS(NS, 'g');
+    g.setAttribute('font-family', "'Songti SC','STSong','SimSun','Noto Serif SC',serif");
+    g.setAttribute('font-weight', '700');
+    g.setAttribute('font-size', size);
+    g.setAttribute('fill', fill);
+    g.setAttribute('text-anchor', 'middle');
+    g.setAttribute('dominant-baseline', 'central');
+    for (var i = 0; i < str.length; i++){
+      if (!str[i].trim()) continue;
+      var t = document.createElementNS(NS, 'text');
+      t.setAttribute('x', cx);
+      t.setAttribute('y', y0 + i * gap);
+      t.textContent = str[i];
+      g.appendChild(t);
+    }
+    return g;
+  }
+
+  var right = document.getElementById('rightCouplet');
+  right.appendChild(vCol('创大业千秋昌盛', 862, 152, 80, 46, '#f7e3a1'));
+
+  var left = document.getElementById('leftCouplet');
+  left.appendChild(vCol('展宏图再就辉煌', 138, 152, 80, 46, '#f7e3a1'));
+})();
+</script>
+</body>
+</html>

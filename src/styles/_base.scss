@@ -1,0 +1,173 @@
+// =============================================================================
+// BASE STYLES - ZEO Portfolio (3D Corridor Experience)
+// =============================================================================
+
+@use 'variables' as *;
+@use 'mixins' as *;
+
+// CSS Reset
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    font-size: 16px;
+
+    @include mobile {
+        font-size: 14px;
+    }
+}
+
+body {
+    font-family: $font-primary;
+    background-color: #fafafa;
+    color: $color-black;
+    overflow: hidden; // No scroll - 3D handles it
+    // 吉他光标由 cursorArt.js 运行时生成 data URL，经 --zeo-cursor-* 注入
+    // （热点 13,2 = 琴头）；交互元素由 setGuitarCursor('pointer') 覆盖。
+    // 变量尚未注入时回退到系统默认箭头。
+    cursor: var(--zeo-cursor-default, auto);
+    @include smooth-text;
+    @include hide-scrollbar;
+}
+
+// DOM 层可点击元素（3D 场景内由 setGuitarCursor 控制）
+a,
+button,
+[role='button'],
+input[type='range'],
+label[for] {
+    cursor: var(--zeo-cursor-pointer, pointer);
+}
+
+// App container
+.app {
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    position: relative;
+    overflow: hidden;
+}
+
+// Canvas wrapper
+.canvas-wrapper {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+}
+
+// UI Overlay
+.ui-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+}
+
+// Scroll hint
+.scroll-hint {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    animation: fadeIn 1s ease 0.5s both;
+
+    &__text {
+        font-family: $font-handwritten;
+        font-size: 1rem;
+        color: #666;
+    }
+
+    &__arrow {
+        font-size: 1.5rem;
+        color: $color-black;
+        animation: bounce 2s ease infinite;
+    }
+}
+
+// Instructions
+.instructions {
+    position: absolute;
+    bottom: 1rem;
+    right: 1rem;
+
+    p {
+        font-family: $font-handwritten;
+        font-size: 0.9rem;
+        color: #888;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        border: 1px solid #eee;
+    }
+
+    @include mobile {
+        bottom: auto;
+        top: 1rem;
+        right: 1rem;
+
+        p {
+            font-size: 0.75rem;
+        }
+    }
+}
+
+// Animations
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes bounce {
+
+    0%,
+    20%,
+    50%,
+    80%,
+    100% {
+        transform: translateY(0);
+    }
+
+    40% {
+        transform: translateY(-8px);
+    }
+
+    60% {
+        transform: translateY(-4px);
+    }
+}
+
+// Prevent text selection on UI
+.ui-overlay,
+.scroll-hint,
+.instructions {
+    user-select: none;
+}
+
+// Links reset
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+// Button reset
+button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+}
