@@ -20,15 +20,20 @@
 
 ---
 
-# 🙋 本轮待你验收（WO-01 ~ WO-05）
+# 🙋 本轮待你验收（WO-01 ~ WO-06）
 
 | WO | 一句话 | 验证证据 | 状态 |
 |---|---|---|---|
 | WO-01 | 盆栽树冠不再被左右裁平 | 边界墨迹 152/178 → **0/0**；`AB-pottedtree-cut.png` | 待验收 |
 | WO-02 | 瓢虫缩到一半 | 屏幕墨迹 280×235 → **135×133 px**；`AB-ladybird-size.png` | 待验收 |
 | WO-03 | BGM 加载完即播 | 你报了缺陷 → 已定位并修复，**请重验**（见 WO-03） | ⚠️ **重验** |
-| WO-04 | gh-pages 部署脚本 | `bash -n` / `--dry-run` 通过；无 remote 时明确报错 | 待验收 |
-| WO-05 | gh-pages CI workflow | YAML 解析通过；推送序列用本地 bare 仓库**实测跑通** | 待验收 |
+| WO-04 | gh-pages 部署脚本 | `bash -n` / `--dry-run` 通过；发布源检查 + `--configure-pages` 实测 | 待验收 |
+| WO-05 | gh-pages CI workflow | YAML 解析通过；**线上首次运行 success（25 s）** | 待验收 |
+| WO-06 | 旧站 `data/` 迁到 `public/` | blob sha 一致；新旧 URL 同为 200 / 1485 B | 待验收 |
+
+**站点已上线**：`https://aispin.github.io/` 现在跑的就是新站
+（标题 `黄泽昊 · AISPIN`，原来是 `Faso.ME`）。`/me/`、`/data/little-snitch/zeo-music.lsrules`、
+`/404.html`、`/_redirects`、`/_headers`、`.nojekyll` 全部 200。
 
 生产冒烟（`smoke.mjs`，生产构建，72 s）→ `meshes 697` / `hasCanvas true` /
 `ERRORS (0)` / 只栅格化 2 张位图。697 = 原基线 696 + 新增的瓢虫点击垫片 1。
@@ -63,28 +68,42 @@
 > （`master`，标题 `Faso.ME`，最近构建 2026-09-18）。
 > 推 `gh-pages` + 改发布源 = **旧站被新站替换**。**要不要现在上线，等你一句话。**
 
-## DR-02 · 远端仓库 —— ⚠️ **前提变了，请你重新拍板**
+## DR-02 · 远端仓库 —— ✅ 你选了「**C. 覆盖远端 main** + `master` 改名 `v1`」，已执行
 
-你选的是「用 gh 新建一个」，但我一查：**仓库已经存在，而且是你的原始上游仓库。**
+原本以为要 `gh repo create`，一查发现**仓库早就存在**，而且是你的原始上游仓库：
 
 | | |
 |---|---|
 | `aispin/aispin.github.io` | **已存在**（2013-02-23 建），**PUBLIC**，不是 fork |
-| 默认分支 | `dev`；另有 `main` / `master` / `v2` |
-| 最近推送 | 2026-09-18 |
+| 原分支 | `dev`（默认）/ `main` / `master` / `v2` |
 | 说明 | `Home of AISPIN` |
 
-**所以没有仓库可建。** 而且两边历史**无关**：本地是新起的 29 个提交
-（基线 `259ed2f 建立版本管理基线（此前的仓库历史已丢失）`），远端是 2013 年以来的老历史。
-→ `git push origin main` 会**撞上远端的 `main`**（非快进，必须强推），**不能乱推**。
+两边历史**无关**：本地是新起的 29 个提交（基线
+`259ed2f 建立版本管理基线（此前的仓库历史已丢失）`），远端是 2013 年以来的老历史。
 
-| 选项 | 做法 | 后果 |
-|---|---|---|
-| **A. 只推 `gh-pages`**（推荐） | 只把 `dist/` 推成 `gh-pages`，远端旧分支全部原样保留 | 非破坏性；站点换成新站，源码历史仍只在本地 |
-| **B. 再推一个源码分支** | 本地 `main` 推成远端**新**分支（如 `v3`），旧分支不动 | 源码也上了远端，但与旧历史是两条线 |
-| **C. 覆盖远端 `main`** | 强推本地 `main` → 远端 `main` | ❌ 破坏性，不建议 |
+**你的决定**：强推本地 `main` 覆盖远端 `main`；把 `master` 改名为 `v1`。
 
-我建议 **A** —— 你要的是「站点上线」，`gh-pages` 已经够了。
+**执行记录**（全部已做，24 个分支操作都验过）：
+
+| 步骤 | 结果 |
+|---|---|
+| 强推前留退路 | 建 `backup-main-20261008` → 旧 `main` 的 `071fffdf`（**你不想要了就删**） |
+| 构建 + 推 `gh-pages` | ✔ dist **110** 文件 → `gh-pages` |
+| 改 Pages 发布源 | ✔ `master` → **`gh-pages` / (root)** |
+| 强推 `main` | ✔ `--force-with-lease=main:071fffdf…` → `071fffd...e903d51 (forced update)` |
+| `master` → `v1` | ✔ `v1` = `7ada2eb7`（旧站内容原样） |
+| CI workflow | ✔ 首次运行 **success**（25 s），自动重推了 `gh-pages` |
+
+> ⚠️ **没敢用 `--force`，用的是 `--force-with-lease=<ref>:<sha>`**：它会把"我以为远端
+> 还是这个 SHA"写进命令，远端一旦被别人动过就直接拒绝 —— 强推不可逆，值得多这一道。
+
+> ⚠️ **`master` 不是纯归档分支**：它到 **2026-09-18** 还有提交（作者 `Livin AI`，
+> 内容是 `zeo-music.lsrules`）。改名是可逆的（`branch rename` 改回来即可），
+> 但如果别处有本地 clone 还 tracking `master`，那边需要 `git fetch --prune` 一下。
+
+> 🔴 顺带踩到：本机出海走代理，**`github.com` 的 CONNECT 偶发 502**
+> （实测约每 5~6 次里 1 次成功），而 `api.github.com` 一直稳。
+> 所以 `git push` 失败**未必是仓库的问题**。已给脚本加 `GIT_RETRIES`（默认 5）。
 
 ---
 
@@ -211,6 +230,26 @@
      `index.html` / `me/index.html` / `404.html` / `.nojekyll` 全在，
      且**真实 `dist/` 没被 `.git` 污染**。
   3. 真上线还要等 DR-02 拍板；Pages 源不必手点 —— `scripts/deploy-gh-pages.sh --configure-pages` 直接改。
+- **上线实测**：强推 `main` 触发首次运行 → `completed / success`，25 s，
+  自动把 `gh-pages` 从 `c12547a6` 重推到 `30ddd507`；Pages 随即从 `30ddd507` 构建成功。
+
+## WO-06 · 旧站 `data/` 迁到新站 `public/`（保持原访问路径）
+
+- **需求原文**：「将原 master 分支下的 data 目录，复制一份到我们新项目的 public 目录下，
+  确保 data 依然可以按照原方式访问」
+- **状态**：✅ **已实施，待验收**（无 DR，影响面小，直接做）
+- **现状**：旧站把 `data/` 放在**仓库根目录**（与 `index.html` 同级）→ 对外 URL 是
+  `https://aispin.github.io/data/little-snitch/zeo-music.lsrules`。
+  实际内容**只有一个文件**：`data/little-snitch/zeo-music.lsrules`（1485 B）。
+- **改什么**：把它放到 `public/data/little-snitch/zeo-music.lsrules`。
+  Vite 原样拷贝 `public/` → 构建后落在 `dist/data/…` → **URL 与旧站完全一致**，
+  不需要重写规则或重定向。
+- **取件方式**：`gh api -H "Accept: application/vnd.github.raw" … /contents/…?ref=master`
+  （`master` 现已改名 `v1`，用 `?ref=v1` 同样可取）。
+- **验收判据**：
+  1. 本地 `git hash-object` == 远端 blob sha（`c0bf9855…`）→ **逐字节一致**。
+  2. 构建产物里有 `dist/data/little-snitch/zeo-music.lsrules`，`cmp` 通过。
+  3. 线上该 URL → `200` / `application/octet-stream` / `1485 B`（与旧站一致）。
 
 ---
 
@@ -218,11 +257,12 @@
 
 | | |
 |---|---|
-| 版本管理 | git；本地 **29 个提交**（新起历史），**没有 remote**（见 DR-02）；`.workbuddy-ai/` 已排除 |
-| 远端 | `aispin/aispin.github.io` **已存在**（2013-02-23 起，PUBLIC，默认分支 `dev`，另有 `main`/`master`/`v2`）—— 与本地历史**无关** |
-| 线上 | `https://aispin.github.io/` 现在跑的是**旧站**（Pages 源 = `master`，标题 `Faso.ME`） |
+| 版本管理 | git；本地 **30 个提交**（新起历史）；remote `origin` = `https://github.com/aispin/aispin.github.io.git`；`.workbuddy-ai/` 已排除 |
+| 远端分支 | `main`（= 本项目源码，**强推覆盖**过旧历史）/ `gh-pages`（= 构建产物，CI 维护）/ `v1`（旧 `master`，旧站内容）/ `dev` / `v2` / `backup-main-20261008`（强推前的退路，可删） |
+| 线上 | `https://aispin.github.io/` 跑**新站**（标题 `黄泽昊 · AISPIN`）；Pages 源 = `gh-pages` / (root) |
 | dev server | `npx vite --port 5199 --strictPort --host 127.0.0.1`（⚠️ 必须带 `--host`） |
 | 视觉约束 | 程序化 / canvas / three 生成；零 jpg/png；不用 AI 生图；全站只允许 2 张位图 |
 | 基线 | meshes **697**（`smoke.mjs` 生产构建，**等 ≥65 s**）· 贴图 **59 次 / 64.5 MB**（`texture-inventory.mjs` 走廊态） |
-| 部署 | GitHub Pages。Pages 源**当前 = `master`**（旧站），目标 = **`gh-pages`**（DR-01 选 A）；workflow `.github/workflows/deploy-gh-pages.yml`；本地脚本 `scripts/deploy-gh-pages.sh`（`--configure-pages` 可改 Pages 源）。**真上线待 DR-02 拍板** |
+| 部署 | 推 `main` → CI `.github/workflows/deploy-gh-pages.yml` 自动构建并推 `gh-pages`；本地等价命令 `scripts/deploy-gh-pages.sh`（`--dry-run` / `--configure-pages`） |
+| ⚠️ 网络 | 本机出海走代理，**`github.com` 的 CONNECT 偶发 502**（约 5~6 次成功 1 次）；`api.github.com` 稳定。`git push` 失败先重试，脚本有 `GIT_RETRIES`（默认 5） |
 | 备注 | `public/demos/demos.json` 是构建插件生成的（每次 dev/preview 启动刷新 `generatedAt`）→ 会让工作区变脏，提交前 `git checkout --` 掉 |
