@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import gsap from 'gsap';
 import '../shaders/RevealMaterial'; // Registers alpha-discard reveal shader
 import { playBackgroundMusic } from '../../../utils/audioManager';
+import { playInsectChirp } from '../../../audio/sfx';
 import { useAchievements } from '../../../context/AchievementsContext';
 import { isTouchDevice } from '../../../utils/deviceDetect';
 import { setGuitarCursor } from '../../../utils/guitarCursor';
@@ -24,7 +25,6 @@ import {
     makeWallInkTexture,
     makeLadybirdTexture,
     makeSpeechBubbleTexture,
-    makeInkSplashTexture,
 } from '../../../utils/entranceArt';
 import {
     makeDoorGodTexture,
@@ -291,20 +291,57 @@ const EntranceDoors = ({
 
     const treeTexture = makeTreeTexture();
     const bugTexture = makeLadybirdTexture();
-    const inkSplashTexture = makeInkSplashTexture();
     const speechBubbleTexture = makeSpeechBubbleTexture();
 
     // Bug Ref
     const bugRef = useRef();
 
-    // Bug Click Animation State
-    const [isBugClicked, setIsBugClicked] = useState(false);
-    const [textVisible, setTextVisible] = useState(false);
-    const [clipProgress, setClipProgress] = useState(0); // 0-1 for pencil drawing reveal
-    const inkSplashRef = useRef();
+    /* --- Ladybird dodge (2026-10-08) -------------------------------------
+       The old interaction was click -> ink splash + a "BUG FIXED!" caption
+       wiped on with a clip rect. Removed at the user's request; the bug now
+       *dodges* the click instead, and chirps.
+
+       The dodge is an offset ADDED to the idle wander in useFrame rather than
+       a tween on position, because useFrame overwrites position.x/y every
+       frame — a tween on the mesh would be erased on the next frame. Tweening
+       a plain object and reading it inside useFrame is the only thing that
+       survives. */
+    const bugDodge = useRef({ x: 0, y: 0 });
+    const bugDodgeTl = useRef(null);
     const handleHideDelayRef = useRef(); // Track pending gsap.delayedCall for handle visibility
-    const bugFixedTextRef = useRef();
-    const bugClickPos = useRef({ x: 0, y: 0 }); // Store click position
+
+    const handleBugDodge = (e) => {
+        e.stopPropagation();
+        const b = bugRef.current;
+        if (!b) return;
+
+        // Push away from wherever the pointer landed on the bug's plane, so a
+        // click on the left flank sends it right. Fall back to "straight up"
+        // if the click is dead centre (no usable direction).
+        const p = e.point;
+        let dx = p ? b.position.x - p.x : 0;
+        let dy = p ? b.position.y - p.y : 1;
+        const len = Math.hypot(dx, dy);
+        if (len < 0.04) { dx = Math.random() < 0.5 ? -1 : 1; dy = 0.7; }
+        else { dx /= len; dy /= len; }
+
+        const dist = 0.5 + Math.random() * 0.35;
+        // Clamped so a few dodges in a row cannot walk it off the facade.
+        const tx = Math.max(-0.62, Math.min(0.62, bugDodge.current.x + dx * dist));
+        const ty = Math.max(-0.45, Math.min(0.62, bugDodge.current.y + dy * dist * 0.7 + 0.14));
+
+        bugDodgeTl.current?.kill();
+        bugDodgeTl.current = gsap.timeline()
+            .to(bugDodge.current, { x: tx, y: ty, duration: 0.36, ease: 'back.out(2.4)' })
+            .to(bugDodge.current, { x: 0, y: 0, duration: 1.5, ease: 'power2.inOut' }, '+=0.30');
+
+        // A startled flinch: quick squash, back to 1.
+        gsap.fromTo(b.scale,
+            { x: 1, y: 1 },
+            { x: 1.16, y: 0.84, duration: 0.1, yoyo: true, repeat: 1, ease: 'power2.out' });
+
+        playInsectChirp(1);
+    };
 
     // Duck Speech Bubble State (Rubber Duck Debugging)
     const [isDuckSpeaking, setIsDuckSpeaking] = useState(false);
@@ -324,71 +361,6 @@ const EntranceDoors = ({
         "Is it plugged in?",
         "Works in production!",
     ];
-
-    // Bug Click Handler
-    const handleBugClick = (e) => {
-        e.stopPropagation();
-        if (isBugClicked) return; // Already clicked
-
-        // Store bug position at click time
-        if (bugRef.current) {
-            bugClickPos.current = {
-                x: bugRef.current.position.x,
-                y: bugRef.current.position.y
-            };
-        }
-
-        setIsBugClicked(true);
-        setGuitarCursor('auto');
-
-        // Animate ink splash scale up
-        if (inkSplashRef.current) {
-            // Position ink splash at bug's last position
-            inkSplashRef.current.position.x = bugClickPos.current.x;
-            inkSplashRef.current.position.y = bugClickPos.current.y;
-            inkSplashRef.current.scale.set(0, 0, 0);
-            inkSplashRef.current.material.opacity = 1;
-
-            gsap.to(inkSplashRef.current.scale, {
-                x: 0.8,
-                y: 0.8,
-                z: 1,
-                duration: 0.4,
-                ease: 'back.out(1.7)'
-            });
-        }
-
-        // Pencil drawing effect - smooth reveal from left to right
-        setTextVisible(true);
-        setClipProgress(0);
-
-        if (bugFixedTextRef.current) {
-            bugFixedTextRef.current.position.x = bugClickPos.current.x;
-            bugFixedTextRef.current.position.y = bugClickPos.current.y;
-        }
-
-        // Animate clip progress from 0 to 1 (reveals text like pencil drawing)
-        gsap.to({ progress: 0 }, {
-            progress: 1,
-            duration: 0.8,
-            ease: 'power1.inOut',
-            onUpdate: function () {
-                setClipProgress(this.targets()[0].progress);
-            },
-            onComplete: () => {
-                // Fade out after a delay
-                setTimeout(() => {
-                    if (inkSplashRef.current) {
-                        gsap.to(inkSplashRef.current.material, {
-                            opacity: 0,
-                            duration: 1,
-                            ease: 'power2.out'
-                        });
-                    }
-                }, 1500);
-            }
-        });
-    };
 
     // Duck Click Handler (Rubber Duck Debugging)
     const handleDuckClick = (e) => {
@@ -677,9 +649,13 @@ const EntranceDoors = ({
             // Wandering logic: slightly complex sine waves for "random" walking felt
             // Initial Pos: [2.5, floorY + 3.0, 0.16] (Above window)
             // Range: +/- 0.3 in X, +/- 0.3 in Y
-
-            const xOffset = Math.sin(time * 0.8) * 0.3 + Math.sin(time * 1.5) * 0.1;
-            const yOffset = Math.cos(time * 0.6) * 0.2 + Math.cos(time * 1.1) * 0.1;
+            //
+            // `bugDodge` is the startled offset from the click handler; it is
+            // added here rather than tweened onto the mesh, because this line
+            // rewrites position every frame (see the note on bugDodge).
+            const dodge = bugDodge.current;
+            const xOffset = Math.sin(time * 0.8) * 0.3 + Math.sin(time * 1.5) * 0.1 + dodge.x;
+            const yOffset = Math.cos(time * 0.6) * 0.2 + Math.cos(time * 1.1) * 0.1 + dodge.y;
 
             bugRef.current.position.x = 3 + xOffset;
             bugRef.current.position.y = (floorY + 3.8) + yOffset;
@@ -694,6 +670,17 @@ const EntranceDoors = ({
     // The three tunnel wall panels (see the JSX below) sit behind this, so
     // they cannot occlude the window's interior or its curtains.
     const WALL_PANEL_Z = -0.5;
+
+    /**
+     * Colour of those legacy panels.
+     *
+     * Sampled off the facade: the 青砖 around the opening reads (88, 92, 91)
+     * at the resting entrance camera. Painted #e0e0e0 they were the brightest
+     * thing in the frame (measured 205,205,205) and the facade's soft cut-out
+     * ramp turned them into a bright halo around the gate — see the long note
+     * on the panels below.
+     */
+    const WALL_REVEAL = '#585c5b';
 
     // --- Window hover ---------------------------------------------------
     // The opening is centred on x = 2.5 and is 1.4 wide, so its right edge is
@@ -841,33 +828,37 @@ const EntranceDoors = ({
 
             {/* === TUNNEL WALL PANELS (Z-BACKED) ===
                 这三块板是"门洞周围那圈墙"，从入口还是一条纯走廊的时候就留在这里。
-                现在 10×6 的青砖门脸（z = 0.15）把它们**完全盖住**了 —— 除了通过
-                门洞和窗洞看进去的那一格。
+                现在 10×6 的青砖门脸（z = 0.15）把它们盖住 —— **但不是完全盖住**。
 
-                ⚠️ 这正是"窗户后面是一块惨白的板子、窗帘只剩几条细线"的成因：
-                右侧板（x 0.9..5.0）就横在窗洞后面，是一块不透明白板（#e0e0e0），
-                把窗内景（z 21.89）和窗帘（z 21.99）全遮掉了。之前以为是窗帘
-                本身画错了，查了两轮才发现是这块挡板。
+                ⚠️ 2026-10-08：用户报「大门两边的白色竖条」就是它们。
+                门脸的洞口不是硬裁的：SONG_WALL_FRAG 里
+                    float hole = max(rectHole(uHoleDoor), rectHole(uHoleWindow));
+                    gl_FragColor = vec4(col, 1.0 - hole);
+                而 rectHole 是 `1.0 - smoothstep(0.0, 0.06, ...)`，所以洞口**四周
+                往外 0.06 世界单位**（在默认机位约 8 px）门脸是半透明的。那一条
+                半透明带子后面正是这块板：涂成 #e0e0e0（无光照 → 224）的板子从
+                青砖（实测 88,92,91）后面透出来，就是一道白边。
 
-                修法：把它们挪到**窗内景之后**（世界 z = 21.5）。它们在该在的
-                地方（门洞两侧），但不再是窗洞里离相机最近的东西。位置由
-                WALL_PANEL_Z 表达，别再回到 0。 */}
+                修法：板子代表的是"洞口周围那圈墙"，就按墙的颜色画。它们在视觉上
+                等于不存在了，而门脸那 0.06 的柔边无论透出多少都还是砖色。
+                别再改回 #e0e0e0 —— 那正是这条 bug 的成因。 */}
+
             {/* LEFT WALL PANEL */}
             <mesh position={[-(doorOpeningWidth / 2 + sideWallWidth / 2), wallCenterY, WALL_PANEL_Z]}>
                 <primitive object={sharedGeometry('box', sideWallWidth, corridorHeight, wallThickness)} attach="geometry" />
-                <meshBasicMaterial color="#e0e0e0" roughness={0.95} />
+                <meshBasicMaterial color={WALL_REVEAL} roughness={0.95} />
             </mesh>
 
             {/* RIGHT WALL PANEL */}
             <mesh position={[(doorOpeningWidth / 2 + sideWallWidth / 2), wallCenterY, WALL_PANEL_Z]}>
                 <primitive object={sharedGeometry('box', sideWallWidth, corridorHeight, wallThickness)} attach="geometry" />
-                <meshBasicMaterial color="#e0e0e0" roughness={0.95} />
+                <meshBasicMaterial color={WALL_REVEAL} roughness={0.95} />
             </mesh>
 
             {/* TOP WALL PANEL */}
             <mesh position={[0, topWallCenterY, WALL_PANEL_Z]}>
                 <primitive object={sharedGeometry('box', doorOpeningWidth, topWallHeight, wallThickness)} attach="geometry" />
-                <meshBasicMaterial color="#e0e0e0" roughness={0.95} />
+                <meshBasicMaterial color={WALL_REVEAL} roughness={0.95} />
             </mesh>
 
             {/* === SONG-DYNASTY WALL FACADE === */}
@@ -1178,55 +1169,26 @@ const EntranceDoors = ({
             </group>
 
             {/* ANIMATED BUG (Right Side - Above Window) */}
-            {!isBugClicked && (
-                <mesh
-                    ref={bugRef}
-                    position={[2.5, floorY + 2.8, 0.16]}
-                    onClick={handleBugClick}
-                    onPointerEnter={() => { setGuitarCursor('pointer'); }}
-                    onPointerLeave={() => { setGuitarCursor('auto'); }}
-                >
-                    <primitive object={sharedGeometry('plane', 0.4, 0.4)} attach="geometry" />
-                    <meshBasicMaterial color="#e0e0e0"
-                        map={bugTexture}
-                        transparent={true}
-                        alphaTest={0.01}
-                        depthWrite={false}
-                    />
-                </mesh>
-            )}
-
-            {/* INK SPLASH - always mounted to preload texture/shader */}
+            {/* Clicking it no longer splashes ink — it dodges (see
+                handleBugDodge) and chirps. The mesh that takes the pointer is
+                a plane a bit LARGER than the bug, so going for it and missing
+                by a few pixels still counts: the point is that it gets away,
+                not that you hit a 0.4-unit target dead centre. */}
             <mesh
-                ref={inkSplashRef}
-                position={[2.5, floorY + 2.8, 0.17]}
-                scale={[0, 0, 0]}
-            // Removed conditional 'visible' to ensure GPU upload
+                ref={bugRef}
+                position={[2.5, floorY + 2.8, 0.16]}
+                onPointerDown={handleBugDodge}
+                onPointerEnter={() => { setGuitarCursor('pointer'); }}
+                onPointerLeave={() => { setGuitarCursor('auto'); }}
             >
-                <primitive object={sharedGeometry('plane', 2, 2)} attach="geometry" />
+                <primitive object={sharedGeometry('plane', 0.74, 0.74)} attach="geometry" />
                 <meshBasicMaterial color="#e0e0e0"
-                    map={inkSplashTexture}
+                    map={bugTexture}
                     transparent={true}
                     alphaTest={0.01}
                     depthWrite={false}
                 />
             </mesh>
-
-            {/* BUG FIXED! Text - always mounted to preload font */}
-            <Text
-                ref={bugFixedTextRef}
-                position={[2.5, floorY + 2.8, 0.35]} // Default pos, updated on click
-                fontSize={0.25}
-                color="#1a1a1a"
-                anchorX="center"
-                anchorY="middle"
-                font={SCENE_FONTS.maple}
-                outlineWidth={0.015}
-                outlineColor="#ffffff"
-                clipRect={[-1, -0.5, -1 + (clipProgress * 2.5), 0.5]}
-            >
-                BUG FIXED!
-            </Text>
 
 
 

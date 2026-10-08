@@ -1195,7 +1195,28 @@ function drawPot(ctx, cx, topY, bottomY, topW, bottomW) {
     inkStroke(ctx, path, { color: '#3a2415', width: 4, echo: 0.3 });
 }
 
-/** The tall potted plant that stands opposite the Contact door. */
+/**
+ * The tall potted plant that stands opposite the Contact door.
+ *
+ * REDRAWN 2026-10-08 — the user reported 一个黑色的黑圈 across it.
+ *
+ * That ring was literal: the canopy was finished with
+ *     ctx.ellipse(cx, H*0.27, W*0.42, H*0.21, ...)  // "Ink contour around the canopy"
+ * — a *free-standing* ellipse stroked on top of the foliage. It had no
+ * relationship to the eight blobs underneath it, so it crossed straight
+ * through the middle of the canopy and out the other side. A contour has to
+ * be the silhouette, not an approximation of it.
+ *
+ * How the contour follows the silhouette now: every blob is stroked FIRST
+ * with a fat ink line (16 px, i.e. 8 px proud of the blob edge) and the
+ * blobs are filled on top. Where two blobs overlap, the later fill buries
+ * the earlier stroke; only the outer boundary of the union survives. That
+ * gives a contour that hugs the canopy exactly, with no path math.
+ *
+ * The leaf speckle used to be scattered across an ellipse that did not match
+ * the blob union, so leaves floated in the gaps between blobs. Each blob now
+ * stamps its own leaves *clipped to itself*, so nothing can escape.
+ */
 export function makePottedTreeTexture() {
     const key = 'corridor-potted-tree';
     if (cache.has(key)) return cache.get(key);
@@ -1208,7 +1229,29 @@ export function makePottedTreeTexture() {
 
     const cx = W * 0.5;
 
-    // ---- trunk --------------------------------------------------------
+    // ---- canopy blobs (declared first: trunk, contour and leaves all use them)
+    //
+    // ⚠️ These must overlap GENEROUSLY. The contour is made by stroking every
+    // blob fat (16 px) and then filling them on top, so a blob only loses its
+    // internal outline where a neighbour's FILL covers it. Give them any real
+    // rotation and the overlap drops below the 8 px half-stroke, every blob
+    // keeps its own ring, and the canopy turns into a bunch of grapes.
+    const blobs = [
+        [cx, H * 0.19, W * 0.40, H * 0.165, 0],
+        [cx - W * 0.24, H * 0.29, W * 0.27, H * 0.125, 0],
+        [cx + W * 0.24, H * 0.27, W * 0.28, H * 0.135, 0],
+        [cx - W * 0.15, H * 0.13, W * 0.23, H * 0.105, 0],
+        [cx + W * 0.17, H * 0.125, W * 0.21, H * 0.095, 0],
+        [cx, H * 0.37, W * 0.31, H * 0.115, 0],
+        [cx - W * 0.30, H * 0.41, W * 0.19, H * 0.095, 0],
+        [cx + W * 0.30, H * 0.40, W * 0.19, H * 0.095, 0],
+    ];
+    const blobPath = (c, [bx, by, bw, bh, rot = 0]) => {
+        c.beginPath();
+        c.ellipse(bx, by, bw, bh, rot, 0, Math.PI * 2);
+    };
+
+    // ---- trunk (behind the canopy) ------------------------------------
     const trunkTop = H * 0.44;
     const trunkBottom = H * 0.76;
     ctx.strokeStyle = '#7a5a38';
@@ -1228,48 +1271,85 @@ export function makePottedTreeTexture() {
         ctx.stroke();
     });
 
+    // ---- ink contour: stroke every blob fat, then bury the overlaps -----
+    ctx.save();
+    ctx.strokeStyle = 'rgba(52, 62, 24, 0.72)';
+    ctx.lineWidth = 16;
+    ctx.lineJoin = 'round';
+    blobs.forEach((b) => { blobPath(ctx, b); ctx.stroke(); });
+    ctx.restore();
+
     // ---- foliage ------------------------------------------------------
-    const blobs = [
-        [cx, H * 0.20, W * 0.40, H * 0.17],
-        [cx - W * 0.26, H * 0.30, W * 0.26, H * 0.12],
-        [cx + W * 0.26, H * 0.28, W * 0.27, H * 0.13],
-        [cx - W * 0.16, H * 0.14, W * 0.22, H * 0.10],
-        [cx + W * 0.18, H * 0.13, W * 0.20, H * 0.09],
-        [cx, H * 0.38, W * 0.30, H * 0.11],
-        [cx - W * 0.32, H * 0.42, W * 0.18, H * 0.09],
-        [cx + W * 0.32, H * 0.41, W * 0.18, H * 0.09],
+    // Colours are deliberately wide: a canopy built from one green reads as
+    // plastic. The five leaf tones span a bright yellow-green to a deep olive
+    // so the stamping builds up real internal contrast.
+    const LEAF_COLORS = [
+        'rgba(206, 214, 122, 0.62)',
+        'rgba(158, 174, 74, 0.66)',
+        'rgba(106, 122, 44, 0.62)',
+        'rgba(224, 230, 160, 0.46)',
+        'rgba(126, 146, 56, 0.60)',
     ];
-    blobs.forEach(([bx, by, bw, bh]) => {
-        const g = ctx.createRadialGradient(bx - bw * 0.25, by - bh * 0.35, bh * 0.2, bx, by, bw);
-        g.addColorStop(0, rgba(168, 178, 78));
-        g.addColorStop(0.55, rgba(138, 150, 60));
-        g.addColorStop(1, rgba(96, 108, 42));
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.ellipse(bx, by, bw, bh, (rand() - 0.5) * 0.5, 0, Math.PI * 2);
-        ctx.fill();
+
+    // ONE gradient for the whole canopy, not one per blob.
+    //
+    // ⚠️ Per-blob gradients look right in isolation and wrong in a union:
+    // each blob's fill is clipped to its own ellipse, so its dark outer stop
+    // is painted as a hard arc wherever that blob is the topmost fill — the
+    // canopy comes out looking like a bunch of grapes. Sharing one canopy-wide
+    // gradient means every overlapping fill lands the same colour on the same
+    // pixel, so the seams vanish. Per-blob variation is added afterwards as a
+    // soft highlight that fades to zero alpha, which has no edge to show.
+    const canopy = ctx.createRadialGradient(cx - W * 0.14, H * 0.10, H * 0.08, cx, H * 0.27, W * 0.54);
+    canopy.addColorStop(0, rgba(182, 192, 94));
+    canopy.addColorStop(0.5, rgba(142, 154, 64));
+    canopy.addColorStop(1, rgba(82, 94, 36));
+
+    blobs.forEach((b) => {
+        const [bx, by, bw, bh] = b;
+        ctx.save();
+        blobPath(ctx, b);
+        ctx.clip();
+
+        ctx.fillStyle = canopy;
+        ctx.fillRect(0, 0, W, H);
+
+        // soft per-blob lift, fading out long before the blob edge
+        const hg = ctx.createRadialGradient(bx - bw * 0.32, by - bh * 0.46, 2, bx - bw * 0.08, by - bh * 0.18, bw * 0.98);
+        hg.addColorStop(0, `rgba(228, 236, 154, ${(0.14 + rand() * 0.12).toFixed(3)})`);
+        hg.addColorStop(1, 'rgba(228, 236, 154, 0)');
+        ctx.fillStyle = hg;
+        ctx.fillRect(bx - bw * 1.4, by - bh * 1.4, bw * 2.8, bh * 2.8);
+
+        // leaves, clipped to THIS blob so none can float in a gap.
+        // Small and numerous: at 8-19 px they read as seeds, not foliage.
+        const n = Math.round((bw * bh) / 520);
+        for (let i = 0; i < n; i++) {
+            const lx = bx + (rand() - 0.5) * bw * 2.2;
+            const ly = by + (rand() - 0.5) * bh * 2.2;
+            const lr = 5.5 + rand() * 8;
+            ctx.save();
+            ctx.translate(lx, ly);
+            ctx.rotate(rand() * Math.PI);
+            ctx.fillStyle = LEAF_COLORS[(rand() * LEAF_COLORS.length) | 0];
+            ctx.beginPath();
+            ctx.ellipse(0, 0, lr, lr * 0.46, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+        ctx.restore();
     });
 
-    // Leaf speckle so the canopy has texture
-    for (let i = 0; i < 340; i++) {
-        const a = rand() * Math.PI * 2;
-        const r = Math.sqrt(rand());
-        const bx = cx + Math.cos(a) * r * W * 0.40;
-        const by = H * 0.27 + Math.sin(a) * r * H * 0.20;
-        ctx.fillStyle = rand() > 0.5
-            ? rgba(190, 200, 110, 0.45 + rand() * 0.3)
-            : rgba(88, 100, 38, 0.35 + rand() * 0.3);
-        ctx.beginPath();
-        ctx.ellipse(bx, by, 5 + rand() * 7, 3 + rand() * 4, rand() * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Ink contour around the canopy
-    ctx.strokeStyle = 'rgba(58, 66, 26, 0.55)';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.ellipse(cx, H * 0.27, W * 0.42, H * 0.21, 0, 0, Math.PI * 2);
-    ctx.stroke();
+    // ---- shading: darken the underside of the canopy -------------------
+    ctx.save();
+    blobs.forEach((b) => { blobPath(ctx, b); ctx.clip(); });
+    const sh = ctx.createLinearGradient(0, H * 0.14, 0, H * 0.50);
+    sh.addColorStop(0, 'rgba(48, 58, 22, 0)');
+    sh.addColorStop(0.62, 'rgba(48, 58, 22, 0.10)');
+    sh.addColorStop(1, 'rgba(38, 46, 16, 0.34)');
+    ctx.fillStyle = sh;
+    ctx.fillRect(0, 0, W, H * 0.55);
+    ctx.restore();
 
     // ---- pot ----------------------------------------------------------
     drawPot(ctx, cx, H * 0.78, H * 0.96, W * 0.46, W * 0.34);

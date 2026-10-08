@@ -165,6 +165,36 @@ const INK_SOFT = '#5A4636';
 /* Ladybird — the wandering bug above the window                        */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 瓢虫. Redrawn 2026-10-08.
+ *
+ * WHAT WAS WRONG
+ * --------------
+ * The first version stroked TWO closed paths — a "head" and a "shell" — and
+ * the head path was a **D**: a dome closed with a *straight* line from
+ * (400,272) back to (112,272). It was stroked *after* the shell had been
+ * filled, so that flat bottom edge and the two vertical ends of the dome
+ * landed on top of the orange body as a hard black **rectangle bracket**
+ * straight across the eyes. At the size this thing is actually seen (a 0.4
+ * unit plane, ~100 px on screen) the bracket plus the 12 px shell outline
+ * read as exactly what the user reported: 一个黑圈.
+ *
+ * The eyes were also drawn at 56 px radius on a head that is only ~92 px
+ * tall, so they overflowed the head and sat on the wing cases.
+ *
+ * THE FIX
+ * -------
+ * One silhouette, one outline. `bodyPath` is the union of the head dome and
+ * the shell as a single closed curve, and it is the ONLY path that gets an
+ * ink stroke — so a bracket is not expressible any more. Everything else
+ * (pronotum cap, seam, spots) is clipped to it. Eyes are down to 42 px and
+ * live inside the dark pronotum cap, the way a real ladybird's head does.
+ *
+ * The outline is stroked with `double: false`. `inkOutline`'s second pass
+ * offsets the path by up to 0.8 x width and strokes at 0.38 alpha, which
+ * puts a soft dark echo *outside* the silhouette — at scene scale that is a
+ * halo, i.e. another ring. Crisp single stroke here.
+ */
 export function makeLadybirdTexture() {
     const key = 'entrance:ladybird';
     if (cache.has(key)) return cache.get(key);
@@ -177,129 +207,128 @@ export function makeLadybirdTexture() {
     const SHELL = '#E8552A';
     const SHELL_HI = '#F58A44';
     const SHELL_LO = '#C4351A';
-    const HEAD = '#F6C078';
-    const HEAD_HI = '#FBDCA8';
+    const DARK = '#2E2320';
+    const cx = 256;
 
-    const shellPath = (c) => {
+    /** Head dome + shell, as ONE closed silhouette. */
+    const bodyPath = (c) => {
         c.beginPath();
-        c.moveTo(78, 300);
-        c.bezierCurveTo(78, 196, 160, 150, 256, 150);
-        c.bezierCurveTo(352, 150, 434, 196, 434, 300);
-        c.bezierCurveTo(434, 400, 366, 470, 256, 470);
-        c.bezierCurveTo(146, 470, 78, 400, 78, 300);
+        c.moveTo(158, 176);
+        c.bezierCurveTo(162, 92, 350, 92, 354, 176);   // head dome
+        c.bezierCurveTo(394, 200, 428, 240, 428, 302); // right shoulder
+        c.bezierCurveTo(428, 388, 352, 460, 256, 460); // bottom right
+        c.bezierCurveTo(160, 460, 84, 388, 84, 302);   // bottom left
+        c.bezierCurveTo(84, 240, 118, 200, 158, 176);  // left shoulder
         c.closePath();
     };
-    const headPath = (c) => {
+
+    /** 前胸背板 + head: the dark cap across the top, rear edge dipped. */
+    const capPath = (c) => {
         c.beginPath();
-        c.moveTo(112, 272);
-        c.bezierCurveTo(104, 164, 172, 92, 256, 92);
-        c.bezierCurveTo(340, 92, 408, 164, 400, 272);
+        c.moveTo(150, 180);
+        c.bezierCurveTo(156, 90, 356, 90, 362, 180);
+        c.bezierCurveTo(344, 216, 300, 224, cx, 216);
+        c.bezierCurveTo(212, 224, 168, 216, 150, 180);
         c.closePath();
     };
 
     // --- antennae (behind everything) ---
-    limb(ctx, [[208, 140], [188, 92], [158, 52], [142, 30]], 13, INK, { taper: 0.5 });
-    limb(ctx, [[304, 140], [324, 92], [354, 52], [370, 30]], 13, INK, { taper: 0.5 });
-    [[142, 30], [370, 30]].forEach(([x, y]) => {
+    limb(ctx, [[216, 128], [198, 88], [174, 58], [160, 40]], 10, DARK, { taper: 0.5 });
+    limb(ctx, [[296, 128], [314, 88], [338, 58], [352, 40]], 10, DARK, { taper: 0.5 });
+    [[160, 40], [352, 40]].forEach(([x, y]) => {
         ctx.save();
-        ctx.fillStyle = INK;
+        ctx.fillStyle = DARK;
         ctx.beginPath();
-        ctx.ellipse(x, y, 19, 15, 0, 0, Math.PI * 2);
+        ctx.ellipse(x, y, 15, 12, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
     });
 
     // --- legs (behind the shell) ---
     [-1, 1].forEach((s) => {
-        [[236, 300], [214, 372], [196, 438]].forEach(([x, y], i) => {
-            const sx = 256 + s * (x - 256);
-            const ex = 256 + s * ((x - 256) + 60 + i * 6);
-            limb(ctx, [[sx, y], [ex, y + 26], [ex + s * 16, y + 58]], 12, INK, { taper: 0.6 });
+        [[296, 30], [356, 40], [414, 34]].forEach(([y, drop]) => {
+            const x0 = cx + s * 152;
+            limb(ctx, [[x0, y], [x0 + s * 32, y + 20], [x0 + s * 50, y + drop + 20]], 11, DARK, { taper: 0.55 });
         });
     });
 
-    // --- head ---
-    wash(ctx, headPath, HEAD, rand, { passes: 4, spread: 5, alpha: 0.34 });
-    speckleIn(ctx, headPath, [HEAD_HI, '#F2AE62', '#FDE6C2'], rand, { count: 110, rMin: 3, rMax: 10, alpha: 0.3 });
-
-    // --- shell ---
-    wash(ctx, shellPath, SHELL, rand, { passes: 5, spread: 7, alpha: 0.34 });
-    speckleIn(ctx, shellPath, [SHELL_HI, SHELL_LO, '#F26B33', '#D94A20'], rand, { count: 260, rMin: 3, rMax: 14, alpha: 0.26 });
-
-    // shell spots
+    // --- body: solid fill, then blotchy watercolour clipped inside it ---
     ctx.save();
-    shellPath(ctx);
+    ctx.fillStyle = SHELL;
+    bodyPath(ctx);
+    ctx.fill();
+    ctx.restore();
+    wash(ctx, bodyPath, SHELL, rand, { passes: 4, spread: 8, alpha: 0.22 });
+    speckleIn(ctx, bodyPath, [SHELL_HI, SHELL_LO, '#F26B33', '#D94A20'], rand,
+        { count: 260, rMin: 3, rMax: 14, alpha: 0.22 });
+
+    // --- dark head + pronotum cap, clipped to the silhouette ---
+    ctx.save();
+    bodyPath(ctx);
     ctx.clip();
-    ctx.globalAlpha = 0.5;
-    ctx.fillStyle = SHELL_LO;
-    [[176, 316, 30, 26], [176, 396, 24, 20], [336, 322, 28, 24], [330, 400, 22, 18], [256, 430, 26, 18]].forEach(
-        ([x, y, rx, ry]) => {
-            ctx.beginPath();
-            ctx.ellipse(x, y, rx, ry, rand() * 0.6 - 0.3, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    );
+    ctx.fillStyle = DARK;
+    capPath(ctx);
+    ctx.fill();
     ctx.restore();
 
-    // centre seam
+    // --- wing-case seam ---
     ctx.save();
-    ctx.strokeStyle = INK;
-    ctx.lineWidth = 11;
+    bodyPath(ctx);
+    ctx.clip();
+    ctx.strokeStyle = DARK;
+    ctx.lineWidth = 10;
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(256, 244);
-    ctx.bezierCurveTo(250, 320, 250, 400, 256, 462);
+    ctx.moveTo(cx, 214);
+    ctx.bezierCurveTo(cx - 7, 300, cx - 7, 392, cx, 452);
     ctx.stroke();
-    ctx.restore();
 
-    // --- face ---
-    ctx.save();
-    ctx.fillStyle = '#FFFFFF';
-    [[200, 196, 56], [312, 196, 56]].forEach(([x, y, r]) => {
+    // --- spots (symmetric about the seam) ---
+    ctx.fillStyle = DARK;
+    [[172, 292, 31, 28], [340, 292, 31, 28], [140, 372, 25, 22], [372, 372, 25, 22],
+     [196, 428, 23, 20], [316, 428, 23, 20]].forEach(([x, y, rx, ry]) => {
         ctx.beginPath();
-        ctx.ellipse(x, y, r, r * 1.06, 0, 0, Math.PI * 2);
+        ctx.ellipse(x, y, rx, ry, (rand() - 0.5) * 0.5, 0, Math.PI * 2);
         ctx.fill();
     });
     ctx.restore();
+
+    // --- soft top-left highlight so the shell reads as domed ---
     ctx.save();
-    ctx.fillStyle = '#2A201A';
-    [[206, 200, 30], [306, 200, 30]].forEach(([x, y, r]) => {
+    bodyPath(ctx);
+    ctx.clip();
+    const hl = ctx.createRadialGradient(190, 250, 20, 210, 280, 240);
+    hl.addColorStop(0, 'rgba(255, 226, 190, 0.30)');
+    hl.addColorStop(0.6, 'rgba(255, 226, 190, 0.07)');
+    hl.addColorStop(1, 'rgba(255, 226, 190, 0)');
+    ctx.fillStyle = hl;
+    ctx.fillRect(0, 0, S, S);
+    ctx.restore();
+
+    // --- face: two eyes inside the dark cap ---
+    ctx.save();
+    ctx.fillStyle = '#FFFFFF';
+    [[204, 158, 42], [308, 158, 42]].forEach(([x, y, r]) => {
+        ctx.beginPath();
+        ctx.ellipse(x, y, r, r * 1.04, 0, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    ctx.fillStyle = '#241B17';
+    [[211, 163, 22], [301, 163, 22]].forEach(([x, y, r]) => {
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
     });
     ctx.fillStyle = '#FFFFFF';
-    [[194, 186, 11], [294, 186, 11]].forEach(([x, y, r]) => {
+    [[200, 152, 8.5], [290, 152, 8.5]].forEach(([x, y, r]) => {
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
     });
     ctx.restore();
 
-    // smile
-    ctx.save();
-    ctx.strokeStyle = INK;
-    ctx.lineWidth = 9;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.arc(256, 238, 26, 0.18 * Math.PI, 0.82 * Math.PI);
-    ctx.stroke();
-    ctx.restore();
-
-    // --- outlines ---
-    inkOutline(ctx, headPath, INK, 10, rand);
-    inkOutline(ctx, shellPath, INK, 12, rand);
-
-    // eye rims
-    ctx.save();
-    ctx.strokeStyle = INK;
-    ctx.lineWidth = 8;
-    [[200, 196, 56], [312, 196, 56]].forEach(([x, y, r]) => {
-        ctx.beginPath();
-        ctx.ellipse(x, y, r, r * 1.06, 0, 0, Math.PI * 2);
-        ctx.stroke();
-    });
-    ctx.restore();
+    // --- the one and only outline ---
+    inkOutline(ctx, bodyPath, DARK, 11, rand, { double: false });
 
     grain(ctx, S, S, rand, { alpha: 0.045 });
 
@@ -1228,197 +1257,6 @@ export function makeWallInkTexture(worldW = 16, worldH = 8) {
  *
  * Loaded with useTexture in EntranceDoors, preloaded via ENTRANCE_TEXTURES.
  */
-
-/* ------------------------------------------------------------------ */
-/* Ink splash — the black blot that blooms where you squash the bug      */
-/* ------------------------------------------------------------------ */
-
-/**
- * Square, matching the 2 x 2 plane the splash is drawn on in EntranceDoors
- * (the fifth and last entrance bitmap — `images/ink-splash.webp`). The mesh
- * runs `transparent` + `alphaTest`, so only the silhouette matters: a heavy
- * irregular mass with two attached lobes, a mix of torn wedges and flicked
- * needles, thrown droplets and a few drips running off the bottom.
- *
- * Two things are load-bearing:
- *
- *  - The mass is drawn in a *round* local space and the whole thing is
- *    stretched by ctx.scale afterwards. Scaling the radius per-axis instead
- *    (cos*r*SX) squashes the angular width of any spike sitting at 12 or 6
- *    o'clock, and a needle up there comes out as a rectangular bar.
- *  - It is drawn oversized on a wide scratch canvas and fitted down by
- *    alphaBBox afterwards, so a random spike can never run off an edge and
- *    get its tip clipped flat.
- *
- * No grain: the blot is flat ink, and speckle over an `alphaTest` edge would
- * show up as loose dots.
- */
-export const INK_SPLASH_ASPECT = 1; // 500 x 500, drawn onto a 2 x 2 plane
-
-/** Near-black, a shade warmer than #000 so it sits with the scene's ink. */
-const SPLAT_INK = '#141110';
-
-export function makeInkSplashTexture() {
-    const key = 'entrance:ink-splash';
-    if (cache.has(key)) return cache.get(key);
-
-    const SC_W = 1200;
-    const SC_H = 900;
-    const scratch = makeCanvas(SC_W, SC_H);
-    const ctx = scratch.getContext('2d');
-    const rand = mulberry32(hashString(key));
-
-    const SX = 1.12; // the reference blot is wider than it is tall
-    const SY = 0.94;
-
-    ctx.save();
-    ctx.translate(SC_W * 0.5, SC_H * 0.5);
-    ctx.rotate(-0.18); // the reference blot runs lower-left to upper-right
-    ctx.scale(SX, SY); // everything below is authored in a circle
-    ctx.fillStyle = SPLAT_INK;
-    ctx.strokeStyle = SPLAT_INK;
-    ctx.lineCap = 'round';
-
-    const baseR = SC_H * 0.23;
-    const at = (a, r) => ({ x: Math.cos(a) * r, y: Math.sin(a) * r });
-
-    const harmonics = (k) => [
-        { k: 3, a: 0.20 * k, p: rand() * Math.PI * 2 },
-        { k: 5, a: 0.14 * k, p: rand() * Math.PI * 2 },
-        { k: 8, a: 0.09 * k, p: rand() * Math.PI * 2 },
-        { k: 15, a: 0.045 * k, p: rand() * Math.PI * 2 },
-    ];
-
-    /**
-     * Closed lumpy outline: a few sine harmonics give the organic wobble.
-     *
-     * Spikes are deliberately NOT added here. A triangular *radius* profile
-     * goes flat wherever the peak falls between two samples, and on a needle
-     * that flat is wide enough to read as a rectangular chimney. They are
-     * drawn afterwards as explicit triangles instead, so every tip is a real
-     * point.
-     */
-    const lumpy = (radius, harm, samples = 1440) => {
-        ctx.beginPath();
-        for (let i = 0; i <= samples; i++) {
-            const a = (i / samples) * Math.PI * 2;
-            let r = radius;
-            for (const h of harm) r += Math.sin(a * h.k + h.p) * radius * h.a;
-            r += (rand() - 0.5) * radius * 0.025; // rough, torn edge
-            const p = at(a, r);
-            if (i === 0) ctx.moveTo(p.x, p.y);
-            else ctx.lineTo(p.x, p.y);
-        }
-        ctx.closePath();
-    };
-
-    // ---- main mass --------------------------------------------------------
-    lumpy(baseR, harmonics(1));
-    ctx.fill();
-
-    // ---- spikes: explicit triangles, so every tip is a real point ---------
-    const spikes = [];
-    // broad torn wedges — the mass itself throwing out tongues
-    for (let i = 0; i < 6; i++) {
-        spikes.push({ a: rand() * Math.PI * 2, w: 0.13 + rand() * 0.22, len: baseR * (0.22 + rand() * 0.5) });
-    }
-    // sharp needles — the flicked ink
-    for (let i = 0; i < 5; i++) {
-        spikes.push({ a: rand() * Math.PI * 2, w: 0.03 + rand() * 0.03, len: baseR * (0.5 + rand() * 0.5) });
-    }
-    // two long tendrils, so the burst reads as directional rather than a star
-    spikes.push({ a: -0.6 + rand() * 0.5, w: 0.045, len: baseR * 1.15 });
-    spikes.push({ a: 2.2 + rand() * 0.5, w: 0.045, len: baseR * 0.95 });
-
-    for (const sp of spikes) {
-        const b1 = at(sp.a - sp.w, baseR * 0.88); // base chord buried in the mass
-        const b2 = at(sp.a + sp.w, baseR * 0.88);
-        const tip = at(sp.a, baseR + sp.len);
-        ctx.beginPath();
-        ctx.moveTo(b1.x, b1.y);
-        ctx.lineTo(tip.x, tip.y);
-        ctx.lineTo(b2.x, b2.y);
-        ctx.closePath();
-        ctx.fill();
-    }
-
-    // ---- two attached lobes, so the mass is not one tidy disc -------------
-    for (let i = 0; i < 2; i++) {
-        const o = at(rand() * Math.PI * 2, baseR * (0.55 + rand() * 0.35));
-        const orad = baseR * (0.34 + rand() * 0.24);
-        ctx.save();
-        ctx.translate(o.x, o.y);
-        lumpy(orad, harmonics(0.9), 720);
-        ctx.fill();
-        ctx.restore();
-    }
-
-    // ---- thrown droplets (some smeared along their flight path) -----------
-    for (let i = 0; i < 52; i++) {
-        const a = rand() * Math.PI * 2;
-        const p = at(a, baseR * (0.95 + rand() * 1.05));
-        const rad = 2 + rand() * rand() * 11;
-        const smear = rand() < 0.4 ? 1 + rand() * 2.6 : 1;
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(a);
-        ctx.beginPath();
-        ctx.ellipse(0, 0, rad * smear, rad, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-    }
-
-    // ---- fine spray: thin lines flung outward -----------------------------
-    for (let i = 0; i < 12; i++) {
-        const a = rand() * Math.PI * 2;
-        const r0 = baseR * (0.85 + rand() * 0.6);
-        const p0 = at(a, r0);
-        const p1 = at(a, r0 + baseR * (0.25 + rand() * 0.8));
-        ctx.lineWidth = 1.6 + rand() * 3.4;
-        ctx.beginPath();
-        ctx.moveTo(p0.x, p0.y);
-        ctx.lineTo(p1.x, p1.y);
-        ctx.stroke();
-    }
-
-    // ---- drips running off the bottom -------------------------------------
-    for (let i = 0; i < 4; i++) {
-        const dx = (rand() - 0.5) * baseR * 1.4;
-        const y0 = baseR * (0.5 + rand() * 0.35);
-        const len = baseR * (0.3 + rand() * 0.9);
-        const w = 3 + rand() * 6;
-        ctx.beginPath();
-        ctx.moveTo(dx - w, y0);
-        ctx.quadraticCurveTo(dx - w * 1.6, y0 + len * 0.65, dx, y0 + len);
-        ctx.quadraticCurveTo(dx + w * 1.6, y0 + len * 0.65, dx + w, y0);
-        ctx.closePath();
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(dx, y0 + len, w * (0.85 + rand() * 0.5), 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    ctx.restore();
-
-    // ---- fit the blot into the square output ------------------------------
-    const out = makeCanvas(500, 500);
-    const bb = alphaBBox(scratch);
-    const bw = bb.x1 - bb.x0 + 1;
-    const bh = bb.y1 - bb.y0 + 1;
-    const k = (out.width * 0.9) / Math.max(bw, bh);
-    const dw = bw * k;
-    const dh = bh * k;
-    const octx = out.getContext('2d');
-    octx.imageSmoothingEnabled = true;
-    octx.imageSmoothingQuality = 'high';
-    octx.drawImage(
-        scratch,
-        bb.x0, bb.y0, bw, bh,
-        (out.width - dw) / 2, (out.height - dh) / 2, dw, dh
-    );
-
-    return toTexture(out, key);
-}
 
 /* ------------------------------------------------------------------ */
 /* The room seen through the window                                     */

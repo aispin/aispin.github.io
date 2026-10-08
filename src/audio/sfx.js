@@ -9,6 +9,8 @@
  *                  so it shimmers like a real gust.
  * playSwallow():   燕子 — a tight burst of high, slightly falling chirps, each
  *                  with a rapid trill and a breathy onset.
+ * playInsectChirp(): 虫叫 — a few dry stridulation pulses, used by the
+ *                  entrance ladybird's dodge.
  *
  * Respects the site's mute/volume preferences (audio_muted / audio_volume).
  */
@@ -315,4 +317,119 @@ export function playSwallow(volume = 1) {
         master.disconnect();
         tone.disconnect();
     }, 1600);
+}
+
+/* ------------------------------------------------------------------ */
+/* Insect — the ladybird's alarm chirp                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * One stridulation pulse.
+ *
+ * A cricket does not whistle: it drags a scraper across a file, so the sound
+ * is a train of very short, dry bursts. Model one burst as a high sine with a
+ * *fast* amplitude envelope and a small pitch rise-and-fall, plus a detuned
+ * upper partial, band-passed so it stays papery instead of turning into a
+ * synth beep. A 4 ms noise tick at the front stands in for the scraper.
+ */
+function insectPulse(context, dest, t0, baseFreq, level) {
+    const osc = context.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(baseFreq * 0.94, t0);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq, t0 + 0.008);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.90, t0 + 0.022);
+
+    const osc2 = context.createOscillator();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(baseFreq * 1.51, t0);
+    osc2.frequency.exponentialRampToValueAtTime(baseFreq * 1.44, t0 + 0.022);
+
+    const g2 = context.createGain();
+    g2.gain.setValueAtTime(0.0001, t0);
+    g2.gain.exponentialRampToValueAtTime(Math.max(0.0002, level * 0.22), t0 + 0.003);
+    g2.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.02);
+
+    const bp = context.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 2.6;
+    bp.frequency.value = baseFreq * 1.02;
+
+    const body = context.createGain();
+    body.gain.setValueAtTime(0.0001, t0);
+    body.gain.exponentialRampToValueAtTime(Math.max(0.0002, level), t0 + 0.003);
+    body.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.026);
+
+    osc.connect(bp);
+    osc2.connect(g2);
+    g2.connect(bp);
+    bp.connect(body);
+    body.connect(dest);
+
+    osc.start(t0); osc.stop(t0 + 0.035);
+    osc2.start(t0); osc2.stop(t0 + 0.035);
+
+    const noiseLen = Math.max(1, Math.floor(context.sampleRate * 0.004));
+    const buf = context.createBuffer(1, noiseLen, context.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < noiseLen; i++) {
+        data[i] = (Math.random() * 2 - 1) * (1 - i / noiseLen);
+    }
+    const noise = context.createBufferSource();
+    noise.buffer = buf;
+
+    const hp = context.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 3200;
+
+    const nGain = context.createGain();
+    nGain.gain.setValueAtTime(level * 0.22, t0);
+    nGain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.005);
+
+    noise.connect(hp);
+    hp.connect(nGain);
+    nGain.connect(dest);
+    noise.start(t0);
+    noise.stop(t0 + 0.007);
+}
+
+/**
+ * Play a bug's alarm chirp — 3–4 dry pulses, the noise the entrance ladybird
+ * makes when you go for it (see EntranceDoors' dodge handler).
+ * @param {number} volume 0..1 relative level (multiplied by user prefs)
+ */
+export function playInsectChirp(volume = 1) {
+    if (typeof window === 'undefined') return;
+    const pref = prefVolume();
+    if (pref <= 0) return;
+
+    const context = getCtx();
+    if (context.state === 'suspended') {
+        context.resume().catch(() => { });
+    }
+
+    // The pulses are bright; trim the very top so they never hiss, and keep
+    // the master well down — this fires every time the bug is swatted at.
+    const tone = context.createBiquadFilter();
+    tone.type = 'lowpass';
+    tone.frequency.value = 8000;
+    tone.Q.value = 0.5;
+
+    const master = context.createGain();
+    master.gain.value = Math.max(0, Math.min(1, volume * pref * 0.22));
+    tone.connect(master);
+    master.connect(context.destination);
+
+    const t = context.currentTime + 0.02;
+    const count = 3 + Math.floor(Math.random() * 2);
+    const base = 4200 + Math.random() * 700;
+    let cursor = t;
+    for (let i = 0; i < count; i++) {
+        insectPulse(context, tone, cursor, base * (1 - i * 0.02), 1 - i * 0.08);
+        cursor += 0.030 + Math.random() * 0.012;
+    }
+
+    setTimeout(() => {
+        master.disconnect();
+        tone.disconnect();
+    }, 1200);
 }

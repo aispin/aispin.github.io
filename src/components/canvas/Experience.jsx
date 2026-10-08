@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
+import * as THREE from 'three';
 
 import InfiniteCorridorManager from './corridor/InfiniteCorridorManager';
 import EntranceDoors from './entrance/EntranceDoors';
@@ -38,6 +39,11 @@ const Experience = ({ isLoaded, onSceneReady, performanceTier }) => {
     if (typeof window !== 'undefined') {
         window.__cam = camera;
         window.__scene = scene;
+        // `window.__THREE` exists so a harness can raycast from the page
+        // (see .workbuddy-ai/harness/probe-pixel.mjs). Without it, working out
+        // *what* a stray 5 px bright line on screen actually is degenerates
+        // into hiding objects one at a time and guessing from the diff.
+        window.__THREE = THREE;
     }
 
     // Camera control - both scroll and parallax only work after entering
