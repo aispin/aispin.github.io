@@ -28,24 +28,16 @@
 
 # 📋 待办 WO
 
-## WO-07 · 站点标题改为「ZEO · 黄泽昊 · WEB3D HOUSE」
-
-- **需求原文**：「1、标题改为 ZEO · 黄泽昊 · WEB3D HOUSE」
-- **状态**：✅ 无 DR，直接做
-- **现状**：标题在**四个地方**各写了一份，得一起改，否则会出现"静态 HTML 一个标题、
-  JS 跑起来又变另一个"：
-  1. `src/data/site.json` → `siteTitle`（构建时 `seo-plugin.js` 用它生成 `<title>`/OG）
-  2. `src/hooks/useDocumentMeta.js` → `ROOM_META[null].title`（前端跑起来后覆盖 `document.title`）
-  3. `index.html` → 静态 `<title>`（无 JS 时的兜底）
-  4. `index.html` → `og:title` / `og:site_name` / `apple-mobile-web-app-title`
-- **改什么**：四处统一为 `ZEO · 黄泽昊 · WEB3D HOUSE`。
-- **验收判据**：`curl` 到的静态 HTML 里 `<title>` 是新的；JS 跑完后 `document.title` 也是新的。
-
 ## WO-08 · 用 `iskill-app-icon` 生成一套「大写 Z + 中间实心点」图标
 
 - **需求原文**：「2、图标使用 `iskill-app-icon` 生成一套，图案是大写字符 Z，
   中间有一个代表 O 的实心小点」
-- **状态**：⚠️ **等 DR-04 选变体与配色**；PNG 那部分等 **DR-03**
+- **状态**：⚠️ **比选图已就绪，等你选变体与配色**（见 DR-04）；PNG 那部分等 **DR-03**
+- **已做**：`harness/make-zeo-icon.py` —— **在运行时把自定义图形注入技能的 `GLYPHS`**，
+  复用它的超椭圆底板 / 渐变推导 / 镂空色推导 / SVG 组装，**技能文件一个字没动**。
+  已出 3 变体 × 3 配色的比选图（`harness/shot-html.mjs` 截图）。
+- **点的大小是刻意定的**：半径 40（半笔宽是 27）—— 太小的话 16px 下直接看不见，
+  技能的设计规则也是「按 512 设计、按 32px 验收」。
 - **现状**：`public/` 里是**手写 SVG**（`favicon.svg` + `app-icon-maskable.svg`），
   **一个 PNG 都没有**，`manifest.webmanifest` 也全用 SVG（`sizes: "any"`）。
   这是「零 jpg/png」那条约定的实现方式，而且 `.github/workflows/deploy-gh-pages.yml`
