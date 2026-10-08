@@ -218,6 +218,86 @@ export function fitToCanvas(src, outW, outH, { pad = 0.04, align = 'center', bg 
 }
 
 /* ------------------------------------------------------------------ */
+/* 降采样                                                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 把一张**已经画完**的 canvas 等比缩到 `scale` 倍（0 < scale < 1），返回新 canvas。
+ * `scale >= 1` 时原样返回（不复制）。
+ *
+ * 为什么是「照原尺寸画完再整体缩」，而不是「直接把画布尺寸调小」：
+ * 门类美术是**按画布像素坐标硬编码**的 —— `const BAND = 40`、`plateX = W - plateW - 4`、
+ * 一堆 `ctx.arc(W / 2, ...)`、笔画宽度全是裸数字。改 `W` 不会等比缩放这些笔触，
+ * 只会把整幅画改错（40px 的边带在 256 宽上就变成两倍宽）。所以降分辨率的唯一
+ * 正确做法是「照原尺寸画，再整体缩」—— 这也是「宽高比契约」的推论：
+ * 画布尺寸是**画法的一部分**，不是可以随便调的旋钮。
+ *
+ * 逐级缩、每级最多缩一半：一次 `drawImage` 缩太多，浏览器只能用有限的低通核，
+ * 高频木纹/噪点会走样（aliasing）。分成两级等效于更接近 box filter，代价是一次
+ * 额外的 canvas 分配 —— 生成器都在 `createTextureCache` 后面，只跑一次。
+ */
+export function downscaleCanvas(src, scale) {
+    if (!(scale > 0) || scale >= 1) return src;
+    const steps = [];
+    let rest = scale;
+    while (rest < 0.5) {
+        steps.push(0.5);
+        rest /= 0.5;
+    }
+    steps.push(rest);
+    let cur = src;
+    for (const st of steps) {
+        const w = Math.max(1, Math.round(cur.width * st));
+        const h = Math.max(1, Math.round(cur.height * st));
+        const next = makeCanvas(w, h);
+        const ctx = next.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(cur, 0, 0, w, h);
+        cur = next;
+    }
+    return cur;
+}
+
+/**
+ * 把 canvas 裁到「有墨的范围 + pad」，返回 `{ canvas, offset, repeat }`。
+ *
+ * 为什么需要：有些贴图是**整扇门大小**的透明平面，但只在角落里画一个零件 ——
+ * 门把就是这种（`corridorArt` 的 `makeRoomDoorHandleTexture`：512×1216 里
+ * 杠杆只占 170×100，**97% 是空白**）。空白照样上传、照样占显存。
+ * 裁掉之后**每纹素密度不变**（所以画质零损失），显存掉到 1/20 以上。
+ *
+ * ⚠️ 裁完必须把 UV 缩回去，否则零件会跑到门中间。这里最容易写错的一点是：
+ * `offset` / `repeat` 是**相对裁剪后那张小图**算的，不是相对原图 ——
+ * 我们要的是「平面的 uv 落在 [x0, x0+bw] 这一块时，采到小图的 0..1」，
+ * 也就是 `uv' = (uv·原图尺寸 − x0) / bw`，即 `repeat = 原图/bw`、`offset = −x0/bw`。
+ * 写成 `repeat = bw/原图` 会让零件被放大到铺满整扇门（踩过）。
+ * 又：three 的 UV 原点在**左下**、canvas 在**左上**，所以 y 那一项还要翻过来。
+ *
+ * `pad` 给边缘留几个像素，避免 mipmap 低层级把 clamp 边吃到墨迹上。
+ */
+export function cropToInk(src, pad = 8) {
+    const bb = alphaBBox(src);
+    const x0 = Math.max(0, bb.x0 - pad);
+    const y0 = Math.max(0, bb.y0 - pad);
+    const x1 = Math.min(src.width - 1, bb.x1 + pad);
+    const y1 = Math.min(src.height - 1, bb.y1 + pad);
+    const bw = x1 - x0 + 1;
+    const bh = y1 - y0 + 1;
+    // 本来就画满了（木纹这类满幅贴图）就别复制一份。
+    if (bw >= src.width && bh >= src.height) {
+        return { canvas: src, offset: [0, 0], repeat: [1, 1] };
+    }
+    const out = makeCanvas(bw, bh);
+    out.getContext('2d').drawImage(src, x0, y0, bw, bh, 0, 0, bw, bh);
+    return {
+        canvas: out,
+        offset: [-x0 / bw, -(src.height - y1 - 1) / bh],
+        repeat: [src.width / bw, src.height / bh],
+    };
+}
+
+/* ------------------------------------------------------------------ */
 /* 纹理                                                                */
 /* ------------------------------------------------------------------ */
 

@@ -25,17 +25,40 @@
  */
 
 import * as THREE from 'three';
-import { hashString, makeCanvas, mulberry32, rgba, roundRectPath } from '../engine/art';
+import { cropToInk, downscaleCanvas, hashString, makeCanvas, mulberry32, rgba, roundRectPath } from '../engine/art';
 
 const cache = new Map();
+
+/**
+ * 门类画布的降采样倍率（1 = 不缩）。
+ *
+ * 门类贴图是走廊态显存的 **60%**（512×1216 ×19 + 512×1310 ×5 ≈ 77 MB）。
+ * 但**不能**把 `makeDoorFaceTexture` 里的 `W = 512` 直接改小 —— 那些画法是按
+ * 画布像素坐标硬编码的（见 `engine/art.js:downscaleCanvas` 的注释）。
+ * 所以走「照 512 画完，再整体缩一半」：显存降到 1/4（77 MB → 约 19 MB）。
+ *
+ * ⚠️ 这是**渲染决策**，不是免费的：门叶是能走到跟前看的。0.5 是量过 A/B 之后的
+ * 取值 —— 见 WORKPLAN「贴图显存压缩」。要改先看那一段的截图。
+ */
+const TEX_SCALE = 0.5;
 
 /* ------------------------------------------------------------------ */
 /* Small helpers                                                        */
 /* ------------------------------------------------------------------ */
 
-function toTexture(canvas, key, { clamp = true, repeat = null } = {}) {
-    if (cache.has(key)) return cache.get(key);
-    const texture = new THREE.CanvasTexture(canvas);
+function toTexture(canvas, key, { clamp = true, repeat = null, scale = 1, crop = false } = {}) {
+    // 降采样 / 裁剪都是**画完之后的独立一步**，所以缓存键要把参数带上 ——
+    // 否则同一个 key 先被请求大图、后被请求小图时会拿到错的尺寸。
+    const ck = `${key}|${scale}${crop ? '|c' : ''}`;
+    if (cache.has(ck)) return cache.get(ck);
+    let src = canvas;
+    let uv = null;
+    if (crop) {
+        uv = cropToInk(canvas);
+        src = uv.canvas;
+    }
+    if (scale !== 1) src = downscaleCanvas(src, scale);
+    const texture = new THREE.CanvasTexture(src);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = 4;
     if (clamp) {
@@ -43,9 +66,15 @@ function toTexture(canvas, key, { clamp = true, repeat = null } = {}) {
     } else {
         texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
     }
-    if (repeat) texture.repeat.set(repeat[0], repeat[1]);
+    // 裁过就把 UV 缩回原画布里的那一块；没裁才用调用方给的 repeat。
+    if (uv && (uv.repeat[0] !== 1 || uv.repeat[1] !== 1)) {
+        texture.offset.set(uv.offset[0], uv.offset[1]);
+        texture.repeat.set(uv.repeat[0], uv.repeat[1]);
+    } else if (repeat) {
+        texture.repeat.set(repeat[0], repeat[1]);
+    }
     texture.needsUpdate = true;
-    cache.set(key, texture);
+    cache.set(ck, texture);
     return texture;
 }
 
@@ -377,7 +406,7 @@ export function makeDoorFaceTexture(side = 'left', variant = 'painted') {
 
     paperGrain(out.getContext('2d'), W, H, rand, 7);
 
-    const texture = toTexture(out, key);
+    const texture = toTexture(out, key, { scale: TEX_SCALE });
     cache.set(key, texture);
     return texture;
 }
@@ -477,7 +506,7 @@ export function makeDoorFrameTexture(
 
     paperGrain(ctx, W, H, rand, 6);
 
-    const texture = toTexture(canvas, key);
+    const texture = toTexture(canvas, key, { scale: TEX_SCALE });
     cache.set(key, texture);
     return texture;
 }
@@ -543,7 +572,7 @@ export function makeDoorBackTexture(variant = 'painted') {
     });
 
     paperGrain(ctx, W, H, rand, 6);
-    const texture = toTexture(canvas, key);
+    const texture = toTexture(canvas, key, { scale: TEX_SCALE });
     cache.set(key, texture);
     return texture;
 }
@@ -1234,7 +1263,7 @@ export function makeRoomDoorTexture(variant = 'painted', seed = 0) {
     }, rand);
 
     paperGrain(ctx, W, H, rand, 7);
-    const texture = toTexture(canvas, key);
+    const texture = toTexture(canvas, key, { scale: TEX_SCALE });
     cache.set(key, texture);
     return texture;
 }
@@ -1299,7 +1328,7 @@ export function makeRoomDoorFrameTexture(variant = 'painted') {
     });
 
     paperGrain(ctx, W, H, rand, 6);
-    const texture = toTexture(canvas, key);
+    const texture = toTexture(canvas, key, { scale: TEX_SCALE });
     cache.set(key, texture);
     return texture;
 }
@@ -1329,7 +1358,7 @@ export function makeRoomDoorBackTexture(variant = 'painted') {
     }, rand);
 
     paperGrain(ctx, W, H, rand, 6);
-    const texture = toTexture(canvas, key);
+    const texture = toTexture(canvas, key, { scale: TEX_SCALE });
     cache.set(key, texture);
     return texture;
 }
@@ -1603,7 +1632,7 @@ export function makeHandleTexture(side = 'left', painted = false) {
 
     ctx.restore();
 
-    const texture = toTexture(canvas, key);
+    const texture = toTexture(canvas, key, { crop: true });
     cache.set(key, texture);
     return texture;
 }

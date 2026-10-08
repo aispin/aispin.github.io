@@ -20,7 +20,7 @@
  */
 
 import * as THREE from 'three';
-import { hashString, makeCanvas, mulberry32, rgba, roundRectPath } from '../engine/art';
+import { cropToInk, downscaleCanvas, hashString, makeCanvas, mulberry32, rgba, roundRectPath } from '../engine/art';
 
 const cache = new Map();
 
@@ -28,9 +28,19 @@ const cache = new Map();
 /* Small helpers                                                        */
 /* ------------------------------------------------------------------ */
 
-function toTexture(canvas, key, { clamp = true, repeat = null } = {}) {
-    if (cache.has(key)) return cache.get(key);
-    const texture = new THREE.CanvasTexture(canvas);
+function toTexture(canvas, key, { clamp = true, repeat = null, scale = 1, crop = false } = {}) {
+    // 降采样 / 裁剪都是画完之后的独立一步，缓存键要把参数带上，
+    // 否则同一个 key 先被要原图、后被要裁剪图时会拿到错的。
+    const ck = `${key}|${scale}${crop ? '|c' : ''}`;
+    if (cache.has(ck)) return cache.get(ck);
+    let src = canvas;
+    let uv = null;
+    if (crop) {
+        uv = cropToInk(canvas);
+        src = uv.canvas;
+    }
+    if (scale !== 1) src = downscaleCanvas(src, scale);
+    const texture = new THREE.CanvasTexture(src);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = 4;
     if (clamp) {
@@ -38,9 +48,15 @@ function toTexture(canvas, key, { clamp = true, repeat = null } = {}) {
     } else {
         texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
     }
-    if (repeat) texture.repeat.set(repeat[0], repeat[1]);
+    // 裁过就把 UV 缩回原画布里的那一块；没裁才用调用方给的 repeat。
+    if (uv && (uv.repeat[0] !== 1 || uv.repeat[1] !== 1)) {
+        texture.offset.set(uv.offset[0], uv.offset[1]);
+        texture.repeat.set(uv.repeat[0], uv.repeat[1]);
+    } else if (repeat) {
+        texture.repeat.set(repeat[0], repeat[1]);
+    }
     texture.needsUpdate = true;
-    cache.set(key, texture);
+    cache.set(ck, texture);
     return texture;
 }
 
@@ -320,7 +336,7 @@ export function makeDoubleDoorHandleTexture(side = 'left', variant = 'sketch') {
         out = flip;
     }
 
-    const texture = toTexture(out, key);
+    const texture = toTexture(out, key, { crop: true });
     cache.set(key, texture);
     return texture;
 }
@@ -395,7 +411,7 @@ export function makeRoomDoorHandleTexture(variant = 'sketch') {
     ctx.restore();
     inkStroke(ctx, drawLever, { color: pal.ink, width: 3, echo: 0.3 });
 
-    const texture = toTexture(canvas, key);
+    const texture = toTexture(canvas, key, { crop: true });
     cache.set(key, texture);
     return texture;
 }
