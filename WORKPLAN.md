@@ -1,7 +1,7 @@
 # 工作计划 · aispin.github.io
 
 > 只保留**待做**的事项；做完的从这里删掉（历史看 `git log`，项目已纳入版本管理）。
-> 最近更新：2026-10-08 13:48
+> 最近更新：2026-10-08 15:24（③-1 音频泄漏 / ③-2 硬边抠图**已验收**，两节已按规矩删除）
 
 ---
 
@@ -14,122 +14,6 @@
 | dev server | 用的时候现起：`npx vite --port 5199 --strictPort --host 127.0.0.1`（⚠️ 必须带 `--host`） |
 | `dist/` | ✅ 2026-10-08 重构建；生产冒烟全绿（0 error、只加载 2 张允许的位图） |
 | 部署目标 | **Cloudflare Pages**（`_headers` / `_redirects`，其中 `_redirects` 管着 `/me`）。**发布暂停** —— 你 2026-10-08 决定先继续抠体验细节 |
-
-### 最近一轮交付（2026-10-08）· 你验收通过后这一节就删
-
-你提的 7 条 + 追加的第 8 条**已全部实现并过了无头自验**，等你在真机上过一遍。
-总览图：`.workbuddy-ai/round2-2026-10-08/SHEET-round2.png`。
-
-| # | 事项 | 自验结论 |
-|---|---|---|
-| 1 | 外墙藤蔓调绿 + 去半透明 | ✅ **你已验收 OK** |
-| 2 | 夜间：灯笼 / 窗户灯光调亮 | 灯笼 p50–p95 **+15~17%**、窗户玻璃格 p75 **+22%**；砖墙对照 0%（证明只有它俩变了） |
-| 3 | 窗户里的人下移 + 头发白点抠净 | 下移 `y 0.04 → -0.16`（断腿藏到窗台后）；白点判据从 `min(RGB)≥235` 换成**局部对比**后命中 5201px，另加**去白边**通道（半透明边缘换成局部发色） |
-| 4 | 音效一键静音 | 面板里 `role="switch"`，接 AudioManager；**10 项断言全过**（含刷新后仍静音） |
-| 5 | 窗帘白缝 | 是 `#e0e0e0` 遗留挡板从斜角透出来；加一块暗色 reveal 平面 → 近白像素 **2087 → 0** |
-| 6 | 对联去 hover 换副 + 日常藏头联 | hover 那套（6 个 mesh）已删；日常联 = 藏头「**泽昊**」：泽润庭花春入砚 / 昊涵云影月临窗，横批 泽昊同春 |
-| 7 | 房门去贴纸 + 古韵木板招牌 | 24 张贴纸（8 扇门 × 3）已删；招牌换成深色木板，高 0.65 → 0.42、字体居中 |
-| 8 | **大门：去门环 + 只留一个钥匙孔**（2026-10-08 追加） | 见下 |
-| + | **修 bug：取消静音后仍然没音乐** | 根因：「静音」被实现成两种东西 —— ①`muted` 标志（`syncMuteState` 管）②把音量调成 0（`AchievementPopup` 的 `setMusicVolume(0)`）。取消静音只翻 ①，② 没人恢复 → 永久无声。已改成**静音只是标志位、音量归用户**，并加了 18 项断言（`harness/music-mute-check.mjs`）+ 角上按钮的静音视觉态 |
-
-### 第 8 条详情：两个 bug，一个真因
-
-**「圆形物件」= 门环（铺首衔环）**，一片叶子一个，落在叶中线上。它本身就是多余的
-（门已经有杠杆把手，这个环是第二个、还拉不动的把手）。已从 `DoorOrnaments` 删掉，
-画法 `makeDoorKnockerTexture` / `KNOCKER_ASPECT` 一并从 `gateArt.js` 删除（-128 行）。
-
-**「钥匙孔出现了两个」= `makeDoorFaceTexture` 末尾的镜像翻转让「内侧边」跑到了铰链边。**
-右叶画锁板时 `plateX = 4`（画布左侧 = 内侧边），但函数最后把整幅 canvas 镜像翻转，
-X 被反了 → 锁板落到**铰链侧**。于是大门上出现两个钥匙孔：左叶的在门缝（= 门中间），
-右叶的在右门框。实测截图黑块 x **277–286** 与 **533–542**，模型反推 **283.2 / 537.2** ——
-2px 内吻合。按你的话「保留中间那个」，现在**只左叶画锁板 + 钥匙孔**。
-
-自验：`shots.mjs` 四张（`/tmp/door-after-*.png`），0 error；右叶铰链侧已无锁板无钥匙孔。
-
-## ③ 我自主推进的（2026-10-08 下午 · 已完成，待你验收）
-
-### ③-1 音频节点泄漏 —— 挖出一个真 bug 并修掉
-
-**起因**：原来那条「P5 音频池化」要求先证明「门扇悬停音不被别的门影响」。
-按 `engine/audioBus.js` 里写明的契约，**节点池化是被正确否决的**（悬停音用
-`ref.current.isPlaying` 判断「我这一扇响不响」，共用节点会串味）。
-但为了拿到证据写了 `harness/audio-pool-audit.mjs`，结果量出一个**此前没人知道的真泄漏**。
-
-**泄漏**：每个 `THREE.Audio` 在**构造函数**里就无条件接了一条直通 destination 的线
-（`this.gain.connect(listener.getInput())`），而 `THREE.Audio` **没有 `dispose()`**，
-R3F 卸载时调的 `object.dispose?.()` 是空操作 → **每次卸载都留下一对
-PannerNode + GainNode 永远挂在输出链上，只增不减**。
-
-实测（房间切换 8 次）：PannerNode 创建数 66 → 140，而场景里只从 42 涨到 52
-→ 净漏 64 个。启动时就已漏了 24 个（`RoomWarmup` 预热房间挂了又卸）。
-
-**🔴 第一版修法失败了，原因值得记**：`node.disconnect()` 是**空操作** —— three 的
-`Audio.disconnect()` 第一行是 `if (this._connected === false) return;`，而 `_connected`
-只在 `connect()` 里置 true、构造函数把它初始化成 **false**（尽管构造函数**确实**接了线）。
-走廊里那 42 个全是 `isPlaying === false`，所以 `disconnect()` 对它们直接返回。
-→ 必须**直接摘原生节点**。
-
-**修法**（`src/components/canvas/audio/SpatialSfx.jsx`，全站唯一挂 `<positionalAudio>` 处）：
-卸载时 `panner.disconnect()` + `gain.disconnect()`；用一个标志位处理 StrictMode 的
-mount→cleanup→mount（只在「线是我们摘的」时才重接）。
-
-**验证**（同一 harness / 同一场景 / churn 8 次）：
-
-| 指标 | 改前 | 改后 |
-|---|---|---|
-| PannerNode 累计**创建**数 | 66 → 140 | 66 → 140 ← 创建数本来就该涨，**它不是泄漏指标** |
-| **仍挂在音频图里的 panner** | 42 → **140** | 42 → **52** |
-| 场景内节点数 | 42 → 52 | 42 → 52 |
-
-改后「仍挂在图里」与「场景内」**完全对齐**（42/42、52/52）→ 泄漏消失。
-另跑 `audio-check.mjs` 全绿：0 个 404、0 个 AudioContext 警告、合成音效 RMS 0.23/0.14
-有信号、静音契约 3/3、门音 `otwarciedrzwi.mp3` / `zamknieciedrzwi.mp3` 照常取到
-→ **无音频回归**。
-
-### ③-2 硬边抠图去 `transparent: true`（14 个源点位 / 4 个文件）
-
-判据不是「有没有 alpha」，而是「**这张图的 alpha 是硬的还是软的**」。
-摘掉 `transparent` + `depthWrite: false`，让 `alphaTest` 自己 discard。
-
-⚠️ **中途有一次真回归，已还原**：一开始连 `alphaTest={0.01}` 的树冠也摘了，
-A/B 出 **43.46%** 像素大改（树冠从半透明糊成实心、压在砖墙上）。那 **4 个**低阈值点位
-（`treeTexture` / `bugTexture` / `speechBubbleTexture` / `inkSplashTexture`）
-全部保持 `transparent` 不动 —— **低 alphaTest 是作者保留软边的手段**，不能当抠图处理。
-
-**最终判据比「阈值 ≥ 0.5」更准，是量出来的**：看贴图 alpha 直方图是不是**双峰**。
-用临时预览页量了三个 `alphaTest={0.1}` 的点位，中间 alpha 像素只占 **0.18%~0.59%**，
-且集中在 1px 抗锯齿带（bucket 几乎只有 0 和 255 两档）→ 摘掉只影响那条边，安全。
-
-**A/B 结果**（冻结时钟后噪声底 0~0.06%）：全部 ≤ 0.561%，逐张看过差异图，
-**全是轮廓级**（`fcdiff-corridor1` = 涂鸦轮廓、`fcdiff-right` = 窗框边缘）。
-
-**材质体检前后**（同一 harness、`enter` 态、`material-audit.mjs`）：
-
-| 类 | 改前 | 改后 |
-|---|---|---|
-| transparent 材质总计 | 286 | **238** |
-| **A 硬边抠图** | 63 / 63 | **0 / 0** ✅ |
-| B 真淡入淡出 | 165 | 180 |
-| C 其余 | 58 / 67 | 58 / 67（未动） |
-
-⚠️ **顺带修了体检工具自己的一个误报**：A 类原来的判据只写了 `alphaTest > 0`，
-于是把「alphaTest>0 **但 opacity<1**」的材质也算成"白挂的抠图" ——
-可它们**真的需要** `transparent`（它同时在淡入），`alphaTest` 只是顺带带的。
-实测走廊里剩下那 15 个 256×256 全是 Doodles 的**影子层**（`opacity={0.15} alphaTest={0.5}`），
-被误报成 A 类，白追了一轮才查清。判据已补成 `alphaTest>0 && opacity>=1`，
-`opacity<1` 的一律归 B。
-
-⚠️ 另注：`engine/resources.js` 的 `cutoutMaterial()` **本来就正确**
-（`transparent = forceTransparent || opacity < 1`，是「契约 1」的唯一实现处）——
-**问题从来不在那个工厂，而在绕过它、直接写内联 JSX 材质的地方。**
-
-### 顺带升级的 harness 能力（可复用）
-
-- **`shots.mjs` 新增 `SHOTS_FREEZE_CLOCK=<ms>`** —— 把页面时钟钉死。这是做 A/B 像素比对的**前提**：
-  走廊有大量时间驱动动画，同一构建跑两次噪声就有 **13~18%**；冻结后降到 **0~0.06%**（7 张里 6 张逐字节相同）。
-- **`audio-pool-audit.mjs` 新增 `churn` 模式** —— 反复进出房间，量「仍挂在音频图里的节点」，用来证明/证伪泄漏。
-- 生产冒烟（`vite preview` + `smoke.mjs`）：`rootChildren:1` / `hasCanvas:true` / `meshes 698` /
-  只加载 2 张允许的位图 / **0 error**。`chunk-graph.mjs`：无环、react chunk 195.5 KB ✅
 
 ## ① 需要你点头、我就动手的
 
@@ -147,26 +31,23 @@ A/B 出 **43.46%** 像素大改（树冠从半透明糊成实心、压在砖墙�
 
 ### 透明材质体检（2026-10-08，工具 `harness/material-audit.mjs`）
 
-`transparent: true` 共 **286** 个材质，分三类：
+`transparent: true` 现共 **238** 个材质（③-2 前是 286），分三类：
 
 | 类 | 数量 | 是什么 | 该怎么办 |
 |---|---|---|---|
-| **A 硬边抠图**（`alphaTest>0`） | **63 材质 / 63 mesh** | 见下表 | `alphaTest` 自己就 `discard`，`transparent` 白挂 |
-| **B 真淡入淡出**（`opacity<1`） | 165 材质 / 165 mesh | 房间揭示动画等 | **别动**，真需要 |
-| **C 其余**（opacity=1、无 alphaTest） | 58 材质 / 67 mesh | 25 个无 map（纯浪费）、30 个 384×384、3 个 460×960 | 逐个人肉看 |
+| **A 硬边抠图**（`alphaTest>0 && opacity=1`） | **0 材质 / 0 mesh** ✅ | ③-2 已清干净（63 → 0） | 做完了，留着这一行当回归基线 |
+| **B 真淡入淡出**（`opacity<1`） | 180 材质 / 180 mesh | 房间揭示动画、Doodles 影子层（`opacity=0.15`） | **别动**，真需要 |
+| **C 其余**（opacity=1、无 alphaTest） | 58 材质 / 67 mesh | 25 个无 map、30 个 384×384、3 个 460×960 | 见 ②-3，逐个人肉看 |
 
-**A 类（63 个「抠图」）的构成**：
+> ⚠️ 判据**必须**带 `opacity >= 1`：`alphaTest>0` 但 `opacity<1` 的材质（Doodles 影子层
+> `opacity={0.15} alphaTest={0.5}`）**真的需要** `transparent`，它同时在淡入。
+> 少写这一条会把 15 个影子层误报成"白挂的抠图"。
 
-| 尺寸 | 数量 | 是什么 |
-|---|---|---|
-| 256×256 | 30 | 走廊小道具的剪影：纸团 / 纸飞机 / 铅笔 / 咖啡杯（`corridorArt` 的 `makePaperBallTexture` 等 4 个生成器，各段重复摆放） |
-| 512×1216 | 24 | 房间门相关：门叶剪影、门把、指示箭头 |
-| 512×1310 | 6 | 大门相关：福字、门环、门联 |
-| 512×625 | 3 | |
-
-判据来自 `src/engine/resources.js` 的「三条契约」第 1 条：**判据是「这张图的 alpha 是硬的还是软的」，不是「有没有 alpha」。**
-canvas 画出来的图 alpha 只有 0 和 1，唯一的中间值是抗锯齿那 1px 边 —— 所以摘掉
-`transparent` 唯一的视觉风险就是那 1px 边会从"半透明"变成"硬切"。**这就是为什么必须 A/B 截图。**
+**③-2 已确认的一条硬规则（做 ②-3 时同样适用）**：
+**低 `alphaTest`（如 `0.01`）是作者保留软边的手段，不能当抠图处理。**
+那 **4 个**点位（`treeTexture` / `bugTexture` / `speechBubbleTexture` / `inkSplashTexture`）
+全部保持 `transparent` 不动 —— 摘了会让树冠从半透明糊成实心（实测 A/B 差异 43.46%）。
+判据是**量 alpha 直方图是不是双峰**，不是看阈值大小。
 
 ### 贴图账本（2026-10-08 实测，工具 `harness/texture-inventory.mjs`）
 
