@@ -144,22 +144,27 @@ const COUPLET_Z = 0.17;
  * ---------------
  * The date decides. resolveCoupletSet() maps today onto one of 39 sets
  * (24 节气 + 11 传统节日 + 3 法定假期 + 兜底), honouring the multi-day windows
- * for 春节 / 国庆 / 劳动节 / 清明. Hovering any piece still cross-fades to the
- * 搞笑 easter egg, exactly as it always did.
+ * for 春节 / 国庆 / 劳动节 / 清明.
+ *
+ * NO HOVER SWAP (removed 2026-10-08)
+ * ----------------------------------
+ * Hovering any piece used to cross-fade to the 搞笑 easter egg. The user asked
+ * for that to go: the gate should carry today's couplet and nothing else, and
+ * a poem that rewrites itself under the cursor undercuts the one thing the
+ * 春联 is for. The easter egg survives as `?couplet=funny` (data only).
  *
  * ?couplet=<id|中文名> forces a set (see config/couplets.js) so the other 38
  * are reachable without changing the system clock.
  *
- * WHY ONLY TWO SETS ARE EVER BAKED
- * --------------------------------
+ * WHY ONLY ONE SET IS EVER BAKED
+ * ------------------------------
  * This used to be `COUPLET_SETS.map(...)`: EVERY set baked and EVERY set left
  * mounted, stacked on 0.002 z steps with opacity doing the cross-fade. At two
  * sets that was 6 textures and 6 meshes — free. At 39 it would be 117 textures
  * of 200x1420 (≈95 MB of VRAM) and 117 extra meshes, which would both blow up
  * a phone and break the scene's mesh budget.
  *
- * So only the active set and the easter egg are baked, and the two of them are
- * rebuilt when the date rolls over. Re-baking is cheap because the red paper
+ * So only the active set is baked. Re-baking is cheap because the red paper
  * is cached separately in gateArt (see paperCanvas) — a rollover costs one
  * drawImage plus seven fillText per piece, not a fresh gradient/fibre/age-spot
  * pass.
@@ -169,36 +174,14 @@ const COUPLET_Z = 0.17;
  * not worth a pop for. Reload and it is correct.
  */
 const CoupletWall = () => {
-    const [alt, setAlt] = useState(false);
-    const mats = useRef([]);
-
     // The date-driven set, or whatever ?couplet= forced.
     const activeId = useMemo(() => (coupletOverride() || resolveCoupletSet().set).id, []);
 
-    // Exactly two: [0] the active set, [1] the easter egg. `alt` picks one.
-    const ids = useMemo(() => [activeId, 'funny'], [activeId]);
-
-    const textures = useMemo(
-        () => ids.map((id) => ({
-            upper: makeCoupletTexture(id, 'upper'),
-            lower: makeCoupletTexture(id, 'lower'),
-            banner: makeCoupletTexture(id, 'banner'),
-        })),
-        [ids]
-    );
-
-    useEffect(() => {
-        mats.current.forEach((m, i) => {
-            if (!m) return;
-            const isAlt = Math.floor(i / 3) === 1;
-            gsap.to(m, {
-                opacity: isAlt === alt ? 1 : 0,
-                duration: 0.34,
-                ease: 'power2.out',
-                overwrite: true,
-            });
-        });
-    }, [alt]);
+    const textures = useMemo(() => ({
+        upper: makeCoupletTexture(activeId, 'upper'),
+        lower: makeCoupletTexture(activeId, 'lower'),
+        banner: makeCoupletTexture(activeId, 'banner'),
+    }), [activeId]);
 
     const pieces = [
         { key: 'upper', x: COUPLET_X, y: COUPLET_Y, w: COUPLET_W, h: COUPLET_H },
@@ -206,33 +189,22 @@ const CoupletWall = () => {
         { key: 'banner', x: 0, y: BANNER_Y, w: BANNER_W, h: BANNER_H },
     ];
 
-    const enter = () => { setAlt(true); setGuitarCursor('pointer'); };
-    const leave = () => { setAlt(false); setGuitarCursor('auto'); };
-
     return (
         <group>
-            {textures.map((set, si) => (
-                <group key={si}>
-                    {pieces.map((p, pi) => (
-                        <mesh
-                            key={p.key}
-                            position={[p.x, p.y, COUPLET_Z + si * 0.002]}
-                            renderOrder={6}
-                            onPointerEnter={enter}
-                            onPointerLeave={leave}
-                        >
-                            <primitive object={sharedGeometry('plane', p.w, p.h)} attach="geometry" />
-                            <meshBasicMaterial
-                                ref={(m) => { mats.current[si * 3 + pi] = m; }}
-                                map={set[p.key]}
-                                transparent
-                                opacity={si === 0 ? 1 : 0}
-                                depthWrite={false}
-                                toneMapped={false}
-                            />
-                        </mesh>
-                    ))}
-                </group>
+            {pieces.map((p) => (
+                <mesh
+                    key={p.key}
+                    position={[p.x, p.y, COUPLET_Z]}
+                    renderOrder={6}
+                >
+                    <primitive object={sharedGeometry('plane', p.w, p.h)} attach="geometry" />
+                    <meshBasicMaterial
+                        map={textures[p.key]}
+                        transparent
+                        depthWrite={false}
+                        toneMapped={false}
+                    />
+                </mesh>
             ))}
         </group>
     );
@@ -1106,7 +1078,7 @@ const EntranceDoors = ({
                 <DoorOrnaments god="zhangfei" leafX={-doorWidth / 2} />
             </group>
 
-            {/* === 春联 + 横批 (hover to swap word sets) === */}
+            {/* === 春联 + 横批 (date-driven; no hover swap) === */}
             <CoupletWall />
 
             {/* === 燕子窝 — perched above the right of the lintel === */}
@@ -1123,10 +1095,23 @@ const EntranceDoors = ({
                 `depthWrite={false}` stops its transparent margin from punching a
                 depth hole through the curtain behind it, and z = 0.06 puts the
                 figure in front of the curtain panels (-0.01) while staying
-                behind the brick facade (0.15) so the wall hides it at rest. */}
+                behind the brick facade (0.15) so the wall hides it at rest.
+
+                ⚠️ y is NOT decorative. The illustration is a half-body pose that
+                is CROPPED AT ITS OWN BOTTOM EDGE — the ink runs to y=1023 of a
+                1024px canvas (see the note in the texture pipeline). At 0.04 the
+                ink bottom landed exactly on the window opening's bottom edge, so
+                a good 0.29 world units of trouser showed and read as a pair of
+                severed legs sitting on the sill. The user's report was exactly
+                that: "断腿露出来了". -0.16 pushes that hard cut behind the
+                frame's bottom rail and leaves only the hip, which reads as a
+                person standing at the window.
+                The head still clears the top rail comfortably at this height —
+                measured, not guessed: see .workbuddy-ai/round2-2026-10-08/
+                avatar-y-*.png. */}
             <mesh
                 ref={windowAvatarRef}
-                position={[AVATAR_REST_X, 0.04, 0.06]}
+                position={[AVATAR_REST_X, -0.16, 0.06]}
                 rotation={[0, 0, 0]}
             >
                 <primitive object={sharedGeometry('plane', 1.5, 1.5)} attach="geometry" />

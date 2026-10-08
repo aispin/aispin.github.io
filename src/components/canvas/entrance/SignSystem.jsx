@@ -69,9 +69,15 @@ const GLOW = '#FF8A4C';
  * the emissive here is what makes it read as the light source it is. The
  * numbers: (map + 1.5 x this) x veil lands around (0.90, 0.24, 0.11) — a
  * saturated glow, not a white blob.
+ *
+ * 1.5 -> 2.0 on 2026-10-08 on the user's "灯笼调亮一点". The red channel was
+ * already at 0.90 of a possible 1.0, so most of the headroom left is in the
+ * light the lantern *throws* rather than in the paper itself; the point light
+ * below therefore moved further (2.6 -> 4.4) than the emissive did. Both are
+ * still driven by the same `k`, so day is still exactly as dark as before.
  */
 const GLOW_EMISSIVE = '#FF3B0A';
-const LANTERN_LIT = 1.5;
+const LANTERN_LIT = 2.0;
 const GOLD = '#CE9B3E';
 const GOLD_DARK = '#8A6524';
 const TASSEL = '#8E1B12';
@@ -132,10 +138,10 @@ const Lantern = ({ x }) => {
             bodyRef.current.emissiveIntensity = LANTERN_LIT * k * flicker;
         }
         if (goldRef.current) {
-            goldRef.current.emissiveIntensity = 0.35 * k * flicker;
+            goldRef.current.emissiveIntensity = 0.5 * k * flicker;
         }
         if (lightRef.current) {
-            lightRef.current.intensity = 2.6 * k * flicker;
+            lightRef.current.intensity = 4.4 * k * flicker;
         }
     });
 

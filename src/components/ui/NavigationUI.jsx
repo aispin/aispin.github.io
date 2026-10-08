@@ -11,7 +11,7 @@ import '../../styles/NavigationUI.scss';
 
 const NavigationUI = () => {
     const { currentRoom, isInRoom, requestExit, hasEntered, teleportTo, isTeleporting, markEntered, requestHouseExit, doorBusy } = useScene();
-    const { globalVolume, setGlobalVolume } = useAudio();
+    const { globalVolume, setGlobalVolume, isMuted, toggleMute } = useAudio();
     const { showTutorial } = useAchievements();
     const { language } = useSitePreferences();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -321,6 +321,45 @@ const NavigationUI = () => {
                                 </svg>
                             </button>
                         </div>
+                        {/* One-tap mute (user request 2026-10-08). Lives above
+                            the two sliders because it is the coarse control:
+                            it silences BGM *and* every SFX at once via
+                            AudioManager's `toggleMute` → `syncMuteState`, which
+                            is the only path that reaches the mp3 element, the
+                            synth engine and the positional door sounds alike.
+                            Dragging either slider above 0 un-mutes again (see
+                            enhancedSetGlobalVolume), so the two never fight. */}
+                        <button
+                            type="button"
+                            className={`audio-mute ${isMuted ? 'is-muted' : ''}`}
+                            role="switch"
+                            aria-checked={isMuted}
+                            onClick={toggleMute}
+                            aria-label={language === 'zh' ? '一键静音' : 'Mute all audio'}
+                        >
+                            <span className="audio-mute__icon" aria-hidden="true">
+                                {isMuted ? (
+                                    <svg viewBox="0 0 24 24">
+                                        <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                                        <line x1="23" y1="9" x2="17" y2="15" />
+                                        <line x1="17" y1="9" x2="23" y2="15" />
+                                    </svg>
+                                ) : (
+                                    <svg viewBox="0 0 24 24">
+                                        <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                                        <path d="M15 9a5 5 0 0 1 0 6" />
+                                        <path d="M18 5a9 9 0 0 1 0 14" />
+                                    </svg>
+                                )}
+                            </span>
+                            <span className="audio-mute__label">
+                                {language === 'zh' ? '一键静音' : 'Mute all'}
+                            </span>
+                            <span className="audio-mute__pill" aria-hidden="true">
+                                <span className="audio-mute__knob" />
+                            </span>
+                        </button>
+
                         <div className="audio-sliders-container">
                             <div className="slider-group">
                                 <div className="slider-label">

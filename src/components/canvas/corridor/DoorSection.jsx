@@ -18,13 +18,14 @@ import {
     makeRoomDoorTexture,
     makeRoomDoorFrameTexture,
     makeRoomDoorBackTexture,
-    makeTapedNoteTexture,
     seedFromString,
 } from '../../../utils/doorArt';
 import {
     makeRoomDoorHandleTexture,
     makeDoorArrowTexture,
-    makeSignBoardTexture,
+    makeWoodenSignTexture,
+    SIGN_BOARD_W,
+    SIGN_BOARD_H,
 } from '../../../utils/corridorArt';
 import { trimTexture } from '../../../utils/proceduralTextures';
 import { INK_WALL_FRAG, makeRoomMaterial, WORLD_UV_VERT } from '../../../shaders/roomSurfaces';
@@ -63,22 +64,6 @@ const getInkWallMaterial = () => {
 };
 
 /**
- * The three paper notes taped to every room door. They carry the studio's
- * identity — a mouse playing guitar (music), a robot with "AI" on its belly,
- * and a terminal full of code — and replace the hand-drawn icon notes that
- * used to be baked into the `drzwi*.webp` bitmaps.
- *
- * `y` is the height on the leaf (upper / middle / lower note), `x` a small
- * hand-placed offset. The tilt is derived from the door id so every door
- * looks stuck-on by a different hand.
- */
-const DOOR_NOTES = [
-    { kind: 'music', x: -0.05, y: 0.66 },
-    { kind: 'ai', x: 0.05, y: -0.06 },
-    { kind: 'code', x: -0.03, y: -0.78 },
-];
-
-/**
  * Feedback for a door click that arrives while the door is mid-animation.
  * Room names are not used here on purpose: the message is about the door being
  * busy, which is independent of which door it is.
@@ -87,36 +72,12 @@ const DOOR_TOAST = {
     busy: { zh: '门还在动，稍等一下', en: 'Still opening — one moment' },
 };
 
-const noteTilt = (doorId, index) => {
-    let h = 0;
-    for (let i = 0; i < doorId.length; i++) h = (h * 31 + doorId.charCodeAt(i)) % 9973;
-    const a = ((h + index * 617) % 100) / 100;   // 0..1
-    const b = ((h * 7 + index * 211) % 100) / 100;
-    return (a - 0.5) * 0.22 + (b - 0.5) * 0.06;
-};
-
-const DoorNotes = ({ doorId, x, z, size = 0.38 }) => {
-    const notes = useMemo(
-        () => DOOR_NOTES.map((n, i) => ({
-            ...n,
-            tilt: noteTilt(doorId, i),
-            texture: makeTapedNoteTexture(n.kind),
-        })),
-        [doorId]
-    );
-
-    return notes.map((n, i) => (
-        <mesh
-            key={`${doorId}-${n.kind}-${i}`}
-            position={[x + n.x, n.y - 0.2, z]}
-            rotation={[0, 0, n.tilt]}
-            renderOrder={6}
-        >
-            <primitive object={sharedGeometry('plane', size, size)} attach="geometry" />
-            <meshBasicMaterial map={n.texture} transparent depthWrite={false} toneMapped={false} />
-        </mesh>
-    ));
-};
+/**
+ * The three taped paper notes (music / AI / code) that used to sit on every
+ * room door leaf were removed on 2026-10-08 at the user's request
+ * ("房门上的贴纸去掉"). `makeTapedNoteTexture` is still exported by doorArt.js
+ * for the entrance door's taped-note variant, so nothing there changes.
+ */
 
 // Constants from CorridorSegment
 const WALL_X_OUTER = 3.5;
@@ -1172,7 +1133,7 @@ const DoorSection = ({
 
     // Sign board — procedural canvas art (utils/corridorArt.js). The room name
     // is drawn on top of it by <Text>, so the board itself is blank.
-    const signTexture = makeSignBoardTexture();
+    const signTexture = makeWoodenSignTexture();
 
     return (
         // Outer group at pivot position (outer edge of wall)
@@ -1277,16 +1238,20 @@ const DoorSection = ({
 
                 {/* Door and frame - centered on wall */}
                 <group position={[wallOffsetX, -0.4, 0]}>
-                    {/* === TEXTURED SIGN === */}
+                    {/* === 古韵木板招牌 ===
+                        Board size comes from corridorArt (SIGN_BOARD_W/H), so
+                        the plane and the canvas share an aspect and the grain
+                        never stretches. It hangs 0.45 above the leaf; the old
+                        0.65-tall plate used the same anchor, so shrinking the
+                        board to 0.42 simply opens the gap up a little.
+
+                        The label is CENTRED — both anchors are 'middle' and
+                        offsetY is 0. The -0.11 that used to be here existed
+                        only to dodge the lantern the old plate had painted into
+                        its top 32px; the wooden board has none. */}
                     <group position={[0, doorHeight / 2 + 0.45, 0.08]}>
-                        {/* 
-                            WIELKOŚĆ TABLICZKI (SIGN SIZE):
-                            Zmień liczby w args={[Szerokość, Wysokość]}
-                            Obecnie: 1.3 szerokości, 0.65 wysokości
-                        */}
                         <mesh>
-                            {/* Adjusted size for the signs - assuming rectangular aspect ratio */}
-                            <primitive object={sharedGeometry('plane', 1.3, 0.65)} attach="geometry" />
+                            <primitive object={sharedGeometry('plane', SIGN_BOARD_W, SIGN_BOARD_H)} attach="geometry" />
                             <meshBasicMaterial color="#e0e0e0"
                                 map={signTexture}
                                 alphaTest={0.1}
@@ -1296,24 +1261,26 @@ const DoorSection = ({
 
                         <Text
                             font={TEXT.font3d}
-                            fontSize={language === 'en' ? Math.min(0.22, 1.35 / Math.max(label.length, 1)) : 0.24}
-                            color={TEXT.color}
+                            fontSize={language === 'en'
+                                ? Math.min(0.2, 1.05 / Math.max(label.length, 1))
+                                : 0.2}
+                            color={TEXT.plaque.ink}
                             anchorX="center"
                             anchorY="middle"
-                            maxWidth={1.02}
+                            maxWidth={SIGN_BOARD_W * 0.86}
                             textAlign="center"
-                            position={[0, -0.11, 0.01]}
+                            position={[0, TEXT.plaque.offsetY, 0.01]}
                         >
                             {label}
                         </Text>
-
-                        {/* The four "legacy sign variant" blocks that used to live
-                            here (THE GALLERY / THE STUDIO / THE ABOUT / LET'S
-                            CONNECT) were unreachable: `label` is always
-                            `ROOMS[n][language]`, i.e. 档案/ABOUT, 摄影/GALLERY…,
-                            never the old "THE …" strings. They were also the
-                            last CabinSketch users, so they went with the font. */}
                     </group>
+
+                    {/* The four "legacy sign variant" blocks that used to live
+                        here (THE GALLERY / THE STUDIO / THE ABOUT / LET'S
+                        CONNECT) were unreachable: `label` is always
+                        `ROOMS[n][language]`, i.e. 档案/ABOUT, 摄影/GALLERY…,
+                        never the old "THE …" strings. They were also the
+                        last CabinSketch users, so they went with the font. */}
 
                     {/* === DOOR FRAME (textured) === */}
                     {/* Moved to Z = 0.04 to sit in front of baseboards (Z=0.02), hiding the hole edges */}
@@ -1394,8 +1361,8 @@ const DoorSection = ({
                             />
                         </mesh>
 
-                        {/* Taped identity notes (music / AI / code) */}
-                        <DoorNotes doorId={doorId} x={doorMeshX} z={0.02} />
+                        {/* (The taped identity notes that used to sit here were
+                            removed on 2026-10-08 — see the note above.) */}
 
                         {/* Handle Layer - pivot at screw position */}
                         <group ref={handleRef} position={[doorMeshX + (side === 'left' ? 0.45 : -0.45), -0.29, 0.03]}>

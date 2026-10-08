@@ -56,13 +56,23 @@ export const TEXT = {
    *  Regenerate with: python3 scripts/build-scene-fonts.py */
   font3d: '/fonts/maple-ui.woff',
   /**
-   * Door plaques are drawn with the lantern occupying the top ~32px, so labels
-   * sit lower. Widths are capped and the font size is derived from the plaque
-   * so long words (ARCHIVE, CONTACT) never touch the frame.
+   * Room-door plaques (the 匾 above every door in the corridor).
+   *
+   * The board itself is drawn by utils/corridorArt.makeWoodenSignTexture(),
+   * which also owns the plane size (SIGN_BOARD_W / SIGN_BOARD_H) so the canvas
+   * aspect and the geometry can never drift apart. Only the ink lives here.
+   *
+   * `ink` is a warm bone/gold: the plaque became a dark lacquered plank on
+   * 2026-10-08 ("换成古韵木板招牌"), and TEXT.color (#5A4636, the body ink) is
+   * unreadable on it.
+   *
+   * `offsetY` is 0 — the old white plate drew a lantern into its top ~32px and
+   * the label had to dodge it; the wooden board has no such thing, and the user
+   * asked for the text to be centred ("保障字体居中").
    */
   plaque: {
-    safeWidthRatio: 0.58,
-    offsetY: -0.06,
+    ink: '#F3DFB4',
+    offsetY: 0,
   },
 }
 

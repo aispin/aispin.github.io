@@ -38,8 +38,14 @@
  */
 import { TERM_DAYS, TERM_MONTHS, TERM_NAMES, FESTIVAL_DAYS, FESTIVAL_NAMES } from './coupletCalendar.data';
 
-/** 兜底那一副。`literary` 同时是「表里查不到今天」时的门联。 */
-export const DEFAULT_COUPLET_ID = 'literary';
+/**
+ * 兜底那一副 —— 也是「日常」那一副。
+ *
+ * 2026-10-08 用户拍板：日常门联改成**基于他中文名「黄泽昊」的藏头诗**，
+ * 上下联首字分别嵌「泽」「昊」。所以它不再叫 'literary'，直接叫 'zehao'。
+ * 日期表查不到今天时挂的就是它 —— 一年里大多数日子都是它。
+ */
+export const DEFAULT_COUPLET_ID = 'zehao';
 
 /**
  * 每一副联。`label` 是它对应的节气/节日名（要和日期表里的名字**逐字相同**），
@@ -48,14 +54,30 @@ export const DEFAULT_COUPLET_ID = 'literary';
  * id 只用于贴图缓存键和 ?couplet= 调试参数，所以取英文/pinyin，别用中文。
  */
 export const COUPLET_SETS = [
-    /* ---------------- 兜底 & 彩蛋 ---------------- */
+    /* ---------------- 日常（兜底）& 彩蛋 ---------------- */
+    /**
+     * 日常那一副：藏头「泽」「昊」，取自用户中文名黄泽昊。
+     *
+     *   上联  泽润庭花春入砚
+     *   下联  昊涵云影月临窗
+     *   横批  泽昊同春
+     *
+     * 逐字对仗：泽润/昊涵（名+动）、庭花/云影（名+名）、春/月、入/临、砚/窗。
+     * 上联收「砚」(yàn, 去声) = 仄，下联收「窗」(chuāng, 阴平) = 平 ✓。
+     * 母题仍是书房（砚、窗），与 24 节气那批同源，门口不会换季变主题。
+     */
     {
-        id: 'literary',
-        label: '文艺',
-        banner: '见字如面',
-        upper: '檐下风来书自展',
-        lower: '案头灯暖字生香',
+        id: 'zehao',
+        label: '日常',
+        banner: '泽昊同春',
+        upper: '泽润庭花春入砚',
+        lower: '昊涵云影月临窗',
     },
+    /**
+     * 彩蛋。**自 2026-10-08 起不再有 UI 入口** —— 用户要求去掉「hover 门联
+     * 换成另一幅」的逻辑，门口的字就该老老实实是今天那一副。这一条留着只
+     * 是为了 `?couplet=funny` 还能调试贴图/版式（长词、窄字都靠它试）。
+     */
     {
         id: 'funny',
         label: '搞笑',

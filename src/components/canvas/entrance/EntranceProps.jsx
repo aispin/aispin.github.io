@@ -563,11 +563,45 @@ export function WindowCurtain({ position }) {
      *
      * Lerped in useFrame rather than set from a ternary so the window warms up
      * over the same 0.9 s as the rest of the day/night fade.
+     *
+     * 2026-10-08: user asked for a brighter window light. R was already at
+     * 0.96 of 1.0, so the extra brightness had to come out of G and B — the
+     * glow is now a lighter, more amber light rather than a deeper orange.
+     *
+     * The first attempt (1+1.85 / 1+0.95 / 1+0.15) measured only +8..13% on
+     * the lit panes, which is below the threshold where a change is noticed at
+     * all — and this was a "too dim" report, so a change nobody can see is a
+     * failed change. Measured against `.workbuddy-ai/round2-2026-10-08/
+     * before-night-window.png` with harness/measure-night-brightness.py.
      */
     const interiorMat = useMemo(() => new THREE.MeshBasicMaterial({
         map: interior,
         color: new THREE.Color(1, 1, 1),
     }), [interior]);
+
+    /**
+     * The window REVEAL — the sliver of wall you see past the curtain when you
+     * look through the opening at an angle.
+     *
+     * WHY IT EXISTS: the curtain panels end exactly at the opening's edges
+     * (±0.70), so at any off-axis angle the sight line through the opening
+     * misses both the fabric and the 1.55-wide interior backdrop, and lands on
+     * the legacy tunnel wall panel 0.65 behind — which is flat `#e0e0e0`. That
+     * is a **white slit down one side of the window**, reported by the user as
+     * "窗帘有一边露出了白缝隙". Measured: at the resting entrance camera it is
+     * invisible; from 3.9 world units to the right it is 10px of (216,216,216)
+     * — see .workbuddy-ai/round2-2026-10-08/probe-win-right.png.
+     *
+     * Widening the interior backdrop instead would have been the obvious fix
+     * and is the wrong one: the backdrop's plane and its texture share an
+     * aspect, so a 1.5x wider plane shows only the middle 58% of the room
+     * painting and cuts the shelf off the side. A dark reveal plane behind it
+     * costs one quad, changes nothing at rest, and turns the slit into what a
+     * real window reveal looks like — the shadowed side of the opening.
+     */
+    const revealMat = useMemo(() => new THREE.MeshBasicMaterial({
+        color: new THREE.Color('#2A1C12'),
+    }), []);
 
     const { theme } = useSitePreferences();
 
@@ -580,9 +614,16 @@ export function WindowCurtain({ position }) {
             lit.t = target > lit.t ? Math.min(target, lit.t + step) : Math.max(target, lit.t - step);
         } else return;
         interiorMat.color.setRGB(
-            1 + 1.55 * lit.t,
-            1 + 0.62 * lit.t,
-            1 + 0.02 * lit.t,
+            1 + 2.15 * lit.t,
+            1 + 1.25 * lit.t,
+            1 + 0.30 * lit.t,
+        );
+        // The reveal warms with the room, or it would cut a cold dark line
+        // across the edge of a glowing window at night.
+        revealMat.color.setRGB(
+            0.165 + 0.42 * lit.t,
+            0.110 + 0.26 * lit.t,
+            0.071 + 0.10 * lit.t,
         );
     });
 
@@ -591,6 +632,11 @@ export function WindowCurtain({ position }) {
             {/* the room beyond. Unlit, and warmed up at night — see above. */}
             <mesh position={[0, 0, -0.075]} material={interiorMat}>
                 <primitive object={sharedGeometry('plane', 1.55, 1.62)} attach="geometry" />
+            </mesh>
+
+            {/* the reveal, 0.02 further back so the two never z-fight */}
+            <mesh position={[0, 0, -0.095]} material={revealMat}>
+                <primitive object={sharedGeometry('plane', 2.6, 2.2)} attach="geometry" />
             </mesh>
 
             {/* curtain rod + finials */}

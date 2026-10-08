@@ -443,64 +443,151 @@ export function makeDoorArrowTexture() {
 /* ------------------------------------------------------------------ */
 
 /**
- * The blank plaque above every room door. `<Text>` draws the room name on
- * top of it, so this is just the board: a warm off-white plate with a
- * bevel, a fine inner rule and four corner screws.
+ * Aspect of the room-door plaque (see DoorSection). The canvas and the plane
+ * share it, so the board is never stretched.
+ *
+ * 1020 x 340 = 3.0. The old plate was 1024 x 512 (2.0) and hung 0.65 tall;
+ * the user asked for a shorter board on 2026-10-08 ("高度调小"), so the height
+ * came down to 0.42 at the same 1.26 width.
  */
-export function makeSignBoardTexture() {
-    const key = 'corridor-sign-board';
+const SIGN_TEX_W = 1020;
+const SIGN_TEX_H = 340;
+export const SIGN_BOARD_ASPECT = SIGN_TEX_W / SIGN_TEX_H;
+
+/** The plane the plaque is painted for, in world units. Height is derived from
+ *  the canvas aspect, so the board can never be stretched. */
+export const SIGN_BOARD_W = 1.26;
+export const SIGN_BOARD_H = SIGN_BOARD_W / SIGN_BOARD_ASPECT;
+
+/**
+ * The 古韵木板招牌 above every room door. `<Text>` draws the room name on top
+ * of it, so this is just the board.
+ *
+ * IT REPLACED A WHITE "SCREW PLATE"
+ * ---------------------------------
+ * The old board was a warm off-white plate with a bevel, a fine inner rule and
+ * four corner screws — a gallery label, not a 匾. The user asked for a wooden
+ * sign with some age to it ("换成古韵木板招牌"), so this draws what a real
+ * one is: a single plank of dark walnut, lacquered, with
+ *
+ *   1. **Grain.** Long horizontal figure lines, plus a few knots. Drawn with a
+ *      low-alpha dark stroke and an even lower-alpha light one offset a couple
+ *      of px, which is what makes grain read as figure rather than as stripes.
+ *   2. **A carved border.** A recessed groove just inside the edge: a dark
+ *      stroke with a light stroke beneath it, so the light catches the lower
+ *      lip. That single pair is what says "carved" instead of "printed".
+ *   3. **Age.** Uneven edge darkening, a scatter of darker blotches, and a
+ *      grain pass. A board that is perfectly even reads as plastic.
+ *
+ * The name is drawn in `TEXT.plaque.ink` (a warm bone/gold), which is the only
+ * colour that survives on wood this dark.
+ */
+export function makeWoodenSignTexture() {
+    const key = 'corridor-sign-board-wood';
     if (cache.has(key)) return cache.get(key);
 
-    const W = 1024;
-    const H = 512;
+    const W = SIGN_TEX_W;
+    const H = SIGN_TEX_H;
     const canvas = makeCanvas(W, H);
     const ctx = canvas.getContext('2d');
     const rand = mulberry32(hashString(key));
 
-    const M = 14;
+    const M = 10;
 
-    // Outer edge
-    ctx.fillStyle = rgba(178, 172, 160);
-    roundRectPath(ctx, M - 6, M - 6, W - (M - 6) * 2, H - (M - 6) * 2, 16);
-    ctx.fill();
+    // ---- the plank -----------------------------------------------------
+    const base = ctx.createLinearGradient(0, 0, 0, H);
+    base.addColorStop(0.00, '#7C5836');
+    base.addColorStop(0.18, '#6E4C2E');
+    base.addColorStop(0.62, '#5C3F27');
+    base.addColorStop(1.00, '#48301D');
+    ctx.fillStyle = base;
+    ctx.fillRect(0, 0, W, H);
 
-    // Plate with a soft bevel: light at the top, shaded at the bottom
-    roundRectPath(ctx, M, M, W - M * 2, H - M * 2, 12);
-    const pg = ctx.createLinearGradient(0, M, 0, H - M);
-    pg.addColorStop(0, rgba(248, 246, 241));
-    pg.addColorStop(0.45, rgba(238, 236, 230));
-    pg.addColorStop(1, rgba(219, 216, 208));
-    ctx.fillStyle = pg;
-    ctx.fill();
+    // A faint side-to-side shading so the plank reads as slightly dished.
+    const across = ctx.createLinearGradient(0, 0, W, 0);
+    across.addColorStop(0.00, 'rgba(24,14,8,0.22)');
+    across.addColorStop(0.16, 'rgba(24,14,8,0.00)');
+    across.addColorStop(0.84, 'rgba(24,14,8,0.00)');
+    across.addColorStop(1.00, 'rgba(24,14,8,0.26)');
+    ctx.fillStyle = across;
+    ctx.fillRect(0, 0, W, H);
 
-    // Inner rule
-    ctx.strokeStyle = rgba(160, 154, 142, 0.55);
-    ctx.lineWidth = 3;
-    roundRectPath(ctx, M + 16, M + 16, W - (M + 16) * 2, H - (M + 16) * 2, 8);
+    // ---- grain ---------------------------------------------------------
+    // Long figure lines. `wobble` walks the line's height so no two are
+    // parallel — real grain drifts.
+    for (let i = 0; i < 46; i++) {
+        const y0 = rand() * H;
+        const amp = 2 + rand() * 7;
+        const light = rand() < 0.42;
+        ctx.beginPath();
+        for (let x = -10; x <= W + 10; x += 14) {
+            const y = y0 + Math.sin(x * (0.004 + rand() * 0.002) + i) * amp;
+            if (x <= -10) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.lineWidth = 0.8 + rand() * 2.6;
+        ctx.strokeStyle = light
+            ? `rgba(255,220,168,${(0.03 + rand() * 0.05).toFixed(3)})`
+            : `rgba(32,19,10,${(0.05 + rand() * 0.13).toFixed(3)})`;
+        ctx.stroke();
+    }
+
+    // Two knots, off to one side so the name never sits on one.
+    [[W * 0.13, H * 0.36], [W * 0.88, H * 0.68]].forEach(([kx, ky]) => {
+        const r = H * (0.09 + rand() * 0.04);
+        const kg = ctx.createRadialGradient(kx, ky, 1, kx, ky, r);
+        kg.addColorStop(0.0, 'rgba(38,22,12,0.55)');
+        kg.addColorStop(0.5, 'rgba(58,36,20,0.22)');
+        kg.addColorStop(1.0, 'rgba(58,36,20,0.0)');
+        ctx.fillStyle = kg;
+        ctx.beginPath();
+        ctx.ellipse(kx, ky, r * 1.5, r, rand() * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    // ---- carved border --------------------------------------------------
+    // The recess: dark lip on top, light catch underneath.
+    const inset = 22;
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(255,222,172,0.14)';
+    ctx.lineWidth = 4;
+    roundRectPath(ctx, M + inset - 2, M + inset - 2, W - (M + inset - 2) * 2, H - (M + inset - 2) * 2, 10);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(28,16,8,0.62)';
+    ctx.lineWidth = 6;
+    roundRectPath(ctx, M + inset, M + inset, W - (M + inset) * 2, H - (M + inset) * 2, 10);
     ctx.stroke();
 
-    // Paper tooth
-    paperGrain(ctx, W, H, rand, 6);
+    // ---- the outer edge of the plank ------------------------------------
+    ctx.strokeStyle = 'rgba(22,12,6,0.72)';
+    ctx.lineWidth = 7;
+    roundRectPath(ctx, M * 0.5, M * 0.5, W - M, H - M, 12);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,228,182,0.10)';
+    ctx.lineWidth = 2.5;
+    roundRectPath(ctx, M, M, W - M * 2, H - M * 2, 11);
+    ctx.stroke();
 
-    // Corner screws
-    [[M + 30, M + 30], [W - M - 30, M + 30], [M + 30, H - M - 30], [W - M - 30, H - M - 30]].forEach(([sx, sy]) => {
-        const sg = ctx.createRadialGradient(sx - 2, sy - 2, 1, sx, sy, 9);
-        sg.addColorStop(0, rgba(228, 226, 220));
-        sg.addColorStop(1, rgba(150, 146, 138));
-        ctx.fillStyle = sg;
-        ctx.beginPath();
-        ctx.arc(sx, sy, 9, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = rgba(96, 92, 84, 0.6);
-        ctx.lineWidth = 1.6;
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(sx - 5, sy);
-        ctx.lineTo(sx + 5, sy);
-        ctx.strokeStyle = rgba(96, 92, 84, 0.55);
-        ctx.lineWidth = 2;
-        ctx.stroke();
-    });
+    // ---- age: blotches + a vignette -------------------------------------
+    for (let i = 0; i < 90; i++) {
+        const x = rand() * W;
+        const y = rand() * H;
+        const r = 6 + rand() * 46;
+        const g = ctx.createRadialGradient(x, y, 1, x, y, r);
+        const dark = rand() < 0.7;
+        g.addColorStop(0, dark ? 'rgba(28,16,8,0.10)' : 'rgba(255,214,158,0.06)');
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+
+    const vig = ctx.createRadialGradient(W * 0.5, H * 0.5, H * 0.34, W * 0.5, H * 0.5, W * 0.62);
+    vig.addColorStop(0, 'rgba(0,0,0,0)');
+    vig.addColorStop(1, 'rgba(16,9,4,0.42)');
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, W, H);
+
+    paperGrain(ctx, W, H, rand, 5);
 
     const texture = toTexture(canvas, key);
     cache.set(key, texture);
