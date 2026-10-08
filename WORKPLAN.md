@@ -1,7 +1,7 @@
 # 工作计划 · aispin.github.io
 
 > 只保留**待做**的事项；做完的从这里删掉（历史看 `git log`，项目已纳入版本管理）。
-> 最近更新：2026-10-08 10:4x
+> 最近更新：2026-10-08 13:48
 
 ---
 
@@ -46,6 +46,90 @@ X 被反了 → 锁板落到**铰链侧**。于是大门上出现两个钥匙孔
 
 自验：`shots.mjs` 四张（`/tmp/door-after-*.png`），0 error；右叶铰链侧已无锁板无钥匙孔。
 
+## ③ 我自主推进的（2026-10-08 下午 · 已完成，待你验收）
+
+### ③-1 音频节点泄漏 —— 挖出一个真 bug 并修掉
+
+**起因**：原来那条「P5 音频池化」要求先证明「门扇悬停音不被别的门影响」。
+按 `engine/audioBus.js` 里写明的契约，**节点池化是被正确否决的**（悬停音用
+`ref.current.isPlaying` 判断「我这一扇响不响」，共用节点会串味）。
+但为了拿到证据写了 `harness/audio-pool-audit.mjs`，结果量出一个**此前没人知道的真泄漏**。
+
+**泄漏**：每个 `THREE.Audio` 在**构造函数**里就无条件接了一条直通 destination 的线
+（`this.gain.connect(listener.getInput())`），而 `THREE.Audio` **没有 `dispose()`**，
+R3F 卸载时调的 `object.dispose?.()` 是空操作 → **每次卸载都留下一对
+PannerNode + GainNode 永远挂在输出链上，只增不减**。
+
+实测（房间切换 8 次）：PannerNode 创建数 66 → 140，而场景里只从 42 涨到 52
+→ 净漏 64 个。启动时就已漏了 24 个（`RoomWarmup` 预热房间挂了又卸）。
+
+**🔴 第一版修法失败了，原因值得记**：`node.disconnect()` 是**空操作** —— three 的
+`Audio.disconnect()` 第一行是 `if (this._connected === false) return;`，而 `_connected`
+只在 `connect()` 里置 true、构造函数把它初始化成 **false**（尽管构造函数**确实**接了线）。
+走廊里那 42 个全是 `isPlaying === false`，所以 `disconnect()` 对它们直接返回。
+→ 必须**直接摘原生节点**。
+
+**修法**（`src/components/canvas/audio/SpatialSfx.jsx`，全站唯一挂 `<positionalAudio>` 处）：
+卸载时 `panner.disconnect()` + `gain.disconnect()`；用一个标志位处理 StrictMode 的
+mount→cleanup→mount（只在「线是我们摘的」时才重接）。
+
+**验证**（同一 harness / 同一场景 / churn 8 次）：
+
+| 指标 | 改前 | 改后 |
+|---|---|---|
+| PannerNode 累计**创建**数 | 66 → 140 | 66 → 140 ← 创建数本来就该涨，**它不是泄漏指标** |
+| **仍挂在音频图里的 panner** | 42 → **140** | 42 → **52** |
+| 场景内节点数 | 42 → 52 | 42 → 52 |
+
+改后「仍挂在图里」与「场景内」**完全对齐**（42/42、52/52）→ 泄漏消失。
+另跑 `audio-check.mjs` 全绿：0 个 404、0 个 AudioContext 警告、合成音效 RMS 0.23/0.14
+有信号、静音契约 3/3、门音 `otwarciedrzwi.mp3` / `zamknieciedrzwi.mp3` 照常取到
+→ **无音频回归**。
+
+### ③-2 硬边抠图去 `transparent: true`（14 个源点位 / 4 个文件）
+
+判据不是「有没有 alpha」，而是「**这张图的 alpha 是硬的还是软的**」。
+摘掉 `transparent` + `depthWrite: false`，让 `alphaTest` 自己 discard。
+
+⚠️ **中途有一次真回归，已还原**：一开始连 `alphaTest={0.01}` 的树冠也摘了，
+A/B 出 **43.46%** 像素大改（树冠从半透明糊成实心、压在砖墙上）。那三个点
+（`treeTexture` / `bugTexture` / `speechBubbleTexture`）已还原。
+
+**最终判据比「阈值 ≥ 0.5」更准，是量出来的**：看贴图 alpha 直方图是不是**双峰**。
+用临时预览页量了三个 `alphaTest={0.1}` 的点位，中间 alpha 像素只占 **0.18%~0.59%**，
+且集中在 1px 抗锯齿带（bucket 几乎只有 0 和 255 两档）→ 摘掉只影响那条边，安全。
+
+**A/B 结果**（冻结时钟后噪声底 0~0.06%）：全部 ≤ 0.561%，逐张看过差异图，
+**全是轮廓级**（`fcdiff-corridor1` = 涂鸦轮廓、`fcdiff-right` = 窗框边缘）。
+
+**材质体检前后**（同一 harness、`enter` 态、`material-audit.mjs`）：
+
+| 类 | 改前 | 改后 |
+|---|---|---|
+| transparent 材质总计 | 286 | **238** |
+| **A 硬边抠图** | 63 / 63 | **0 / 0** ✅ |
+| B 真淡入淡出 | 165 | 180 |
+| C 其余 | 58 / 67 | 58 / 67（未动） |
+
+⚠️ **顺带修了体检工具自己的一个误报**：A 类原来的判据只写了 `alphaTest > 0`，
+于是把「alphaTest>0 **但 opacity<1**」的材质也算成"白挂的抠图" ——
+可它们**真的需要** `transparent`（它同时在淡入），`alphaTest` 只是顺带带的。
+实测走廊里剩下那 15 个 256×256 全是 Doodles 的**影子层**（`opacity={0.15} alphaTest={0.5}`），
+被误报成 A 类，白追了一轮才查清。判据已补成 `alphaTest>0 && opacity>=1`，
+`opacity<1` 的一律归 B。
+
+⚠️ 另注：`engine/resources.js` 的 `cutoutMaterial()` **本来就正确**
+（`transparent = forceTransparent || opacity < 1`，是「契约 1」的唯一实现处）——
+**问题从来不在那个工厂，而在绕过它、直接写内联 JSX 材质的地方。**
+
+### 顺带升级的 harness 能力（可复用）
+
+- **`shots.mjs` 新增 `SHOTS_FREEZE_CLOCK=<ms>`** —— 把页面时钟钉死。这是做 A/B 像素比对的**前提**：
+  走廊有大量时间驱动动画，同一构建跑两次噪声就有 **13~18%**；冻结后降到 **0~0.06%**（7 张里 6 张逐字节相同）。
+- **`audio-pool-audit.mjs` 新增 `churn` 模式** —— 反复进出房间，量「仍挂在音频图里的节点」，用来证明/证伪泄漏。
+- 生产冒烟（`vite preview` + `smoke.mjs`）：`rootChildren:1` / `hasCanvas:true` / `meshes 698` /
+  只加载 2 张允许的位图 / **0 error**。`chunk-graph.mjs`：无环、react chunk 195.5 KB ✅
+
 ## ① 需要你点头、我就动手的
 
 （暂无 —— 2026-10-08 你已答：**对联文案不用审**、**harness/memory 保持现状**。）
@@ -56,11 +140,9 @@ X 被反了 → 锁板落到**铰链侧**。于是大门上出现两个钥匙孔
 
 | # | 事项 | 现状 | 验收标准 |
 |---|---|---|---|
-| 1 | **P5 音频池化** | 42 个 `PositionalAudio` 的 **listener 已合并**，但 **42 个节点本身还在** | 评审原话「一个 listener + 一个共享 Audio 池」。⚠️ 必须先证明**门扇悬停音**不被别的门影响 |
-| 2 | **63 个抠图去 `transparent: true`** | 219 → 63；剩下没动是**故意的**。实测构成见下 | **必须有 A/B 截图**：摘掉会让它们退出透明通道，前后关系可能变 |
-| 3 | **双面材质 435 收敛** | 一直没动 | 逐个确认哪面永远看不到，改回单面；需 A/B 截图 |
-| 4 | **贴图显存压缩** | 见下方「贴图账本」。走廊态 **59 次上传 / 128.3 MB**，门扇一类就占 60% | 压缩后视觉无差 + `texture-inventory.mjs` 显存下降 |
-| 5 | **58 个「其余」透明材质**（新发现） | 其中 **25 个连 `map` 都没有、opacity 还是 1** —— 既没贴图又全不透明，挂 `transparent` 是纯浪费（进排序队列、丢 early-Z、不写深度） | 先分类：贴图带软 alpha 的留着，其余摘掉 + A/B |
+| 1 | **双面材质收敛** | 全项目 `DoubleSide` 约 **55 处**，集中在 `GalleryRoom`(13) / `CorridorDecorations`(8) / `DoorSection`(6) / `ContactRoom`(4) / `RoomInterior`(4) | 逐个确认哪面永远看不到，改回单面；需 A/B 截图 |
+| 2 | **贴图显存压缩** | 见下方「贴图账本」。门扇一类占约一半；⚠️ 上传数/显存两组数字**待重新对齐**（59/128.3 MB vs 75/158.5 MB） | 压缩后视觉无差 + `texture-inventory.mjs` 显存下降 |
+| 3 | **58 个「其余」透明材质**（新发现） | 其中 **25 个连 `map` 都没有、opacity 还是 1** —— 既没贴图又全不透明，挂 `transparent` 是纯浪费（进排序队列、丢 early-Z、不写深度） | 先分类：贴图带软 alpha 的留着，其余摘掉 + A/B |
 
 ### 透明材质体检（2026-10-08，工具 `harness/material-audit.mjs`）
 
