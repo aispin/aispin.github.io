@@ -20,6 +20,26 @@
 
 ---
 
+# 🙋 本轮待你验收（WO-01 ~ WO-04）
+
+四条 WO 都已实施完并跑过验证（生产构建）。**你说「验收通过」我就删掉这四条 WO**；
+有不满意的地方直接说，我改完再验。
+
+| WO | 一句话 | 验证证据 |
+|---|---|---|
+| WO-01 | 盆栽树冠不再被左右裁平 | 边界墨迹 152/178 → **0/0**；`AB-pottedtree-cut.png` |
+| WO-02 | 瓢虫缩到一半 | 屏幕墨迹 280×235 → **135×133 px**；`AB-ladybird-size.png` |
+| WO-03 | BGM 加载完即播 | 生产构建下 t=**68.3 s** 无手势起播，当时加载器读数 **100%** |
+| WO-04 | gh-pages 部署脚本 | `bash -n` 通过；`--dry-run` 跑通；无 remote 时明确报错 |
+
+生产冒烟：`smoke.mjs`（生产构建，72 s）→ `meshes 697` / `hasCanvas true` /
+`ERRORS (0)` / 只栅格化 2 张位图。697 = 原基线 696 + 新增的瓢虫点击垫片 1。
+
+**⚠️ 还有 2 条 DR 等你拍板**（见下）：**DR-01** 决定 WO-05 怎么写，
+**DR-02** 决定脚本能不能真推出去。
+
+---
+
 # DR · 等你决策
 
 ## DR-01 · GitHub Pages 的发布源用哪个？（阻塞 WO-05）
@@ -50,7 +70,10 @@ Pages 的发布源是**单选**，下面两条路只能留一条：
 ## WO-01 · 走廊盆栽树冠左右被垂直截断
 
 - **需求原文**：「1、树两边似乎被垂直截断」
-- **状态**：✅ 无 DR，直接做
+- **状态**：✅ **已实施，待验收**（无 DR）
+- **实测**：`probe-art-edges.mjs <url> 1.8 2.99` → `inkTouchingBorder` 四边全 0，
+  `inkBBox [22, 28, 574, 958]`（改前 `[0, 18, 598, 958]`，左 152 / 右 178 列墨）。
+  截图 `.workbuddy-ai/art-2026-10-08/AB-pottedtree-cut.png`：左=被裁平，右=全弧线。
 - **定位结论**：说的是**走廊那棵盆栽**（院子那棵柿子树立案了 —— 用
   `harness/probe-art-edges.mjs` 量过，它的墨迹四边边界计数全是 0，没被裁）。
 - **现状**：`makePottedTreeTexture()` 的贴图 600×997，墨迹外接框是 **x 0..598 / 600**，
@@ -68,7 +91,11 @@ Pages 的发布源是**单选**，下面两条路只能留一条：
 ## WO-02 · 瓢虫缩小一半
 
 - **需求原文**：「2、虫子太大了，缩小一半」
-- **状态**：✅ 无 DR，直接做
+- **状态**：✅ **已实施，待验收**（无 DR）
+- **实测**：屏幕上瓢虫墨迹 **280×235 px → 135×133 px**（约一半）。
+  截图 `.workbuddy-ai/art-2026-10-08/AB-ladybird-size.png`。
+  `test-bug-dodge.mjs` 四项断言全过：位移 0.515 / 虫叫振荡器 0→6 /
+  墨点平面 0 / `BUG FIXED!` 0；垫片实测 `{parentIsMesh: true, opacity: 0}`。
 - **现状**：瓢虫平面 `0.74 × 0.74`（上一轮为了让"躲点击"好点中，从 0.4 放大过）。
   墨迹占画布 9.8%..90.2%，屏幕上虫子本体约 0.59 世界单位。
 - **改什么**：`EntranceDoors.jsx` 瓢虫平面 `0.74 → 0.37`。
@@ -83,7 +110,14 @@ Pages 的发布源是**单选**，下面两条路只能留一条：
 ## WO-03 · 背景音乐改为「加载完资源自动播放」
 
 - **需求原文**：「3、目前音乐是推开门播放，是否可改为加载完资源自动开始播放」
-- **状态**：✅ 无 DR，直接做
+- **状态**：✅ **已实施，待验收**（无 DR）
+- **实测**（生产构建，`test-bgm-autoplay.mjs`）：t=**68.3 s** 无任何用户手势起播
+  （`paused=false` / `vol=0.3` / `ready=4`），起播那一刻加载器读数 **100%** ——
+  即「加载完才播」而不是「一挂载就播」。三条断言全 ✅。
+  ⚠️ **自动播放策略的兜底只能人工验**：无头下必须加
+  `--autoplay-policy=no-user-gesture-required` 才测得到代码；真机上首访被拦时
+  的「第一次点击补播」请你手动确认一下（刷新后不碰鼠标，进度走完应无声；
+  点一下页面应立刻响）。
 - **现状**：`playBackgroundMusic()` 只在 `EntranceDoors` 的推门 `handleClick` 里调。
 - **改什么**：
   1. `Preloader` 的退出序列开始时（进度到 100%、纸撕开那一刻）调一次 —— 这就是"加载完"。
@@ -100,13 +134,19 @@ Pages 的发布源是**单选**，下面两条路只能留一条：
 ## WO-04 · gh-pages 构建并推送脚本（本地）
 
 - **需求原文**：「4、撰写构建并推送 gh-pages 分支的脚本以及 workflow 文件。」
-- **状态**：✅ 无 DR，直接做（脚本内容与远端地址无关；**真跑一次要等 DR-02**）
+- **状态**：✅ **脚本已实施，待验收**；workflow 见 WO-05（被 DR-01 阻塞）。
+  **真跑一次要等 DR-02**。
+- **实测**：`bash -n` 通过；无 remote 时明确报错退出（不静默失败）；
+  `--base=/my-site/` 覆盖生效（产物里资源变成 `/my-site/assets/…`）；
+  `site.json` 默认值生效；工作区脏、Project Page 不匹配都会告警。
 - **改什么**：新增 `scripts/deploy-gh-pages.sh`。
   - `npm run build` → 校验 `dist/` → 在**临时目录**里 `git init` + `add` + `commit`
     → `push --force <remote> gh-pages`。**不碰工作区，也不在 `dist/` 里留 `.git`。**
   - 远端默认取 `origin`，可用 `--remote` 覆盖；取不到就**报错退出**（不静默失败）。
-  - 自动判断 `base`：仓库名是 `<owner>.github.io` → `base=/`；
-    否则（Project Page）→ 自动用 `--base=/<repo>/` 重新构建。
+  - 自动判断 `base`：**以 `src/data/site.json` 的 `siteUrl` 路径名为准**
+    （canonical / og:url / sitemap 都用它，是唯一真源），
+    再与远端仓库形状交叉校验、不匹配就告警。**不靠仓库名猜** ——
+    `aispin.github.io` 这种名字既可能是 User Page 也可能是 Project Page。
   - 支持 `--dry-run`（只构建 + 报告，不推送）与 `--message <msg>`。
   - `dist/.nojekyll` 已由 `public/.nojekyll` 带出来，脚本再确认一次。
   - ⚠️ 这是**强推**到 `gh-pages`：该分支是生成物，别在上面手写东西。
@@ -130,5 +170,5 @@ Pages 的发布源是**单选**，下面两条路只能留一条：
 | 版本管理 | git；**还没有 remote**（见 DR-02）；`.workbuddy-ai/` 已排除 |
 | dev server | `npx vite --port 5199 --strictPort --host 127.0.0.1`（⚠️ 必须带 `--host`） |
 | 视觉约束 | 程序化 / canvas / three 生成；零 jpg/png；不用 AI 生图；全站只允许 2 张位图 |
-| 基线 | meshes **696**（`smoke.mjs` 生产构建，**等 ≥65 s**）· 贴图 **59 次 / 64.5 MB**（`texture-inventory.mjs` 走廊态） |
+| 基线 | meshes **697**（`smoke.mjs` 生产构建，**等 ≥65 s**）· 贴图 **59 次 / 64.5 MB**（`texture-inventory.mjs` 走廊态） |
 | 部署 | 目标 Cloudflare Pages（`public/_headers` / `_redirects`）；**发布暂停** |
