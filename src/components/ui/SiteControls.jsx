@@ -30,6 +30,26 @@ export default function SiteControls() {
   const [updateReady, setUpdateReady] = useState(null)
   const [openPanel, setOpenPanel] = useState(null)
 
+  /**
+   * 音乐是不是"开着"。**默认 false** —— 这是有意的。
+   *
+   * 首访时浏览器必然拒绝自动播放（用户还没做过手势），所以站点一进来其实是
+   * **静音**的。图标要如实反映"现在没声音"，而不是反映 `isMuted` 这个偏好位
+   * ——那一位默认 false，画出来是"有声"，与实际不符（用户 2026-10-08 报的）。
+   *
+   * 起播点是**推门**（EntranceDoors）与**面板里取消静音**，两处都会经
+   * audioManager 广播 `musicStateChanged`。
+   */
+  const [musicOn, setMusicOn] = useState(false)
+  useEffect(() => {
+    const onMusicState = (event) => setMusicOn(!!event.detail?.on)
+    window.addEventListener('musicStateChanged', onMusicState)
+    return () => window.removeEventListener('musicStateChanged', onMusicState)
+  }, [])
+
+  // 图标取"没声音"的态：全局静音，或者音乐还没起播
+  const soundOff = isMuted || !musicOn
+
   // PWA 更新感知：main.jsx 在新 SW 安装完成后派发 'sw-update-ready'
   useEffect(() => {
     const onUpdate = (event) => setUpdateReady(event.detail)
@@ -122,16 +142,18 @@ export default function SiteControls() {
           {theme === 'dark' ? '☼' : '☾'}
         </button>
 
-        {/* 4 · Audio settings */}
+        {/* 4 · Audio settings —— 图标按「现在有没有声音」取态（默认静音态），
+               但**行为不变**：点它只打开音频设置面板。用户 2026-10-08 明确要
+               保留这个行为，因为播放/静音的开关就在面板里。 */}
         <button
           type="button"
-          className={`hud-btn ${openPanel === 'audio' ? 'is-open' : ''} ${isMuted ? 'is-muted' : ''}`}
+          className={`hud-btn ${openPanel === 'audio' ? 'is-open' : ''} ${soundOff ? 'is-muted' : ''}`}
           style={dropDelay(3)}
           onClick={() => togglePanel('audio')}
           aria-label={zh ? '音频设置' : 'Audio settings'}
           aria-expanded={openPanel === 'audio'}
         >
-          {isMuted ? (
+          {soundOff ? (
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M11 5L6 9H2v6h4l5 4V5z" />
               <line x1="23" y1="9" x2="17" y2="15" />

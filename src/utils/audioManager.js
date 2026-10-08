@@ -26,6 +26,11 @@ const ensureBgMusicAudio = () => {
     bgMusicAudio.loop = true;
     bgMusicAudio.volume = bgVolume;
     bgMusicAudio.muted = isMuted;
+    // mp3 的 `play()` 是**异步**的，只在调用点广播会让图标停在旧状态，
+    // 所以元素自己也要报信。
+    bgMusicAudio.addEventListener('playing', notifyMusicState);
+    bgMusicAudio.addEventListener('pause', notifyMusicState);
+    bgMusicAudio.addEventListener('ended', notifyMusicState);
     return bgMusicAudio;
 };
 
@@ -45,12 +50,12 @@ export const playBackgroundMusic = () => {
     bgMusicStarted = true;
     // 合成 BGM 源：Web Audio 生成式主题（需在用户手势内首次调用）
     if (bgmSource === 'synth') {
-        if (isMuted) return;
-        startSynthBgm();
+        if (!isMuted) startSynthBgm();
+        notifyMusicState();
         return;
     }
     const el = ensureBgMusicAudio();
-    if (!el) return;
+    if (!el) { notifyMusicState(); return; }
     // ⚠️ 这里**故意不判 `el.paused`**（原本是 `if (el && el.paused)`）。
     //
     // 被自动播放策略拦下的元素，`paused` 在某些浏览器里会停在 false（意思是
@@ -63,12 +68,13 @@ export const playBackgroundMusic = () => {
     if (p && typeof p.catch === 'function') {
         p.catch((err) => {
             // NotAllowedError = 还没等到用户手势。这是**预期内**的，不是故障：
-            // 交给 `autoplayBackgroundMusic` 的一次性手势补播，别刷控制台。
+            // 起播点现在是推门 / 取消静音，两者都自带手势；真被拒也只是没声音。
             if (err && err.name !== 'NotAllowedError') {
                 console.warn('Audio play failed:', err);
             }
         });
     }
+    notifyMusicState();
 };
 
 export const pauseBackgroundMusic = () => {
@@ -108,6 +114,8 @@ export const setMusicVolume = (vol) => {
     }
     // Dispatch event so UI sliders can stay in sync if changed programmatically
     window.dispatchEvent(new CustomEvent('musicVolumeChanged', { detail: v }));
+    // 拖滑杆抬音量会顺带取消静音（见上），所以开关状态也要广播
+    notifyMusicState();
 };
 
 export const getMusicVolume = () => bgVolume;
@@ -180,70 +188,63 @@ export const setBgmSource = (source) => {
  * 结果是「取消静音了却还是没声」：标志翻回来了，音量还停在 0，
  * 而没有任何东西会去恢复它。2026-10-08 用户报的「没音乐了」就是这个。
  */
+let lastSyncedMute = null;
+
 export const syncMuteState = (muted) => {
+    // 上一轮的静音位。`null` = 还没同步过（React 挂载时那次 effect），
+    // **那次不算"用户主动取消静音"** —— 否则加载完又会自动起播，
+    // 正是这次要拿掉的旧行为。
+    const userUnmuted = lastSyncedMute === true && muted === false;
+    lastSyncedMute = muted;
+
     isMuted = muted;
     if (bgMusicAudio) {
         bgMusicAudio.muted = muted;
     }
     if (muted) {
         stopSynthBgm();
+    } else if (userUnmuted) {
+        // 用户在面板里**主动把静音关掉** → 当成一次明确的"我要听"，直接起播。
+        // 必须走 playBackgroundMusic 而不是"续播"：加载即播已经拿掉了，
+        // 所以此时 bgMusicStarted 可能还是 false，续播逻辑会什么都不做
+        // —— 那就变成"开关拨开了却没声音"。
+        playBackgroundMusic();
     } else if (bgMusicStarted) {
-        // 取消静音：合成引擎要重新起（它的 start 需要用户手势，而点开关
-        // 正好就是）；mp3 若被暂停过（切标签页 / 系统打断）也要续上。
+        // 同一个静音位被重复同步（例如拖滑杆也走这条）→ 只做必要的续播：
+        // 合成引擎要重新起（它的 start 需要用户手势，而点开关正好就是）；
+        // mp3 若被暂停过（切标签页 / 系统打断）也要续上。
         if (bgmSource === 'synth') startSynthBgm();
         else if (bgMusicAudio && bgMusicAudio.paused && bgVolume > 0) {
             bgMusicAudio.play().catch(() => { /* 等下一次用户手势 */ });
         }
     }
+    notifyMusicState();
 };
 
 /* ============================================================
- * 加载完成即播（2026-10-08）
+ * 音乐开关状态（给 UI 取态用，2026-10-08）
  * ============================================================ */
 
-/** 现在是不是真的没在响？（不是"用户想不想听"，是"声音出来没有"） */
-const isSilentNow = () => {
-    if (bgmSource === 'synth') {
-        // 用 `audible` 而不是 `playing`：被策略挂起的上下文 `playing` 也是 true。
-        return !(synth && synth.audible);
-    }
-    // ⚠️ 这里**不能只判 `paused`**。被策略拦下的元素，`paused` 在某些浏览器里
-    // 会停在 false，那样 isSilentNow() 会谎报"正在响" → retry() 直接 disarm
-    // → 补播永远不发生（WO-03 验收不通过的原因之一）。
-    // `currentTime` 才是"真有声音出来"的证据：被拦下的元素它一动不动。
-    return !(bgMusicAudio && !bgMusicAudio.paused && bgMusicAudio.currentTime > 0);
+/**
+ * 音乐现在是不是"开着"？
+ *
+ * ⚠️ 这**不是**"真有声音出来"。mp3 的 `play()` 是异步的，拿"真有声音"取态会让
+ * 图标慢半拍；这里判的是"**已起播且没被静音**"——正好是用户理解的"声音开着"。
+ *
+ * 为什么需要它：首访必然被自动播放策略拒绝，所以站点一进来其实是**静音**的，
+ * 右上角那个图标就不该画成"有声"。默认外观 = 静音态，等**推门**
+ * （EntranceDoors 的 handleClick）或**面板里取消静音**之后再变成"有声"。
+ */
+export const isMusicOn = () => {
+    if (isMuted) return false;
+    if (bgmSource === 'synth') return !!(synth && synth.playing);
+    return !!(bgMusicAudio && !bgMusicAudio.paused);
 };
 
-let autoplayRetryArmed = false;
-
-/**
- * 资源加载完成后调用：请求播放 BGM，并为「被自动播放策略拦下」准备好补播。
- * 入口是 `Preloader` 的退出序列（进度到 100%、纸撕开那一刻）。
- *
- * ⚠️ 为什么还需要补播：首访时用户**还没做过任何手势**，Chrome / Safari 会
- * 直接拒掉 `play()`。这不是 bug 而是策略，唯一的出路是等一次真实交互。
- * 所以这里挂一次性手势监听，第一次交互时若「已经请求过播放、但实际没在响」
- * 就补播，响起来即摘掉监听。**不做任何 UI 打扰**（不弹按钮、不弹 toast）。
- *
- * 推门处的 `playBackgroundMusic()` 保留着，它是同一个兜底的手势版本 ——
- * 两者都幂等，重复调不会有第二次声音。
- */
-export const autoplayBackgroundMusic = () => {
+/** 把"音乐开关状态"广播给 UI（`SiteControls` 的图标靠它取态）。 */
+const notifyMusicState = () => {
     if (typeof window === 'undefined') return;
-
-    playBackgroundMusic();   // 被策略拦下时内部已 catch，静默失败
-
-    if (autoplayRetryArmed) return;
-    autoplayRetryArmed = true;
-
-    const events = ['pointerdown', 'keydown', 'touchstart'];
-    const disarm = () => events.forEach((ev) => window.removeEventListener(ev, retry));
-
-    function retry() {
-        if (isMuted || !bgMusicStarted) return;   // 用户明确不要 / 还没请求过
-        if (!isSilentNow()) { disarm(); return; } // 已经在响，收工
-        playBackgroundMusic();
-    }
-
-    events.forEach((ev) => window.addEventListener(ev, retry, { passive: true }));
+    window.dispatchEvent(new CustomEvent('musicStateChanged', {
+        detail: { on: isMusicOn(), muted: isMuted },
+    }));
 };

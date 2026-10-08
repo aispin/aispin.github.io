@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import gsap from 'gsap';
 import { useAudio } from '../../context/AudioManager';
-import { autoplayBackgroundMusic } from '../../utils/audioManager';
 
 /* How long to wait for the loading manager to say *anything* before assuming
  * there is nothing left to load. Only used when no asset ever reported — a
@@ -362,10 +361,15 @@ const Preloader = ({ onComplete, ready }) => {
     }
     play('tear', { volume: 0.8 });
 
-    // 加载完成 —— 背景音乐从这里开始（用户要求：不再等到推门）。
-    // 首访没有用户手势时会被自动播放策略拦下，audioManager 里挂了
-    // 一次性手势补播兜底，见 autoplayBackgroundMusic 的说明。
-    autoplayBackgroundMusic();
+    // 背景音乐**不**在这里起播（2026-10-08 用户改的）。
+    //
+    // 曾经在这里调 autoplayBackgroundMusic()：加载完就请求播放，首访被自动播放
+    // 策略拦下时再挂一次性手势补播。问题是"被拦下"是常态（首访必然被拦），
+    // 于是站点一进来就是"要么没声音、要么说不清什么时候会响"，
+    // 而右上角那个图标又画成"有声"，与实际不符。
+    //
+    // 现在改成完全手势驱动：**推开大门**（EntranceDoors 的 handleClick）
+    // 或**面板里取消静音**才起播。图标默认因此画成静音态。
 
     const tl = gsap.timeline({
       onComplete: () => {
