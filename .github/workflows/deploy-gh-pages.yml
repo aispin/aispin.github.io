@@ -1,0 +1,84 @@
+# 构建并推送 gh-pages 分支（DR-01 选 A：Pages 的发布源就是这个分支）
+#
+# 与本地脚本 scripts/deploy-gh-pages.sh 做的是同一件事，只是跑在 CI 上：
+#   npm ci → npm run build → 把 dist/ 的内容推成 gh-pages 分支
+#
+# ⚠️ 配套设置（在 GitHub 仓库里手动做一次，workflow 改不了它）：
+#   Settings → Pages → Build and deployment → Source = **Deploy from a branch**
+#   Branch = `gh-pages` / `(root)`
+#   如果是 "GitHub Actions" 模式，这个 workflow 推上去的分支不会被发布。
+#
+# ⚠️ 这个分支是**生成物**，别在上面手写东西 —— 每次都是 force push 覆盖。
+#   本仓库同时保留了旧版 artifact 流程的教训：两套并存只会互相覆盖，故已删除 deploy.yml。
+#
+# base 路径：siteUrl = https://aispin.github.io → User Page → 站点在根路径，
+#   所以 Vite 的 base 保持默认 `/` 即正确，这里不需要传任何 --base。
+
+name: Deploy to GitHub Pages (gh-pages branch)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 推分支需要写权限；不需要 pages/id-token（那是 artifact 流程用的）
+permissions:
+  contents: write
+
+concurrency:
+  group: gh-pages-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Sanity-check dist/
+        run: |
+          set -euo pipefail
+          test -f dist/index.html || { echo "::error::dist/index.html 缺失"; exit 1; }
+          test -f dist/me/index.html || { echo "::error::dist/me/index.html 缺失"; exit 1; }
+          test -f dist/404.html || { echo "::error::dist/404.html 缺失（emit404Fallback 没生效？）"; exit 1; }
+          # .nojekyll：不加的话 GitHub Pages 的 Jekyll 会吃掉下划线开头的目录
+          touch dist/.nojekyll
+          # 守卫：仓库约定零 jpg/png（只允许 2 张 webp）。漏进来就报错，别悄悄上线。
+          if find dist -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \) | grep -q .; then
+            echo "::error::dist/ 里出现了 jpg/png，违反仓库视觉约定"
+            find dist -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \) | head -20
+            exit 1
+          fi
+          du -sh dist
+
+      - name: Push dist/ to gh-pages
+        run: |
+          set -euo pipefail
+          cd dist
+          # 在 dist 里建一个**临时**仓库：不碰工作区，推完这个 .git 就随 runner 一起消失
+          git init -q
+          # 用 symbolic-ref 而不是 `git init -b`：后者要 git >= 2.28，这样更保险
+          git symbolic-ref HEAD refs/heads/gh-pages
+          git add -A
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -q -m "deploy: ${GITHUB_SHA::7} ($(date -u +%Y-%m-%dT%H:%M:%SZ))"
+          git push --force \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            HEAD:refs/heads/gh-pages
+          echo "已推送 gh-pages：${GITHUB_SHA}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

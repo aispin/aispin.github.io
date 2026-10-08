@@ -685,6 +685,10 @@ export function createBgm() {
       setTimeout(() => { try { ctx && ctx.close(); } catch (e) {} ctx = null; }, 80);
     },
     get playing() { return playing; },
+    /* `playing` 只表示"**已请求**播放"。被自动播放策略挂起的 AudioContext
+       （`state === 'suspended'`）一个采样都出不来 —— 判断"真的在响"必须用这个，
+       否则 isSilentNow() 会谎报"正在响"，手势补播就被 disarm 掉了。 */
+    get audible() { return playing && !!ctx && ctx.state === 'running'; },
     get theme() { return theme; }
   };
 }

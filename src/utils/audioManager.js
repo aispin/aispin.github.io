@@ -50,10 +50,23 @@ export const playBackgroundMusic = () => {
         return;
     }
     const el = ensureBgMusicAudio();
-    if (el && el.paused) {
-        // Only play if not muted and it's currently paused
-        el.play().catch((err) => {
-            console.warn('Audio play failed/blocked by browser:', err);
+    if (!el) return;
+    // ⚠️ 这里**故意不判 `el.paused`**（原本是 `if (el && el.paused)`）。
+    //
+    // 被自动播放策略拦下的元素，`paused` 在某些浏览器里会停在 false（意思是
+    // "已请求播放"），拿它当守卫的话，手势补播调到这里就被挡回去 ——
+    // **补播永远进不来**，正是 WO-03 验收不通过的那条路。
+    //
+    // 对已经在播的元素再调一次 play() 是无害的：立刻 resolve，不会叠第二路声音。
+    // （`pauseBackgroundMusic` 全仓库无人调用，所以不存在"用户主动暂停后不该自动续播"的顾虑。）
+    const p = el.play();
+    if (p && typeof p.catch === 'function') {
+        p.catch((err) => {
+            // NotAllowedError = 还没等到用户手势。这是**预期内**的，不是故障：
+            // 交给 `autoplayBackgroundMusic` 的一次性手势补播，别刷控制台。
+            if (err && err.name !== 'NotAllowedError') {
+                console.warn('Audio play failed:', err);
+            }
         });
     }
 };
@@ -122,7 +135,13 @@ const getSynth = () => {
 
 const startSynthBgm = () => {
     const s = getSynth();
-    if (s.playing) return;
+    if (s.playing) {
+        // 已经在跑，但 AudioContext 可能还挂在 `suspended`（自动播放被策略拦下时
+        // 就是这种状态：`playing` 已经是 true，却一个采样都出不来）。
+        // 补播路径必须能把上下文唤醒 —— 否则 `if (s.playing) return` 会让补播变成空操作。
+        if (!s.audible) s.unlock();
+        return;
+    }
     s.start({
         kind: 'theme',
         id: 'cheerful',
@@ -183,10 +202,17 @@ export const syncMuteState = (muted) => {
  * ============================================================ */
 
 /** 现在是不是真的没在响？（不是"用户想不想听"，是"声音出来没有"） */
-const isSilentNow = () =>
-    bgmSource === 'synth'
-        ? !(synth && synth.playing)
-        : !(bgMusicAudio && !bgMusicAudio.paused);
+const isSilentNow = () => {
+    if (bgmSource === 'synth') {
+        // 用 `audible` 而不是 `playing`：被策略挂起的上下文 `playing` 也是 true。
+        return !(synth && synth.audible);
+    }
+    // ⚠️ 这里**不能只判 `paused`**。被策略拦下的元素，`paused` 在某些浏览器里
+    // 会停在 false，那样 isSilentNow() 会谎报"正在响" → retry() 直接 disarm
+    // → 补播永远不发生（WO-03 验收不通过的原因之一）。
+    // `currentTime` 才是"真有声音出来"的证据：被拦下的元素它一动不动。
+    return !(bgMusicAudio && !bgMusicAudio.paused && bgMusicAudio.currentTime > 0);
+};
 
 let autoplayRetryArmed = false;
 
