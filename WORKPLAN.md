@@ -92,8 +92,9 @@ mount→cleanup→mount（只在「线是我们摘的」时才重接）。
 摘掉 `transparent` + `depthWrite: false`，让 `alphaTest` 自己 discard。
 
 ⚠️ **中途有一次真回归，已还原**：一开始连 `alphaTest={0.01}` 的树冠也摘了，
-A/B 出 **43.46%** 像素大改（树冠从半透明糊成实心、压在砖墙上）。那三个点
-（`treeTexture` / `bugTexture` / `speechBubbleTexture`）已还原。
+A/B 出 **43.46%** 像素大改（树冠从半透明糊成实心、压在砖墙上）。那 **4 个**低阈值点位
+（`treeTexture` / `bugTexture` / `speechBubbleTexture` / `inkSplashTexture`）
+全部保持 `transparent` 不动 —— **低 alphaTest 是作者保留软边的手段**，不能当抠图处理。
 
 **最终判据比「阈值 ≥ 0.5」更准，是量出来的**：看贴图 alpha 直方图是不是**双峰**。
 用临时预览页量了三个 `alphaTest={0.1}` 的点位，中间 alpha 像素只占 **0.18%~0.59%**，
