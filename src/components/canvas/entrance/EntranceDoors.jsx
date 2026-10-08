@@ -1170,24 +1170,48 @@ const EntranceDoors = ({
 
             {/* ANIMATED BUG (Right Side - Above Window) */}
             {/* Clicking it no longer splashes ink — it dodges (see
-                handleBugDodge) and chirps. The mesh that takes the pointer is
-                a plane a bit LARGER than the bug, so going for it and missing
-                by a few pixels still counts: the point is that it gets away,
-                not that you hit a 0.4-unit target dead centre. */}
+                handleBugDodge) and chirps.
+
+                Size: the visible plane is 0.37. It had been enlarged to 0.74
+                when the click interaction was added (a bigger target), which
+                read on screen as a beetle the size of the door handle — the
+                user asked for it halved. The *target* is not halved with it:
+                the invisible child below is what takes the pointer. */}
             <mesh
                 ref={bugRef}
                 position={[2.5, floorY + 2.8, 0.16]}
-                onPointerDown={handleBugDodge}
-                onPointerEnter={() => { setGuitarCursor('pointer'); }}
-                onPointerLeave={() => { setGuitarCursor('auto'); }}
             >
-                <primitive object={sharedGeometry('plane', 0.74, 0.74)} attach="geometry" />
+                <primitive object={sharedGeometry('plane', 0.37, 0.37)} attach="geometry" />
                 <meshBasicMaterial color="#e0e0e0"
                     map={bugTexture}
                     transparent={true}
                     alphaTest={0.01}
                     depthWrite={false}
                 />
+                {/* Hit pad — child of the bug, so it inherits the idle wander and
+                    the dodge without any extra plumbing.
+                    Halving the visible bug must not halve the target: "go for it
+                    and it gets away" stops being a game if the target is 40 px.
+                    0.46 gives ~10 px of slack around the drawn bug — generous
+                    enough to land a swipe, tight enough that the bug does not
+                    dodge clicks you aimed somewhere else.
+                    opacity 0 + alphaTest 0.01: three bakes `opacity` into
+                    diffuseColor.a *before* the alpha test, so every fragment is
+                    discarded. It draws nothing and only ever raycasts. */}
+                <mesh
+                    position={[0, 0, 0.001]}
+                    onPointerDown={handleBugDodge}
+                    onPointerEnter={() => { setGuitarCursor('pointer'); }}
+                    onPointerLeave={() => { setGuitarCursor('auto'); }}
+                >
+                    <primitive object={sharedGeometry('plane', 0.46, 0.46)} attach="geometry" />
+                    <meshBasicMaterial color="#ffffff"
+                        transparent={true}
+                        opacity={0}
+                        alphaTest={0.01}
+                        depthWrite={false}
+                    />
+                </mesh>
             </mesh>
 
 

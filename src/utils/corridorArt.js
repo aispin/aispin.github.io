@@ -1231,20 +1231,35 @@ export function makePottedTreeTexture() {
 
     // ---- canopy blobs (declared first: trunk, contour and leaves all use them)
     //
-    // ⚠️ These must overlap GENEROUSLY. The contour is made by stroking every
-    // blob fat (16 px) and then filling them on top, so a blob only loses its
-    // internal outline where a neighbour's FILL covers it. Give them any real
-    // rotation and the overlap drops below the 8 px half-stroke, every blob
-    // keeps its own ring, and the canopy turns into a bunch of grapes.
+    // ⚠️ Two rules, and breaking either one is visible on screen:
+    //
+    // 1. These must overlap GENEROUSLY. The contour is made by stroking every
+    //    blob fat (16 px) and then filling them on top, so a blob only loses its
+    //    internal outline where a neighbour's FILL covers it. Give them any real
+    //    rotation and the overlap drops below the 8 px half-stroke, every blob
+    //    keeps its own ring, and the canopy turns into a bunch of grapes.
+    //
+    // 2. The UNION must fit inside the canvas. This is the one that bit us
+    //    (2026-10-08): the first cut of this redraw reached
+    //        x −6 .. 612  →  +8 px stroke  →  −14 .. 620
+    //    in a 600 px canvas, so the canopy was sliced off flat down both sides —
+    //    the user reported it as 树两边似乎被垂直截断. `harness/probe-art-edges.mjs`
+    //    now measures this directly (ink columns on each border; it read 152 left
+    //    and 178 right). Check it after any change here.
+    //
+    // Current extremes (W=600, H=997), blobs only, before the stroke:
+    //        x  30 .. 567      →  +8 px stroke →  22 .. 575   (margins 22 / 25)
+    //        y  34.9 .. 503.5  →  +8 px stroke →  26.9 .. 511.5 (margins 26.9 / 485)
+    //    so every blob is comfortably inside. Verify, do not assume.
     const blobs = [
-        [cx, H * 0.19, W * 0.40, H * 0.165, 0],
-        [cx - W * 0.24, H * 0.29, W * 0.27, H * 0.125, 0],
-        [cx + W * 0.24, H * 0.27, W * 0.28, H * 0.135, 0],
-        [cx - W * 0.15, H * 0.13, W * 0.23, H * 0.105, 0],
-        [cx + W * 0.17, H * 0.125, W * 0.21, H * 0.095, 0],
-        [cx, H * 0.37, W * 0.31, H * 0.115, 0],
-        [cx - W * 0.30, H * 0.41, W * 0.19, H * 0.095, 0],
-        [cx + W * 0.30, H * 0.40, W * 0.19, H * 0.095, 0],
+        [cx, H * 0.200, W * 0.350, H * 0.165, 0],   // crown
+        [cx - W * 0.210, H * 0.295, W * 0.240, H * 0.125, 0],   // left shoulder
+        [cx + W * 0.210, H * 0.275, W * 0.235, H * 0.135, 0],   // right shoulder
+        [cx - W * 0.130, H * 0.150, W * 0.200, H * 0.105, 0],   // upper left
+        [cx + W * 0.150, H * 0.145, W * 0.185, H * 0.095, 0],   // upper right
+        [cx, H * 0.375, W * 0.270, H * 0.115, 0],   // belly
+        [cx - W * 0.260, H * 0.410, W * 0.170, H * 0.095, 0],   // lower left
+        [cx + W * 0.260, H * 0.400, W * 0.170, H * 0.095, 0],   // lower right
     ];
     const blobPath = (c, [bx, by, bw, bh, rot = 0]) => {
         c.beginPath();

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import gsap from 'gsap';
 import { useAudio } from '../../context/AudioManager';
+import { autoplayBackgroundMusic } from '../../utils/audioManager';
 
 /* How long to wait for the loading manager to say *anything* before assuming
  * there is nothing left to load. Only used when no asset ever reported — a
@@ -360,6 +361,11 @@ const Preloader = ({ onComplete, ready }) => {
       pencilSoundRef.current = null;
     }
     play('tear', { volume: 0.8 });
+
+    // 加载完成 —— 背景音乐从这里开始（用户要求：不再等到推门）。
+    // 首访没有用户手势时会被自动播放策略拦下，audioManager 里挂了
+    // 一次性手势补播兜底，见 autoplayBackgroundMusic 的说明。
+    autoplayBackgroundMusic();
 
     const tl = gsap.timeline({
       onComplete: () => {

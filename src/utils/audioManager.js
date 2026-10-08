@@ -177,3 +177,47 @@ export const syncMuteState = (muted) => {
         }
     }
 };
+
+/* ============================================================
+ * 加载完成即播（2026-10-08）
+ * ============================================================ */
+
+/** 现在是不是真的没在响？（不是"用户想不想听"，是"声音出来没有"） */
+const isSilentNow = () =>
+    bgmSource === 'synth'
+        ? !(synth && synth.playing)
+        : !(bgMusicAudio && !bgMusicAudio.paused);
+
+let autoplayRetryArmed = false;
+
+/**
+ * 资源加载完成后调用：请求播放 BGM，并为「被自动播放策略拦下」准备好补播。
+ * 入口是 `Preloader` 的退出序列（进度到 100%、纸撕开那一刻）。
+ *
+ * ⚠️ 为什么还需要补播：首访时用户**还没做过任何手势**，Chrome / Safari 会
+ * 直接拒掉 `play()`。这不是 bug 而是策略，唯一的出路是等一次真实交互。
+ * 所以这里挂一次性手势监听，第一次交互时若「已经请求过播放、但实际没在响」
+ * 就补播，响起来即摘掉监听。**不做任何 UI 打扰**（不弹按钮、不弹 toast）。
+ *
+ * 推门处的 `playBackgroundMusic()` 保留着，它是同一个兜底的手势版本 ——
+ * 两者都幂等，重复调不会有第二次声音。
+ */
+export const autoplayBackgroundMusic = () => {
+    if (typeof window === 'undefined') return;
+
+    playBackgroundMusic();   // 被策略拦下时内部已 catch，静默失败
+
+    if (autoplayRetryArmed) return;
+    autoplayRetryArmed = true;
+
+    const events = ['pointerdown', 'keydown', 'touchstart'];
+    const disarm = () => events.forEach((ev) => window.removeEventListener(ev, retry));
+
+    function retry() {
+        if (isMuted || !bgMusicStarted) return;   // 用户明确不要 / 还没请求过
+        if (!isSilentNow()) { disarm(); return; } // 已经在响，收工
+        playBackgroundMusic();
+    }
+
+    events.forEach((ev) => window.addEventListener(ev, retry, { passive: true }));
+};
