@@ -14,7 +14,7 @@ const SITE_BASE = 'https://aispin.github.io';
 const ROOM_META = {
     null: {
         path: '/',
-        title: 'AISPIN · 温馨的 3D 个人主页',
+        title: 'ZEO · 黄泽昊 · WEB3D HOUSE',
         description: '一个可以走进去的个人主页：8 个 3D 房间，装着档案、摄影、项目、文章、视频、音乐与 AI 技能。',
     },
     about: {
