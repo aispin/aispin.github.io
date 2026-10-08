@@ -104,7 +104,7 @@ const DoorOrnaments = ({ god, leafX }) => {
             {/* 倒福 — lower panel. The 福 is drawn rotated 180° on the sheet. */}
             <mesh position={[leafX, FU_Y, ORNAMENT_Z]} renderOrder={5}>
                 <primitive object={sharedGeometry('plane', FU_SIZE, FU_SIZE)} attach="geometry" />
-                <meshBasicMaterial map={fuTexture} toneMapped={false} transparent alphaTest={0.5} />
+                <meshBasicMaterial map={fuTexture} toneMapped={false} alphaTest={0.5} />
             </mesh>
         </>
     );
@@ -899,10 +899,8 @@ const EntranceDoors = ({
                 <primitive object={sharedGeometry('plane', frameWidth, frameHeight)} attach="geometry" />
                 <meshBasicMaterial color="#e0e0e0"
                     map={frameTexture}
-                    transparent={true}
                     alphaTest={0.1}
                     roughness={0.9}
-                    depthWrite={false}
                 />
             </mesh>
 
@@ -937,10 +935,8 @@ const EntranceDoors = ({
                     <revealMaterial color="#e0e0e0"
                         ref={leftDoorMaterialRef}
                         map={doorLeftTexture}
-                        transparent={true}
                         alphaTest={0.5}
                         roughness={0.8}
-                        depthWrite={false}
                         uProgress={isMobileDevice ? 0.0 : 1.0}
                     />
                 </mesh>
@@ -964,9 +960,7 @@ const EntranceDoors = ({
                             <primitive object={sharedGeometry('plane', doorWidth, doorHeight)} attach="geometry" />
                             <meshBasicMaterial color="#e0e0e0"
                                 map={handleLeftPaintedTexture}
-                                transparent={true}
                                 alphaTest={0.5}
-                                depthWrite={false}
                             />
                         </mesh>
                     )}
@@ -976,9 +970,7 @@ const EntranceDoors = ({
                         <revealMaterial color="#e0e0e0"
                             ref={leftHandleMaterialRef}
                             map={handleLeftTexture}
-                            transparent={true}
                             alphaTest={0.5}
-                            depthWrite={false}
                             uProgress={isMobileDevice ? 0.0 : 1.0}
                         />
                     </mesh>
@@ -1019,10 +1011,8 @@ const EntranceDoors = ({
                     <revealMaterial color="#e0e0e0"
                         ref={rightDoorMaterialRef}
                         map={doorRightTexture}
-                        transparent={true}
                         alphaTest={0.5}
                         roughness={0.8}
-                        depthWrite={false}
                         uProgress={isMobileDevice ? 0.0 : 1.0}
                     />
                 </mesh>
@@ -1045,9 +1035,7 @@ const EntranceDoors = ({
                             <primitive object={sharedGeometry('plane', doorWidth, doorHeight)} attach="geometry" />
                             <meshBasicMaterial color="#e0e0e0"
                                 map={handleRightPaintedTexture}
-                                transparent={true}
                                 alphaTest={0.5}
-                                depthWrite={false}
                             />
                         </mesh>
                     )}
@@ -1057,9 +1045,7 @@ const EntranceDoors = ({
                         <revealMaterial color="#e0e0e0"
                             ref={rightHandleMaterialRef}
                             map={handleRightTexture}
-                            transparent={true}
                             alphaTest={0.5}
-                            depthWrite={false}
                             uProgress={isMobileDevice ? 0.0 : 1.0}
                         />
                     </mesh>

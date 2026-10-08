@@ -175,9 +175,7 @@ const SketchElement = ({
                 <primitive object={sharedGeometry('plane', dimensions.width, dimensions.height)} attach="geometry" />
                 <meshBasicMaterial color="#e0e0e0"
                     map={texture}
-                    transparent={true}
                     side={THREE.DoubleSide}
-                    depthWrite={false}
                     alphaTest={0.5}
                 />
             </mesh>

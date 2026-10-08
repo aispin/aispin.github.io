@@ -195,10 +195,8 @@ const SegmentDoors = ({
                 <primitive object={sharedGeometry('plane', frameWidth, frameHeight)} attach="geometry" />
                 <meshBasicMaterial color="#e0e0e0"
                     map={frameTexture}
-                    transparent={true}
                     alphaTest={0.1}
                     roughness={0.9}
-                    depthWrite={false}
                 />
             </mesh>
 
@@ -237,9 +235,7 @@ const SegmentDoors = ({
                         <primitive object={sharedGeometry('plane', doorWidth, doorHeight)} attach="geometry" />
                         <meshBasicMaterial color="#e0e0e0"
                             map={handleLeftTexture}
-                            transparent={true}
                             alphaTest={0.5}
-                            depthWrite={false}
                         />
                     </mesh>
                 </group>
@@ -279,9 +275,7 @@ const SegmentDoors = ({
                         <primitive object={sharedGeometry('plane', doorWidth, doorHeight)} attach="geometry" />
                         <meshBasicMaterial color="#e0e0e0"
                             map={handleRightTexture}
-                            transparent={true}
                             alphaTest={0.5}
-                            depthWrite={false}
                         />
                     </mesh>
                 </group>

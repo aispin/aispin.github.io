@@ -1371,9 +1371,7 @@ const DoorSection = ({
                                 <primitive object={sharedGeometry('plane', doorWidth, doorHeight)} attach="geometry" />
                                 <meshBasicMaterial color="#e0e0e0"
                                     map={handlePaintedTexture}
-                                    transparent={true}
                                     alphaTest={0.5}
-                                    depthWrite={false}
                                 />
                             </mesh>
                             {/* Sketch handle overlay (front) */}
@@ -1382,9 +1380,7 @@ const DoorSection = ({
                                 <revealMaterial color="#e0e0e0"
                                     ref={handleMaterialRef}
                                     map={handleTexture}
-                                    transparent={true}
                                     alphaTest={0.1}
-                                    depthWrite={false}
                                     uProgress={0.0}
                                 />
                             </mesh>
