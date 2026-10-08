@@ -8,6 +8,17 @@
 #   Branch = `gh-pages` / `(root)`
 #   如果是 "GitHub Actions" 模式，这个 workflow 推上去的分支不会被发布。
 #
+#   这一步也能用命令行做（不用点网页，但要 gh 已登录且有 admin 权限；
+#   CI 里的 GITHUB_TOKEN 权限不够，所以**只能本地做一次**）：
+#     gh api -X PUT repos/<owner>/<repo>/pages \
+#       -f build_type=legacy -f 'source[branch]=gh-pages' -f 'source[path]=/'
+#   （`build_type=legacy` 就是 UI 上的 "Deploy from a branch"；成功返回 204。）
+#   本地脚本 `scripts/deploy-gh-pages.sh --configure-pages` 会替你做这一步，
+#   并且每次部署前都会只读地检查发布源指对了没有 —— 指错了推上去是**静默不生效**的。
+#
+#   ⚠️ 方括号必须加引号：zsh 下 `source[branch]=x` 会被当 glob 报
+#      "no matches found"，bash 下也可能被字符类匹配到别的文件名。
+#
 # ⚠️ 这个分支是**生成物**，别在上面手写东西 —— 每次都是 force push 覆盖。
 #   本仓库同时保留了旧版 artifact 流程的教训：两套并存只会互相覆盖，故已删除 deploy.yml。
 #

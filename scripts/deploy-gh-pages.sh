@@ -12,13 +12,20 @@
 #
 # 用法：
 #   scripts/deploy-gh-pages.sh [--dry-run] [--remote <name|url>] [--base <path>]
-#                              [--message <msg>] [--keep-temp]
+#                              [--message <msg>] [--keep-temp] [--configure-pages]
 #
-#   --dry-run      只构建 + 校验 + 报告，不推送
-#   --remote       git remote 名或完整 URL（默认 origin）
-#   --base         覆盖 Vite base（默认取 site.json 的 siteUrl 路径，见下）
-#   --message      覆盖提交信息
-#   --keep-temp    保留临时目录（排障用）
+#   --dry-run           只构建 + 校验 + 报告，不推送
+#   --remote            git remote 名或完整 URL（默认 origin）
+#   --base              覆盖 Vite base（默认取 site.json 的 siteUrl 路径，见下）
+#   --message           覆盖提交信息
+#   --keep-temp         保留临时目录（排障用）
+#   --configure-pages   推送后顺便把 Pages 发布源改成 gh-pages / (root)。
+#                       这一步不是 git 操作，是改**仓库设置**，所以需要 gh 已登录。
+#
+# ⚠️ 光把 dist 推上 gh-pages 是不够的：Pages 的发布源（Source）必须也指向它。
+#    发布源是**单选**的，指错了分支，推上去的内容永远不会被发布 ——
+#    而且没有任何报错，站点只是静静地停在旧版本上。所以本脚本每次都会
+#    只读地查一下发布源，不对就提醒（用 --configure-pages 可以直接改）。
 #
 # base 取自**站点的规范地址** —— `src/data/site.json` 的 `siteUrl` 的路径部分
 # （不靠猜远端仓库名，那不可靠）。判断错了页面会整站 404（资源路径全错），
@@ -31,11 +38,47 @@ BASE_OVERRIDE=""
 MESSAGE=""
 DRY_RUN=0
 KEEP_TEMP=0
+CONFIGURE_PAGES=0
+PAGES_BRANCH="gh-pages"
 
 die() { printf '\033[31m✖ %s\033[0m\n' "$*" >&2; exit 1; }
 info() { printf '\033[36m• %s\033[0m\n' "$*"; }
 ok() { printf '\033[32m✔ %s\033[0m\n' "$*"; }
 warn() { printf '\033[33m⚠ %s\033[0m\n' "$*"; }
+
+# ------------------------------------------------------ GitHub Pages 源：小工具
+# Pages 的发布源是**仓库设置**，不是 git 里的东西，所以只能走 REST API。
+# gh 没有 `gh pages` 这种子命令，但 `gh api` 可以直接打：
+#   读：GET  /repos/{owner}/{repo}/pages
+#   改：PUT  /repos/{owner}/{repo}/pages   （204 No Content = 成功）
+#   建：POST /repos/{owner}/{repo}/pages   （仓库从没开过 Pages 时用这个）
+# 请求体里 `build_type=legacy` 就是 UI 上的 "Deploy from a branch"。
+#
+# ⚠️ `-f 'source[branch]=…'` 的方括号**必须加引号**：在 zsh 下
+# `source[branch]=gh-pages` 会被当 glob 展开（zsh: no matches found），
+# 在 bash 下也可能被字符类匹配到别的文件名。
+# ⚠️ 这一整套需要 admin 权限，`GITHUB_TOKEN`（CI 里那个）做不到 ——
+# 所以它只放在本地脚本里，不放进 workflow。
+gh_ready() {
+  command -v gh >/dev/null 2>&1 || return 1
+  gh auth status >/dev/null 2>&1 || return 1
+  return 0
+}
+
+# 读当前发布源分支；读不到（404 = 没开 Pages / 没权限）就输出空串。
+pages_source_branch() {
+  gh api "repos/${OWNER}/${REPO}/pages" --jq '.source.branch' 2>/dev/null || true
+}
+
+# 把发布源设成 <branch> / (root)。已开 Pages 用 PUT，没开用 POST。
+pages_set_source() {
+  local body=(-f build_type=legacy -f "source[branch]=$1" -f 'source[path]=/')
+  if [ -n "$(pages_source_branch)" ]; then
+    gh api -X PUT "repos/${OWNER}/${REPO}/pages" "${body[@]}" >/dev/null
+  else
+    gh api -X POST "repos/${OWNER}/${REPO}/pages" "${body[@]}" >/dev/null
+  fi
+}
 
 # 支持 `--opt=value` 写法：先拆成 `--opt value` 两段，主循环只认后者。
 _ARGS=()
@@ -51,10 +94,11 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY_RUN=1 ;;
     --keep-temp) KEEP_TEMP=1 ;;
+    --configure-pages) CONFIGURE_PAGES=1 ;;
     --remote) shift; [ $# -gt 0 ] || die "--remote 需要一个值"; REMOTE="$1" ;;
     --base) shift; [ $# -gt 0 ] || die "--base 需要一个值"; BASE_OVERRIDE="$1" ;;
     --message) shift; [ $# -gt 0 ] || die "--message 需要一个值"; MESSAGE="$1" ;;
-    -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
     *) die "未知参数：$1（-h 看用法）" ;;
   esac
   shift
@@ -107,6 +151,16 @@ OWNER="$(printf '%s' "$SLUG" | awk -F/ '{print $(NF-1)}')"
 REPO="$(printf '%s' "$SLUG" | awk -F/ '{print $NF}')"
 
 CANON_PATH="$(node -e 'try{const s=require("./src/data/site.json");process.stdout.write(new URL(s.siteUrl).pathname)}catch(e){process.stdout.write("")}' 2>/dev/null || true)"
+
+# 远端是不是 github.com —— 决定后面要不要查/改 Pages 源。
+IS_GITHUB=0
+printf '%s' "$REMOTE_URL" | grep -qE '(^|@|//)github\.com[:/]' && IS_GITHUB=1
+
+# --configure-pages 的前置条件在这里就查掉 —— 别等构建 + 推送跑完才失败。
+if [ "$CONFIGURE_PAGES" = "1" ]; then
+  [ "$IS_GITHUB" = "1" ] || die "--configure-pages 只对 github.com 的远端有效（当前：${REMOTE_URL}）"
+  gh_ready || die "--configure-pages 需要可用的 gh，且已登录（gh auth status 失败）"
+fi
 
 if [ -n "$BASE_OVERRIDE" ]; then
   BASE="$BASE_OVERRIDE"
@@ -170,11 +224,33 @@ fi
 SIZE="$(du -sh dist | cut -f1)"
 ok "构建完成：dist ${SIZE}，$(find dist -type f | wc -l | tr -d ' ') 个文件"
 
+# ------------------------------------------------- 5.5 Pages 发布源（只读检查）
+# 推上去 ≠ 发布出去。发布源指错分支时 GitHub 不报错，站点只是停在旧版本 ——
+# 这种"静默不生效"最容易让人以为是构建坏了，所以这里主动查一次。
+if [ "$IS_GITHUB" = "1" ]; then
+  if gh_ready; then
+    CUR_PAGES="$(pages_source_branch)"
+    if [ -z "$CUR_PAGES" ]; then
+      warn "读不到 ${OWNER}/${REPO} 的 Pages 配置（可能还没启用 Pages，或当前账号无权限）。"
+      warn "  启用：gh api -X POST repos/${OWNER}/${REPO}/pages -f build_type=legacy -f 'source[branch]=${PAGES_BRANCH}' -f 'source[path]=/'"
+    elif [ "$CUR_PAGES" != "$PAGES_BRANCH" ]; then
+      warn "Pages 发布源现在是 **${CUR_PAGES}**，不是 ${PAGES_BRANCH} —— 推上去不会发布。"
+      warn "  改它：scripts/deploy-gh-pages.sh --configure-pages"
+      warn "  等价于：gh api -X PUT repos/${OWNER}/${REPO}/pages -f build_type=legacy -f 'source[branch]=${PAGES_BRANCH}' -f 'source[path]=/'"
+    else
+      ok "Pages 发布源 = ${CUR_PAGES} / (root)"
+    fi
+  else
+    info "（跳过 Pages 源检查：gh 不可用或未登录）"
+  fi
+fi
+
 if [ "$DRY_RUN" = "1" ]; then
   echo
   ok "--dry-run：到此为止。真要推送就去掉 --dry-run。"
   info "将要执行：把 dist/ 的内容强推到 $REMOTE_URL 的 gh-pages 分支"
   info "提交信息：$MESSAGE"
+  [ "$CONFIGURE_PAGES" = "1" ] && info "并会把 Pages 发布源设为 ${PAGES_BRANCH} / (root)"
   exit 0
 fi
 
@@ -201,7 +277,27 @@ ok "已在临时仓库里提交（$(git rev-parse --short HEAD)）"
 
 info "推送到 gh-pages …"
 git push --force "$REMOTE_URL" "HEAD:refs/heads/gh-pages"
+cd "$ROOT"
 
 echo
 ok "部署完成：$REMOTE_URL 的 gh-pages 分支"
-echo "  如果 GitHub Pages 还没打开：Settings → Pages → Source = Deploy from a branch → gh-pages / (root)"
+
+# ------------------------------------------------- 7. 顺带把发布源指过来
+if [ "$CONFIGURE_PAGES" = "1" ]; then
+  # 前置条件已在开头查过（github 远端 + gh 可用）。
+  # 顺序不能反：gh-pages 分支必须先存在，否则 GitHub 会拒绝这次设置。
+  # 所以这里是"推完再改源"，而不是"改完源再推"。
+  info "设置 Pages 发布源为 ${PAGES_BRANCH} / (root) …"
+  pages_set_source "$PAGES_BRANCH"
+  ok "Pages 发布源 = $(pages_source_branch) / (root)"
+elif [ "$IS_GITHUB" = "1" ] && gh_ready; then
+  CUR="$(pages_source_branch)"
+  if [ -n "$CUR" ] && [ "$CUR" != "$PAGES_BRANCH" ]; then
+    echo
+    warn "发布源还指着 ${CUR} —— 站点不会更新（GitHub 不会报错）。"
+    warn "  改：scripts/deploy-gh-pages.sh --configure-pages"
+  fi
+fi
+
+echo
+echo "  发布源没对就：Settings → Pages → Source = Deploy from a branch → ${PAGES_BRANCH} / (root)"
