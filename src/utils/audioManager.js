@@ -65,16 +65,7 @@ export const pauseBackgroundMusic = () => {
 };
 
 export const toggleMute = () => {
-    isMuted = !isMuted;
-    if (bgMusicAudio) {
-        bgMusicAudio.muted = isMuted;
-    }
-    // 合成 BGM 同步：静音淡出 / 取消静音且已请求播放则重新开始
-    if (isMuted) {
-        stopSynthBgm();
-    } else if (bgMusicStarted && bgmSource === 'synth') {
-        startSynthBgm();
-    }
+    syncMuteState(!isMuted);
     return isMuted;
 };
 
@@ -160,7 +151,16 @@ export const setBgmSource = (source) => {
     return bgmSource;
 };
 
-/** Keep module-level mute in sync with the React context (called on every mute change) */
+/**
+ * 把 React 层的静音状态推到模块层（每次 isMuted 变化都调）。
+ *
+ * ⚠️ 这里**只**管 muted 标志，**绝不动 bgVolume**。
+ *
+ * 「静音」是标志位，「音量」归用户 —— 这两件事必须分开。曾经有代码用
+ * 「把音量调成 0」来表达静音（AchievementPopup 的 setMusicVolume(0)），
+ * 结果是「取消静音了却还是没声」：标志翻回来了，音量还停在 0，
+ * 而没有任何东西会去恢复它。2026-10-08 用户报的「没音乐了」就是这个。
+ */
 export const syncMuteState = (muted) => {
     isMuted = muted;
     if (bgMusicAudio) {
@@ -168,7 +168,12 @@ export const syncMuteState = (muted) => {
     }
     if (muted) {
         stopSynthBgm();
-    } else if (bgMusicStarted && bgmSource === 'synth') {
-        startSynthBgm();
+    } else if (bgMusicStarted) {
+        // 取消静音：合成引擎要重新起（它的 start 需要用户手势，而点开关
+        // 正好就是）；mp3 若被暂停过（切标签页 / 系统打断）也要续上。
+        if (bgmSource === 'synth') startSynthBgm();
+        else if (bgMusicAudio && bgMusicAudio.paused && bgVolume > 0) {
+            bgMusicAudio.play().catch(() => { /* 等下一次用户手势 */ });
+        }
     }
 };

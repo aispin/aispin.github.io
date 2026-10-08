@@ -125,7 +125,7 @@ export default function SiteControls() {
         {/* 4 · Audio settings */}
         <button
           type="button"
-          className={`hud-btn ${openPanel === 'audio' ? 'is-open' : ''}`}
+          className={`hud-btn ${openPanel === 'audio' ? 'is-open' : ''} ${isMuted ? 'is-muted' : ''}`}
           style={dropDelay(3)}
           onClick={() => togglePanel('audio')}
           aria-label={zh ? '音频设置' : 'Audio settings'}

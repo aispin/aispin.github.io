@@ -78,6 +78,23 @@ export const AudioProvider = ({ children }) => {
 
     const toggleMute = () => setIsMuted(prev => !prev);
 
+    /**
+     * 反向同步：模块层（BGM 滑杆）自己把音量抬起来时会顺手取消静音
+     * （setMusicVolume 的老行为，见 utils/audioManager.js），但那只改了
+     * 模块层的 isMuted。React 这边如果不跟着走，就会「开关显示静音中、
+     * 声音却是响的」，两个控制各说各话 —— 下次任何一次重渲染都会用
+     * 陈旧的 isMuted 再把它静回去。
+     *
+     * 只认 v > 0：把滑杆拖到 0 不等于静音（音量归用户，静音归开关）。
+     */
+    useEffect(() => {
+        const onMusicVolume = (e) => {
+            if (e.detail > 0) setIsMuted(false);
+        };
+        window.addEventListener('musicVolumeChanged', onMusicVolume);
+        return () => window.removeEventListener('musicVolumeChanged', onMusicVolume);
+    }, []);
+
     // Enhanced setter that auto-unmutes if user manually drags slider above 0
     const enhancedSetGlobalVolume = useCallback((vol) => {
         if (typeof vol === 'function') {

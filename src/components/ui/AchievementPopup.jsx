@@ -1,12 +1,11 @@
 import React from 'react';
 import { useAchievements, ACHIEVEMENTS } from '../../context/AchievementsContext';
 import { useAudio } from '../../context/AudioManager';
-import { toggleMute as toggleBgmMute, getIsMuted as getBgmMuted, setMusicVolume } from '../../utils/audioManager';
 import '../../styles/AchievementPopup.scss';
 
 const AchievementPopup = () => {
     const { activePopup } = useAchievements();
-    const { isMuted, toggleMute, setGlobalVolume } = useAudio();
+    const { isMuted, toggleMute } = useAudio();
 
     if (!activePopup) return null;
 
@@ -47,21 +46,20 @@ const AchievementPopup = () => {
                                 onClick={(e) => {
                                     e.stopPropagation();
 
-                                    const willMute = !isMuted;
-
-                                    // 1. Oprogramowujemy flagi MUTE (dla silnika i utilsa)
-                                    if (isMuted !== willMute) toggleMute();
-                                    if (getBgmMuted() !== willMute) toggleBgmMute();
-
-                                    // 2. Wymuszamy fizyczne zjechanie pasków głośności, 
-                                    // żeby menu się zsynchronizowało z ustawieniami z wejścia
-                                    if (willMute) {
-                                        setGlobalVolume(0);
-                                        setMusicVolume(0);
-                                    } else {
-                                        setGlobalVolume(1.0); // 100% SFX
-                                        setMusicVolume(0.3);  // 30% BGM
-                                    }
+                                    // 只翻「静音」这一个标志位，别的什么都不碰。
+                                    //
+                                    // 这里以前还顺手 setGlobalVolume(0) / setMusicVolume(0)，
+                                    // 用「把音量调成 0」来表达静音 —— 两个后果：
+                                    //  1. 用户辛苦调好的音量被抹掉，取消静音时又被强行写成
+                                    //     1.0 / 0.3，等于每次开声音都重置一遍设置
+                                    //  2. setMusicVolume(0) 改的是模块级 bgVolume，而
+                                    //     syncMuteState() 只管 muted 标志、不管音量 ——
+                                    //     于是「取消静音了却还是没声」（2026-10-08 用户报的 bug）
+                                    //
+                                    // 静音必须是标志位；音量归用户。React 的 effect 会在
+                                    // isMuted 变化时调 syncMuteState，mp3 元素 / 合成引擎 /
+                                    // 空间音效一起同步，所以不需要在这里碰模块层。
+                                    toggleMute();
                                 }}
                             >
                                 {!isMuted ? " [🔊 ON]" : " [🔇 OFF]"}

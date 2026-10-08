@@ -103,6 +103,18 @@
     background: #FFD9C0;
     border-color: rgba(200, 155, 123, .7);
   }
+
+  // Muted audio. The icon already swaps to a crossed-out speaker, but that is a
+  // 20px detail in a corner the eye skips — and mute is PERSISTED, so the user
+  // can come back to a silent site with no idea why. Dim the whole button and
+  // drop the fill so "off" reads at a glance.
+  &.is-muted {
+    color: rgba(90, 70, 54, .5);
+    background: transparent;
+    border-style: dashed;
+
+    &:hover { background: rgba(255, 246, 233, .6); }
+  }
 }
 
 // The language button carries a word instead of an icon, so it needs a touch
@@ -138,6 +150,14 @@ html[data-theme='dark'] .hud-btn {
 
   &:hover { background: #655044; }
   &.is-open { background: #655044; border-color: rgba(255, 246, 233, .5); }
+
+  &.is-muted {
+    color: rgba(245, 232, 217, .5);
+    background: transparent;
+    border-color: rgba(255, 246, 233, .28);
+
+    &:hover { background: rgba(48, 41, 35, .8); }
+  }
 
   &:disabled:hover { background: rgba(48, 41, 35, .94); }
 }
