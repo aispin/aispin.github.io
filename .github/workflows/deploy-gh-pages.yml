@@ -68,9 +68,23 @@ jobs:
           # .nojekyll：不加的话 GitHub Pages 的 Jekyll 会吃掉下划线开头的目录
           touch dist/.nojekyll
           # 守卫：仓库约定零 jpg/png（只允许 2 张 webp）。漏进来就报错，别悄悄上线。
-          if find dist -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \) | grep -q .; then
-            echo "::error::dist/ 里出现了 jpg/png，违反仓库视觉约定"
-            find dist -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \) | head -20
+          #
+          # ⚠️ 例外 = **应用图标**。它们不是"内容图片"，且 `apple-touch-icon` 在 iOS 上
+          #    只吃 PNG（不支持 SVG）。白名单收窄到**这几个确切文件名**，且必须落在
+          #    `dist/` **根目录** —— 子目录里出现任何 jpg/png 一律失败。
+          ICON_ALLOW="favicon-16.png favicon-32.png favicon-48.png apple-touch-icon.png icon-192.png icon-512.png maskable-512.png"
+          bad=""
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            b="$(basename "$f")"
+            if [ "$(dirname "$f")" = "dist" ]; then
+              case " ${ICON_ALLOW} " in *" ${b} "*) continue ;; esac
+            fi
+            bad="${bad}${f}"$'\n'
+          done < <(find dist -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \))
+          if [ -n "$bad" ]; then
+            echo "::error::dist/ 里出现了白名单之外的 jpg/png，违反仓库视觉约定（应用图标除外）"
+            printf '%s' "$bad"
             exit 1
           fi
           du -sh dist

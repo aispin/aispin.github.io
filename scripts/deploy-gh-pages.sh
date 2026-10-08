@@ -240,9 +240,22 @@ if [ ! -f dist/.nojekyll ]; then
 fi
 
 # 站点的硬约束：零 jpg/png（只允许 2 张 webp 位图）。这里只报告，不拦。
-RASTERS="$(find dist -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \) | head -20 || true)"
+#
+# ⚠️ **例外：应用图标。** 它们不进 3D 场景、不是"内容图片"，而且
+# `apple-touch-icon` 在 iOS 上**只吃 PNG**（不支持 SVG），PWA 的 192/512 同理。
+#
+# 白名单收窄到**这几个确切文件名**，且**必须落在 dist 根目录** ——
+# 子目录里出现任何 jpg/png 一律照报，免得有人把内容图片塞进 images/ 蒙混过关。
+ICON_ALLOW="favicon-16.png favicon-32.png favicon-48.png apple-touch-icon.png icon-192.png icon-512.png maskable-512.png"
+RASTERS="$(find dist -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \) | while IFS= read -r f; do
+  b="$(basename "$f")"
+  if [ "$(dirname "$f")" = "dist" ]; then
+    case " ${ICON_ALLOW} " in *" ${b} "*) continue ;; esac
+  fi
+  printf '%s\n' "$f"
+done | head -20 || true)"
 if [ -n "$RASTERS" ]; then
-  warn "dist 里出现了 jpg/png（本站规定零 jpg/png）："
+  warn "dist 里出现了白名单之外的 jpg/png（本站规定零 jpg/png）："
   printf '    %s\n' $RASTERS
 fi
 

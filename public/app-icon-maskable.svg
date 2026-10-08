@@ -1,12 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="AISPIN">
-  <title>AISPIN</title>
-  <!-- maskable：底色满铺，内容收在中心 80% 安全区内 -->
-  <rect width="512" height="512" fill="#FFF6E9"/>
-  <circle cx="256" cy="256" r="198" fill="none" stroke="#E3CFAF" stroke-width="8"/>
-  <g fill="none" stroke="#5A4636" stroke-width="44" stroke-linecap="butt" stroke-linejoin="miter">
-    <path d="M256 152 L180 348"/>
-    <path d="M256 152 L332 348"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="ZEO · 黄泽昊 · WEB3D HOUSE">
+  <title>ZEO · 黄泽昊 · WEB3D HOUSE</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#765C47"/>
+      <stop offset="0.52" stop-color="#5A4636"/>
+      <stop offset="1" stop-color="#362A20"/>
+    </linearGradient>
+    <clipPath id="tile">
+      <path d="M0 0H512V512H0Z"/>
+    </clipPath>
+  </defs>
+  <path d="M0 0H512V512H0Z" fill="url(#bg)"/>
+  <g>
+    <g clip-path="url(#tile)">
+      <g transform="translate(256.000 256.000) scale(0.7600) translate(-256.000 -256.000)">
+    <path fill="none" stroke="#FFFFFF" stroke-width="54" stroke-linecap="round" stroke-linejoin="round" d="M 150 154 L 362 154 L 294 210"/>
+    <path fill="none" stroke="#FFFFFF" stroke-width="54" stroke-linecap="round" stroke-linejoin="round" d="M 218 302 L 150 358 L 362 358"/>
+    <circle cx="256" cy="256" r="38" fill="#FFFFFF"/>
+      </g>
+    </g>
   </g>
-  <path d="M212 288 L304 288" fill="none" stroke="#5A4636" stroke-width="40"/>
-  <circle cx="356" cy="356" r="26" fill="#C89B7B"/>
 </svg>
