@@ -44,21 +44,47 @@
 - 删除 `.github/workflows/deploy.yml`（官方 artifact 流程）
 - 新增 `.github/workflows/deploy-gh-pages.yml`（构建 → 强推 `gh-pages` 分支）
 
-> 🔴 **有一件事只能你手动做**（workflow 改不了它）：
-> `Settings → Pages → Build and deployment → Source` 选
-> **Deploy from a branch**，Branch 选 **`gh-pages`** / **`(root)`**。
-> 如果那里还是 "GitHub Actions"，推上去的分支**不会被发布**。
+> **你问「能不能用 gh 改 Pages 设置」—— 能，而且比预想的简单。**
+> 实测 `gh api -X PUT` 写成功（`HTTP 204 No Content`）。查下来发现
+> `aispin/aispin.github.io` 的 Pages **本来就是** `Deploy from a branch`
+> （`build_type: legacy`），只是分支指着 **`master`**。
+> 所以 UI 上那一步其实就是**把下拉框从 `master` 换成 `gh-pages`，模式不用改**。
+>
+> 脚本现在每次部署前都会**只读**检查发布源（指错就告警 —— 指错是**静默不生效**的，
+> GitHub 不会报错）；加 `--configure-pages` 可以直接替你改：
+> ```bash
+> scripts/deploy-gh-pages.sh --configure-pages --remote git@github.com:aispin/aispin.github.io.git
+> ```
+> ⚠️ **顺序不能反**：`gh-pages` 分支必须先存在（UI 的下拉框也只列已存在的分支）。
+> 所以是「先推分支，再改发布源」。
+> ⚠️ CI 里的 `GITHUB_TOKEN` 权限不够改仓库设置 —— 这步只能在本地做一次。
+>
+> 🔴 **但执行它等于把线上站点换掉**：`https://aispin.github.io/` 现在跑的还是**旧站**
+> （`master`，标题 `Faso.ME`，最近构建 2026-09-18）。
+> 推 `gh-pages` + 改发布源 = **旧站被新站替换**。**要不要现在上线，等你一句话。**
 
-## DR-02 · 远端仓库 —— ✅ 你选了「用 gh 新建」，**还差最后一句确认**
+## DR-02 · 远端仓库 —— ⚠️ **前提变了，请你重新拍板**
 
-`gh` 已登录账号 **aispin**；`src/data/site.json` 的 `siteUrl` 是 `https://aispin.github.io`
-→ **User Page**（站点在根路径，`base` 保持 `/` 正确）。
+你选的是「用 gh 新建一个」，但我一查：**仓库已经存在，而且是你的原始上游仓库。**
 
-仓库名因此基本被站点 URL 定死：**`aispin/aispin.github.io`**。
-只剩可见性要你点头 —— GitHub Pages 对 User Page 在**免费计划下要求 public 仓库**，
-所以我打算建 **public**。
+| | |
+|---|---|
+| `aispin/aispin.github.io` | **已存在**（2013-02-23 建），**PUBLIC**，不是 fork |
+| 默认分支 | `dev`；另有 `main` / `master` / `v2` |
+| 最近推送 | 2026-09-18 |
+| 说明 | `Home of AISPIN` |
 
-确认后我会：`gh repo create` → 配 `origin` → 跑 `scripts/deploy-gh-pages.sh --dry-run` 验证链路。
+**所以没有仓库可建。** 而且两边历史**无关**：本地是新起的 29 个提交
+（基线 `259ed2f 建立版本管理基线（此前的仓库历史已丢失）`），远端是 2013 年以来的老历史。
+→ `git push origin main` 会**撞上远端的 `main`**（非快进，必须强推），**不能乱推**。
+
+| 选项 | 做法 | 后果 |
+|---|---|---|
+| **A. 只推 `gh-pages`**（推荐） | 只把 `dist/` 推成 `gh-pages`，远端旧分支全部原样保留 | 非破坏性；站点换成新站，源码历史仍只在本地 |
+| **B. 再推一个源码分支** | 本地 `main` 推成远端**新**分支（如 `v3`），旧分支不动 | 源码也上了远端，但与旧历史是两条线 |
+| **C. 覆盖远端 `main`** | 强推本地 `main` → 远端 `main` | ❌ 破坏性，不建议 |
+
+我建议 **A** —— 你要的是「站点上线」，`gh-pages` 已经够了。
 
 ---
 
@@ -143,10 +169,12 @@
 
 - **需求原文**：「4、撰写构建并推送 gh-pages 分支的脚本以及 workflow 文件。」
 - **状态**：✅ **脚本已实施，待验收**；workflow 见 WO-05（已写好）。
-  **真跑一次要等 DR-02 建好远端。**
+  **真跑一次要等 DR-02 拍板。**
 - **实测**：`bash -n` 通过；无 remote 时明确报错退出（不静默失败）；
   `--base=/my-site/` 覆盖生效（产物里资源变成 `/my-site/assets/…`）；
   `site.json` 默认值生效；工作区脏、Project Page 不匹配都会告警。
+  **发布源检查实测**：对真远端跑 `--dry-run` → 正确报出
+  `⚠ Pages 发布源现在是 master，不是 gh-pages —— 推上去不会发布。`
 - **改什么**：新增 `scripts/deploy-gh-pages.sh`。
   - `npm run build` → 校验 `dist/` → 在**临时目录**里 `git init` + `add` + `commit`
     → `push --force <remote> gh-pages`。**不碰工作区，也不在 `dist/` 里留 `.git`。**
@@ -157,8 +185,12 @@
     `aispin.github.io` 这种名字既可能是 User Page 也可能是 Project Page。
   - 支持 `--dry-run`（只构建 + 报告，不推送）与 `--message <msg>`。
   - `dist/.nojekyll` 已由 `public/.nojekyll` 带出来，脚本再确认一次。
+  - **每次都会只读检查 Pages 发布源**（`gh api … /pages`），指错分支就告警；
+    `--configure-pages` 可顺手改掉（`PUT`/`POST … /pages`，`build_type=legacy`）。
+    需要 `gh` 已登录 + admin 权限 —— `GITHUB_TOKEN` 不够，所以只放本地、不进 CI。
   - ⚠️ 这是**强推**到 `gh-pages`：该分支是生成物，别在上面手写东西。
-- **验收判据**：`bash -n` 语法通过；`--dry-run` 跑通；跑完 `dist/` 里没多出 `.git`。
+- **验收判据**：`bash -n` 语法通过；`--dry-run` 跑通；跑完 `dist/` 里没多出 `.git`；
+  发布源指向 `gh-pages` 时脚本报 `✔`、指向别处时报 `⚠` 并给出改法。
 
 ## WO-05 · gh-pages 分支 CI workflow
 
@@ -178,7 +210,7 @@
   2. **推送序列实测跑通**：拿本地 bare 仓库当远端跑了一遍 → `gh-pages` 建出来，
      `index.html` / `me/index.html` / `404.html` / `.nojekyll` 全在，
      且**真实 `dist/` 没被 `.git` 污染**。
-  3. 真上线还要等 DR-02 建好仓库 + 你去 Pages 设置里把 Source 切成 `gh-pages`。
+  3. 真上线还要等 DR-02 拍板；Pages 源不必手点 —— `scripts/deploy-gh-pages.sh --configure-pages` 直接改。
 
 ---
 
@@ -186,9 +218,11 @@
 
 | | |
 |---|---|
-| 版本管理 | git；**还没有 remote**（见 DR-02）；`.workbuddy-ai/` 已排除 |
+| 版本管理 | git；本地 **29 个提交**（新起历史），**没有 remote**（见 DR-02）；`.workbuddy-ai/` 已排除 |
+| 远端 | `aispin/aispin.github.io` **已存在**（2013-02-23 起，PUBLIC，默认分支 `dev`，另有 `main`/`master`/`v2`）—— 与本地历史**无关** |
+| 线上 | `https://aispin.github.io/` 现在跑的是**旧站**（Pages 源 = `master`，标题 `Faso.ME`） |
 | dev server | `npx vite --port 5199 --strictPort --host 127.0.0.1`（⚠️ 必须带 `--host`） |
 | 视觉约束 | 程序化 / canvas / three 生成；零 jpg/png；不用 AI 生图；全站只允许 2 张位图 |
 | 基线 | meshes **697**（`smoke.mjs` 生产构建，**等 ≥65 s**）· 贴图 **59 次 / 64.5 MB**（`texture-inventory.mjs` 走廊态） |
-| 部署 | GitHub Pages，发布源 = **`gh-pages` 分支**（DR-01 选 A）；workflow `.github/workflows/deploy-gh-pages.yml`；本地脚本 `scripts/deploy-gh-pages.sh`。**真上线待 DR-02 建仓库** |
+| 部署 | GitHub Pages。Pages 源**当前 = `master`**（旧站），目标 = **`gh-pages`**（DR-01 选 A）；workflow `.github/workflows/deploy-gh-pages.yml`；本地脚本 `scripts/deploy-gh-pages.sh`（`--configure-pages` 可改 Pages 源）。**真上线待 DR-02 拍板** |
 | 备注 | `public/demos/demos.json` 是构建插件生成的（每次 dev/preview 启动刷新 `generatedAt`）→ 会让工作区变脏，提交前 `git checkout --` 掉 |
