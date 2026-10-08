@@ -29,10 +29,8 @@ import {
 import {
     makeDoorGodTexture,
     makeFuDiamondTexture,
-    makeDoorKnockerTexture,
     makeCoupletTexture,
     DOOR_GOD_ASPECT,
-    KNOCKER_ASPECT,
     COUPLET_STRIP_ASPECT,
 } from '../../../utils/gateArt';
 // 门联文案（39 副）与「今天挂哪一副」的解析器。
@@ -63,14 +61,18 @@ import { sharedGeometry } from '../../../engine/resources';
 /* ------------------------------------------------------------------ */
 /*
  * makeDoorFaceTexture authors the leaf on a 512 x 1310 canvas with two recessed
- * panels at y 109..682 and y 775..1228. Against the 2.4-unit-tall leaf that puts
- * their centres at +0.475 and -0.635, with the rail between them at -0.135 — so
- * the 年画 drops into the upper panel, 倒福 into the lower one and the 门环 onto
- * the rail.
+ * panels at y 109..682 and y 775..1228. Against the 2.55-unit-tall leaf that
+ * puts their centres at +0.475 and -0.635, so the 年画 drops into the upper
+ * panel and the 倒福 into the lower one.
  *
- * All three sit on the leaf's centre line, which reads as one deliberate column
- * (门神 / 门环 / 倒福). The 门环 is deliberately NOT at the seam: the lever handle
- * (local X 0.827) and the lock plate already crowd that edge.
+ * NO 门环 (removed 2026-10-08)
+ * ---------------------------
+ * A 铺首衔环 used to hang on the rail between the two panels — a round bronze
+ * plate with a ring, on the leaf's centre line. The user asked for it to go
+ * ("门板上的圆形物件去掉"). It was also the one ornament that made no sense on
+ * this gate: the leaves already have lever handles, so the ring was a second,
+ * decorative handle that could not be pulled. The two stacked panels now carry
+ * 门神 over 倒福 and nothing else.
  */
 const ORNAMENT_Z = 0.098;
 
@@ -81,12 +83,8 @@ const GOD_Y = 0.4754;
 const FU_SIZE = 0.50;
 const FU_Y = -0.6348;
 
-const KNOCKER_W = 0.24;
-const KNOCKER_H = KNOCKER_W / KNOCKER_ASPECT;
-const KNOCKER_Y = -0.135;
-
 /**
- * 门神 (年画) + 倒福 + 门环 for one leaf, stacked down the leaf's centre line.
+ * 门神 (年画) + 倒福 for one leaf, stacked down the leaf's centre line.
  *
  * @param {'guanyu'|'zhangfei'} god   which god is painted on this leaf
  * @param {number} leafX              local X of the leaf centre (±0.47)
@@ -94,7 +92,6 @@ const KNOCKER_Y = -0.135;
 const DoorOrnaments = ({ god, leafX }) => {
     const godTexture = makeDoorGodTexture(god);
     const fuTexture = makeFuDiamondTexture();
-    const knockerTexture = makeDoorKnockerTexture();
 
     return (
         <>
@@ -108,12 +105,6 @@ const DoorOrnaments = ({ god, leafX }) => {
             <mesh position={[leafX, FU_Y, ORNAMENT_Z]} renderOrder={5}>
                 <primitive object={sharedGeometry('plane', FU_SIZE, FU_SIZE)} attach="geometry" />
                 <meshBasicMaterial map={fuTexture} toneMapped={false} transparent alphaTest={0.5} />
-            </mesh>
-
-            {/* 门环 — 铺首衔环 on the rail between the two panels */}
-            <mesh position={[leafX, KNOCKER_Y, ORNAMENT_Z]} renderOrder={5}>
-                <primitive object={sharedGeometry('plane', KNOCKER_W, KNOCKER_H)} attach="geometry" />
-                <meshBasicMaterial map={knockerTexture} toneMapped={false} transparent alphaTest={0.5} />
             </mesh>
         </>
     );

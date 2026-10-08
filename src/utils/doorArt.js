@@ -214,8 +214,9 @@ function paperGrain(ctx, w, h, rand, amount = 8) {
 export const DOOR_FACE_ASPECT = 512 / 1310;
 
 /**
- * Door leaf: warm wood slab, a darker outer stile/rail band, two recessed
- * panels and a lock plate on the hinge-opposite edge.
+ * Door leaf: warm wood slab, a darker outer stile/rail band and two recessed
+ * panels. The LEFT leaf also carries the gate's single lock plate (see the
+ * note on it below — the right leaf must not get one).
  *
  * @param {'left'|'right'} side  which leaf (the right leaf is mirrored)
  * @param {'sketch'|'painted'} variant
@@ -307,42 +308,53 @@ export function makeDoorFaceTexture(side = 'left', variant = 'painted') {
         void index;
     });
 
-    // ---- lock plate on the inner edge --------------------------------
-    // The left leaf's inner edge is on the right of the canvas, and vice versa.
-    const plateW = 42;
-    const plateX = side === 'left' ? W - plateW - 4 : 4;
-    const plateY = 617;
-    const plateH = 174;
+    // ---- lock plate + keyhole — LEFT LEAF ONLY ------------------------
+    // One lock, on the gate's centre line. The plate lands on the left leaf's
+    // inner edge, ~0.044 left of the seam, which is where the eye reads "the
+    // middle of the 大门" — and where a real double gate carries its lock.
+    //
+    // ⚠️ Do NOT draw this on the right leaf. The mirror flip at the end of
+    // this function reverses X, so "inner edge" (plateX = 4, the left of the
+    // canvas) comes out at the HINGE jamb after the flip. That is how the
+    // gate ended up with two keyholes — one at the seam, one out at the right
+    // stile. The user's report was exactly that: "钥匙孔出现了两个，保留中间
+    // 那个即可". The left leaf's is the middle one, so it is the one that stays.
+    if (side === 'left') {
+        const plateW = 42;
+        const plateX = W - plateW - 4;
+        const plateY = 617;
+        const plateH = 174;
 
-    ctx.save();
-    roundRectPath(ctx, plateX, plateY, plateW, plateH, 8);
-    const pg = ctx.createLinearGradient(plateX, 0, plateX + plateW, 0);
-    pg.addColorStop(0, rgba(sr + 22, sg + 18, sb + 12));
-    pg.addColorStop(0.55, rgba(sr - 6, sg - 6, sb - 6));
-    pg.addColorStop(1, rgba(sr - 34, sg - 30, sb - 24));
-    ctx.fillStyle = pg;
-    ctx.fill();
-    ctx.restore();
-    inkSketchRect(ctx, plateX, plateY, plateW, plateH, {
-        amp: 2,
-        r: 8,
-        color: pal.ink,
-        width: pal.inkWidth * 0.8,
-    }, rand);
+        ctx.save();
+        roundRectPath(ctx, plateX, plateY, plateW, plateH, 8);
+        const pg = ctx.createLinearGradient(plateX, 0, plateX + plateW, 0);
+        pg.addColorStop(0, rgba(sr + 22, sg + 18, sb + 12));
+        pg.addColorStop(0.55, rgba(sr - 6, sg - 6, sb - 6));
+        pg.addColorStop(1, rgba(sr - 34, sg - 30, sb - 24));
+        ctx.fillStyle = pg;
+        ctx.fill();
+        ctx.restore();
+        inkSketchRect(ctx, plateX, plateY, plateW, plateH, {
+            amp: 2,
+            r: 8,
+            color: pal.ink,
+            width: pal.inkWidth * 0.8,
+        }, rand);
 
-    // Keyhole
-    const kcx = plateX + plateW / 2;
-    ctx.fillStyle = rgba(38, 28, 20, 0.92);
-    ctx.beginPath();
-    ctx.arc(kcx, plateY + 62, 11, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(kcx - 6, plateY + 66);
-    ctx.lineTo(kcx + 6, plateY + 66);
-    ctx.lineTo(kcx + 9, plateY + 108);
-    ctx.lineTo(kcx - 9, plateY + 108);
-    ctx.closePath();
-    ctx.fill();
+        // Keyhole
+        const kcx = plateX + plateW / 2;
+        ctx.fillStyle = rgba(38, 28, 20, 0.92);
+        ctx.beginPath();
+        ctx.arc(kcx, plateY + 62, 11, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(kcx - 6, plateY + 66);
+        ctx.lineTo(kcx + 6, plateY + 66);
+        ctx.lineTo(kcx + 9, plateY + 108);
+        ctx.lineTo(kcx - 9, plateY + 108);
+        ctx.closePath();
+        ctx.fill();
+    }
 
     // ---- outer ink border -------------------------------------------
     inkSketchRect(ctx, 6, 6, W - 12, H - 12, {
