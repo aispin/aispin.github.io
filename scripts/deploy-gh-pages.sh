@@ -22,6 +22,10 @@
 #   --configure-pages   推送后顺便把 Pages 发布源改成 gh-pages / (root)。
 #                       这一步不是 git 操作，是改**仓库设置**，所以需要 gh 已登录。
 #
+# 环境变量：
+#   GIT_RETRIES         网络重试次数（默认 5）。本机出海走代理，github.com 的
+#                       CONNECT 偶发 502，push 失败未必是仓库的问题。
+#
 # ⚠️ 光把 dist 推上 gh-pages 是不够的：Pages 的发布源（Source）必须也指向它。
 #    发布源是**单选**的，指错了分支，推上去的内容永远不会被发布 ——
 #    而且没有任何报错，站点只是静静地停在旧版本上。所以本脚本每次都会
@@ -80,6 +84,27 @@ pages_set_source() {
   fi
 }
 
+# ------------------------------------------------------------------ 网络重试
+# 这个环境的出海流量走一层代理，`github.com` 的 CONNECT **偶发 502**
+# （`CONNECT tunnel failed, response 502`）——实测每 5~6 次里有 1 次成功。
+# 也就是说 push 失败**未必是仓库的问题**，直接报错退出会让人白查半天。
+#
+# push 是幂等的（`--force` 到同一个 ref，重复执行结果一样），所以重试安全。
+# 次数用 `GIT_RETRIES` 覆盖（默认 5）。
+retry_git() {
+  local tries="${GIT_RETRIES:-5}" n=1
+  while true; do
+    if "$@"; then return 0; fi
+    if [ "$n" -ge "$tries" ]; then
+      warn "连续 ${tries} 次失败：$*"
+      return 1
+    fi
+    warn "网络失败（第 ${n}/${tries} 次），重试中…"
+    sleep 2
+    n=$((n + 1))
+  done
+}
+
 # 支持 `--opt=value` 写法：先拆成 `--opt value` 两段，主循环只认后者。
 _ARGS=()
 for _a in "$@"; do
@@ -98,7 +123,7 @@ while [ $# -gt 0 ]; do
     --remote) shift; [ $# -gt 0 ] || die "--remote 需要一个值"; REMOTE="$1" ;;
     --base) shift; [ $# -gt 0 ] || die "--base 需要一个值"; BASE_OVERRIDE="$1" ;;
     --message) shift; [ $# -gt 0 ] || die "--message 需要一个值"; MESSAGE="$1" ;;
-    -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,36p' "$0"; exit 0 ;;
     *) die "未知参数：$1（-h 看用法）" ;;
   esac
   shift
@@ -276,7 +301,7 @@ git commit -q -m "$MESSAGE"
 ok "已在临时仓库里提交（$(git rev-parse --short HEAD)）"
 
 info "推送到 gh-pages …"
-git push --force "$REMOTE_URL" "HEAD:refs/heads/gh-pages"
+retry_git git push --force "$REMOTE_URL" "HEAD:refs/heads/gh-pages"
 cd "$ROOT"
 
 echo
