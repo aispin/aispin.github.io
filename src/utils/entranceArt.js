@@ -432,8 +432,21 @@ function shoot(x, y, ang, len, bend, steps = 10) {
  *
  * 🔑 另一个同样重要的性质：这个改动**不消耗任何随机数**。所以树的整体形态
  * 逐位不变，秋天的回归锚点得以保留（见 `makeTreeTexture` 的说明）。
+ *
+ * ⚠️ `skip` 只处理了**起点**端面；**终点**端面永远是画出来的（`endCap`）。
+ * 去掉 `closePath` 只省掉起点那一刀，因为路径是「左边上行 → 端面 → 右边下行」
+ * 的单条开放折线，起点没有回到左起点的收口线，终点却有。
+ *
+ * 🔴 树干恰好**不想要终点端面**：树干的终点就是**分叉点**（canvas 390,648），
+ * 而三条主枝都从那儿出发 —— 那条宽 48 的横线落在并集**内部**，读起来就是
+ * 「树干被人横着切了一刀」。所以树干描边时传 `endCap = false`（两条侧边各自
+ * 成一个子路径，中间不再有横向连线）。
+ *
+ * 用 `moveTo` 而不是 `lineTo` 起右边：这样两个子路径各自独立，`stroke()` 就
+ * 不会补那条横线。填色/裁剪一律走默认的 `endCap = true` —— 隐式闭合时，
+ * 「左边缘 + 隐式闭合」得到的是零面积多边形，分成两个子路径会把并集**填空**。
  */
-function taperedPath(c, pts, w0, w1, skip = 0) {
+function taperedPath(c, pts, w0, w1, skip = 0, endCap = true) {
     const n = pts.length;
     const left = [];
     const right = [];
@@ -458,6 +471,13 @@ function taperedPath(c, pts, w0, w1, skip = 0) {
     c.beginPath();
     c.moveTo(left[s][0], left[s][1]);
     for (let i = s + 1; i < n; i++) c.lineTo(left[i][0], left[i][1]);
+    if (endCap) {
+        c.lineTo(right[n - 1][0], right[n - 1][1]);
+    } else {
+        // 新开一个子路径 —— 左右两条侧边之间不再有连线，`stroke()` 也就
+        // 画不出端面。见上面 «树干恰好不想要终点端面» 那段。
+        c.moveTo(right[n - 1][0], right[n - 1][1]);
+    }
     for (let i = n - 1; i >= s; i--) c.lineTo(right[i][0], right[i][1]);
     // 不 closePath —— 见上面的说明。fill()/clip() 会隐式闭合，stroke() 不会。
 }
@@ -887,7 +907,12 @@ export function makeTreeTexture(season = 'autumn') {
     /* --- 2. 树干与主枝：一次成型 -------------------------------------- */
     // A slight lean to the left as it rises, and a root flare at the base.
     const trunk = [[410, 894], [404, 830], [398, 764], [393, 706], [390, 648]];
-    const trunkPath = (c) => taperedPath(c, trunk, 86, 48);
+    // ⚠️ `endCap = false`：树干的终点就是**分叉点**，三条主枝从那儿出发，
+    // 所以「端面」整条落在并集内部。画出来就是一道宽 48、alpha 0.5 的
+    // **深色横线**横在主干上 —— 用户 2026-10-09 报的「大横线，像要把树切断」。
+    // 树干真正的轮廓是**并集的边界**，而并集在分叉处根本没有横边。
+    // 填色/裁剪仍然用 `endCap = true`（见 taperedPath 的说明）。
+    const trunkPath = (c) => taperedPath(c, trunk, 86, 48, 0, false);
 
     // Hand-authored rather than grown, so the silhouette is art-directed
     // instead of merely random: three scaffolds off the trunk, each splitting
