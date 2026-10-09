@@ -122,8 +122,11 @@ const CARD_OPEN_SCALE = 1.32;
 const GalleryRoom = ({ showRoom, onReady, isExiting, isWarmup }) => {
     const { isTeleporting } = useScene();
     const { showTutorial, unlockAchievement, hidePopup } = useAchievements();
-    const { globalVolume, isMuted } = useAudio();
-    const effectiveVolume = isMuted ? 0 : AUDIO_SETTINGS.volume * globalVolume;
+    // ⚠️ 环境音走**自己的开关**（`ambienceOn`），不是音乐开关 `isMuted` ——
+    // 用 isMuted 会让「关掉音乐」把房间底噪一起静掉（用户 2026-10-09 报的
+    // 「环境音听不到」）。音量仍归 SFX 滑杆 globalVolume。
+    const { globalVolume, ambienceOn } = useAudio();
+    const effectiveVolume = ambienceOn ? AUDIO_SETTINGS.volume * globalVolume : 0;
 
     const groupRef = useRef();
     const targetScroll = useRef(0);
@@ -488,7 +491,7 @@ const GalleryRoom = ({ showRoom, onReady, isExiting, isWarmup }) => {
             {!isWarmup && (
                 /* 城市底噪 —— 原来是 /sounds/szummiasta.mp3（2.49 MB，进房间才下）。
                  * 现在现场合成，零字节。见 src/audio/ambience.js */
-                <AmbientSource name="city" volume={effectiveVolume} muted={isMuted} />
+                <AmbientSource name="city" volume={effectiveVolume} muted={!ambienceOn} />
             )}
             <group position={[0, -0.7, -2]}>
                 {/* Floor */}

@@ -100,8 +100,10 @@ const ContactRoom = ({ showRoom, onReady, isExiting, isWarmup }) => {
     const { camera } = useThree();
     const { isTeleporting } = useScene();
     const { showTutorial, unlockAchievement, hidePopup } = useAchievements();
-    const { globalVolume, isMuted } = useAudio();
-    const effectiveVolume = isMuted ? 0 : AUDIO_SETTINGS.volume * globalVolume;
+    // ⚠️ 环境音走**自己的开关**（`ambienceOn`），不是音乐开关 `isMuted` ——
+    // 见 GalleryRoom 同一处的说明。
+    const { globalVolume, ambienceOn } = useAudio();
+    const effectiveVolume = ambienceOn ? AUDIO_SETTINGS.volume * globalVolume : 0;
 
     useEffect(() => {
         if (isExiting || isTeleporting) {
@@ -350,7 +352,7 @@ const ContactRoom = ({ showRoom, onReady, isExiting, isWarmup }) => {
             {!isWarmup && (
                 /* 海浪 —— 原来是 /sounds/szummorza.mp3（1.62 MB，进房间才下）。
                  * 现在现场合成，零字节。见 src/audio/ambience.js */
-                <AmbientSource name="sea" volume={effectiveVolume} muted={isMuted} />
+                <AmbientSource name="sea" volume={effectiveVolume} muted={!ambienceOn} />
             )}
 
             {/* ☁️ CLOUDS */}

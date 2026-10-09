@@ -597,6 +597,14 @@ $torn-paper-clip: polygon(0% 0%, 100% 0%,
         }
     }
 
+    // 环境音开关 —— 音乐开关**下面**那一行。
+    // 两个是**互相独立**的两条线（2026-10-09 用户定：环境音不再被音乐开关连坐），
+    // 所以并排两行、各自一个开关 + 各自一条持久化偏好，而不是合成一个开关。
+    // 负的上边距吃掉一点音乐开关的 14px，让两行读成一组。
+    .audio-ambience {
+        margin-top: -8px;
+    }
+
     // One-tap mute. Deliberately reads as a *switch row*, not a third slider:
     // it is the coarse control above the two fine ones.
     .audio-mute {

@@ -21,7 +21,7 @@ const PANEL_IDS = ['map', 'audio', 'achievements', 'settings'];
 
 const NavigationUI = () => {
     const { currentRoom, isInRoom, requestExit, hasEntered, teleportTo, isTeleporting, markEntered, requestHouseExit, doorBusy } = useScene();
-    const { globalVolume, setGlobalVolume, isMuted, toggleMute } = useAudio();
+    const { globalVolume, setGlobalVolume, isMuted, toggleMute, ambienceOn, toggleAmbience } = useAudio();
     const { showTutorial } = useAchievements();
     const { language, theme, setTheme, season, setSeason } = useSitePreferences();
     // 解析后的季节（'auto' 时按月份算出来的那个）。只用于面板底部那句提示。
@@ -421,6 +421,52 @@ const NavigationUI = () => {
                                 {language === 'zh'
                                     ? (musicOn ? '关闭音乐' : '打开音乐')
                                     : (musicOn ? 'Turn off music' : 'Turn on music')}
+                            </span>
+                            <span className="audio-mute__pill" aria-hidden="true">
+                                <span className="audio-mute__knob" />
+                            </span>
+                        </button>
+
+                        {/* 5 · 环境音开关 —— 音乐开关**下面**那一行。
+                              两条线**互相独立**（2026-10-09 用户定）：
+                              · 音乐：BGM（mp3 / 合成主题），归 musicOn + Music 滑杆
+                              · 环境音：房间底噪 / 季节声床，归**这个**开关 + SFX 滑杆
+                              以前环境音被 `muted={isMuted}` 连坐，关掉音乐就一起哑，
+                              用户没法听、没法验收。起播走 Web Audio 的解锁闸门
+                              （第一次 pointerdown/keydown），所以"点击后就有"。 */}
+                        <button
+                            type="button"
+                            className={`audio-mute audio-ambience ${ambienceOn ? 'is-on' : ''}`}
+                            role="switch"
+                            aria-checked={ambienceOn}
+                            onClick={toggleAmbience}
+                            aria-label={language === 'zh'
+                                ? (ambienceOn ? '关闭环境音' : '打开环境音')
+                                : (ambienceOn ? 'Turn off ambience' : 'Turn on ambience')}
+                        >
+                            <span className="audio-mute__icon" aria-hidden="true">
+                                {ambienceOn ? (
+                                    <svg viewBox="0 0 24 24">
+                                        <path d="M3 11v2" />
+                                        <path d="M7 7v10" />
+                                        <path d="M11 4v16" />
+                                        <path d="M15 7v10" />
+                                        <path d="M19 11v2" />
+                                    </svg>
+                                ) : (
+                                    <svg viewBox="0 0 24 24">
+                                        <path d="M3 11v2" />
+                                        <path d="M7 7v10" />
+                                        <path d="M15 7v10" />
+                                        <path d="M19 11v2" />
+                                        <line x1="10" y1="5" x2="14" y2="19" />
+                                    </svg>
+                                )}
+                            </span>
+                            <span className="audio-mute__label">
+                                {language === 'zh'
+                                    ? (ambienceOn ? '关闭环境音' : '打开环境音')
+                                    : (ambienceOn ? 'Turn off ambience' : 'Turn on ambience')}
                             </span>
                             <span className="audio-mute__pill" aria-hidden="true">
                                 <span className="audio-mute__knob" />

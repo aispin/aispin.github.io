@@ -28,6 +28,9 @@ const SOUND_PATHS = {};
 const AudioContext = createContext({
     isMuted: false,
     toggleMute: () => { },
+    ambienceOn: true,
+    setAmbienceOn: () => { },
+    toggleAmbience: () => { },
     play: () => { },
     enableAudio: () => { },
     audioEnabled: false,
@@ -42,6 +45,24 @@ export const AudioProvider = ({ children }) => {
     const [isMuted, setIsMuted] = useState(() => {
         const saved = localStorage.getItem('audio_muted');
         return saved === 'true';
+    });
+
+    /**
+     * 环境音（房间底噪 / 将来的季节声床）—— **与 BGM 完全独立**。
+     *
+     * 🔴 2026-10-09 用户报「环境音受 BGM 影响，听不到」。根因是房间那边传的是
+     * `muted={isMuted}`，而 `isMuted` 是**音乐开关**：关掉音乐 = 环境音一起哑。
+     * 而环境音的**音量**走的是 SFX 滑杆（`globalVolume`）—— 一个开关管两件事、
+     * 音量又归另一处，必然打架。现在它有自己的开关（面板里音乐开关**下面**那个）。
+     *
+     * 默认 **true**：用户定的是「页面发生点击交互后就打开」。真正的"起播"由
+     * Web Audio 的解锁闸门完成 —— `sfxContext` 的 `whenUnlocked` 监听
+     * pointerdown / touchstart / keydown（只认第一次），所以这里只要为 true，
+     * 第一次点击就会起来。在面板里关掉则**持久化**，之后点击也不会再自动开。
+     */
+    const [ambienceOn, setAmbienceOn] = useState(() => {
+        const saved = localStorage.getItem('audio_ambience');
+        return saved === null ? true : saved === 'true';
     });
 
     // Persist volume preference (0.0 to 1.0)
@@ -77,6 +98,14 @@ export const AudioProvider = ({ children }) => {
     }, [isMuted, globalVolume]);
 
     const toggleMute = () => setIsMuted(prev => !prev);
+
+    const toggleAmbience = useCallback(() => setAmbienceOn(prev => !prev), []);
+
+    // 环境音开关持久化。**不放进上面那个大 effect** —— 那个负责的是 mp3 元素
+    // 与 composite sounds 的静音/音量同步，跟环境音没关系。
+    useEffect(() => {
+        localStorage.setItem('audio_ambience', ambienceOn);
+    }, [ambienceOn]);
 
     /**
      * 反向同步：模块层（BGM 滑杆）自己把音量抬起来时会顺手取消静音
@@ -188,6 +217,10 @@ export const AudioProvider = ({ children }) => {
         <AudioContext.Provider value={{
             isMuted,
             toggleMute,
+            // 环境音是**另一条线**：它自己的开关，不受 isMuted 影响。
+            ambienceOn,
+            setAmbienceOn,
+            toggleAmbience,
             globalVolume,
             setGlobalVolume: enhancedSetGlobalVolume,
             play,
