@@ -1,30 +1,46 @@
-import { useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
-import { SCENE, LIGHTS, NIGHT, unmultiplyVeil } from '../../config/theme'
+import { unmultiplyVeil } from '../../config/theme'
+import { seasonLightFor } from '../../config/seasonLight'
 import { useSitePreferences } from '../../context/SitePreferences'
+import { useSeason } from '../../hooks/useSeason'
 
 /**
  * SceneLighting — the whole scene's ambience in one place: background, fog, the
- * three-light rig and the night veil, cross-fading between the day palette and
- * NIGHT.
+ * three-light rig and the veil, cross-fading between DAY and NIGHT.
  *
  * WHY ONE COMPONENT OWNS ALL OF IT
  * --------------------------------
- * These are five separate scene properties, but night has to move them
- * *together* — a navy sky over a midday-lit wall reads as a bug, not as dusk.
- * Scattering them across App.jsx (background + fog) and Experience.jsx (lights)
- * would mean two effects racing on the same transition. Here it is one eased
- * scalar driving all of them.
+ * These are separate scene properties, but night has to move them *together* —
+ * a navy sky over a midday-lit wall reads as a bug, not as dusk. Scattering
+ * them across App.jsx (background + fog) and Experience.jsx (lights) would mean
+ * two effects racing on the same transition. Here it is one eased scalar
+ * driving all of them.
  *
  * WHY NIGHT NEEDS A FULL-FRAME MULTIPLY AND NOT JUST DARKER LIGHTS
  * ---------------------------------------------------------------
- * See the long note on NIGHT in config/theme.js. Short version: 536 of 806
+ * See the long note on NIGHT in config/theme.js. Short version: hundreds of
  * materials in this scene are unlit `MeshBasicMaterial`s painting baked canvas
  * art, and the facade is a `ShaderMaterial`. Dimming the rig leaves every one
  * of them untouched, so the site simply stayed daytime. The veil is the only
  * knob that reaches all three material kinds.
+ *
+ * ── 季节（2026-10-09）────────────────────────────────────────────────
+ *
+ * 轴是**正交**的：`theme`（明暗）× `season`（春夏秋冬）= 8 态。
+ *
+ * 实现上**只换了端点**：`DAY` / `NIGHT_FROM` 两个模块级常量，变成
+ * `endpointsFor(season)` 给出的那一季的两组。下面的插值机器
+ * —— `t` 的 0.9s 缓动、首帧吸附、veil 的 lerp —— **一行都没动**。
+ *
+ * 之所以能这么省，是因为季节在一次会话内**恒定**（`useSeason()` 每挂载解析
+ * 一次，与门联同理）。所以不需要第二级缓动；将来若要加季节切换 UI，
+ * 这里才要升级成双线性插值（季节轴 × 昼夜轴）。现在不做，是刻意不留死代码。
+ *
+ * 秋天直接引用 `theme.js` 的现有常量（见 config/seasonLight.js），
+ * 所以 `?season=autumn` 与加季节之前**逐位一致**。
  *
  * WHY IT IS NOT INSIDE Experience.jsx
  * -----------------------------------
@@ -42,28 +58,61 @@ import { useSitePreferences } from '../../context/SitePreferences'
 /** Seconds for a full day<->night cross-fade. Long enough to read as a dusk. */
 const FADE_SECONDS = 0.9
 
-const DAY = {
-    sky: new THREE.Color(SCENE.background),
-    haze: new THREE.Color(SCENE.fogColor),
-    ambient: new THREE.Color(LIGHTS.ambient.color),
-    key: new THREE.Color(LIGHTS.key.color),
-    fill: new THREE.Color(LIGHTS.fill.color),
-    veil: new THREE.Color(1, 1, 1),
-}
+/**
+ * 某一季的两组端点，转成 three 的 Color。
+ *
+ * 按季节缓存 —— 虽然季节在一次会话里恒定（等于只算一次），但把它写成表
+ * 更贴近意图：这是"每季算一次"，不是"每次渲染算一次"。
+ */
+const endpointCache = new Map()
 
-/** `scene.background` is multiplied by the veil afterwards, so the sky we
- *  actually want to see has to be un-multiplied first — otherwise it gets
- *  darkened twice and the horizon goes black. */
-const NIGHT_SKY = new THREE.Color(unmultiplyVeil(NIGHT.sky, NIGHT.veil))
-const NIGHT_HAZE = new THREE.Color(unmultiplyVeil(NIGHT.haze, NIGHT.veil))
+function endpointsFor(season) {
+    if (endpointCache.has(season)) return endpointCache.get(season)
 
-const NIGHT_FROM = {
-    sky: NIGHT_SKY,
-    haze: NIGHT_HAZE,
-    ambient: new THREE.Color(NIGHT.lights.ambient.color),
-    key: new THREE.Color(NIGHT.lights.key.color),
-    fill: new THREE.Color(NIGHT.lights.fill.color),
-    veil: new THREE.Color(NIGHT.veil.r, NIGHT.veil.g, NIGHT.veil.b),
+    const L = seasonLightFor(season)
+    const d = L.day
+    const n = L.night
+
+    const out = {
+        day: {
+            sky: new THREE.Color(d.sky),
+            haze: new THREE.Color(d.haze),
+            ambient: new THREE.Color(d.ambient.color),
+            key: new THREE.Color(d.key.color),
+            fill: new THREE.Color(d.fill.color),
+            veil: new THREE.Color(1, 1, 1),
+            fogNear: d.fogNear,
+            fogFar: d.fogFar,
+            ambientI: d.ambient.intensity,
+            keyI: d.key.intensity,
+            fillI: d.fill.intensity,
+            keyPos: d.key.position,
+            fillPos: d.fill.position,
+        },
+        night: {
+            /** `scene.background` is multiplied by the veil afterwards, so the
+             *  sky we actually want to see has to be un-multiplied first —
+             *  otherwise it gets darkened twice and the horizon goes black.
+             *  **每季用自己的 veil 反算**（冬夜的 veil 比秋夜亮，因为雪把天光
+             *  反上来）。 */
+            sky: new THREE.Color(unmultiplyVeil(n.sky, n.veil)),
+            haze: new THREE.Color(unmultiplyVeil(n.haze, n.veil)),
+            ambient: new THREE.Color(n.ambient.color),
+            key: new THREE.Color(n.key.color),
+            fill: new THREE.Color(n.fill.color),
+            veil: new THREE.Color(n.veil.r, n.veil.g, n.veil.b),
+            fogNear: n.fogNear,
+            fogFar: n.fogFar,
+            ambientI: n.ambient.intensity,
+            keyI: n.key.intensity,
+            fillI: n.fill.intensity,
+            keyPos: n.key.position,
+            fillPos: n.fill.position,
+        },
+    }
+
+    endpointCache.set(season, out)
+    return out
 }
 
 /** White -> the night tint. Multiplied into every pixel of the frame. */
@@ -90,13 +139,16 @@ const lerp = (a, b, t) => a + (b - a) * t
 const SceneLighting = ({ isLowTier = false }) => {
     const { theme } = useSitePreferences()
     const night = theme === 'dark'
+    const season = useSeason()
+
+    const EP = useMemo(() => endpointsFor(season), [season])
 
     const ambientRef = useRef()
     const keyRef = useRef()
     const fillRef = useRef()
 
     // A scratch colour reused every frame instead of allocating one per fade.
-    const sky = useRef(new THREE.Color(SCENE.background))
+    const sky = useRef(new THREE.Color(EP.day.sky))
 
     const scene = useThree((state) => state.scene)
 
@@ -124,6 +176,8 @@ const SceneLighting = ({ isLowTier = false }) => {
         }
 
         const k = t.current
+        const D = EP.day
+        const N = EP.night
 
         // Everything below writes straight into the three.js scene graph.
         // `react-hooks/immutability` flags that because `scene` comes out of a
@@ -134,36 +188,36 @@ const SceneLighting = ({ isLowTier = false }) => {
         /* eslint-disable react-hooks/immutability */
 
         // --- background + fog (owned here, see the header) ---
-        sky.current.copy(DAY.sky).lerp(NIGHT_FROM.sky, k)
+        sky.current.copy(D.sky).lerp(N.sky, k)
         scene.background = sky.current
 
         if (scene.fog) {
-            scene.fog.color.copy(DAY.haze).lerp(NIGHT_FROM.haze, k)
-            scene.fog.near = lerp(SCENE.fogNear, NIGHT.fogNear, k)
-            scene.fog.far = lerp(SCENE.fogFar, NIGHT.fogFar, k)
+            scene.fog.color.copy(D.haze).lerp(N.haze, k)
+            scene.fog.near = lerp(D.fogNear, N.fogNear, k)
+            scene.fog.far = lerp(D.fogFar, N.fogFar, k)
         }
         /* eslint-enable react-hooks/immutability */
 
         // --- the veil ---
-        veilUniforms.current.uTint.value.copy(DAY.veil).lerp(NIGHT_FROM.veil, k)
+        veilUniforms.current.uTint.value.copy(D.veil).lerp(N.veil, k)
 
         // --- the rig ---
         const amb = ambientRef.current
         if (amb) {
-            amb.color.copy(DAY.ambient).lerp(NIGHT_FROM.ambient, k)
-            amb.intensity = lerp(LIGHTS.ambient.intensity, NIGHT.lights.ambient.intensity, k)
+            amb.color.copy(D.ambient).lerp(N.ambient, k)
+            amb.intensity = lerp(D.ambientI, N.ambientI, k)
         }
 
         const key = keyRef.current
         if (key) {
-            key.color.copy(DAY.key).lerp(NIGHT_FROM.key, k)
-            key.intensity = lerp(LIGHTS.key.intensity, NIGHT.lights.key.intensity, k)
+            key.color.copy(D.key).lerp(N.key, k)
+            key.intensity = lerp(D.keyI, N.keyI, k)
         }
 
         const fill = fillRef.current
         if (fill) {
-            fill.color.copy(DAY.fill).lerp(NIGHT_FROM.fill, k)
-            fill.intensity = lerp(LIGHTS.fill.intensity, NIGHT.lights.fill.intensity, k)
+            fill.color.copy(D.fill).lerp(N.fill, k)
+            fill.intensity = lerp(D.fillI, N.fillI, k)
         }
     })
 
@@ -172,21 +226,28 @@ const SceneLighting = ({ isLowTier = false }) => {
             {/* Fog is declared here rather than via App.jsx's old declarative
                 <fog>, because this component resolves the theme on its first
                 render — so the very first painted frame is already right. */}
-            <fog attach="fog" args={[SCENE.fogColor, SCENE.fogNear, SCENE.fogFar]} />
+            <fog attach="fog" args={[EP.day.haze.getHex(), EP.day.fogNear, EP.day.fogFar]} />
 
-            <ambientLight ref={ambientRef} color={LIGHTS.ambient.color} intensity={LIGHTS.ambient.intensity} />
+            <ambientLight
+                ref={ambientRef}
+                color={EP.day.ambient.getHex()}
+                intensity={EP.day.ambientI}
+            />
+            {/* 太阳高度角按季节给：夏至最高（影子最短）、冬至最低。
+                它改的是**明暗**（Lambert 项），不是影长 —— 影长画在树的贴图里，
+                因为本项目 `LIGHTS.shadows = false`。 */}
             <directionalLight
                 ref={keyRef}
-                position={LIGHTS.key.position}
-                intensity={LIGHTS.key.intensity}
-                color={LIGHTS.key.color}
+                position={EP.day.keyPos}
+                intensity={EP.day.keyI}
+                color={EP.day.key.getHex()}
             />
             {!isLowTier && (
                 <directionalLight
                     ref={fillRef}
-                    position={LIGHTS.fill.position}
-                    intensity={LIGHTS.fill.intensity}
-                    color={LIGHTS.fill.color}
+                    position={EP.day.fillPos}
+                    intensity={EP.day.fillI}
+                    color={EP.day.fill.getHex()}
                 />
             )}
 

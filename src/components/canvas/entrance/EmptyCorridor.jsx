@@ -3,6 +3,8 @@ import { useFrame } from '@react-three/fiber';
 import { SURFACE_VERT, GRASS_FRAG, makeSurfaceUniforms } from '../../../shaders/entranceTextures';
 import { OUTDOOR_DROP } from '../../../config/entranceMetrics';
 import { sharedGeometry } from '../../../engine/resources';
+// 草地也要跟着季节走 —— 它与甬路的草边共用 grassSurface()，见下面的说明。
+import { useSeason } from '../../../hooks/useSeason';
 
 /**
  * EmptyCorridor Component
@@ -55,6 +57,7 @@ const EmptyCorridor = ({ camera }) => {
 const CorridorSegmentEmpty = ({ zStart, corridorWidth, corridorHeight }) => {
     const length = 40;
     const zCenter = zStart - length / 2;
+    const season = useSeason();
 
     // The outdoor ground sits a deliberate 0.34 below the indoor floor plane.
     //
@@ -96,8 +99,9 @@ const CorridorSegmentEmpty = ({ zStart, corridorWidth, corridorHeight }) => {
     const grassUniforms = useMemo(() => makeSurfaceUniforms(
         corridorWidth,
         length,
-        [-corridorWidth / 2, zCenter]
-    ), [corridorWidth, length, zCenter]);
+        [-corridorWidth / 2, zCenter],
+        season
+    ), [corridorWidth, length, zCenter, season]);
 
     return (
         <group>

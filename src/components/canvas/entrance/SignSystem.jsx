@@ -7,6 +7,8 @@ import { BANNER_TOP_Y } from '../../../config/entranceMetrics';
 import { sharedGeometry } from '../../../engine/resources';
 import { makeLanternTexture } from '../../../utils/entranceArt';
 import { useSitePreferences } from '../../../context/SitePreferences';
+import { seasonGlowFor } from '../../../config/seasonLight';
+import { useSeason } from '../../../hooks/useSeason';
 
 /**
  * SignSystem — minimal rustic wooden sign hanging from a beam, with a 灯笼
@@ -105,6 +107,12 @@ const Lantern = ({ x }) => {
     const { theme } = useSitePreferences();
     const night = theme === 'dark';
 
+    // 灯笼是场景里主动发光的两处之一，它的过驱量要按季节的 veil 亮度补偿 ——
+    // 秋天 = 1（逐位不变），冬天 < 1（veil 更亮，少推一点就不会削顶）。
+    // 推导过程见 config/seasonLight.js 的 seasonGlowFor。
+    const season = useSeason();
+    const glow = seasonGlowFor(season);
+
     const bodyRef = useRef();
     const goldRef = useRef();
     const lightRef = useRef();
@@ -135,13 +143,13 @@ const Lantern = ({ x }) => {
             + Math.sin(state.clock.elapsedTime * 7.7) * 0.03 * k;
 
         if (bodyRef.current) {
-            bodyRef.current.emissiveIntensity = LANTERN_LIT * k * flicker;
+            bodyRef.current.emissiveIntensity = LANTERN_LIT * k * flicker * glow;
         }
         if (goldRef.current) {
-            goldRef.current.emissiveIntensity = 0.5 * k * flicker;
+            goldRef.current.emissiveIntensity = 0.5 * k * flicker * glow;
         }
         if (lightRef.current) {
-            lightRef.current.intensity = 4.4 * k * flicker;
+            lightRef.current.intensity = 4.4 * k * flicker * glow;
         }
     });
 

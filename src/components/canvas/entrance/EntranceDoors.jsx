@@ -13,6 +13,9 @@ import { SURFACE_VERT, SONG_WALL_FRAG, STONE_FRAG, makeSurfaceUniforms } from '.
 import GateBase from './GateBase';
 import { WindChime, WhiteDog, WoodenPlanter, WoodenWindowFrame, WindowCurtain, SwallowNest } from './EntranceProps';
 import { SCENE_FONTS } from '../../../config/theme';
+// 季节：门联与院子共用同一张月份表（config/seasons.js），所以门口挂秋联时
+// 院子就是秋天 —— 这条一致性是免费的。
+import { useSeason } from '../../../hooks/useSeason';
 import {
     makeDoorFaceTexture,
     makeDoorFrameTexture,
@@ -242,6 +245,8 @@ const EntranceDoors = ({
     const windowAvatarRef = useRef();
     const { camera } = useThree();
     const { unlockAchievement } = useAchievements();
+    // 一次会话内恒定 —— 默认按月份，`?season=冬` 可覆盖。见 config/seasons.js。
+    const season = useSeason();
 
     const [isMobile, setIsMobile] = useState(false);
 
@@ -296,7 +301,9 @@ const EntranceDoors = ({
         (texture) => { texture.colorSpace = THREE.SRGBColorSpace; }
     );
 
-    const treeTexture = makeTreeTexture();
+    // 四季：春新芽+花 / 夏浓荫 / 秋红果（= 现状）/ 冬秃枝。
+    // 缓存键含季节，种子不含（见 makeTreeTexture 的说明）。
+    const treeTexture = makeTreeTexture(season);
     const bugTexture = makeLadybirdTexture();
     const speechBubbleTexture = makeSpeechBubbleTexture();
 
@@ -782,7 +789,11 @@ const EntranceDoors = ({
     // The cut-outs are the opening plus a small margin, so the doors and the
     // frame show through without the brick clipping their edges.
     const brickUniforms = useMemo(() => ({
-        ...makeSurfaceUniforms(FACADE_W, FACADE_H, [-FACADE_W / 2, facadeCenterY - FACADE_H / 2]),
+        ...makeSurfaceUniforms(
+            FACADE_W, FACADE_H,
+            [-FACADE_W / 2, facadeCenterY - FACADE_H / 2],
+            season
+        ),
         uHoleDoor: { value: [0, doorCenterY, doorOpeningWidth / 2 + 0.07, doorHeight / 2 + 0.06] },
         uHoleWindow: { value: [WINDOW_X, 0.02, 0.7, 0.73] },
         uInk: { value: wallInk },
@@ -804,13 +815,16 @@ const EntranceDoors = ({
         // supposed to sit on plaster, and at full strength it competes with the
         // coursing for attention (see the note in entranceTextures.js).
         uInkStrength: { value: 0.96 }
-    }), [facadeCenterY, wallInk, doorCenterY, doorOpeningWidth, doorHeight]);
+    }), [facadeCenterY, wallInk, doorCenterY, doorOpeningWidth, doorHeight, season]);
     // vUv=(0,0) of the rotated walkway plane lands at world z = the plane's
     // centre + half its length (its v axis runs against world +Z). Same frame
     // as the grass field, so the two surfaces are continuous at the seam.
+    // ⚠️ 甬路的**草边**走的是共享的 grassSurface()，所以必须跟着季节走 ——
+    // 否则草地换了春绿而路边的草边还是秋绿，石路矩形那条直边会重新裂出接缝，
+    // 也就是这个项目早就修过一次的「生硬」。
     const stoneUniforms = useMemo(() => makeSurfaceUniforms(
-        pathWidth, pathLength, [-pathWidth / 2, position[2] + pathCenterZ + pathLength / 2]
-    ), [pathWidth, pathLength, pathCenterZ, position]);
+        pathWidth, pathLength, [-pathWidth / 2, position[2] + pathCenterZ + pathLength / 2], season
+    ), [pathWidth, pathLength, pathCenterZ, position, season]);
 
     return (
         <group ref={groupRef} position={[position[0], 0, position[2]]}>

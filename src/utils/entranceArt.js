@@ -418,6 +418,20 @@ function shoot(x, y, ang, len, bend, steps = 10) {
  * thick branch shows a step at every joint — this is a single continuous
  * silhouette, which is what lets the trunk be filled and then have its bark
  * clipped inside.
+ *
+ * ⚠️ 路径**刻意不 closePath**（2026-10-09）。
+ *
+ * 端面的封口线正是「树干像拼接出来的」的成因：这个函数给每一条骨架都画了闭合
+ * 轮廓，于是树干顶端有一条**宽 48 的横线**，三条主枝的根部又各有一条
+ * （44 / 44 / 40，而且各自垂直于自己第一段的方向）—— 四条线在分叉点交叉，
+ * 就是用户看到的那道缝。
+ *
+ * 去掉 closePath 对**填充零影响**：canvas 规范里 `fill()` 与 `clip()` 会
+ * **隐式闭合**子路径。所以只有 `stroke()` 会因此不再画端面 —— 而树干/主枝的
+ * 墨线恰好是唯一在意这件事的地方。
+ *
+ * 🔑 另一个同样重要的性质：这个改动**不消耗任何随机数**。所以树的整体形态
+ * 逐位不变，秋天的回归锚点得以保留（见 `makeTreeTexture` 的说明）。
  */
 function taperedPath(c, pts, w0, w1) {
     const n = pts.length;
@@ -441,16 +455,95 @@ function taperedPath(c, pts, w0, w1) {
     c.moveTo(left[0][0], left[0][1]);
     for (let i = 1; i < n; i++) c.lineTo(left[i][0], left[i][1]);
     for (let i = n - 1; i >= 0; i--) c.lineTo(right[i][0], right[i][1]);
-    c.closePath();
+    // 不 closePath —— 见上面的说明。fill()/clip() 会隐式闭合，stroke() 不会。
 }
 
 /* Persimmon foliage palette. Autumn tints sit in the minority — a tree in
    fruit is mostly still green, and the orange fruit is what should read. */
 const TREE_GREENS = ['#4A6A31', '#567A38', '#3E5B2A', '#62883F', '#375124'];
 const TREE_AUTUMN = ['#8E6A2C', '#A87C2E', '#7A5A26', '#B98A33'];
+/* 春：返青的嫩芽。比 TREE_GREENS 亮一档、往黄绿偏 —— 新叶本来就更黄更透。 */
+const TREE_SPRING = ['#6E8F3C', '#7FA246', '#5E7D33', '#8CB053', '#547029'];
 /* The shadow pass: the same greens pushed well down in value. */
 const TREE_SHADE = ['#22390F', '#2A4416', '#1B2F0C', '#31501B'];
 const TREE_RIB = '#2C421C';
+
+/**
+ * 每季的树参数。
+ *
+ * ⚠️ `autumn` 一栏**必须逐位等于加季节之前的行为** —— 它就是原来那些写死的
+ * 常量搬进了表里。改动它等于放弃本方案最便宜的回归锚点。
+ *
+ * 四个状态里只有两处是"结构性"的：
+ *   - `winter.canopy = false` —— 整段树冠不画（柿子树的骨架 `LIMBS` 是手写死的，
+ *     所以"冬天秃枝"是删一段绘制，不是做一套新资产）
+ *   - `spring/summer.fruit = 0` —— 果实段不画
+ *
+ * `shadow` 是**画在 canvas 上的影子**的压扁系数（`ctx.scale(1, shadow)`），
+ * 不是光照算出来的 —— 本项目 `LIGHTS.shadows = false`，影长只能手绘。
+ * 夏至最短（0.11）、冬至最长（0.30）。`shadowDx` 是太阳方位的水平偏移。
+ */
+const TREE_SEASON = {
+    spring: {
+        canopy: true,
+        foliage: { lit: TREE_SPRING, accent: null, accentChance: 0 },
+        rosetteR: [30, 26],
+        scatterChance: 0.28,
+        fruit: 0,
+        blossoms: 26,
+        windfalls: 0,
+        litter: 14,
+        litterKind: 'petal',
+        shadow: 0.20,
+        shadowDx: -14,
+        snow: false,
+    },
+    summer: {
+        canopy: true,
+        foliage: { lit: TREE_GREENS, accent: null, accentChance: 0 },
+        rosetteR: [36, 30],
+        scatterChance: 0.34,
+        fruit: 0,
+        blossoms: 0,
+        windfalls: 0,
+        litter: 0,
+        litterKind: 'leaf',
+        shadow: 0.11,
+        shadowDx: 0,
+        snow: false,
+    },
+    /* 秋 = 现状。这一栏是原值，不是"又调了一遍的秋色"。 */
+    autumn: {
+        canopy: true,
+        foliage: { lit: TREE_GREENS, accent: TREE_AUTUMN, accentChance: 0.3 },
+        rosetteR: [30, 26],
+        scatterChance: 0.28,
+        fruit: 34,
+        blossoms: 0,
+        windfalls: 3,
+        litter: 14,
+        litterKind: 'leaf',
+        shadow: 0.17,
+        shadowDx: 0,
+        snow: false,
+    },
+    winter: {
+        canopy: false,
+        foliage: null,
+        rosetteR: [0, 0],
+        scatterChance: 0,
+        fruit: 0,
+        blossoms: 0,
+        windfalls: 0,
+        litter: 0,
+        litterKind: 'leaf',
+        shadow: 0.30,
+        shadowDx: 22,
+        snow: true,
+    },
+};
+
+const treeSeasonOf = (season) => TREE_SEASON[season] || TREE_SEASON.autumn;
 
 /**
  * One leaf rosette. Persimmon foliage grows in tufts at the end of a shoot,
@@ -465,18 +558,23 @@ const TREE_RIB = '#2C421C';
  * would show through the gaps between tufts as smudge on the wall; a shadow
  * made of the tufts themselves cannot escape the foliage.
  */
-function drawRosette(c, cx, cy, R, baseAng, rand, shade = false) {
+function drawRosette(c, cx, cy, R, baseAng, rand, shade = false, foliage = null) {
     // A small irregular wash first so the tuft has body. Deliberately much
     // smaller than the leaves reach, so it can never read as a sphere.
     const body = (cc) => wobblePath(cc, cx, cy, R * 0.66, R * 0.58, rand, { amp: 0.3, segments: 11 });
     wash(c, body, shade ? '#16260A' : '#2C4520', rand, { passes: 3, spread: R * 0.34, alpha: shade ? 0.16 : 0.11 });
+
+    // 季节只换调色板，不换结构。`foliage.accent` 为 null 时**不调用 rand()**
+    // （短路），所以春/夏是纯色树冠，而秋保持原来的「30% 秋色叶」混搭。
+    const fol = foliage || { lit: TREE_GREENS, accent: TREE_AUTUMN, accentChance: 0.3 };
 
     const n = 6 + Math.floor(rand() * 6);
     for (let i = 0; i < n; i++) {
         const a = baseAng + (rand() - 0.5) * 2.9;
         const d = R * (0.1 + rand() * 0.75);
         const len = R * (0.5 + rand() * 0.46);
-        const pal = shade ? TREE_SHADE : (rand() < 0.3 ? TREE_AUTUMN : TREE_GREENS);
+        const pal = shade ? TREE_SHADE
+            : (fol.accent && rand() < fol.accentChance ? fol.accent : fol.lit);
         drawLeaf(
             c,
             cx + Math.cos(a) * d, cy + Math.sin(a) * d,
@@ -592,9 +690,63 @@ function drawPersimmon(c, x, y, r, rand) {
     c.restore();
 }
 
-export function makeTreeTexture() {
-    const key = 'entrance:tree';
+/**
+ * 一朵柿子花 / 一片落花。
+ *
+ * 四瓣、极淡的黄白，中间一小点花心。柿子花本来就小得几乎看不见，
+ * 所以这里不追求单朵的好看，追求的是**远看能读出「这树在开花」**——
+ * 春天需要一个正向信号（花开了），而不只是"没有果子"。
+ */
+function drawBlossom(c, x, y, r, rand) {
+    c.save();
+    c.translate(x, y);
+    c.rotate(rand() * Math.PI * 2);
+    const petals = 4;
+    for (let i = 0; i < petals; i++) {
+        c.save();
+        c.rotate((i / petals) * Math.PI * 2);
+        c.globalAlpha = 0.70 + rand() * 0.26;
+        c.fillStyle = i % 2 ? '#F6F0DE' : '#EFE5CB';
+        c.beginPath();
+        c.ellipse(r * 0.60, 0, r * 0.66, r * 0.42, 0, 0, Math.PI * 2);
+        c.fill();
+        c.restore();
+    }
+    c.globalAlpha = 0.85;
+    c.fillStyle = '#C9A24A';
+    c.beginPath();
+    c.arc(0, 0, r * 0.28, 0, Math.PI * 2);
+    c.fill();
+    c.restore();
+}
+
+/**
+ * 柿子树 —— 院子的四季主心骨。
+ *
+ * 为什么树是四季的主轴
+ * --------------------
+ * 它是全场唯一有生命周期的物件：春华、夏荫、秋实、冬枯。而且它本来就被**冻在秋天** ——
+ * 这个函数从写下第一天起就画的是红果 + 黄叶 + 落果 + 落叶。所以「做四季」不是给
+ * 四个变体加装饰，而是**把冻住的那一季解冻**。
+ *
+ * 冬秃枝之所以便宜
+ * ----------------
+ * 树骨架（`LIMBS` 那 13 条主枝）是**手写死的**，所以冬天只是 `canopy: false` ——
+ * 少画一段，不是另一套资产。
+ *
+ * 🔑 回归锚点：秋天的随机序列必须逐位不变
+ * --------------------------------------
+ * 种子里**不含季节**（固定 `'entrance:tree'`），季节只体现在 `cfg` 的开关与调色板上。
+ * 加上 `taperedPath` 那次「去掉 closePath」也不消耗随机数，所以
+ * `?season=autumn` 的树与加季节之前**逐位一致** —— 这是本方案最便宜的回归测试。
+ * 改动本函数时，任何**新增/删减 `rand()` 调用**都会打破它。
+ *
+ * @param {'spring'|'summer'|'autumn'|'winter'} [season]
+ */
+export function makeTreeTexture(season = 'autumn') {
+    const key = `entrance:tree:${season}`;
     if (cache.has(key)) return cache.get(key);
+    const cfg = treeSeasonOf(season);
 
     // Canvas aspect matches the 6×8 plane, so the tree renders at its natural
     // proportions — the bitmap this replaces was 1010×945 and therefore
@@ -603,7 +755,8 @@ export function makeTreeTexture() {
     const H = 1024;
     const canvas = makeCanvas(W, H);
     const ctx = canvas.getContext('2d');
-    const rand = mulberry32(hashString(key));
+    // ⚠️ 种子不含季节 —— 见上面的「回归锚点」。key 只负责缓存身份。
+    const rand = mulberry32(hashString('entrance:tree'));
 
     // The tree group is parked at y 0.95 with an 8-unit-tall plane, and the
     // lawn sits at y -1.75 — so the ground crosses this canvas at y = 858.
@@ -628,9 +781,14 @@ export function makeTreeTexture() {
     /* --- 1. ground shadow -------------------------------------------- */
     // Drawn first so the trunk lands on top of it. Squashed by the context
     // transform rather than by a per-axis radius, so the falloff stays round.
+    //
+    // 影长是**季节信号里最强的一条**，而本项目 `LIGHTS.shadows = false`
+    // （模板刻意关掉阴影贴图，是要保留的性能红利），所以影长不能靠灯算 ——
+    // 它就是下面这个压扁系数：夏至 0.11 最短、冬至 0.30 最长。
+    // `shadowDx` 跟着太阳方位左右挪一点。
     ctx.save();
-    ctx.translate(398, GROUND + 12);
-    ctx.scale(1, 0.17);
+    ctx.translate(398 + cfg.shadowDx, GROUND + 12);
+    ctx.scale(1, cfg.shadow);
     const shadow = ctx.createRadialGradient(0, 0, 14, 0, 0, 300);
     shadow.addColorStop(0, 'rgba(38,52,24,0.44)');
     shadow.addColorStop(0.5, 'rgba(38,52,24,0.20)');
@@ -839,29 +997,105 @@ export function makeTreeTexture() {
         limb(ctx, t.pts, t.w, '#6B4A30', { taper: 0.72 });
     }
 
+    /* --- 4b. 冬：枝上积雪 ---------------------------------------------- */
+    // 只在冬天画，压在骨架与细枝之上 —— 雪是最后落到枝上的东西。
+    //
+    // 沿每条枝的**法线朝上**偏一段，而不是简单地把 y 减小：水平走向的枝上
+    // 减 y 会把雪线整个挪出枝条外，法线偏移才对所有走向都成立。
+    // （canvas 的 y 轴朝下，所以"朝上"是 ny < 0。）
+    //
+    // 🔴 只在**够水平**的段落上画雪，竖直段直接跳过。
+    //
+    // 第一版把偏移量乘了个「朝上程度」`|ny|` —— 那是错的：`|ny| → 0` 只是让
+    // 雪线**贴回枝条中线**，于是树干上出现一条从分叉点拖到根部的白线。
+    // 短不等于对，得**不画**。所以这里把折线按 `up` 切成若干段，只给
+    // `up >= 0.30` 的连续段描边 —— 物理上也对：竖直的枝干挂不住雪。
+    if (cfg.snow) {
+        const UP_MIN = 0.30;
+
+        const snowRun = (run) => {
+            if (run.length < 2) return;
+            ctx.beginPath();
+            run.forEach(([x, y], i) => { if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+            ctx.stroke();
+        };
+
+        const snowLine = (pts, w0, w1, wMul) => {
+            const n = pts.length;
+            let run = [];
+            for (let i = 0; i < n; i++) {
+                const t = i / (n - 1);
+                const w = (w0 + (w1 - w0) * t) * wMul;
+                const p = pts[i];
+                const q = pts[Math.min(n - 1, i + 1)];
+                const r = pts[Math.max(0, i - 1)];
+                let dx = q[0] - r[0];
+                let dy = q[1] - r[1];
+                const L = Math.hypot(dx, dy) || 1;
+                dx /= L;
+                dy /= L;
+                let nx = -dy;
+                let ny = dx;
+                if (ny > 0) { nx = -nx; ny = -ny; }
+                if (Math.abs(ny) < UP_MIN) { snowRun(run); run = []; continue; }
+                run.push([p[0] + nx * w, p[1] + ny * w]);
+            }
+            snowRun(run);
+        };
+
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#EFF4F9';
+
+        // 树干**不画**：它几乎竖直，`up ≈ 0.08` 会被 UP_MIN 整段跳过。
+        // 留着这一条反而是个陷阱 —— 它看起来像"给树干也上了雪"，
+        // 但实际一个像素都不会落下去。要真的给树干积雪，得改的是
+        // 根部的**根盘**（水平面），不是这条竖直的轮廓。
+
+        // 主枝
+        ctx.globalAlpha = 0.90;
+        ctx.lineWidth = 3.2;
+        for (const L of LIMBS) snowLine(L.pts, L.w0, L.w1, 0.22);
+
+        // 细枝：薄薄一层，细枝挂不住多少雪
+        ctx.globalAlpha = 0.70;
+        ctx.lineWidth = 1.8;
+        for (const t of twigs) snowLine(t.pts, t.w, t.w * 0.72, 0.30);
+
+        ctx.restore();
+    }
+
     /* --- 5. canopy ----------------------------------------------------- */
     // Rosettes at every terminal tip, plus a scattering along the shoots, so
     // the foliage follows the branch structure instead of floating over it.
     // Painted in a shuffled order: cluster-by-cluster along a branch would
     // show up as stripes.
-    const rosettes = [];
-    for (const [x, y, a] of tips) rosettes.push([x, y, a, 30 + rand() * 26]);
-    for (const t of twigs) {
-        for (let i = 2; i < t.pts.length; i += 3) {
-            if (rand() > 0.28) continue;
-            const p = t.pts[i];
-            const q = t.pts[i - 1];
-            rosettes.push([p[0], p[1], Math.atan2(p[1] - q[1], p[0] - q[0]), 18 + rand() * 22]);
+    //
+    // 冬：整段不画 —— **这就是「秃枝」**。骨架是手写死的，所以冬天是少画一段，
+    // 不是另一套资产。春夏秋的差异只在 rosetteR（树冠厚度）、scatterChance
+    // （细枝上补多少簇）与 foliage（调色板）。
+    if (cfg.canopy) {
+        const [rBase, rJit] = cfg.rosetteR;
+        const rosettes = [];
+        for (const [x, y, a] of tips) rosettes.push([x, y, a, rBase + rand() * rJit]);
+        for (const t of twigs) {
+            for (let i = 2; i < t.pts.length; i += 3) {
+                if (rand() > cfg.scatterChance) continue;
+                const p = t.pts[i];
+                const q = t.pts[i - 1];
+                rosettes.push([p[0], p[1], Math.atan2(p[1] - q[1], p[0] - q[0]), 18 + rand() * 22]);
+            }
         }
-    }
-    rosettes.sort(() => rand() - 0.5);
+        rosettes.sort(() => rand() - 0.5);
 
-    // Shadow pass, offset down-right, then the lit pass over the top.
-    ctx.save();
-    ctx.translate(13, 11);
-    for (const [x, y, a, R] of rosettes) drawRosette(ctx, x, y, R, a, rand, true);
-    ctx.restore();
-    for (const [x, y, a, R] of rosettes) drawRosette(ctx, x, y, R, a, rand);
+        // Shadow pass, offset down-right, then the lit pass over the top.
+        ctx.save();
+        ctx.translate(13, 11);
+        for (const [x, y, a, R] of rosettes) drawRosette(ctx, x, y, R, a, rand, true, cfg.foliage);
+        ctx.restore();
+        for (const [x, y, a, R] of rosettes) drawRosette(ctx, x, y, R, a, rand, false, cfg.foliage);
+    }
 
     /* --- 6. fruit ------------------------------------------------------ */
     // Persimmons hang off the terminal twigs. A tree in fruit shows them on
@@ -874,7 +1108,9 @@ export function makeTreeTexture() {
         for (const p of LIMBS[li].pts) if (rand() < 0.55) hang.push(p);
     }
     hang.sort(() => rand() - 0.5);
-    for (const [x, y] of hang.slice(0, 34)) {
+    // 数量由季节给：秋 34（现状），其余三季 0。
+    // `slice(0, 0)` 是空数组 —— 既没画东西也没消耗随机数，所以不需要额外的 if。
+    for (const [x, y] of hang.slice(0, cfg.fruit)) {
         // Fruit radius, against the canopy leaves drawn by drawRosette.
         //
         // A rosette's leaves come out at R * (0.5..0.96) with R = 30..56, so a
@@ -887,14 +1123,34 @@ export function makeTreeTexture() {
         drawPersimmon(ctx, x + (rand() - 0.5) * 16, y + r * 1.15 + rand() * 8, r, rand);
     }
 
-    /* --- 7. windfalls -------------------------------------------------- */
+    /* --- 6b. 春：花 ---------------------------------------------------- */
+    // 柿子花其实很小、黄白色，不像桃花那样张扬。所以这里刻意画得**小、颜色淡**，
+    // 靠数量读出春天，而不是靠单朵的艳 —— 一棵柿树开花本来就不是一场花事。
+    if (cfg.blossoms > 0) {
+        const spots = [];
+        for (const [x, y] of tips) if (rand() < 0.5) spots.push([x, y]);
+        spots.sort(() => rand() - 0.5);
+        for (const [x, y] of spots.slice(0, cfg.blossoms)) {
+            drawBlossom(ctx, x + (rand() - 0.5) * 14, y + (rand() - 0.5) * 12, 5 + rand() * 3, rand);
+        }
+    }
+
+    /* --- 7. windfalls / 落花 ------------------------------------------- */
     // Three on the grass: the detail that turns a tree into a season.
     // Same fruit size as the canopy — a windfall does not shrink on the way
     // down. The old 21/18/20 were the same oversized fruit lying on the lawn.
-    for (const [x, y, r] of [[268, 840, 8], [330, 856, 7], [486, 846, 7.5]]) {
+    //
+    // 地上这一层是四季差异最讨巧的地方：秋 = 落果 + 落叶，春 = 落花，
+    // 夏冬什么都不落（`litter: 0`）。`slice(0, 0)` 同样是空数组。
+    const WINDSPOTS = [[268, 840, 8], [330, 856, 7], [486, 846, 7.5]];
+    for (const [x, y, r] of WINDSPOTS.slice(0, cfg.windfalls)) {
         drawPersimmon(ctx, x, y, r, rand);
     }
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < cfg.litter; i++) {
+        if (cfg.litterKind === 'petal') {
+            drawBlossom(ctx, 180 + rand() * 400, 826 + rand() * 30, 4 + rand() * 3, rand);
+            continue;
+        }
         const pal = rand() < 0.5 ? TREE_AUTUMN : TREE_GREENS;
         drawLeaf(
             ctx, 180 + rand() * 400, 826 + rand() * 30, rand() * Math.PI * 2,

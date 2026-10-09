@@ -8,6 +8,8 @@ import { reducedMotion } from '../../../hooks/useReducedMotion';
 import { sharedGeometry } from '../../../engine/resources';
 import { makeCurtainTexture, makeWindowInteriorTexture } from '../../../utils/entranceArt';
 import { useSitePreferences } from '../../../context/SitePreferences';
+import { seasonGlowFor } from '../../../config/seasonLight';
+import { useSeason } from '../../../hooks/useSeason';
 
 /**
  * Procedural entrance props — built purely from Three.js geometry,
@@ -605,6 +607,12 @@ export function WindowCurtain({ position }) {
 
     const { theme } = useSitePreferences();
 
+    // 窗内暖光同样靠"过驱 color 去压过 veil"，所以也要按季节补偿 ——
+    // 秋天 = 1（逐位不变），冬天 < 1（veil 更亮，不补偿就削顶成白窗）。
+    // 见 config/seasonLight.js 的 seasonGlowFor。
+    const season = useSeason();
+    const glow = seasonGlowFor(season);
+
     useFrame((state, delta) => {
         const target = theme === 'dark' ? 1 : 0;
         const lit = state.__curtainLit ?? (state.__curtainLit = { t: -1 });
@@ -614,16 +622,16 @@ export function WindowCurtain({ position }) {
             lit.t = target > lit.t ? Math.min(target, lit.t + step) : Math.max(target, lit.t - step);
         } else return;
         interiorMat.color.setRGB(
-            1 + 2.15 * lit.t,
-            1 + 1.25 * lit.t,
-            1 + 0.30 * lit.t,
+            1 + 2.15 * lit.t * glow,
+            1 + 1.25 * lit.t * glow,
+            1 + 0.30 * lit.t * glow,
         );
         // The reveal warms with the room, or it would cut a cold dark line
         // across the edge of a glowing window at night.
         revealMat.color.setRGB(
-            0.165 + 0.42 * lit.t,
-            0.110 + 0.26 * lit.t,
-            0.071 + 0.10 * lit.t,
+            0.165 + 0.42 * lit.t * glow,
+            0.110 + 0.26 * lit.t * glow,
+            0.071 + 0.10 * lit.t * glow,
         );
     });
 

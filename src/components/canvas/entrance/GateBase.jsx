@@ -14,6 +14,9 @@ import {
     PLINTH_W, PLINTH_H, PLINTH_Z,
 } from '../../../config/entranceMetrics';
 import { sharedGeometry } from '../../../engine/resources';
+// 台明 / 踏跺的顶面用 STONE_FRAG，冬天会落一层薄雪（见 shader 里的 uSnow），
+// 所以这两块也要跟着季节走 —— 否则雪后的院子里只有门前那块石头是干的。
+import { useSeason } from '../../../hooks/useSeason';
 
 /**
  * GateBase — 门座：台基 / 台明 / 踏跺 / 门槛 / 门枕石
@@ -55,6 +58,7 @@ import { sharedGeometry } from '../../../engine/resources';
  * 而不是地面。冷暖分开是有意的：青石是墙，石板是路。
  */
 const GateBase = ({ worldZ = 0 }) => {
+    const season = useSeason();
     // 台明：从门平面稍后一点一直伸到踏跺前缘
     const apronCenterZ = APRON_FRONT_Z - APRON_DEPTH / 2;
     const stepCenterZ = APRON_FRONT_Z + STEP_DEPTH / 2;
@@ -78,18 +82,20 @@ const GateBase = ({ worldZ = 0 }) => {
     const apronTopUniforms = useMemo(() => ({
         ...makeSurfaceUniforms(
             APRON_W, APRON_DEPTH,
-            [-APRON_W / 2, worldZ + apronCenterZ + APRON_DEPTH / 2]
+            [-APRON_W / 2, worldZ + apronCenterZ + APRON_DEPTH / 2],
+            season
         ),
         uInLawn: { value: 0 },
-    }), [apronCenterZ, worldZ]);
+    }), [apronCenterZ, worldZ, season]);
 
     const stepTopUniforms = useMemo(() => ({
         ...makeSurfaceUniforms(
             STEP_W, STEP_DEPTH,
-            [-STEP_W / 2, worldZ + stepCenterZ + STEP_DEPTH / 2]
+            [-STEP_W / 2, worldZ + stepCenterZ + STEP_DEPTH / 2],
+            season
         ),
         uInLawn: { value: 0 },
-    }), [stepCenterZ, worldZ]);
+    }), [stepCenterZ, worldZ, season]);
 
     const thresholdTexture = useMemo(() => makeThresholdTexture(), []);
 

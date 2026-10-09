@@ -76,6 +76,26 @@ float fbm(vec2 p) {
 /* ------------------------------------------------------------------ */
 
 const GRASS_GLSL = /* glsl */ `
+// ---- 季节调色板 ------------------------------------------------------
+// **只在这里声明一次。** GRASS_FRAG（草地）与 STONE_FRAG（甬路的草边）都
+// include 本段，所以两边的季节色板天生相同 —— 石路矩形边上不可能裂出接缝。
+//
+// 这是本文件最贵的一课的直接应用：这两个 surface 曾经各有一套调色板和
+// 两个坐标系，在石路的直边相接，那正是「生硬」的定义。当时的解法是
+// **删掉接缝而不是柔化它**。季节色板加在共享函数里，接缝就没机会回来。
+//
+// 用 palette uniforms 而不是在 GLSL 里写季节分支：着色器保持通用，
+// 季节只是数据。默认值（见 SEASON_GROUND 的 autumn 一栏）逐位等于加季节之前。
+uniform vec3  uGrassA;        // 草基色 A
+uniform vec3  uGrassB;        // 草基色 B
+uniform vec3  uMoss;          // 苔色
+uniform vec3  uTip;           // 受光叶尖
+uniform vec3  uFlowerA;       // 花瓣色阶 2
+uniform vec3  uFlowerB;       // 花瓣色阶 3
+uniform vec3  uFlowerC;       // 花瓣色阶 4
+uniform float uFlowerDensity; // 开花格子比例
+uniform float uSnow;          // 0..1 积雪覆盖
+
 vec2 hash22(vec2 p) {
     return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453);
 }
@@ -107,7 +127,7 @@ vec3 grassSurface(vec2 gw) {
     // things that read as bright.
     float n1 = noise2(gw * 1.1);
     float n2 = fbm(gw * 3.0 + 11.0);
-    vec3 col = mix(vec3(0.408, 0.514, 0.298), vec3(0.278, 0.400, 0.220), n1 * 0.65 + n2 * 0.35);
+    vec3 col = mix(uGrassA, uGrassB, n1 * 0.65 + n2 * 0.35);
 
     // Blade tufts: two crossed stretched-noise layers give a soft, non-
     // directional shag instead of a single hard streak direction.
@@ -116,14 +136,14 @@ vec3 grassSurface(vec2 gw) {
     float blades = mix(bladesA, bladesB, 0.45);
     col *= 0.92 + 0.16 * blades;
     // Sunlit tips
-    col += vec3(0.040, 0.062, 0.024) * smoothstep(0.82, 0.99, blades);
+    col += uTip * smoothstep(0.82, 0.99, blades);
     // Shadowed clumps
     col *= 1.0 - 0.12 * smoothstep(0.78, 0.97, n2);
 
     // Moss gathering in the shadier patches — this is what makes the ground
     // read as a garden floor rather than as turf.
     float mossN = fbm(gw * 1.7 + 33.0);
-    col = mix(col, vec3(0.322, 0.416, 0.224), smoothstep(0.56, 0.84, mossN) * 0.45);
+    col = mix(col, uMoss, smoothstep(0.56, 0.84, mossN) * 0.45);
 
     // --- Sparse flowers: jittered world grid, roughly one every five cells ---
     float cell = 0.95;
@@ -135,19 +155,21 @@ vec3 grassSurface(vec2 gw) {
         for (int x = -1; x <= 1; x++) {
             vec2 o = vec2(float(x), float(y));
             vec2 h = hash22(gid + o);
-            // Keep only ~8% of the cells. A Song garden plants a few things
-            // deliberately; a meadow of flowers is the wrong century.
-            if (h.x > 0.08) continue;
+            // Keep only a small share of the cells. A Song garden plants a few
+            // things deliberately; a meadow of flowers is the wrong century.
+            // 密度按季节给：春最多（0.16）、夏秋回到 0.08、冬为 0。
+            if (h.x > uFlowerDensity) continue;
 
             // Jittered centre inside the cell, never right on the border
             vec2 c = o + 0.24 + h * 0.52;
             vec2 p = gf - c;
 
-            // Petal tint: restrained — cream, pale gold, faded rose, muted red
+            // Petal tint: restrained — cream, pale gold, faded rose, muted red.
+            // 第 1 阶（奶白）是基准，2..4 阶按季节给：春偏粉白、夏秋是上面这套。
             float t = hash21((gid + o) * 1.37 + 5.1);
-            vec3 petal = mix(vec3(0.960, 0.941, 0.878), vec3(0.937, 0.855, 0.549), smoothstep(0.0, 0.34, t));
-            petal = mix(petal, vec3(0.906, 0.729, 0.780), smoothstep(0.34, 0.68, t));
-            petal = mix(petal, vec3(0.839, 0.522, 0.463), smoothstep(0.68, 1.0, t));
+            vec3 petal = mix(vec3(0.960, 0.941, 0.878), uFlowerA, smoothstep(0.0, 0.34, t));
+            petal = mix(petal, uFlowerB, smoothstep(0.34, 0.68, t));
+            petal = mix(petal, uFlowerC, smoothstep(0.68, 1.0, t));
             vec3 core = vec3(0.890, 0.749, 0.310);
 
             // Scale each flower a little differently
@@ -168,6 +190,16 @@ vec3 grassSurface(vec2 gw) {
             col = mix(col, fl.rgb, fl.a);
         }
     }
+
+    // --- 积雪 ---------------------------------------------------------
+    // 雪是**一次 mix**，不是新增几何：地面薄雪全靠这一个 uniform。
+    // 用低频噪声做出"没盖满、还露着枯草"的斑驳 —— 纯白平铺会像塑料布。
+    //
+    // ⚠️ 其余三季 uSnow = 0，而「mix(col, x, 0.0)」在数值上严格等于 col，
+    // 所以这三季的画面**逐位不受影响**（这是秋天回归锚点成立的前提之一）。
+    float snowN = fbm(gw * 0.62 + 61.0);
+    float snowMask = 0.42 + 0.58 * smoothstep(0.28, 0.66, snowN);
+    col = mix(col, vec3(0.930, 0.947, 0.972), uSnow * snowMask);
 
     // Paper-like grain to match the sketchy art direction. Keyed off the
     // world frame so it does not band across the ground tiles.
@@ -214,6 +246,11 @@ uniform float uInkStrength;
 // 传 >1 就是「这面墙没有压顶」—— 台基/勒脚那类矮石台用它，
 // 否则压顶的 smoothstep 会落在石头顶上，给石台盖一条瓦色的带子。
 uniform float uCapFrac;
+// 0..1 积雪。STONE_FRAG / GRASS_FRAG 里这一行声明在共享的 GRASS_GLSL 中，
+// 本 shader 不 include 那一段，所以自己声明 —— 名字与 makeSurfaceUniforms
+// 分发的那个必须一致，否则冬天会静默不生效（three 忽略多余的 uniform，
+// 也**不会**为缺失的 uniform 报错）。
+uniform float uSnow;
 
 ${NOISE_GLSL}
 
@@ -373,6 +410,20 @@ void main() {
     vec4 ink = texture2D(uInk, vUv);
     col = mix(col, ink.rgb, ink.a * uInkStrength);
 
+    /* ---- 冬：压顶与檐口积雪 -------------------------------------------- */
+    // 冬天最容易露馅的一笔：地面全白了、屋顶还是黑的，整个场景立刻"假"。
+    // 雪只落在**水平的瓦面**上（压顶 capMask 那一段 + 瓦当滴水的檐口），
+    // 砖墙立面保持干净 —— 垂直面挂不住雪，这也正是它读起来像"雪后"、
+    // 而不是像蒙了一层白纱的原因。
+    //
+    // ⚠️ uSnow = 0 时「mix(col, x, 0.0)」在数值上严格等于 col，所以其余
+    // 三季**逐字节不变**（秋天回归锚点的一部分，别把这一行挪到 ink 之前）。
+    float wallSnow = smoothstep(capBase - 0.05, capBase + 0.02, above)
+                   + eaveMask * 0.80;
+    float wallSnowN = 0.55 + 0.45 * fbm(world * 2.1 + 23.0);
+    col = mix(col, vec3(0.930, 0.947, 0.972),
+              clamp(uSnow * wallSnow, 0.0, 1.0) * wallSnowN);
+
     /* ---- paper grain -------------------------------------------------- */
     col *= 0.975 + 0.05 * noise2(vUv * uSize * 24.0);
 
@@ -476,6 +527,19 @@ void main() {
 
     vec3 col = mix(grassSurface(gw), pathCol, inPath);
 
+    // --- 冬：石板上的一层薄雪 -------------------------------------------
+    // 厚雪在 grassSurface() 里。石板是**扫过的路**，所以这里只给一层薄得多
+    // 的雪：积在石缝和低处，露出石头的暖色。满铺会把甬路变成一条白布，
+    // 而雪后的院子恰恰是靠"哪块扫了、哪块没扫"读出来的。
+    //
+    // 「* inPath」是必须的：草边已经吃过 grassSurface 的厚雪了，再叠一层
+    // 就会比草地还白，接缝立刻回来。
+    //
+    // ⚠️ uSnow = 0 时逐位不变（秋天回归锚点）。
+    float stoneSnow = fbm(gw * 0.85 + 17.0);
+    col = mix(col, vec3(0.930, 0.947, 0.972),
+              uSnow * inPath * (0.18 + 0.30 * smoothstep(0.34, 0.72, stoneSnow)));
+
     // 沿阶草 border: a real garden path never goes stone-straight-to-lawn.
     // There is always a strip of damp, darker growth hugging the slabs,
     // and drawing it is what turns the edge into a planting line rather
@@ -516,7 +580,83 @@ void main() {
 /* Uniform factories                                                    */
 /* ------------------------------------------------------------------ */
 
-export function makeSurfaceUniforms(width, height, origin = [0, 0]) {
+/**
+ * 四季的地面色板。
+ *
+ * ⚠️ `autumn` 一栏**逐位等于加季节之前的那些硬编码常量** —— 它不是"又调了一遍的秋色"，
+ * 而是把原值原样搬进表里。所以 `?season=autumn` 的地面与改动前逐位一致，
+ * 这就是本方案最便宜的回归锚点。改这一栏之前先想清楚：你会失去那个锚点。
+ *
+ * 花色的第 1 阶（奶白那一档）在 GLSL 里仍是基准常量，这里给的是 2..4 阶。
+ */
+const SEASON_GROUND = {
+    /* 春：返青的嫩绿，花最多（0.16）且偏粉白 —— 春是唯一"多花"的一季。 */
+    spring: {
+        uGrassA: [0.451, 0.588, 0.318],
+        uGrassB: [0.302, 0.451, 0.239],
+        uMoss: [0.353, 0.478, 0.263],
+        uTip: [0.075, 0.105, 0.035],
+        uFlowerA: [0.960, 0.878, 0.898],
+        uFlowerB: [0.925, 0.760, 0.800],
+        uFlowerC: [0.960, 0.941, 0.878],
+        uFlowerDensity: 0.16,
+        uSnow: 0,
+    },
+    /* 夏：最深最茂的一季，草色压到最暗。 */
+    summer: {
+        uGrassA: [0.365, 0.510, 0.247],
+        uGrassB: [0.231, 0.376, 0.176],
+        uMoss: [0.286, 0.400, 0.196],
+        uTip: [0.052, 0.086, 0.024],
+        uFlowerA: [0.960, 0.941, 0.878],
+        uFlowerB: [0.937, 0.855, 0.549],
+        uFlowerC: [0.839, 0.522, 0.463],
+        uFlowerDensity: 0.08,
+        uSnow: 0,
+    },
+    /* 秋：现状。见上面的警告。 */
+    autumn: {
+        uGrassA: [0.408, 0.514, 0.298],
+        uGrassB: [0.278, 0.400, 0.220],
+        uMoss: [0.322, 0.416, 0.224],
+        uTip: [0.040, 0.062, 0.024],
+        uFlowerA: [0.937, 0.855, 0.549],
+        uFlowerB: [0.906, 0.729, 0.780],
+        uFlowerC: [0.839, 0.522, 0.463],
+        uFlowerDensity: 0.08,
+        uSnow: 0,
+    },
+    /* 冬：枯黄底 + 全覆雪，一朵花都没有。 */
+    winter: {
+        uGrassA: [0.478, 0.463, 0.353],
+        uGrassB: [0.365, 0.353, 0.271],
+        uMoss: [0.408, 0.400, 0.318],
+        uTip: [0.075, 0.071, 0.055],
+        uFlowerA: [0.960, 0.941, 0.878],
+        uFlowerB: [0.960, 0.941, 0.878],
+        uFlowerC: [0.960, 0.941, 0.878],
+        uFlowerDensity: 0,
+        uSnow: 1,
+    },
+};
+
+/** 某一季的地面色板 → three 的 uniform 对象。未知季节落到秋天。 */
+export function groundSeasonUniforms(season = 'autumn') {
+    const p = SEASON_GROUND[season] || SEASON_GROUND.autumn;
+    return {
+        uGrassA: { value: p.uGrassA },
+        uGrassB: { value: p.uGrassB },
+        uMoss: { value: p.uMoss },
+        uTip: { value: p.uTip },
+        uFlowerA: { value: p.uFlowerA },
+        uFlowerB: { value: p.uFlowerB },
+        uFlowerC: { value: p.uFlowerC },
+        uFlowerDensity: { value: p.uFlowerDensity },
+        uSnow: { value: p.uSnow },
+    };
+}
+
+export function makeSurfaceUniforms(width, height, origin = [0, 0], season = 'autumn') {
     return {
         uSize: { value: [width, height] },
         uOrigin: { value: origin },
@@ -525,6 +665,9 @@ export function makeSurfaceUniforms(width, height, origin = [0, 0]) {
         // 那会让 uInLawn=0 的甬路整条没有石板、uCapFrac=0 的墙整面变成黑瓦。
         // 默认值必须落在"正常的墙/正常的路"这一侧。
         uInLawn: { value: 1 },     // STONE_FRAG：1 = 铺在草坪里的甬路
-        uCapFrac: { value: 0.905 } // SONG_WALL_FRAG：压顶起始高度占墙高的比例
+        uCapFrac: { value: 0.905 }, // SONG_WALL_FRAG：压顶起始高度占墙高的比例
+        // 季节地面色板。**默认秋天**（= 加季节之前的原值），
+        // 所以忘记传 season 的调用方（墙、台基）既不会变黑也不会变色。
+        ...groundSeasonUniforms(season),
     };
 }

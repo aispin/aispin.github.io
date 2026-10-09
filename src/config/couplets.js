@@ -37,6 +37,9 @@
  * 超出范围就落到兜底那一副，不会崩。
  */
 import { TERM_DAYS, TERM_MONTHS, TERM_NAMES, FESTIVAL_DAYS, FESTIVAL_NAMES } from './coupletCalendar.data';
+// 季节的月份表**不在这里** —— 它是 config/seasons.js 的唯一真源，
+// 四季院子也用同一张表（今天挂秋联，院子就是秋天）。
+import { seasonZhOf, resolveSeason, SEASONS } from './seasons';
 
 /**
  * 日常那几副 —— **按季节分四套**（2026-10-09 用户要求）。
@@ -66,15 +69,33 @@ export const DAILY_COUPLETS = [
  * 3–5 春 / 6–8 夏 / 9–11 秋 / 12–2 冬。
  * 不按节气算，是因为日常联本来就**只在不是节气、也不是节日的日子**出现；
  * 按月份切分更直白，也不会在立春 / 立夏那几天出现「某一副只挂一天」。
+ *
+ * ⚠️ 月份表已搬到 `config/seasons.js`（唯一真源），这里只是转出 ——
+ * 它现在同时服务于门联和院子，抄两份迟早在某一边漂移。
  */
-const SEASON_BY_MONTH = ['冬', '冬', '春', '春', '春', '夏', '夏', '夏', '秋', '秋', '秋', '冬'];
 
 /** 某个日期属于哪个季节（'春' | '夏' | '秋' | '冬'）。 */
-export const seasonOf = (date = new Date()) => SEASON_BY_MONTH[date.getMonth()];
+export const seasonOf = seasonZhOf;
+
+/**
+ * `?season=` **明确指定**时的季节（中文）；自动判断时返回 null。
+ *
+ * 为什么门联要读它：`?season=` 是「把院子摆成这一季」的调试开关，而门联原本
+ * 只认系统日期。于是 `?season=spring` 在十月会得到**春天的院子挂着秋天的门联**
+ * —— 两个真源互相打脸，四季定妆照也没法看。
+ *
+ * 优先级：**`?couplet=` > `?season=` > 日期链（节日 > 假期 > 节气 > 季节兜底）**。
+ * `?season=` 是硬覆盖，会**跳过整条日期链** —— 否则十月的寒露节气联会盖掉
+ * 你指定的春天。
+ */
+function seasonOverrideZh() {
+    const r = resolveSeason();
+    return r.source === 'override' ? SEASONS[r.id].zh : null;
+}
 
 /** 某一天该挂哪一副日常联 —— 兜底分支用它。 */
 export const dailyCoupletFor = (date = new Date()) => {
-    const season = seasonOf(date);
+    const season = seasonOverrideZh() || seasonOf(date);
     return DAILY_COUPLETS.find((c) => c.season === season) || DAILY_COUPLETS[0];
 };
 
@@ -206,11 +227,18 @@ const parseMmdd = (y, mmdd) => {
  *
  * @param {Date} [date] 默认现在。传参是为了能单测，也让 ?couplet= 之外
  *                      还能在控制台里试别的日期。
- * @returns {{set: object, reason: 'festival'|'holiday'|'term'|'default', label: string|null}}
+ * @returns {{set: object, reason: 'season'|'festival'|'holiday'|'term'|'default', label: string|null}}
  */
 export function resolveCoupletSet(date = new Date()) {
     const y = date.getFullYear();
     const today = dayNumber(y, date.getMonth() + 1, date.getDate());
+
+    // --- 0. `?season=` 是硬覆盖，整条日期链跳过（见 seasonOverrideZh） ---
+    const sZh = seasonOverrideZh();
+    if (sZh) {
+        const set = DAILY_COUPLETS.find((c) => c.season === sZh);
+        if (set) return { set, reason: 'season', label: null };
+    }
 
     const hit = (label, start, window) => {
         if (start === null) return false;
