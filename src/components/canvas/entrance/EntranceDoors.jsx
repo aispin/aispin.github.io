@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import gsap from 'gsap';
 import '../shaders/RevealMaterial'; // Registers alpha-discard reveal shader
 import { playBackgroundMusic } from '../../../utils/audioManager';
+import { useAudio } from '../../../context/AudioManager';
 import { playInsectChirp, playRabbitSqueak } from '../../../audio/sfx';
 import { useAchievements } from '../../../context/AchievementsContext';
 import { isTouchDevice } from '../../../utils/deviceDetect';
@@ -289,6 +290,8 @@ const EntranceDoors = ({
     const windowAvatarRef = useRef();
     const { camera } = useThree();
     const { unlockAchievement } = useAchievements();
+    // 推门是音乐的**起播点**之一（另一个是音频面板）—— 见 handleClick。
+    const { isMuted, toggleMute } = useAudio();
     // 一次会话内恒定 —— 默认按月份，`?season=冬` 可覆盖。见 config/seasons.js。
     const season = useSeason();
 
@@ -540,7 +543,29 @@ const EntranceDoors = ({
 
         setIsOpen(true);
         setIsAnimating(true);
-        playBackgroundMusic();
+
+        /* 推门起播 BGM。
+         *
+         * 🔴 光调 `playBackgroundMusic()` 是**不够**的 —— 用户 2026-10-09 报的
+         * 「点大门开门没有音乐」就是这条。
+         *
+         * `audio_muted` 是**持久化**的偏好位，而 `playBackgroundMusic()` 是
+         * **尊重**它的：静音位是 true 时，它照样把元素 `play()` 起来，只是
+         * `muted = true`。于是元素**在"播放"**（`paused === false`、`currentTime`
+         * 一直在走）**却一点声音都没有**。之前一直没被发现，正是因为只看 `paused`
+         * 会把"静音播放"判成"在响"。
+         *
+         * 面板那条路没这个毛病：它走 `toggleMute()` → `syncMuteState(false)`，
+         * 而 `syncMuteState` 认得「静音位 true→false」是**用户主动要听**，
+         * 会顺手把静音位清掉。推门在文档里和它并列，都是起播点（见
+         * WO-09 / `SiteControls.jsx` 的注释），所以这里按**同构**处理：
+         * 静音位开着 → 清掉（这一次点击就是"我要听"）；否则直接起播。
+         *
+         * ⚠️ 别写成无条件 `toggleMute()`：那样在"本来没静音"时会把它**静掉**，
+         * 与动作的意思正好相反 —— 面板那边踩过同一个坑（见 NavigationUI）。
+         */
+        if (isMuted) toggleMute();
+        else playBackgroundMusic();
         unlockAchievement('corridor_enter');
 
         const tl = gsap.timeline({
