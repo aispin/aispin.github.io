@@ -502,6 +502,18 @@ uniform float uInLawn;
 // ⚠️ autumn 分发的那两个值**逐位等于原常量**，所以秋天（回归锚点）逐位不变。
 uniform vec3 uMossJoint;
 uniform vec3 uVergeGreen;
+// 1 = **磨光的整块石板**（石桌 / 石凳的桌面），0 = 原来的铺装（甬路 / 台明 / 踏跺）。
+//
+// 🔴 为什么需要它：cellSize = 0.34 的鹅卵石图案是给**大面积铺装**写的。
+// 铺在一张 1 米宽的圆桌面上只剩一两个格子，于是那几块「石头」变成了几大块
+// 明暗面 —— 从斜上方看**像一块翘起来的斜面**（用户 2026-10-09 报的
+// 「石桌桌面和凳子椅面看起来是倾斜的」）。把图案放大或缩小都治不好，
+// 因为问题不是尺度，是「石缝 + 拼色 + 倒角」这三样在大面上一律读成折面。
+//
+// 开 uSlab 后这三样全部收掉，只留细密的石斑与**季节性的薄雪**。
+// ⚠️ uSlab = 0 时下面每一处 mix 都退化成原式（乘 1.0、mix(a,b,0)），
+// 逐位不变 —— 甬路与秋天锚点都不受影响。
+uniform float uSlab;
 
 ${NOISE_GLSL}
 ${GRASS_GLSL}
@@ -545,10 +557,15 @@ void main() {
     vec3 s3 = vec3(0.639, 0.580, 0.514);
     vec3 stone = mix(s1, s2, h.x);
     stone = mix(stone, s3, step(0.72, h.y));
+    // uSlab = 1：**不拼色**。格子少的时候，每个格子一种色调 = 几大块色斑，
+    // 从上面看同样是"折面"。
+    stone = mix(stone, s1, uSlab);
     stone *= 0.92 + 0.16 * noise2(world * 4.0);
+    // uSlab = 1：补一层细密的石粒，免得磨光面读成塑料。
+    stone *= 1.0 - uSlab * 0.10 * noise2(world * 26.0);
 
     // Bevel shading: darker rim toward the joint
-    stone *= 0.72 + 0.34 * smoothstep(0.02, 0.22, interior);
+    stone *= mix(0.72 + 0.34 * smoothstep(0.02, 0.22, interior), 1.0, uSlab);
 
     // Mossy dirt between stones. The moss is gated by uInLawn: a stone slab
     // laid in a lawn grows moss in its joints, one sitting on a raised terrace
@@ -561,7 +578,7 @@ void main() {
     vec3 gap = mix(dirt, gapMoss, smoothstep(0.45, 0.75, m) * uInLawn);
     gap *= 0.9 + 0.2 * noise2(world * 6.0);
 
-    vec3 pathCol = mix(gap, stone, stoneMask);
+    vec3 pathCol = mix(gap, stone, mix(stoneMask, 1.0, uSlab));
 
     // --- Verge ---------------------------------------------------------
     // Two octaves of wobble on the boundary so the walkway is laid, not
@@ -775,6 +792,9 @@ export function makeSurfaceUniforms(width, height, origin = [0, 0], season = 'au
         // 那会让 uInLawn=0 的甬路整条没有石板、uCapFrac=0 的墙整面变成黑瓦。
         // 默认值必须落在"正常的墙/正常的路"这一侧。
         uInLawn: { value: 1 },     // STONE_FRAG：1 = 铺在草坪里的甬路
+        // STONE_FRAG：1 = 磨光整块石板（石桌/石凳的桌面），0 = 原来的铺装图案。
+        // 默认 0 —— 忘了传的调用方拿到的就是原来的甬路/台明，逐位不变。
+        uSlab: { value: 0 },
         uCapFrac: { value: 0.905 }, // SONG_WALL_FRAG：压顶起始高度占墙高的比例
         // 季节地面色板。**默认秋天**（= 加季节之前的原值），
         // 所以忘记传 season 的调用方（墙、台基）既不会变黑也不会变色。

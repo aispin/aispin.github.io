@@ -34,18 +34,6 @@ import { useSeasonUniforms } from '../../../hooks/useSeasonUniforms';
 /** 石板侧面的颜色：比顶面（STONE_FRAG 的暖调石板）暗一档，撑出高度感。 */
 const STONE_SIDE = '#7E7264';
 /**
- * 石板纹的**粗化系数** —— 只影响图案尺度，不动 shader。
- *
- * `STONE_FRAG` 的石缝是按 `cellSize = 0.34`（**世界单位**）切的，而那个世界
- * 坐标是 `world = vUv * uSize`。所以把 `uSize` 按比例报小一点，落在这块平面
- * 上的石缝就变**大**、变少 —— 0.34 的格子铺在甬路上正好是石板，铺在一张
- * 0.92 宽的圆桌面上只有 2.7 格，读出来是"马赛克拼的"，不是"一块石头"。
- *
- * ⚠️ `uInLawn = 0` 时 `uSize` 只剩这一个用途（草边与沿阶草的宽度都被关掉了），
- * 所以这里"报一个不是真实尺寸的 uSize"是安全的 —— 换桌子尺寸时记得一起看。
- */
-const PATTERN = 0.72;
-/**
  * 桌子：面半径 / 总高。
  *
  * ⚠️ 尺度按 DOOR_HEIGHT 反推：2.55 世界单位 ≈ 2.2 m 的实木门扇，即
@@ -71,17 +59,24 @@ const STOOL_BODY_H = 0.38;
 export function StoneTable({ position, worldZ = 0 }) {
     // 桌面那一张平面的世界原点：只决定噪声取到的相位。这张桌面是**独立石板**
     // （周围是草，不是铺装），所以相位是任意的 —— 不必像台明那样和大平面接缝。
+    //
+    // 🔴 `uSlab = 1`：**必须**。默认的石板图案是给大面积铺装写的（鹅卵石 +
+    // 石缝 + 拼色 + 倒角），铺在这张小圆面上只剩一两个格子 → 几大块明暗面 →
+    // 从斜上方看**像一块翘起来的斜面**（用户 2026-10-09 报的「看起来是倾斜的」）。
+    // uSlab 把这三样收掉，只留细腻石斑 —— 同时**保住 uSnow**，所以冬天照样落雪。
     const topUniforms = useSeasonUniforms(
         (season) => ({
-            ...makeSurfaceUniforms(TOP_R * 2 * PATTERN, TOP_R * 2 * PATTERN, [-TOP_R, worldZ + TOP_R], season),
+            ...makeSurfaceUniforms(TOP_R * 2, TOP_R * 2, [-TOP_R, worldZ + TOP_R], season),
             uInLawn: { value: 0 },
+            uSlab: { value: 1 },
         }),
         [worldZ]
     );
     const stoolUniforms = useSeasonUniforms(
         (season) => ({
-            ...makeSurfaceUniforms(STOOL_R * 2 * PATTERN, STOOL_R * 2 * PATTERN, [-STOOL_R, worldZ + STOOL_R], season),
+            ...makeSurfaceUniforms(STOOL_R * 2, STOOL_R * 2, [-STOOL_R, worldZ + STOOL_R], season),
             uInLawn: { value: 0 },
+            uSlab: { value: 1 },
         }),
         [worldZ]
     );
