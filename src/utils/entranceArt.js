@@ -433,7 +433,7 @@ function shoot(x, y, ang, len, bend, steps = 10) {
  * 🔑 另一个同样重要的性质：这个改动**不消耗任何随机数**。所以树的整体形态
  * 逐位不变，秋天的回归锚点得以保留（见 `makeTreeTexture` 的说明）。
  */
-function taperedPath(c, pts, w0, w1) {
+function taperedPath(c, pts, w0, w1, skip = 0) {
     const n = pts.length;
     const left = [];
     const right = [];
@@ -451,11 +451,97 @@ function taperedPath(c, pts, w0, w1) {
         left.push([p[0] - dy * hw, p[1] + dx * hw]);
         right.push([p[0] + dy * hw, p[1] - dx * hw]);
     }
+    // `skip`：描边时跳过起点的前 `skip` 个采样点。**只对 stroke 有意义** ——
+    // 三条主枝共用同一个起点（分叉点），它们的轮廓在分叉附近互相插进对方
+    // 内部，描出来会在分叉处织出一个菱形。填充/裁剪一律用默认的 0。
+    const s = Math.max(0, Math.min(skip, n - 2));
     c.beginPath();
-    c.moveTo(left[0][0], left[0][1]);
-    for (let i = 1; i < n; i++) c.lineTo(left[i][0], left[i][1]);
-    for (let i = n - 1; i >= 0; i--) c.lineTo(right[i][0], right[i][1]);
+    c.moveTo(left[s][0], left[s][1]);
+    for (let i = s + 1; i < n; i++) c.lineTo(left[i][0], left[i][1]);
+    for (let i = n - 1; i >= s; i--) c.lineTo(right[i][0], right[i][1]);
     // 不 closePath —— 见上面的说明。fill()/clip() 会隐式闭合，stroke() 不会。
+}
+
+/* ------------------------------------------------------------------ */
+/* 树皮：调色板 + 共用规则                                              */
+/* ------------------------------------------------------------------ */
+
+/* 树干与主枝**共用**这套颜色。放在模块作用域而不是 makeTreeTexture 里，
+ * 是因为 fissure() / coreHighlight() 也要用 —— 树干与主枝共用同一套颜色、
+ * 同一条明暗规则，正是「分叉两侧不再像两块拼起来」的关键。 */
+const BARK = '#66452A';
+const BARK_DARK = '#3F2A1B';
+const BARK_HI = '#A8835B';
+const BARK_DARK_RGB = '63,42,27';
+const BARK_HI_RGB = '168,131,91';
+
+/**
+ * 并集水彩：把同一种底色在**一整块并集轮廓**上叠 `passes` 遍。
+ *
+ * 🔴 这是「树干与主枝像两块拼起来」的正解。
+ *
+ * 以前是每条枝各自 `wash`：重叠处叠两层、不重叠处只有一层，于是分叉两侧的
+ * **色调**必然对不上 —— 那条水平分界就是这么来的。逐条去"把色调调成一样"
+ * 治不好：主枝的轮廓在分叉处是一条**平底**，底色画到那儿就断。
+ * 改成在并集上叠，底色就只有一个来源，跨分叉连续。
+ *
+ * ⚠️ `passes` 的总和必须等于改动前逐条 wash 的次数（树干 4 + 主枝 13×3 = 43），
+ * 因为 `rand()` 的**总次数**一变，下游的细枝 / 树冠 / 果实会整棵重排。
+ * 单遍 alpha 相应压低（43 遍 × 0.038 ≈ 累计 0.81，与原来树干 4 × 0.34 相当）。
+ *
+ * 不返回值 —— 画完就完。
+ */
+function unionWash(ctx, path, color, rand, passes, spread, alpha) {
+    ctx.save();
+    ctx.fillStyle = color;
+    for (let i = 0; i < passes; i++) {
+        ctx.save();
+        ctx.globalAlpha = alpha * (0.7 + rand() * 0.6);
+        ctx.translate((rand() - 0.5) * spread, (rand() - 0.5) * spread);
+        ctx.fill(path);
+        ctx.restore();
+    }
+    ctx.restore();
+}
+
+/**
+ * 树皮裂隙：**短、断续、沿轴、两端渐隐**。
+ *
+ * 🔴 原来是 26 条 `moveTo(x, 900)` → `bezierCurveTo(..., 660)` 的
+ * **贯穿全高**的竖线，外加 14 条同样贯穿的高光。它们平行、等长、间距均匀
+ * —— 那不是树皮，那是**竖着拼起来的木板**。这正是用户说的「像拼接」。
+ *
+ * 真实树皮是一道道**互不相连**的短裂缝：起点参差、长度不一、两端淡出。
+ * 渐隐靠 strokeStyle 的线性渐变做，一次描边就够，不需要分段画。
+ *
+ * 不消耗随机数 —— 位置由调用方传入（调用方把原有的 rand() 值喂进来，
+ * 见 makeTreeTexture 的说明）。
+ */
+function fissure(ctx, x, y0, y1, bow, rgb, alpha, width) {
+    if (y1 <= y0) return;
+    const g = ctx.createLinearGradient(x, y0, x + bow, y1);
+    g.addColorStop(0, `rgba(${rgb},0)`);
+    g.addColorStop(0.22, `rgba(${rgb},${alpha})`);
+    g.addColorStop(0.78, `rgba(${rgb},${alpha})`);
+    g.addColorStop(1, `rgba(${rgb},0)`);
+    ctx.strokeStyle = g;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.moveTo(x, y0);
+    ctx.quadraticCurveTo(x + bow * 1.6, (y0 + y1) / 2, x + bow, y1);
+    ctx.stroke();
+}
+
+/**
+ * 0..1 的确定性伪随机，由 (i, x, k) 派生。
+ *
+ * 用途只有一个：给裂隙挑**位置与长度**。不能再用 `rand()` ——
+ * 多一次/少一次 `rand()` 都会让下游的细枝、树冠、果实**整棵重新生成**，
+ * 而这一轮只需要动树干。见 makeTreeTexture 的「回归锚点」说明。
+ */
+function pick01(i, x, k) {
+    const s = Math.sin(i * 12.9898 + x * 78.233 + k * 37.719) * 43758.5453;
+    return s - Math.floor(s);
 }
 
 /* Persimmon foliage palette. Autumn tints sit in the minority — a tree in
@@ -764,9 +850,8 @@ export function makeTreeTexture(season = 'autumn') {
     // flat; the lawn hides the rest.
     const GROUND = 858;
 
-    const BARK = '#66452A';
-    const BARK_DARK = '#3F2A1B';
-    const BARK_HI = '#A8835B';
+    // 树皮调色板已提到模块作用域（BARK / BARK_DARK / BARK_HI）——
+    // 因为 fissure() / coreHighlight() 与树干、主枝共用同一套颜色与明暗规则。
 
     // Keep the canopy off the canvas edges. A twig that runs out of room has
     // its length cut rather than being clipped flat — and the budget has to
@@ -799,85 +884,11 @@ export function makeTreeTexture(season = 'autumn') {
     ctx.fill();
     ctx.restore();
 
-    /* --- 2. trunk ----------------------------------------------------- */
+    /* --- 2. 树干与主枝：一次成型 -------------------------------------- */
     // A slight lean to the left as it rises, and a root flare at the base.
     const trunk = [[410, 894], [404, 830], [398, 764], [393, 706], [390, 648]];
     const trunkPath = (c) => taperedPath(c, trunk, 86, 48);
-    wash(ctx, trunkPath, BARK, rand, { passes: 4, spread: 5, alpha: 0.34 });
 
-    ctx.save();
-    trunkPath(ctx);
-    ctx.clip();
-    ctx.lineCap = 'round';
-    for (let i = 0; i < 26; i++) {
-        const x = 356 + rand() * 62;
-        ctx.globalAlpha = 0.16 + rand() * 0.2;
-        ctx.strokeStyle = BARK_DARK;
-        ctx.lineWidth = 3 + rand() * 5;
-        ctx.beginPath();
-        ctx.moveTo(x, 900);
-        ctx.bezierCurveTo(x - 8, 826, x + 8, 754, x - 3, 660);
-        ctx.stroke();
-    }
-    for (let i = 0; i < 14; i++) {
-        const x = 368 + rand() * 40;
-        ctx.globalAlpha = 0.14 + rand() * 0.16;
-        ctx.strokeStyle = BARK_HI;
-        ctx.lineWidth = 2 + rand() * 4;
-        ctx.beginPath();
-        ctx.moveTo(x, 892);
-        ctx.bezierCurveTo(x + 7, 818, x - 7, 746, x + 4, 668);
-        ctx.stroke();
-    }
-    ctx.restore();
-
-    // Ink edge, same as the limbs get — an ink-and-wash trunk is drawn, not
-    // merely shaded, and without this it reads as a pale bar on a pale wall.
-    ctx.save();
-    ctx.globalAlpha = 0.5;
-    trunkPath(ctx);
-    ctx.strokeStyle = BARK_DARK;
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    ctx.restore();
-
-    // A knot where the trunk forks.
-    //
-    // 第一版只画了「暗色实心椭圆 + 一圈亮色描边」，结果读出来是个**悬空的
-    // 圆环**：实心那层 alpha 0.4、又是压在同样暗的树皮上，几乎看不见；
-    // 而 BARK_HI 那圈 alpha 0.3 的描边反而是唯一看得见的东西。
-    // 再加上圆心 (416) 偏离中轴线 (398)，右边就溢出到轮廓外面去了。
-    //
-    // 真实树结是**同心的一圈圈**：外层树皮鼓起来、中间凹下去、结心最暗。
-    // 所以这里改成三层，并且把圆心对回中轴线。
-    // 该处树干半宽约 33px（taperedPath 86→48，y=764 处约 66/2），
-    // 最外圈半宽 20 → 旋转后包围盒约 20.6，安全。
-    ctx.save();
-    ctx.translate(398, 764);
-    ctx.rotate(0.22);
-    // 结心：最暗最实的一块，这才是「结」的主体
-    ctx.globalAlpha = 0.62;
-    ctx.fillStyle = BARK_DARK;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 10, 16, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // 外面一圈被顶起来的树皮高光
-    ctx.globalAlpha = 0.26;
-    ctx.strokeStyle = BARK_HI;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 17, 26, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    // 再外一圈暗边，把结从树干上「分」出来
-    ctx.globalAlpha = 0.22;
-    ctx.strokeStyle = BARK_DARK;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 21, 31, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-
-    /* --- 3. limbs ----------------------------------------------------- */
     // Hand-authored rather than grown, so the silhouette is art-directed
     // instead of merely random: three scaffolds off the trunk, each splitting
     // into three sub-limbs, plus a short arm placed where the wind chime
@@ -903,41 +914,209 @@ export function makeTreeTexture(season = 'autumn') {
         { pts: [[396, 578], [420, 544], [440, 512], [450, 486]], w0: 18, w1: 7 },
     ];
 
-    for (const L of LIMBS.slice().sort((a, b) => b.w0 - a.w0)) {
-        const build = (c) => taperedPath(c, L.pts, L.w0, L.w1);
-        wash(ctx, build, BARK, rand, { passes: 3, spread: 4, alpha: 0.34 });
+    /* 🔴 「像拼接出来的」的正解：树干与 13 条主枝**共用一个并集轮廓**。
+     *
+     * 以前它们是各自 `wash` + 各自打光 + 各自描边。重叠的地方叠了两层、
+     * 不重叠的地方只有一层 —— 于是分叉两侧的**色调**必然对不上，那条水平的
+     * 分界就是这么来的（放大 5 倍看得最清楚）。逐条去"把色调调成一样"
+     * 是治不好的：主枝的轮廓在分叉处是一条**平底**，底色画到那儿就断。
+     *
+     * 裁到并集之后，底色、水彩、亮芯、树皮裂隙**全都跨过分叉连续**，
+     * 只剩墨线还是逐条的 —— 而墨线本来就该是并集的边界。
+     */
+    const skeleton = new Path2D();
+    const skeletonSink = {
+        beginPath() { },
+        moveTo: (x, y) => skeleton.moveTo(x, y),
+        lineTo: (x, y) => skeleton.lineTo(x, y),
+    };
+    taperedPath(skeletonSink, trunk, 86, 48);
+    for (const L of LIMBS) taperedPath(skeletonSink, L.pts, L.w0, L.w1);
+
+    /**
+     * 全局光：**水平**的一束，整棵树共用一条渐变。
+     *
+     * 为什么是水平而不是斜的：树干是竖直的，所以**横向**渐变对树干而言
+     * 正好就是圆柱明暗（左亮右暗）。斜向渐变在树干上的投影几乎只剩竖直
+     * 分量 —— 那是"上亮下暗"，树干照样是平的（试过，就是一团糊的棕色）。
+     * 对主枝而言横向渐变则是一盏从左来的方向光：左边亮、右边暗。
+     *
+     * 试过「每条枝各画一条亮芯」，结果是三条亮芯在分叉处交叠、拼出一个
+     * 亮 X —— 逐条打光天然会在交汇处打架。一盏灯照一整块就没这问题。
+     */
+    const lightField = () => {
+        const g = ctx.createLinearGradient(170, 700, 640, 700);
+        g.addColorStop(0.00, `rgba(${BARK_HI_RGB},0.08)`);
+        g.addColorStop(0.28, `rgba(${BARK_HI_RGB},0.20)`);
+        g.addColorStop(0.55, `rgba(${BARK_HI_RGB},0.02)`);
+        g.addColorStop(0.80, `rgba(${BARK_DARK_RGB},0.12)`);
+        g.addColorStop(1.00, `rgba(${BARK_DARK_RGB},0.22)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+    };
+
+    ctx.save();
+    ctx.clip(skeleton);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // 底色。⚠️ 总遍数必须等于原来逐条 wash 的次数（树干 4 + 主枝 13×3 = 43）：
+    // `rand()` 的**总次数**一变，下游的细枝、树冠、果实会**整棵重排**。
+    // 所以这里照样跑 43 遍，只是把落点从「各自的轮廓」换成「并集轮廓」。
+    // 单遍 alpha 相应压到 0.038（43 遍累计 ≈ 0.81，与原来树干的 4×0.34 相当）。
+    unionWash(ctx, skeleton, BARK, rand, 4, 5, 0.038);
+    for (const L of LIMBS) unionWash(ctx, skeleton, BARK, rand, 3, 4, 0.038);
+
+    // 全局光 + 根部压暗（环境遮蔽）。两者都裁在并集内，所以跨分叉连续。
+    lightField();
+    const ao = ctx.createLinearGradient(0, 910, 0, 620);
+    ao.addColorStop(0, `rgba(${BARK_DARK_RGB},0.20)`);
+    ao.addColorStop(0.5, `rgba(${BARK_DARK_RGB},0.05)`);
+    ao.addColorStop(1, `rgba(${BARK_DARK_RGB},0)`);
+    ctx.fillStyle = ao;
+    ctx.fillRect(100, 580, 580, 360);
+
+    // 树皮裂隙。⚠️ 每条裂隙**只占树干的一小段**（原来是从 y=900 一路贯到
+    // y=660 的长线 —— 26 条平行等长的竖线读出来就是「竖着拼的木板」）。
+    // 位置与长度由 pick01() 派生，**不再多消耗 rand()**：这里 26×3 / 14×3
+    // 次调用的次数必须原样保留，否则细枝、树冠、果实会跟着整棵重生成。
+    for (let i = 0; i < 26; i++) {
+        const x = 356 + rand() * 62;
+        const alpha = 0.22 + rand() * 0.26;
+        const width = 3 + rand() * 5;
+        const y0 = 662 + pick01(i, x, 1) * 168;
+        const len = 62 + pick01(i, x, 2) * 168;
+        fissure(ctx, x, y0, Math.min(902, y0 + len), (pick01(i, x, 3) - 0.5) * 12,
+            BARK_DARK_RGB, alpha, width);
+    }
+    for (let i = 0; i < 14; i++) {
+        const x = 368 + rand() * 40;
+        const alpha = 0.17 + rand() * 0.20;
+        const width = 2 + rand() * 4;
+        const y0 = 664 + pick01(i + 40, x, 4) * 150;
+        const len = 48 + pick01(i + 40, x, 5) * 132;
+        fissure(ctx, x, y0, Math.min(894, y0 + len), (pick01(i + 40, x, 6) - 0.5) * 10,
+            BARK_HI_RGB, alpha, width);
+    }
+    // 横向短裂纹。柿子树的皮是**块状**开裂，不是只有竖纹 —— 而且竖纹加横纹
+    // 交织之后，也就不容易再被读成"竖着拼起来的木板"。
+    // ⚠️ 位置全部由 pick01 派生：**一次 rand() 都不能再消耗**。
+    for (let i = 0; i < 16; i++) {
         ctx.save();
-        build(ctx);
-        ctx.clip();
+        ctx.translate(356 + pick01(i, 13, 12) * 58, 672 + pick01(i, 7, 11) * 216);
+        ctx.rotate(Math.PI / 2 + (pick01(i, 29, 16) - 0.5) * 0.5);
+        fissure(ctx, 0, 0, 12 + pick01(i, 17, 13) * 26,
+            (pick01(i, 31, 17) - 0.5) * 4, BARK_DARK_RGB,
+            0.10 + pick01(i, 19, 14) * 0.16, 1.5 + pick01(i, 23, 15) * 1.6);
+        ctx.restore();
+    }
+    ctx.restore();
+
+    // Ink edge, same as the limbs get — an ink-and-wash trunk is drawn, not
+    // merely shaded, and without this it reads as a pale bar on a pale wall.
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    trunkPath(ctx);
+    ctx.strokeStyle = BARK_DARK;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.restore();
+
+    // A knot where the trunk forks.
+    //
+    // 第一版只画了「暗色实心椭圆 + 一圈亮色描边」，结果读出来是个**悬空的
+    // 圆环**：实心那层 alpha 0.4、又是压在同样暗的树皮上，几乎看不见；
+    // 而 BARK_HI 那圈 alpha 0.3 的描边反而是唯一看得见的东西。
+    // 再加上圆心 (416) 偏离中轴线 (398)，右边就溢出到轮廓外面去了。
+    //
+    // 第二版改成三层同心椭圆，**还是**读成一个悬空的环 —— 因为完整的一圈
+    // 亮边本身就等于"这里有个环"。真实树结是**结心凹下去 + 只在上缘顶起
+    // 一圈皮**，所以这一版把亮边改成**半圈弧**（只画受光的上半圈），
+    // 再从结的两侧各拉一条树皮线出去，把结缝回树干里。
+    // 该处树干半宽约 33px（taperedPath 86→48，y=764 处约 66/2），
+    // 最外圈半宽 16 → 旋转后包围盒约 16.6，安全。
+    ctx.save();
+    ctx.translate(398, 764);
+    ctx.rotate(0.22);
+    // 结心：最暗最实的一块，这才是「结」的主体
+    ctx.globalAlpha = 0.58;
+    ctx.fillStyle = BARK_DARK;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 9, 15, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // 上缘被顶起来的那半圈树皮高光（0.78π → 1.72π 是画布上的上半圈）
+    ctx.globalAlpha = 0.24;
+    ctx.strokeStyle = BARK_HI;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 16, 25, 0, Math.PI * 0.78, Math.PI * 1.72);
+    ctx.stroke();
+    // 结两侧顺下来的树皮线 —— 把结"缝"回树干，而不是让它浮在上面
+    ctx.globalAlpha = 0.20;
+    ctx.strokeStyle = BARK_DARK;
+    ctx.lineWidth = 2;
+    for (const sx of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(sx * 13, -25);
+        ctx.quadraticCurveTo(sx * 27, 0, sx * 14, 26);
+        ctx.stroke();
+    }
+    ctx.restore();
+
+    /* --- 3. 主枝：顺纹 + 墨线 ------------------------------------------ */
+    // 底色与全局光已经在上面按**并集**画完了。这里只剩两件事：
+    // 粗主枝的顺纹（grain），和逐条的墨线。
+    for (const L of LIMBS.slice().sort((a, b) => b.w0 - a.w0)) {
         // Thick limbs get grain along their length; thin ones don't need it
         // and it would only muddy the ink edge below.
+        // ⚠️ 这 7×4 次 rand() 是随机数序列的一部分 —— 与上面并集底色的
+        // 12 + 117 次、树干的 78 + 42 次一起，总数必须与改动前一致
+        // （否则下游的细枝 / 树冠 / 果实会整棵重排）。
         if (L.w0 >= 30) {
+            ctx.save();
+            ctx.clip(skeleton);
             ctx.lineCap = 'round';
             for (let i = 0; i < 7; i++) {
                 ctx.globalAlpha = 0.14 + rand() * 0.16;
                 ctx.strokeStyle = i % 2 ? BARK_HI : BARK_DARK;
                 ctx.lineWidth = 2 + rand() * 3;
                 ctx.beginPath();
-                ctx.moveTo(L.pts[0][0], L.pts[0][1]);
-                for (const p of L.pts) ctx.lineTo(p[0] + (rand() - 0.5) * 10, p[1] + (rand() - 0.5) * 10);
+                let started = false;
+                L.pts.forEach((p, idx) => {
+                    // ⚠️ rand() 照常消耗（两个点两次），只是**不画**起点 ——
+                    // 起点就是分叉点，三条主枝的顺纹都在那里收拢，会在分叉处
+                    // 织出一片明暗条纹，看着又像"拼"上去的。
+                    const jx = p[0] + (rand() - 0.5) * 10;
+                    const jy = p[1] + (rand() - 0.5) * 10;
+                    if (idx === 0) return;
+                    if (!started) { ctx.moveTo(jx, jy); started = true; }
+                    else ctx.lineTo(jx, jy);
+                });
                 ctx.stroke();
             }
+            ctx.restore();
         }
-        ctx.globalAlpha = 0.17;
-        ctx.strokeStyle = BARK_HI;
-        ctx.lineWidth = L.w0 * 0.28;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(L.pts[0][0], L.pts[0][1]);
-        for (const p of L.pts) ctx.lineTo(p[0], p[1]);
-        ctx.stroke();
-        ctx.restore();
         // Ink edge. Without it the limbs read as pale bars against a pale
         // wall — the whole point of an ink-and-wash tree is that the
         // branches are drawn, not merely shaded.
+        //
+        // ⚠️ 子枝的**起点埋在父枝里**（LIMBS 里那些 `pts[0]` 都落在另一条枝的
+        // 路径上）。整条描边会在父枝内部留下一道缝，看着就像小枝是贴上去的。
+        // 所以子枝描边前先**挖掉起点附近的一个圆** —— 那里本来就该长在父枝
+        // 里面，不该有轮廓线。三条主枝不挖：它们的起点就是分叉点，轮廓正是
+        // 并集的边界，挖了反而在分叉处缺口。
         ctx.save();
         ctx.globalAlpha = 0.5;
-        build(ctx);
+        // 三条主枝**共用同一个起点**（分叉点），轮廓在分叉附近互相插进对方
+        // 内部 —— 直接描会在分叉处织出一个菱形。所以主枝从第 1 个采样点开始描。
+        // 子枝是另一种情况：起点埋在**父枝**里，用「挖圆」更直接。
+        if (L.w0 < 30) {
+            const hole = new Path2D();
+            hole.rect(-200, -200, W + 400, H + 400);
+            hole.arc(L.pts[0][0], L.pts[0][1], L.w0 * 0.75 + 6, 0, Math.PI * 2);
+            ctx.clip(hole, 'evenodd');
+        }
+        taperedPath(ctx, L.pts, L.w0, L.w1, L.w0 >= 30 ? 1 : 0);
         ctx.strokeStyle = BARK_DARK;
         ctx.lineWidth = 2.6;
         ctx.stroke();
@@ -1010,11 +1189,47 @@ export function makeTreeTexture(season = 'autumn') {
     // 雪线**贴回枝条中线**，于是树干上出现一条从分叉点拖到根部的白线。
     // 短不等于对，得**不画**。所以这里把折线按 `up` 切成若干段，只给
     // `up >= 0.30` 的连续段描边 —— 物理上也对：竖直的枝干挂不住雪。
+    //
+    // 🔴 「雪条相交」（2026-10-09 用户截图）的成因与解法
+    // ----------------------------------------------------
+    // 「法线永远朝上」这条规则本身没错。错在**分叉处**：两条枝的"朝上法线"
+    // 会**指向彼此**，于是各自的雪线朝对方偏，在分叉上方的**空隙**里交叉成
+    // 一个 X —— 那正是截图里最显眼的一处。
+    //
+    // 解法不是改偏移方向（改成朝下雪就跑到枝底下了），而是**把整段雪裁在
+    // 树冠轮廓之内**。裁完那个 X 落在实心枝干上，读起来是"分叉处积了雪"，
+    // 而不是两条白线悬在空中打架；顺带所有悬空的白线也一并消失。
+    // 再加一条：每条雪线的首尾各让掉一成，避开分叉最挤的地方。
     if (cfg.snow) {
         const UP_MIN = 0.30;
+        const INSET = 0.14;
+
+        // 树冠并集轮廓：树干 + 主枝 + 细枝。taperedPath 对所有枝都用同一种
+        // 绕向，所以 `clip(path)` 的 nonzero 规则得到的正好是**并集**。
+        // 细枝是 `limb()` 描出来的圆头粗线，用同宽同 taper 的 taperedPath
+        // 做等效轮廓，裁雪够用了。
+        const canopy = new Path2D();
+        const sink = {
+            beginPath() { },
+            moveTo: (x, y) => canopy.moveTo(x, y),
+            lineTo: (x, y) => canopy.lineTo(x, y),
+        };
+        taperedPath(sink, trunk, 86, 48);
+        for (const L of LIMBS) taperedPath(sink, L.pts, L.w0, L.w1);
+        for (const t of twigs) taperedPath(sink, t.pts, t.w, t.w * 0.72);
 
         const snowRun = (run) => {
             if (run.length < 2) return;
+            const a = run[0];
+            const b = run[run.length - 1];
+            // 两端渐隐：strokeStyle 用线性渐变，一次描边就够，不必把 run
+            // 拆成几段。雪是**积**在枝上的，不该是一条两端齐平的硬白条。
+            const g = ctx.createLinearGradient(a[0], a[1], b[0], b[1]);
+            g.addColorStop(0, 'rgba(239,244,249,0)');
+            g.addColorStop(0.20, 'rgba(239,244,249,1)');
+            g.addColorStop(0.80, 'rgba(239,244,249,1)');
+            g.addColorStop(1, 'rgba(239,244,249,0)');
+            ctx.strokeStyle = g;
             ctx.beginPath();
             run.forEach(([x, y], i) => { if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
             ctx.stroke();
@@ -1025,6 +1240,7 @@ export function makeTreeTexture(season = 'autumn') {
             let run = [];
             for (let i = 0; i < n; i++) {
                 const t = i / (n - 1);
+                if (t < INSET || t > 1 - INSET * 0.5) { snowRun(run); run = []; continue; }
                 const w = (w0 + (w1 - w0) * t) * wMul;
                 const p = pts[i];
                 const q = pts[Math.min(n - 1, i + 1)];
@@ -1044,9 +1260,9 @@ export function makeTreeTexture(season = 'autumn') {
         };
 
         ctx.save();
+        ctx.clip(canopy);
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.strokeStyle = '#EFF4F9';
 
         // 树干**不画**：它几乎竖直，`up ≈ 0.08` 会被 UP_MIN 整段跳过。
         // 留着这一条反而是个陷阱 —— 它看起来像"给树干也上了雪"，

@@ -1,6 +1,9 @@
 /**
  * Procedural SFX — Web Audio synthesized one-shot effects (zero samples).
  *
+ * These are all **click** sounds: you hit a prop in the entrance and it answers.
+ * They are deliberately independent of the background music — see sfxVolume().
+ *
  * playBark():      cartoon double "汪汪" — sawtooth pitch-drop body through a
  *                  sweeping bandpass (formant-ish), plus a short breath-noise
  *                  attack.
@@ -9,25 +12,29 @@
  *                  so it shimmers like a real gust.
  * playSwallow():   燕子 — a tight burst of high, slightly falling chirps, each
  *                  with a rapid trill and a breathy onset.
+ * playRabbitSqueak(): 兔子 — two short, high, nasal squeaks.
  * playInsectChirp(): 虫叫 — a few dry stridulation pulses, used by the
  *                  entrance ladybird's dodge.
  *
- * Respects the site's mute/volume preferences (audio_muted / audio_volume).
+ * context / bus 来自 sfxContext.js —— 全站只允许存在一个 AudioContext，这里
+ * 不再自己 `new AC()`（曾是唯一漏网的一处，与 sfxContext 的单例规则相冲突）。
  */
 
-let ctx = null;
+import { getAudioBus, getAudioContext } from './sfxContext';
 
-function getCtx() {
-    if (!ctx) {
-        const AC = window.AudioContext || window.webkitAudioContext;
-        ctx = new AC();
-    }
-    return ctx;
-}
-
-function prefVolume() {
+/**
+ * 音效音量 —— **只认 SFX 滑杆**（localStorage.audio_volume）。
+ *
+ * ⚠️ 不读 `audio_muted`。那个键是**音乐开关**（音频面板里的「打开/关闭音乐」，
+ * 由 utils/audioManager 的 syncMuteState 维护）。曾经这里把音乐静音也当成音效
+ * 静音，于是「关掉音乐 → 点小狗 / 风铃 / 燕子窝全都没声音」，与用户预期相反。
+ * 2026-10-09 验收反馈第 3 条：「不管音乐有没有播放，点击它们都发出音效」。
+ *
+ * 音频面板里第二条滑杆的标签就是 "SFX"，写的正是 audio_volume —— 所以
+ * 「音效归滑杆、音乐归开关」现在两边一致（把 SFX 拖到 0 才是真的没音效）。
+ */
+function sfxVolume() {
     try {
-        if (localStorage.getItem('audio_muted') === 'true') return 0;
         const v = parseFloat(localStorage.getItem('audio_volume'));
         return isNaN(v) ? 0.5 : v;
     } catch {
@@ -92,17 +99,19 @@ function barkAt(context, dest, t0, baseFreq, level) {
  */
 export function playBark(volume = 1) {
     if (typeof window === 'undefined') return;
-    const pref = prefVolume();
+    const pref = sfxVolume();
     if (pref <= 0) return;
 
-    const context = getCtx();
+    const context = getAudioContext();
+    const out = getAudioBus();
+    if (!context || !out) return;
     if (context.state === 'suspended') {
         context.resume().catch(() => { });
     }
 
     const master = context.createGain();
     master.gain.value = Math.max(0, Math.min(1, volume * pref));
-    master.connect(context.destination);
+    master.connect(out);
 
     const t = context.currentTime + 0.02;
     barkAt(context, master, t, 430, 0.85);
@@ -159,10 +168,12 @@ function chimeStrike(context, dest, t0, freq, level) {
  */
 export function playWindChime(volume = 1) {
     if (typeof window === 'undefined') return;
-    const pref = prefVolume();
+    const pref = sfxVolume();
     if (pref <= 0) return;
 
-    const context = getCtx();
+    const context = getAudioContext();
+    const out = getAudioBus();
+    if (!context || !out) return;
     if (context.state === 'suspended') {
         context.resume().catch(() => { });
     }
@@ -177,7 +188,7 @@ export function playWindChime(volume = 1) {
     const master = context.createGain();
     master.gain.value = Math.max(0, Math.min(1, volume * pref * 0.34));
     tone.connect(master);
-    master.connect(context.destination);
+    master.connect(out);
 
     const t = context.currentTime + 0.02;
 
@@ -284,10 +295,12 @@ function swallowChirp(context, dest, t0, baseFreq, level) {
  */
 export function playSwallow(volume = 1) {
     if (typeof window === 'undefined') return;
-    const pref = prefVolume();
+    const pref = sfxVolume();
     if (pref <= 0) return;
 
-    const context = getCtx();
+    const context = getAudioContext();
+    const out = getAudioBus();
+    if (!context || !out) return;
     if (context.state === 'suspended') {
         context.resume().catch(() => { });
     }
@@ -302,7 +315,7 @@ export function playSwallow(volume = 1) {
     const master = context.createGain();
     master.gain.value = Math.max(0, Math.min(1, volume * pref * 0.30));
     tone.connect(master);
-    master.connect(context.destination);
+    master.connect(out);
 
     const t = context.currentTime + 0.02;
     const count = 4 + Math.floor(Math.random() * 3);
@@ -317,6 +330,91 @@ export function playSwallow(volume = 1) {
         master.disconnect();
         tone.disconnect();
     }, 1600);
+}
+
+/* ------------------------------------------------------------------ */
+/* Rabbit                                                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * One squeak.
+ *
+ * A rabbit's squeak is short, high and *nasal* — a quick rise into a small
+ * wobble, then a fast fall. Model it as a triangle body with a detuned upper
+ * partial through a narrow bandpass, which keeps it clearly apart from the
+ * swallow's clean falling whistle (a rabbit squeaks; it does not tweet).
+ */
+function rabbitSqueak(context, dest, t0, baseFreq, level) {
+    // --- body: triangle, rises then falls (the "eek" shape) ---
+    const osc = context.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(baseFreq * 0.78, t0);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq, t0 + 0.045);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.86, t0 + 0.16);
+
+    // --- nasal upper partial: the "squeak" edge ---
+    const hi = context.createOscillator();
+    hi.type = 'sawtooth';
+    hi.frequency.setValueAtTime(baseFreq * 2.02, t0);
+    hi.frequency.exponentialRampToValueAtTime(baseFreq * 1.72, t0 + 0.16);
+
+    const hiGain = context.createGain();
+    hiGain.gain.setValueAtTime(0.0001, t0);
+    hiGain.gain.exponentialRampToValueAtTime(Math.max(0.0002, level * 0.15), t0 + 0.02);
+    hiGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.15);
+
+    // --- formant: a narrow band around the squeak's centre ---
+    const bp = context.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 2.2;
+    bp.frequency.setValueAtTime(baseFreq * 1.5, t0);
+    bp.frequency.exponentialRampToValueAtTime(baseFreq * 1.15, t0 + 0.16);
+
+    const body = context.createGain();
+    body.gain.setValueAtTime(0.0001, t0);
+    body.gain.exponentialRampToValueAtTime(Math.max(0.0002, level), t0 + 0.02);
+    body.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.18);
+
+    osc.connect(bp);
+    hi.connect(hiGain);
+    hiGain.connect(bp);
+    bp.connect(body);
+    body.connect(dest);
+
+    osc.start(t0); osc.stop(t0 + 0.2);
+    hi.start(t0); hi.stop(t0 + 0.2);
+}
+
+/**
+ * Play a rabbit squeak — a soft double "eek-eek" (see EntranceDoors'
+ * handleDuckClick, where the rabbit is the rubber-duck easter egg).
+ * @param {number} volume 0..1 relative level (multiplied by user prefs)
+ */
+export function playRabbitSqueak(volume = 1) {
+    if (typeof window === 'undefined') return;
+    const pref = sfxVolume();
+    if (pref <= 0) return;
+
+    const context = getAudioContext();
+    const out = getAudioBus();
+    if (!context || !out) return;
+    if (context.state === 'suspended') {
+        context.resume().catch(() => { });
+    }
+
+    // The squeaks are bright; back the level off so two of them never pierce.
+    const master = context.createGain();
+    master.gain.value = Math.max(0, Math.min(1, volume * pref * 0.5));
+    master.connect(out);
+
+    const t = context.currentTime + 0.02;
+    rabbitSqueak(context, master, t, 980, 0.9);
+    // A second, slightly higher squeak a beat later — "eek-eek".
+    rabbitSqueak(context, master, t + 0.16, 1090, 0.62);
+
+    setTimeout(() => {
+        master.disconnect();
+    }, 900);
 }
 
 /* ------------------------------------------------------------------ */
@@ -399,10 +497,12 @@ function insectPulse(context, dest, t0, baseFreq, level) {
  */
 export function playInsectChirp(volume = 1) {
     if (typeof window === 'undefined') return;
-    const pref = prefVolume();
+    const pref = sfxVolume();
     if (pref <= 0) return;
 
-    const context = getCtx();
+    const context = getAudioContext();
+    const out = getAudioBus();
+    if (!context || !out) return;
     if (context.state === 'suspended') {
         context.resume().catch(() => { });
     }
@@ -417,7 +517,7 @@ export function playInsectChirp(volume = 1) {
     const master = context.createGain();
     master.gain.value = Math.max(0, Math.min(1, volume * pref * 0.22));
     tone.connect(master);
-    master.connect(context.destination);
+    master.connect(out);
 
     const t = context.currentTime + 0.02;
     const count = 3 + Math.floor(Math.random() * 2);

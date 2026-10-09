@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import gsap from 'gsap';
 import '../shaders/RevealMaterial'; // Registers alpha-discard reveal shader
 import { playBackgroundMusic } from '../../../utils/audioManager';
-import { playInsectChirp } from '../../../audio/sfx';
+import { playInsectChirp, playRabbitSqueak } from '../../../audio/sfx';
 import { useAchievements } from '../../../context/AchievementsContext';
 import { isTouchDevice } from '../../../utils/deviceDetect';
 import { setGuitarCursor } from '../../../utils/guitarCursor';
@@ -389,8 +389,15 @@ const EntranceDoors = ({
     ];
 
     // Duck Click Handler (Rubber Duck Debugging)
+    // 注：这里的「duck」就是花盆里那只**兔子**（WoodenPlanter 的 easter egg，
+    // 名字沿用了它替换掉的橡皮鸭）。点它要出声 —— 见下。
     const handleDuckClick = (e) => {
         e.stopPropagation();
+
+        // 先出声，再判「已经在说」。放在守卫之前，连点第二下也有反馈，
+        // 否则听起来像坏了。音效与音乐播放无关（audio/sfx.js 的 sfxVolume）。
+        playRabbitSqueak(1);
+
         if (isDuckSpeaking) return; // Already speaking
 
         // Pick random quote
