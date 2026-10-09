@@ -56,6 +56,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Lint 在构建之前跑：lint 不过就没必要花时间打包，更不该上线。
+      # 判据是 **error**（`eslint .` 有 error 时非零退出）；warning 不拦 ——
+      # 见 eslint.config.js 文件头：React Compiler 专属规则在本项目里只是建议
+      # （本项目不跑 React Compiler），而 exhaustive-deps 的漏项多处是刻意的。
+      - name: Lint
+        run: npm run lint
+
       - name: Build
         run: npm run build
 
