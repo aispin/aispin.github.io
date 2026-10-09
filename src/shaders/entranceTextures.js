@@ -26,6 +26,47 @@ void main() {
 }
 `;
 
+/**
+ * The creeper ink as its own transparent layer, drawn in front of the wall.
+ *
+ * WHY IT IS NOT LEFT INSIDE SONG_WALL_FRAG
+ * ----------------------------------------
+ * It used to be `col = mix(col, ink.rgb, ink.a * uInkStrength)` inside the
+ * brick shader, i.e. the vine was *part of the wall*. That is fine until
+ * something is mounted on the wall in front of it: the 春联 sit at z = 0.17
+ * and the facade is at 0.15, so the couplets were painted over the vine and
+ * sliced the leaves that cross them. A creeper that has come over the wall is
+ * a physical thing standing proud of the plaster — it belongs in front of a
+ * paper strip pasted flat on it.
+ *
+ * 2026-10-09 user note: 「对联：应该在树和藤的后面，现在在树和藤的前面了」.
+ *
+ * So the ink moved out into this layer, parked at z = 0.18 (in front of the
+ * couplets) and above them in the transparent sort order. SONG_WALL_FRAG still
+ * declares uInk/uInkStrength and still runs the same `mix` — it is handed a
+ * strength of 0, and `mix(col, x, 0.0)` is exactly `col`, so the brick is
+ * untouched. Keeping the line in place rather than deleting it is deliberate:
+ * it is the seam where this layer can be folded back in.
+ *
+ * Compositing is identical either way: `mix(dst, ink.rgb, ink.a * s)` and
+ * `dst * (1 - ink.a * s) + ink.rgb * (ink.a * s)` are the same expression.
+ * The only real difference is *when* it lands — after the paper grain and the
+ * snow rather than before — which is a fraction of a percent and, for the
+ * snow, arguably more correct: the vine lies on top of the coping's snow.
+ */
+export const INK_OVERLAY_FRAG = /* glsl */ `
+varying vec2 vUv;
+uniform sampler2D uInk;
+uniform float uInkStrength;
+void main() {
+    vec4 ink = texture2D(uInk, vUv);
+    float a = ink.a * uInkStrength;
+    // Almost the whole quad is empty; discarding it keeps the extra pass free.
+    if (a < 0.004) discard;
+    gl_FragColor = vec4(ink.rgb, a);
+}
+`;
+
 const NOISE_GLSL = /* glsl */ `
 float hash21(vec2 p) {
     p = fract(p * vec2(234.34, 435.345));

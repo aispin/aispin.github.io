@@ -150,6 +150,24 @@ const PUPIL_TRAVEL_X = 0.013;
 const PUPIL_TRAVEL_Y = 0.010;
 
 /**
+ * Rabbit gaze — the same two channels the dog has (head turn + pupil travel),
+ * at roughly half the amplitude.
+ *
+ * 2026-10-09 user note: 「小兔子的眼睛参考小狗，随鼠标方向微微转动」. The dog's
+ * scheme is a white eyeball with a dark pupil that slides across it; a rabbit
+ * has no visible sclera, so the outer bead stays dark and the *pupil* is a
+ * shade darker and glossier. That is the only way the glance stays legible
+ * without inventing a white eyeball the animal does not have.
+ *
+ * Halved because the rabbit's head is roughly half the dog's: the dog's full
+ * 0.18 rad reads as "looking", the same number here reads as a bobble-head.
+ */
+const RABBIT_GAZE_YAW = 0.10;
+const RABBIT_GAZE_PITCH = 0.06;
+const RABBIT_PUPIL_TRAVEL_X = 0.006;
+const RABBIT_PUPIL_TRAVEL_Y = 0.005;
+
+/**
  * The dog is modelled ~1.20 local units tall (paw to ear tip). At the gate's
  * scale — DOOR_HEIGHT is 2.55 units against a real 大门 leaf of ~2.2 m, so
  * ~0.86 m per unit — that made it a metre-tall animal. Next to the 门槛 it
@@ -164,7 +182,7 @@ const PUPIL_TRAVEL_Y = 0.010;
  */
 const DOG_SCALE = 0.58;
 
-export function WhiteDog({ position }) {
+export function WhiteDog({ position, yaw = 0 }) {
     const dogGroupRef = useRef();
     const headRef = useRef();
     const tailRef = useRef();
@@ -264,7 +282,7 @@ export function WhiteDog({ position }) {
     });
 
     return (
-        <group position={position} scale={DOG_SCALE}>
+        <group position={position} rotation={[0, yaw, 0]} scale={DOG_SCALE}>
             <group ref={dogGroupRef}>
                 {/* haunches (back) */}
             <mesh position={[0, 0.3, -0.16]} scale={[1.05, 0.8, 0.7]}>
@@ -377,7 +395,35 @@ const GREEN_STEMS = [
     { x: -0.25, tilt: 0.4, h: 0.4 }
 ];
 
-export function WoodenPlanter({ position }) {
+export function WoodenPlanter({ position, yaw = 0 }) {
+    const rabbitHeadRef = useRef();
+    const rabbitPupilRefs = useRef([]);
+
+    // Same GAZE contract as the dog's (see RABBIT_GAZE_* above). Note there is
+    // deliberately no `reducedMotion()` gate: the glance is driven by the
+    // pointer, i.e. by the user, so it is not an ambient animation — the dog's
+    // gaze is not gated either.
+    useFrame((state, delta) => {
+        const px = state.pointer?.x ?? 0;
+        const py = state.pointer?.y ?? 0;
+        const k = 1 - Math.pow(0.002, delta);
+
+        if (rabbitHeadRef.current) {
+            rabbitHeadRef.current.rotation.y = THREE.MathUtils.lerp(
+                rabbitHeadRef.current.rotation.y, px * RABBIT_GAZE_YAW, k);
+            rabbitHeadRef.current.rotation.x = THREE.MathUtils.lerp(
+                rabbitHeadRef.current.rotation.x, -py * RABBIT_GAZE_PITCH, k);
+        }
+
+        const pOffX = RABBIT_PUPIL_TRAVEL_X * px;
+        const pOffY = -RABBIT_PUPIL_TRAVEL_Y * py;
+        rabbitPupilRefs.current.forEach((p) => {
+            if (!p) return;
+            p.position.x = THREE.MathUtils.lerp(p.position.x, pOffX, k);
+            p.position.y = THREE.MathUtils.lerp(p.position.y, pOffY, k);
+        });
+    });
+
     return (
         <group position={position}>
             {/* planter body */}
@@ -427,42 +473,57 @@ export function WoodenPlanter({ position }) {
                 rounded at the tip, which is most of what reads as "rabbit".
                 Shares the dog's fur palette (FUR / EAR / NOSE, above) so the
                 two white animals in the yard match. */}
-            <group position={[0.38, 0.6, 0.05]}>
+            <group position={[0.38, 0.6, 0.05]} rotation={[0, yaw, 0]}>
                 {/* body — an egg, tipped back a little so it sits rather than stands */}
                 <mesh position={[0, 0.055, -0.01]} scale={[1.0, 1.18, 0.95]}>
                     <primitive object={sharedGeometry('sphere', 0.095, 16, 16)} attach="geometry" />
                     <meshStandardMaterial color={FUR} roughness={0.85} />
                 </mesh>
-                {/* head */}
-                <mesh position={[0, 0.175, 0.028]}>
-                    <primitive object={sharedGeometry('sphere', 0.072, 14, 14)} attach="geometry" />
-                    <meshStandardMaterial color={FUR} roughness={0.85} />
-                </mesh>
-                {/* ears — long, upright, splayed slightly apart; tan inner face */}
-                {[-0.032, 0.032].map((x, i) => (
-                    <group key={x} position={[x, 0.225, 0.02]} rotation={[0.12, 0, i ? -0.22 : 0.22]}>
-                        <mesh position={[0, 0.075, 0]} scale={[1, 1, 0.55]}>
-                            <primitive object={sharedGeometry('capsule', 0.021, 0.11, 4, 10)} attach="geometry" />
-                            <meshStandardMaterial color={FUR} roughness={0.85} />
-                        </mesh>
-                        <mesh position={[0, 0.075, 0.013]} scale={[0.62, 1, 0.4]}>
-                            <primitive object={sharedGeometry('capsule', 0.021, 0.10, 4, 8)} attach="geometry" />
-                            <meshStandardMaterial color={EAR} roughness={0.9} />
-                        </mesh>
-                    </group>
-                ))}
-                {/* eyes */}
-                {[-0.03, 0.03].map((x) => (
-                    <mesh key={x} position={[x, 0.19, 0.088]}>
-                        <primitive object={sharedGeometry('sphere', 0.013, 8, 8)} attach="geometry" />
-                        <meshStandardMaterial color={NOSE} roughness={0.35} />
+                {/* head — grouped so the gaze can turn it (see RABBIT_GAZE_*).
+                    The children keep their old world offsets, expressed relative
+                    to the head centre [0, 0.175, 0.028]: ear y 0.225 -> 0.05,
+                    eye y 0.19 -> 0.015 / z 0.088 -> 0.06, nose y 0.163 -> -0.012
+                    / z 0.098 -> 0.07. */}
+                <group ref={rabbitHeadRef} position={[0, 0.175, 0.028]}>
+                    <mesh>
+                        <primitive object={sharedGeometry('sphere', 0.072, 14, 14)} attach="geometry" />
+                        <meshStandardMaterial color={FUR} roughness={0.85} />
                     </mesh>
-                ))}
-                {/* nose */}
-                <mesh position={[0, 0.163, 0.098]}>
-                    <primitive object={sharedGeometry('sphere', 0.011, 8, 8)} attach="geometry" />
-                    <meshStandardMaterial color={EAR} roughness={0.6} />
-                </mesh>
+                    {/* ears — long, upright, splayed slightly apart; tan inner face */}
+                    {[-0.032, 0.032].map((x, i) => (
+                        <group key={x} position={[x, 0.05, -0.008]} rotation={[0.12, 0, i ? -0.22 : 0.22]}>
+                            <mesh position={[0, 0.075, 0]} scale={[1, 1, 0.55]}>
+                                <primitive object={sharedGeometry('capsule', 0.021, 0.11, 4, 10)} attach="geometry" />
+                                <meshStandardMaterial color={FUR} roughness={0.85} />
+                            </mesh>
+                            <mesh position={[0, 0.075, 0.013]} scale={[0.62, 1, 0.4]}>
+                                <primitive object={sharedGeometry('capsule', 0.021, 0.10, 4, 8)} attach="geometry" />
+                                <meshStandardMaterial color={EAR} roughness={0.9} />
+                            </mesh>
+                        </group>
+                    ))}
+                    {/* eyes — dark bead + a darker, glossier pupil that pokes out
+                        of it and is the part that travels with the pointer. */}
+                    {[-0.03, 0.03].map((x, i) => (
+                        <group key={x} position={[x, 0.015, 0.06]}>
+                            <mesh>
+                                <primitive object={sharedGeometry('sphere', 0.014, 10, 10)} attach="geometry" />
+                                <meshStandardMaterial color={NOSE} roughness={0.35} />
+                            </mesh>
+                            <group ref={(el) => (rabbitPupilRefs.current[i] = el)}>
+                                <mesh position={[0, 0, 0.011]}>
+                                    <primitive object={sharedGeometry('sphere', 0.008, 8, 8)} attach="geometry" />
+                                    <meshStandardMaterial color="#120D0A" roughness={0.15} />
+                                </mesh>
+                            </group>
+                        </group>
+                    ))}
+                    {/* nose */}
+                    <mesh position={[0, -0.012, 0.07]}>
+                        <primitive object={sharedGeometry('sphere', 0.011, 8, 8)} attach="geometry" />
+                        <meshStandardMaterial color={EAR} roughness={0.6} />
+                    </mesh>
+                </group>
                 {/* tail — the scut, a shade off the body so it reads as a puff */}
                 <mesh position={[0, 0.05, -0.098]}>
                     <primitive object={sharedGeometry('sphere', 0.032, 10, 10)} attach="geometry" />

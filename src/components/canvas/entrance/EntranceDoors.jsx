@@ -9,7 +9,7 @@ import { playInsectChirp, playRabbitSqueak } from '../../../audio/sfx';
 import { useAchievements } from '../../../context/AchievementsContext';
 import { isTouchDevice } from '../../../utils/deviceDetect';
 import { setGuitarCursor } from '../../../utils/guitarCursor';
-import { SURFACE_VERT, SONG_WALL_FRAG, STONE_FRAG, makeSurfaceUniforms } from '../../../shaders/entranceTextures';
+import { SURFACE_VERT, SONG_WALL_FRAG, INK_OVERLAY_FRAG, STONE_FRAG, makeSurfaceUniforms } from '../../../shaders/entranceTextures';
 import GateBase from './GateBase';
 import { WindChime, WhiteDog, WoodenPlanter, WoodenWindowFrame, WindowCurtain, SwallowNest } from './EntranceProps';
 import { SCENE_FONTS } from '../../../config/theme';
@@ -131,6 +131,38 @@ const COUPLET_Y = DOOR_CENTER_Y;
 // not hardcode a lintel height of its own to do it.
 
 const COUPLET_Z = 0.17;
+
+/* ---- the two yard animals' facing ------------------------------------ */
+/**
+ * 2026-10-09 user note: 「小狗兔子朝向调整：眼睛望往院子过道的方向，有点看着
+ * 想要进屋的人的感觉」.
+ *
+ * Both animals used to face dead down +Z, i.e. straight out at the viewer, which
+ * reads as "staring at nothing in particular". The 甬路 (the stone walkway that
+ * leads in from the street) is centred on x = 0 and runs z ≈ 1.71…7.33 *inside*
+ * this group, so in world terms it is z ≈ 23.7…29.3 — the dog and the rabbit
+ * both sit beside it and neither was turned toward it.
+ *
+ * The angles are "look at the middle of the walkway, where a visitor stands":
+ *   dog    at world x -1.5, z 22.8  ->  walkway centre (0, 26.5)  ->  +0.40 rad
+ *   rabbit at world x  2.88, z 22.45 ->  walkway centre (0, 26.5)  ->  -0.55 rad
+ * They are deliberately not aimed at the gate itself: someone who wants to come
+ * in is still out on the path, and that is who the animals should be watching.
+ */
+const DOG_YAW = 0.40;
+const RABBIT_YAW = -0.55;
+
+/* ---- the creeper ink layer ------------------------------------------- */
+/**
+ * How strongly the vine reads against the plaster. Tuned as
+ * `uInkStrength` on the wall shader; it now drives the separate ink overlay
+ * (see INK_OVERLAY_FRAG) because the vine has to draw in front of the 春联.
+ * Keep the number and the reasoning together — they were tuned as a pair with
+ * the stroke alphas in `makeWallInkTexture`.
+ */
+const WALL_INK_STRENGTH = 0.96;
+/** In front of the couplets (0.17); the tree is at 1, far in front of both. */
+const INK_OVERLAY_Z = 0.18;
 
 /**
  * 春联 pasted on the brick either side of the door, plus the 横批 above the
@@ -833,8 +865,19 @@ const EntranceDoors = ({
         // went 0.31..0.64 → 0.56..0.92. Do not raise this to 1.0: the ink is
         // supposed to sit on plaster, and at full strength it competes with the
         // coursing for attention (see the note in entranceTextures.js).
-        uInkStrength: { value: 0.96 }
+        //
+        // 🔴 2026-10-09: the strength is now 0 HERE and WALL_INK_STRENGTH below
+        // lives on the ink overlay instead. The vine had to move in front of
+        // the 春联 (see INK_OVERLAY_FRAG). `mix(col, x, 0.0)` is exactly `col`,
+        // so the brick is bit-identical with the line left in place.
+        uInkStrength: { value: 0 }
     }), [facadeCenterY, wallInk, doorCenterY, doorOpeningWidth, doorHeight]);
+
+    /* The creeper, as its own layer in front of the couplets. */
+    const inkOverlayUniforms = useMemo(() => ({
+        uInk: { value: wallInk },
+        uInkStrength: { value: WALL_INK_STRENGTH }
+    }), [wallInk]);
     // vUv=(0,0) of the rotated walkway plane lands at world z = the plane's
     // centre + half its length (its v axis runs against world +Z). Same frame
     // as the grass field, so the two surfaces are continuous at the seam.
@@ -925,6 +968,27 @@ const EntranceDoors = ({
                     fragmentShader={SONG_WALL_FRAG}
                     uniforms={brickUniforms}
                     transparent={true}
+                />
+            </mesh>
+
+            {/* === CREEPER INK (its own layer, in front of the 春联) ===
+                Same quad as the facade, 0.03 in front of it, so the vine draws
+                over anything mounted flat on the wall — which is the whole
+                point: a real creeper stands proud of the plaster and a paper
+                couplet does not. renderOrder 7 puts it above the couplets (6)
+                and below the tree (8), and because it never writes depth the
+                tree still wins wherever it is opaque.
+
+                The wall shader is handed uInkStrength 0, so the ink is drawn
+                exactly once — here. See INK_OVERLAY_FRAG for the reasoning. */}
+            <mesh position={[0, facadeCenterY, INK_OVERLAY_Z]} renderOrder={7}>
+                <primitive object={sharedGeometry('plane', FACADE_W, FACADE_H)} attach="geometry" />
+                <shaderMaterial
+                    vertexShader={SURFACE_VERT}
+                    fragmentShader={INK_OVERLAY_FRAG}
+                    uniforms={inkOverlayUniforms}
+                    transparent={true}
+                    depthWrite={false}
                 />
             </mesh>
 
@@ -1163,7 +1227,7 @@ const EntranceDoors = ({
                 is 0.30 below the floor now, so anything standing on it has to
                 move with OUTDOOR_Y or it floats. */}
             <group position={[2.5, OUTDOOR_Y, 0.4]}>
-                <WoodenPlanter position={[0, 0, 0]} />
+                <WoodenPlanter position={[0, 0, 0]} yaw={RABBIT_YAW} />
 
                 {/* Invisible hitbox just for the duck (right side of planter) */}
                 <mesh
@@ -1263,8 +1327,26 @@ const EntranceDoors = ({
 
             {/* TREE & WIND CHIME (Left Side) */}
             <group position={[-2.9, floorY + 2.7, 1]}>
-                {/* Tree */}
-                <mesh position={[0, 0, 0]}>
+                {/* Tree.
+
+                    ⚠️ renderOrder 8 — deliberately ABOVE the couplets (6) and
+                    the creeper ink layer (7).
+
+                    The tree plane is a billboard parked at z = 1, i.e. a full
+                    0.85 units in FRONT of the 10x6 facade at z = 0.15, so it
+                    really is nearer the camera than the 春联 at z = 0.17. But
+                    both materials are `transparent` with `depthWrite: false`,
+                    and three sorts the transparent pass by renderOrder BEFORE
+                    it sorts by depth — so with the tree at the default 0 the
+                    couplets were painted on top of it and read as pasted over
+                    the trunk. Giving the tree 8 puts the ordering back the
+                    right way round. (2026-10-09 user note: 「对联：应该在树和藤
+                    的后面」.)
+
+                    Depth testing still applies inside the pass, so this cannot
+                    make the tree paint over the chime or the dog: those are
+                    opaque, drawn in the opaque pass, and they are nearer. */}
+                <mesh position={[0, 0, 0]} renderOrder={8}>
                     <primitive object={sharedGeometry('plane', 6, 8)} attach="geometry" />
                     <meshBasicMaterial color="#e0e0e0"
                         map={treeTexture}
@@ -1273,13 +1355,35 @@ const EntranceDoors = ({
                         depthWrite={false}
                     />
                 </mesh>
-                {/* Wind chime hanging from a branch (replaces the mouse picture) */}
-                <WindChime position={[0.45, 0.15, 0.05]} />
+                {/* Wind chime hanging from the right scaffold (replaces the mouse picture).
+
+                    ⚠️ The string top is the group origin, so this position has
+                    to land ON a branch — it is not a "roughly around here".
+
+                    It used to be [0.45, 0.15], which is canvas (441.6, 492.8)
+                    on the 768x1024 tree texture. That looks like it is on the
+                    little arm authored for it (LIMBS[12], canvas 396,578 ->
+                    450,486), and it is within a few pixels of the arm's centre
+                    line — but the arm is *under the canopy*: probing the
+                    texture at the arm's vertices gives bark at 12.0 and 12.2 and
+                    leaf at 12.1 and 12.3. The chime was hanging from a branch
+                    nobody can see, so it read as floating in the gap between the
+                    trunk and the right scaffold.
+
+                    [0.75, -0.4375] is canvas (480, 568) = vertex 4.2 of the
+                    RIGHT SCAFFOLD (LIMBS[4]), which probes clean bark
+                    rgb(94,61,32) at the vertex and at all four ring samples.
+                    Its half-width there is 16.6 canvas px = 0.13 world units,
+                    just wider than the chime's 0.11 cap — so the cap reads as
+                    narrower than the branch it hangs from, which is the whole
+                    point. (2026-10-09 user note: 「风铃：调整下挂的位置，让它挂到
+                    树枝上」.) */}
+                <WindChime position={[0.75, -0.4375, 0.05]} />
             </group>
 
             {/* WHITE DOG (Front Facing) — 3D procedural, blinking eyes, wagging tail.
                 On the lawn, clear of the 台明 (which is only APRON_W wide). */}
-            <WhiteDog position={[-1.5, OUTDOOR_Y, 0.8]} />
+            <WhiteDog position={[-1.5, OUTDOOR_Y, 0.8]} yaw={DOG_YAW} />
 
         </group>
     );
