@@ -592,7 +592,7 @@ function inkStroke(ctx, width = 5) {
 
 /* ---- music: a little mouse playing guitar ------------------------- */
 
-function drawMouseArt(ctx, W, H) {
+function drawMouseArt(ctx) {
     const ink = (w) => {
         ctx.strokeStyle = INK;
         ctx.lineWidth = w;
@@ -844,7 +844,7 @@ function drawMouseArt(ctx, W, H) {
 
 /* ---- ai: a robot with "AI" on its belly --------------------------- */
 
-function drawRobotArt(ctx, W, H) {
+function drawRobotArt(ctx) {
     const ink = (w) => {
         ctx.strokeStyle = INK;
         ctx.lineWidth = w;

@@ -790,6 +790,17 @@ export const PAINTINGS = {
 };
 
 /**
+ * The one clock every painting shares.
+ *
+ * PaintingCanvas already advanced a single module-level time for all of them
+ * (a dozen frames are recycled along the corridor and only one material is ever
+ * drawn at a time), so hoisting the uniform itself out of the per-material
+ * object makes that sharing explicit: the canvas can tick the clock without
+ * reaching into a material it does not own.
+ */
+export const PAINTING_CLOCK = { value: 0 };
+
+/**
  * Build a ShaderMaterial for one painting.
  *
  * @param {keyof typeof PAINTINGS} name
@@ -804,7 +815,7 @@ export function makePaintingMaterial(name, aspect = 1.6) {
         fragmentShader: painting.fragmentShader,
         uniforms: {
             uAspect: { value: aspect },
-            uTime: { value: 0 },
+            uTime: PAINTING_CLOCK,
         },
         side: THREE.DoubleSide,
     });

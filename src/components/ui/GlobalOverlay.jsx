@@ -11,8 +11,10 @@ gsap.registerPlugin(TextPlugin);
 
 const GlobalOverlay = () => {
     const { overlayContent, closeOverlay } = useScene();
-    const [isVisible, setIsVisible] = useState(false);
     const [animateOpen, setAnimateOpen] = useState(false);
+    // Keep the last non-null content around: by the time the sheet slides out,
+    // `overlayContent` is already null and the DOM would have nothing to show.
+    const [cachedContent, setCachedContent] = useState(null);
 
     // Check if mobile based on window width
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -23,28 +25,26 @@ const GlobalOverlay = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    useEffect(() => {
-        if (overlayContent) {
-            setIsVisible(true);
-            // Delay animation to allow DOM mount and initial 'closed' layout paint
-            const delayAnim = setTimeout(() => {
-                setAnimateOpen(true);
-            }, 50); // 50ms is safe for React render + browser paint
-            return () => clearTimeout(delayAnim);
-        } else {
-            setAnimateOpen(false);
-            // Wait for exit animation (should match transition duration ~0.6-1s)
-            const timer = setTimeout(() => setIsVisible(false), 800);
-            return () => clearTimeout(timer);
-        }
-    }, [overlayContent]);
+    // Cache the outgoing content and reset the slide state the moment the
+    // overlay changes. This is React's documented "adjust state when a prop
+    // changes" pattern — doing it during render, rather than in an effect,
+    // skips the wasted commit where the sheet would paint with stale content
+    // and keeps the reset synchronous with the transition.
+    const [prevOverlayContent, setPrevOverlayContent] = useState(overlayContent);
+    if (overlayContent !== prevOverlayContent) {
+        setPrevOverlayContent(overlayContent);
+        if (overlayContent) setCachedContent(overlayContent);
+        else setAnimateOpen(false);
+    }
 
-    // Keep content visible during exit animation using a dedicated cache
-    const [cachedContent, setCachedContent] = useState(null);
+    // Opening is delayed by one frame so the browser paints the "closed"
+    // layout first — inserted already-open, the CSS transition never runs.
+    // The delay must be a timeout, not a synchronous setState: an effect that
+    // setStates immediately is both a cascading render and a lint error.
     useEffect(() => {
-        if (overlayContent) {
-            setCachedContent(overlayContent);
-        }
+        if (!overlayContent) return undefined;
+        const delayAnim = setTimeout(() => setAnimateOpen(true), 50);
+        return () => clearTimeout(delayAnim);
     }, [overlayContent]);
 
     // Wyłączamy "return null", żeby ciężkie filtry rozmycia i SVG były osadzone w DOM 
@@ -72,14 +72,17 @@ const GlobalOverlay = () => {
 };
 
 const ContentCard = ({ content, isOpen, onClose, isMobile }) => {
-    if (!content) return null;
-
-    const label = content.platformConfig?.label || 'Content';
+    // ⚠️ 这里**不能**提前 `return null`（原来是 `if (!content) return null;` 写在
+    //    所有 hook 之前）。提前返回会让下面的 useRef/useEffect/useCallback 变成
+    //    "条件调用" —— 一旦 content 真的为空，React 会抛
+    //    「Rendered fewer hooks than expected」。守卫已挪到所有 hook 之后。
+    //    现在这一行只取 label，用可选链兜住 content 为空的情况。
+    const label = content?.platformConfig?.label || 'Content';
 
     // GSAP TextPlugin typing effect for description
     const descriptionRef = useRef(null);
     useEffect(() => {
-        if (isOpen && content.description && descriptionRef.current && content.layout !== 'certificate_grid') {
+        if (isOpen && content?.description && descriptionRef.current && content.layout !== 'certificate_grid') {
             gsap.killTweensOf(descriptionRef.current);
             gsap.fromTo(descriptionRef.current,
                 { text: "" },
@@ -195,6 +198,13 @@ const ContentCard = ({ content, isOpen, onClose, isMobile }) => {
         const { scrollHeight, clientHeight } = el;
         el.scrollTop = ratio * (scrollHeight - clientHeight);
     }, []);
+
+    // 所有 hook 都已无条件调用完毕 —— 现在才允许提前返回。
+    // 守卫放这么晚是有意的：早于任何一个 hook 都会让 hook 顺序随 content 变化。
+    // 实际上 GlobalOverlay 传进来的 content 永远是
+    // `overlayContent || cachedContent || dummyGridContent`（都不为空），
+    // 所以这行纯属防御。
+    if (!content) return null;
 
     const handleBackdropClick = (e) => {
         // Only close if clicking the wrapper itself (which acts as backdrop here)

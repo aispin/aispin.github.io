@@ -33,9 +33,25 @@ export const useScene = () => {
 };
 
 export const SceneProvider = ({ children }) => {
-    // Deep linking: check if URL points to a specific room on first load
-    const initialRoom = useRef(getInitialRoomFromUrl());
-    const deeplinkHandled = useRef(false);
+    // Deep linking: check if URL points to a specific room on first load.
+    //
+    // ⚠️ 用 state（惰性初始化）而不是 useRef —— 它要进下面那个 memo 化的 context
+    //    value。读 `ref.current` 是**渲染期读 ref**（`react-hooks/refs` 会拦），
+    //    而且 ref 变化不会触发重渲染，memo 也不会失效。它本来就是个"只算一次"
+    //    的常量，state 才是对的工具。
+    const [initialRoom] = useState(() => getInitialRoomFromUrl());
+
+    // Deep-link latch. Kept as a ref (not state) because flipping it must NOT
+    // re-render the whole scene graph — it is a "has this happened yet" flag,
+    // not UI state. It is exposed as read/write *actions* rather than as the
+    // bare ref: handing a ref out through context would make every consumer
+    // mutate it from the outside, which both breaks the render-purity rules
+    // and hides who owns the flag. See markDeeplinkHandled / isDeeplinkHandled.
+    const deeplinkHandledRef = useRef(false);
+    const markDeeplinkHandled = useCallback(() => {
+        deeplinkHandledRef.current = true;
+    }, []);
+    const isDeeplinkHandled = useCallback(() => deeplinkHandledRef.current, []);
 
     // Only used to localise the guard toasts. Safe to read here: SceneProvider
     // is always mounted inside SitePreferencesProvider (see App.jsx).
@@ -290,8 +306,9 @@ export const SceneProvider = ({ children }) => {
         closeOverlay,   // Exposed
         isInRoom: currentRoom !== null,
         // Deep linking
-        initialRoom: initialRoom.current,
-        deeplinkHandled,
+        initialRoom,
+        markDeeplinkHandled,
+        isDeeplinkHandled,
         // Teleportation
         teleportTarget,
         isTeleporting,
@@ -312,6 +329,7 @@ export const SceneProvider = ({ children }) => {
         doorBusy,
         exitRequested,
         overlayContent,
+        initialRoom,
         enterRoom,
         exitRoom,
         requestExit,
@@ -333,7 +351,9 @@ export const SceneProvider = ({ children }) => {
         completeTeleport,
         signalRoomReady,
         finishPaperOpen,
-        cancelTeleport
+        cancelTeleport,
+        markDeeplinkHandled,
+        isDeeplinkHandled
     ]);
 
     return (

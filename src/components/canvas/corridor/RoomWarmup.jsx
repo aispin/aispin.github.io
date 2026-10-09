@@ -25,7 +25,6 @@ const RoomWarmup = ({ onWarmupComplete, isLowTier }) => {
     const { gl, scene, camera } = useThree();
 
     // Wait for rooms to render a few frames, then compile and unmount
-    const warmupStart = useRef(performance.now());
 
     useFrame(() => {
         if (isDone || completeFired.current) return;
@@ -42,8 +41,6 @@ const RoomWarmup = ({ onWarmupComplete, isLowTier }) => {
             completeFired.current = true;
 
             const finishWarmup = () => {
-                const warmupDuration = ((performance.now() - warmupStart.current) / 1000).toFixed(2);
-                // console.info(`🔥 GPU/Shader Warmup Complete: ${warmupDuration}s ${isLowTier ? '(Bypassed for LOW tier)' : ''}`);
                 
                 requestAnimationFrame(() => {
                     setIsDone(true);

@@ -2,6 +2,7 @@ import { useEffect, useRef, useMemo } from 'react';
 import gsap from 'gsap';
 import { useScene } from '../../context/SceneContext';
 import { useAudio } from '../../context/AudioManager';
+import { hashString, mulberry32 } from '../../engine/art';
 import '../../styles/Preloader.scss'; // Reuse preloader styles
 
 /**
@@ -37,7 +38,6 @@ const PaperTransition = () => {
         teleportPhase,
         startTeleportTransition,
         finishPaperOpen,
-        teleportTarget
     } = useScene();
     const { play } = useAudio();
 
@@ -46,16 +46,20 @@ const PaperTransition = () => {
     const rightHalfRef = useRef(null);
     const timelineRef = useRef(null);
 
-    // Generate tear path (same logic as Preloader)
+    // Generate tear path (same logic as Preloader).
+    // Seeded PRNG, not Math.random(): the tear silhouette must be identical on
+    // every run (project determinism contract) and the value has to be pure
+    // during render. A fixed key gives a stable, jittered-looking edge.
     const tearPoints = useMemo(() => {
         const points = [];
         const segments = 12;
+        const rand = mulberry32(hashString('paper-tear'));
 
         points.push([50, 0]);
 
         for (let i = 1; i < segments; i++) {
             const y = (i / segments) * 100;
-            const xOffset = (Math.random() - 0.5) * 6;
+            const xOffset = (rand() - 0.5) * 6;
             const x = 50 + xOffset;
             points.push([x, y]);
         }

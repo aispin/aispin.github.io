@@ -174,7 +174,6 @@ function buildJsonLd(site, projects, articles, photography, aiProjects) {
 }
 
 function buildLlmsTxt(site, projects, articles, labs, music, aiProjects) {
-    const author = site?.author || {};
     let content = `# ${site?.siteTitle || 'AISPIN'}\n`;
     content += `> ${site?.siteDescription || 'A walkable 3D personal site.'}\n\n`;
 

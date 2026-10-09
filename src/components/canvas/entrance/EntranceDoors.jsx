@@ -236,9 +236,9 @@ const EntranceDoors = ({
     const rightHandlePaintedRef = useRef(); // Painted handle mesh visibility
     const groupRef = useRef();
     const [isOpen, setIsOpen] = useState(false);
-    const [isHovered, setIsHovered] = useState(false);
+    const [, setIsHovered] = useState(false);
     const [isAnimating, setIsAnimating] = useState(false);
-    const [isWindowHovered, setIsWindowHovered] = useState(false);
+    const [, setIsWindowHovered] = useState(false);
     const windowAvatarRef = useRef();
     const { camera } = useThree();
     const { unlockAchievement } = useAchievements();
@@ -286,8 +286,15 @@ const EntranceDoors = ({
     // corridor IP sprite (public/textures/corridor/avatar_zeo.webp) — the two
     // are the same person and used to look nothing alike. Path is in
     // ENTRANCE_TEXTURES, so App.jsx has already warmed it behind the loader.
-    const avatarWindowTexture = useTexture('/textures/entrance/avatar-window.webp');
-    avatarWindowTexture.colorSpace = THREE.SRGBColorSpace;
+    // colourSpace is set through useTexture's onLoad callback (drei's supported
+    // hook for exactly this) instead of assigning to the returned texture during
+    // render: mutating a hook's return value in the render body is what
+    // react-hooks/immutability flags, and it would also re-tag the shared,
+    // cached texture on every single render.
+    const avatarWindowTexture = useTexture(
+        '/textures/entrance/avatar-window.webp',
+        (texture) => { texture.colorSpace = THREE.SRGBColorSpace; }
+    );
 
     const treeTexture = makeTreeTexture();
     const bugTexture = makeLadybirdTexture();

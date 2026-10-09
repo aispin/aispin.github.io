@@ -1,5 +1,5 @@
 import { useRef, useState, useMemo, useEffect, forwardRef, useImperativeHandle, memo } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
+import { useFrame } from '@react-three/fiber';
 import { Text, useTexture, Float } from '@react-three/drei';
 import SpatialSfx from '../../audio/SpatialSfx';
 import AmbientSource from '../../audio/AmbientSource';
@@ -8,6 +8,7 @@ import gsap from 'gsap';
 import { Observer } from 'gsap/all';
 import { useScene } from '../../../../context/SceneContext';
 import { sharedGeometry } from '../../../../engine/resources';
+import { hashString, mulberry32 } from '../../../../engine/art';
 
 gsap.registerPlugin(Observer);
 import { useAchievements } from '../../../../context/AchievementsContext';
@@ -125,7 +126,6 @@ const GalleryRoom = ({ showRoom, onReady, isExiting, isWarmup }) => {
     const effectiveVolume = isMuted ? 0 : AUDIO_SETTINGS.volume * globalVolume;
 
     const groupRef = useRef();
-    const [scrollOffset, setScrollOffset] = useState(0);
     const targetScroll = useRef(0);
     const currentScroll = useRef(0);
     const [selectedCard, setSelectedCard] = useState(null);
@@ -139,7 +139,7 @@ const GalleryRoom = ({ showRoom, onReady, isExiting, isWarmup }) => {
     }, [isExiting, isTeleporting, hidePopup]);
 
     // Setup Paint Transition
-    const { onBeforeCompile, animatePaint, resetPaint, uniformsData, updateRoomOrigin } = usePaintMaterial();
+    const { onBeforeCompile, animatePaint, resetPaint, setPaintProgress, uniformsData, updateRoomOrigin } = usePaintMaterial();
     
     // Track transition state to disable interactions
     const [isTransitioning, setIsTransitioning] = useState(false);
@@ -155,7 +155,7 @@ const GalleryRoom = ({ showRoom, onReady, isExiting, isWarmup }) => {
         if (showRoom && !isWarmup) {
             if (wasTeleportedRef.current || isTeleporting) {
                 // Skip the painting transition entirely if teleporting via map
-                uniformsData.uPaintProgress.value = 1.0;
+                setPaintProgress(1.0);
                 setIsTransitioning(false);
             } else {
                 setIsTransitioning(true);
@@ -171,7 +171,7 @@ const GalleryRoom = ({ showRoom, onReady, isExiting, isWarmup }) => {
             }
         } else {
             // Immediately reveal for warmup or hide if not showing
-            uniformsData.uPaintProgress.value = 1.0;
+            setPaintProgress(1.0);
         }
     }, [showRoom, isWarmup, isTeleporting]);
 
@@ -714,18 +714,22 @@ const FlyingBird = ({ texture }) => {
 };
 
 // Sub-component for individual project cards
-const ProjectCard = memo(forwardRef(({ index, project, clothespinTexture, currentScroll, materials, curve, isSelected, scrollToIndex, onClick, isMobile, isTransitioning, paintProgress, roomOrigin }, ref) => {
+const ProjectCard = memo(forwardRef(({ index, project, clothespinTexture, currentScroll, curve, isSelected, scrollToIndex, onClick, isMobile, isTransitioning, paintProgress, roomOrigin }, ref) => {
     const cardRef = useRef();
     const paperRef = useRef(); // Ref for the moving part (Paper)
     const materialRef = useRef();
     const textRef = useRef(); // Ref for the text that sticks to the paper
     const [hovered, setHovered] = useState(false);
     const [isAnimating, setIsAnimating] = useState(false);  // True ONLY during flip animation
-    const [isScrolling, setIsScrolling] = useState(false);  // True during scroll phase
+    const [, setIsScrolling] = useState(false);  // True during scroll phase
 
-    // Random sway properties
-    const swaySpeed = useRef(Math.random() * 0.2 + 0.3); // Slower sway speed
-    const swayOffset = useRef(Math.random() * 100);
+    // Sway properties — deterministic per card index, not Math.random():
+    // impure calls during render are flagged by react-hooks/purity, and the
+    // project determinism contract bans Math.random() in scene code.
+    const [swaySpeed, swayOffset] = useMemo(() => {
+        const rand = mulberry32(hashString(`gallery-sway-${index}`));
+        return [rand() * 0.2 + 0.3, rand() * 100];
+    }, [index]);
 
     // Audio Ref
     const paperAudioRef = useRef();
@@ -1037,7 +1041,7 @@ const ProjectCard = memo(forwardRef(({ index, project, clothespinTexture, curren
 
         // Wind / Sway Animation
         const time = state.clock.getElapsedTime();
-        const wind = Math.sin(time * swaySpeed.current + swayOffset.current) * 0.05;
+        const wind = Math.sin(time * swaySpeed + swayOffset) * 0.05;
 
         cardRef.current.rotation.z = wind;
         cardRef.current.rotation.x = 0;

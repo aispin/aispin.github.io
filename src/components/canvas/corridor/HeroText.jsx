@@ -11,9 +11,6 @@ import { sharedGeometry } from '../../../engine/resources';
 // (troika needs ttf/otf/woff — see config/theme.js).
 const HERO_FONT_URL = SCENE_FONTS.maple;
 
-// Global flag - draw animation only happens ONCE per page load
-let hasPlayedDrawAnimation = false;
-
 /**
  * HeroText Component - Hand-drawn Style with Sketch Fonts
  * 
@@ -64,7 +61,7 @@ const HeroText = ({ position = [0, 0.3, 0] }) => {
     ], []);
 
     // Animation loop
-    useFrame((state, delta) => {
+    useFrame((state) => {
         if (!groupRef.current) return;
 
         const time = state.clock.elapsedTime;

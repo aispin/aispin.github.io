@@ -1,5 +1,5 @@
-import { useState, Suspense, useEffect, useCallback, useLayoutEffect, lazy } from 'react';
-import { Canvas, useFrame, useLoader } from '@react-three/fiber';
+import { useState, Suspense, useEffect, useCallback, lazy } from 'react';
+import { Canvas, useLoader } from '@react-three/fiber';
 import { Preload, useTexture, Text, PerformanceMonitor } from '@react-three/drei';
 import * as THREE from 'three';
 
@@ -104,16 +104,16 @@ const GlobalAudioEnabler = () => {
 function DocumentMetaBridge() {
   useDocumentMeta();
 
-  const { initialRoom, deeplinkHandled, hasEntered, teleportTo, markEntered } = useScene();
+  const { initialRoom, markDeeplinkHandled, isDeeplinkHandled, hasEntered, teleportTo } = useScene();
 
   // Deep linking: if user lands on e.g. /gallery, auto-teleport after scene loads
   useEffect(() => {
-    if (initialRoom && hasEntered && !deeplinkHandled.current) {
-      deeplinkHandled.current = true;
+    if (initialRoom && hasEntered && !isDeeplinkHandled()) {
+      markDeeplinkHandled();
       // Small delay to let the corridor render first
       setTimeout(() => teleportTo(initialRoom), 300);
     }
-  }, [initialRoom, hasEntered, teleportTo, deeplinkHandled]);
+  }, [initialRoom, hasEntered, teleportTo, markDeeplinkHandled, isDeeplinkHandled]);
 
   return null;
 }
@@ -176,7 +176,12 @@ function DebugBridge() {
 }
 
 function AppContent() {
-  const [isLoaded, setIsLoaded] = useState(false);
+  // `?noloader=1` means no Preloader exists to ever call onComplete, so the
+  // scene must consider itself loaded from the first render. Seeding the state
+  // with NO_LOADER does that without a mount effect (an effect would render
+  // once "unloaded" and then immediately re-render, and react-hooks flags the
+  // synchronous setState).
+  const [isLoaded, setIsLoaded] = useState(NO_LOADER);
   const [sceneReady, setSceneReady] = useState(false);
 
   // Use Performance Context
@@ -185,13 +190,6 @@ function AppContent() {
   // Force initialize audio in the background on mount
   useEffect(() => {
     initAudio();
-  }, []);
-
-  // Debug (?noloader=1): no Preloader exists to call onComplete, so mark loaded
-  // ourselves - otherwise UI overlays (PaperTransition etc) never mount and
-  // teleport flows stall forever.
-  useEffect(() => {
-    if (NO_LOADER) setIsLoaded(true);
   }, []);
 
   const handleSceneReady = useCallback(() => {

@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { usePerformance } from '../../../context/PerformanceContext';
@@ -125,17 +125,15 @@ const SketchElement = ({
     initialRotation = 0
 }) => {
     const ref = useRef();
-    const [dimensions, setDimensions] = useState({ width: 1, height: 1 });
 
-    // Calculate dimensions from texture
-    useEffect(() => {
-        if (texture.image) {
-            const aspectRatio = texture.image.width / texture.image.height;
-            setDimensions({
-                width: scale * aspectRatio,
-                height: scale
-            });
-        }
+    // Plane size is a pure function of the texture's aspect and `scale` — it was
+    // previously mirrored into state from an effect, which cost an extra render
+    // per texture and made the first frame use a 1×1 placeholder. Deriving it
+    // during render gives the right size immediately.
+    const dimensions = useMemo(() => {
+        if (!texture.image) return { width: 1, height: 1 };
+        const aspectRatio = texture.image.width / texture.image.height;
+        return { width: scale * aspectRatio, height: scale };
     }, [texture, scale]);
 
     useFrame((state) => {

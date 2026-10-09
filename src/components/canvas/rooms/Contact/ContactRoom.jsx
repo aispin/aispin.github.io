@@ -132,7 +132,7 @@ const ContactRoom = ({ showRoom, onReady, isExiting, isWarmup }) => {
     // ===== PAINT TRANSITION =====
     // Contact is on the RIGHT side of the corridor, so reveal goes from right (+X) into the room
     const groupRef = useRef();
-    const { onBeforeCompile, animatePaint, resetPaint, uniformsData, updateRoomOrigin } = usePaintMaterial({
+    const { onBeforeCompile, animatePaint, resetPaint, setPaintProgress, uniformsData, updateRoomOrigin } = usePaintMaterial({
         dirX: 1.0,    // Opposite to Gallery (right side door)
         dirY: 0.0,
         dirZ: -0.1,   // Slight angle matching mirrored direction
@@ -141,7 +141,7 @@ const ContactRoom = ({ showRoom, onReady, isExiting, isWarmup }) => {
         noiseAxes: 'yz'
     });
 
-    const [isTransitioning, setIsTransitioning] = useState(false);
+    const [, setIsTransitioning] = useState(false);
 
     const wasTeleportedRef = useRef(false);
     useEffect(() => {
@@ -151,7 +151,7 @@ const ContactRoom = ({ showRoom, onReady, isExiting, isWarmup }) => {
     useEffect(() => {
         if (showRoom && !isWarmup) {
             if (wasTeleportedRef.current || isTeleporting) {
-                uniformsData.uPaintProgress.value = 1.0;
+                setPaintProgress(1.0);
                 setIsTransitioning(false);
             } else {
                 setIsTransitioning(true);
@@ -162,7 +162,7 @@ const ContactRoom = ({ showRoom, onReady, isExiting, isWarmup }) => {
                 }, 2700);
             }
         } else {
-            uniformsData.uPaintProgress.value = 1.0;
+            setPaintProgress(1.0);
         }
     }, [showRoom, isWarmup, isTeleporting]);
 
@@ -172,18 +172,19 @@ const ContactRoom = ({ showRoom, onReady, isExiting, isWarmup }) => {
     const FRAMES_TO_WAIT = 5;
 
     // Phase state
-    const [currentPhase, setCurrentPhase] = useState(PHASE.ENTERING);
+    const [, setCurrentPhase] = useState(PHASE.ENTERING);
     const [showSelection, setShowSelection] = useState(true);
 
     const hasAnimatedDown = useRef(false);
     // Latch exit state to prevent glitch
     const hasExitTriggered = useRef(false);
-    if (isExiting && !hasExitTriggered.current) {
-        hasExitTriggered.current = true;
-        // Do NOT reorder to XYZ here. Let DoorSection's GSAP animate camera back to the door
-        // while remaining in YXZ order. This prevents "neck snapping" because interpolating 
-        // to X=0 in YXZ order naturally lifts the head up without twisting the neck.
-    }
+    // Latch is written in an effect, not during render: a render-phase ref write
+    // is a React anti-pattern (and `react-hooks/refs` rejects it). Same effect —
+    // the only reader is the per-frame callback below, which always runs after
+    // the commit that flipped `isExiting`.
+    useEffect(() => {
+        if (isExiting) hasExitTriggered.current = true;
+    }, [isExiting]);
 
     // Refs for animations
     const waveRefs = useRef([]);
@@ -225,7 +226,9 @@ const ContactRoom = ({ showRoom, onReady, isExiting, isWarmup }) => {
                 setShowSelection(true);
             }
         }
-    }, [hasSignaledReady.current, showRoom, camera]);
+        // `hasSignaledReady` is a ref: refs are not reactive and must never
+        // appear in a dependency array (react-hooks/refs).
+    }, [showRoom, camera]);
 
     const handleMailSelect = () => {
         // Awaryjne przekierowanie mailto:
@@ -289,10 +292,16 @@ const ContactRoom = ({ showRoom, onReady, isExiting, isWarmup }) => {
             const safeDelta = Math.min(delta, 0.033);
             const lerpSpeed = safeDelta * CAMERA_SETTINGS.lerpSpeed;
 
-            // NORMAL MODE (Look Down)
-            camera.rotation.x = THREE.MathUtils.lerp(camera.rotation.x, targetRotX.current, lerpSpeed);
-            camera.rotation.y = THREE.MathUtils.lerp(camera.rotation.y, targetRotY.current, lerpSpeed);
-            camera.rotation.z = THREE.MathUtils.lerp(camera.rotation.z, targetRotZ.current, lerpSpeed);
+            // NORMAL MODE (Look Down).
+            // Euler.set() instead of three separate `.rotation.x/.y/.z` writes:
+            // it notifies three.js once instead of three times per frame, and it
+            // keeps the mutation behind a method call rather than poking at
+            // properties of a hook-owned object.
+            camera.rotation.set(
+                THREE.MathUtils.lerp(camera.rotation.x, targetRotX.current, lerpSpeed),
+                THREE.MathUtils.lerp(camera.rotation.y, targetRotY.current, lerpSpeed),
+                THREE.MathUtils.lerp(camera.rotation.z, targetRotZ.current, lerpSpeed)
+            );
         }
 
         // 2. Wave Animation
@@ -472,7 +481,7 @@ const ContactRoom = ({ showRoom, onReady, isExiting, isWarmup }) => {
             <group visible={!showSelection}>
                 <MessagePaper
                     position={[0, 0.07, 2]}
-                    onSend={(data) => {
+                    onSend={() => {
                         // console.log('📬 Contact form submitted:', data);
                         unlockAchievement('contact_submit');
                     }}

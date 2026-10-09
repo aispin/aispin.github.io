@@ -68,6 +68,47 @@ const useInfiniteCamera = ({
     // Store last known mouse position (normalized -1 to 1)
     const lastMousePos = useRef({ x: 0, y: 0 });
 
+    /**
+     * How far the camera should glance toward the nearest door at a given Z.
+     *
+     * Declared up here, above every effect that uses it: it used to sit near the
+     * bottom of the hook, which meant the enable/disable layout effect and the
+     * per-frame callback both captured a binding that was still in its temporal
+     * dead zone on the first render.
+     */
+    const calculateGlance = useCallback((z, segment) => {
+        const zOffset = 10 - (segment * segmentLength);
+        let bestStrength = 0;
+        let bestDir = 0;
+
+        const START_DIST = 15;
+        const PEAK_DIST = 8;
+        const END_DIST = -2;
+
+        for (const door of DOOR_POSITIONS) {
+            const doorGlobalZ = zOffset + door.z;
+            const dist = z - doorGlobalZ;
+
+            let strength = 0;
+            if (dist > PEAK_DIST && dist < START_DIST) {
+                strength = (START_DIST - dist) / (START_DIST - PEAK_DIST);
+            } else if (dist <= PEAK_DIST && dist > END_DIST) {
+                strength = (dist - END_DIST) / (PEAK_DIST - END_DIST);
+            }
+
+            if (strength > 0) {
+                const easedStrength = strength * (2 - strength);
+                const dir = door.side === 'left' ? -1 : 1;
+                if (easedStrength > bestStrength) {
+                    bestStrength = easedStrength;
+                    bestDir = dir;
+                }
+            }
+        }
+
+        return bestDir * bestStrength * glanceIntensity * 3.5;
+    }, [segmentLength, glanceIntensity]);
+
     // Update enabled refs
     useLayoutEffect(() => {
         const wasScrollEnabled = scrollEnabledRef.current;
@@ -241,7 +282,7 @@ const useInfiniteCamera = ({
                     useGyroscope.current = true;
                     window.addEventListener('deviceorientation', handleDeviceOrientation);
                 }
-            } catch (error) {
+            } catch {
                 // console.log('Gyroscope permission denied');
             }
         } else {
@@ -366,10 +407,12 @@ const useInfiniteCamera = ({
                 glanceOffset.current = settleLerp(glanceOffset.current, targetGlance.current, lerpSpeed, SETTLE_ANGLE);
             }
 
-            // Apply Z position to camera (only when scroll enabled)
-            camera.position.z = currentZ.current;
-            camera.position.x = parallax.current.x;
-            camera.position.y = 0.2 + parallax.current.y;
+            // Apply Z position to camera (only when scroll enabled).
+            // Vector3.set() writes all three axes in one go — three.js then
+            // recomputes the matrix once per frame instead of three times, and
+            // the mutation stays behind a method call rather than reaching into
+            // a property of a hook-owned object.
+            camera.position.set(parallax.current.x, 0.2 + parallax.current.y, currentZ.current);
 
             // Look direction with glance + swipe glance
             const lookX = parallax.current.x * 0.3 + glanceOffset.current * 3 + swipeGlance.current * 4;
@@ -387,10 +430,14 @@ const useInfiniteCamera = ({
                 // Calculate blend factor (0 = saved, 1 = target)
                 const blendFactor = 1 - (blendInFrames.current / 30);
 
-                // Lerp from saved rotation to target
-                camera.rotation.x = THREE.MathUtils.lerp(savedRotation.current.x, targetRotation.x, blendFactor);
-                camera.rotation.y = THREE.MathUtils.lerp(savedRotation.current.y, targetRotation.y, blendFactor);
-                camera.rotation.z = THREE.MathUtils.lerp(savedRotation.current.z, targetRotation.z, blendFactor);
+                // Lerp from saved rotation to target.
+                // Euler.set() keeps the camera's YXZ order and notifies three.js
+                // once instead of three times per frame.
+                camera.rotation.set(
+                    THREE.MathUtils.lerp(savedRotation.current.x, targetRotation.x, blendFactor),
+                    THREE.MathUtils.lerp(savedRotation.current.y, targetRotation.y, blendFactor),
+                    THREE.MathUtils.lerp(savedRotation.current.z, targetRotation.z, blendFactor)
+                );
 
                 blendInFrames.current--;
             } else {
@@ -407,48 +454,13 @@ const useInfiniteCamera = ({
             // Parallax-only mode (during GSAP animation)
             // Apply parallax as offset to current camera position, and adjust lookAt
             // Don't override camera.position.z - GSAP controls it
-            camera.position.x = parallax.current.x;
-            camera.position.y = 0.2 + parallax.current.y;
+            camera.position.set(parallax.current.x, 0.2 + parallax.current.y, camera.position.z);
 
             // Look direction with parallax offset
             const lookX = parallax.current.x * 0.3 + swipeGlance.current * 4;
             camera.lookAt(lookX, 0.13 + parallax.current.y, camera.position.z - 10);
         }
     });
-
-    // Helper to calculate glance based on Z position
-    const calculateGlance = useCallback((z, segment) => {
-        const zOffset = 10 - (segment * segmentLength);
-        let bestStrength = 0;
-        let bestDir = 0;
-
-        const START_DIST = 15;
-        const PEAK_DIST = 8;
-        const END_DIST = -2;
-
-        for (const door of DOOR_POSITIONS) {
-            const doorGlobalZ = zOffset + door.z;
-            const dist = z - doorGlobalZ;
-
-            let strength = 0;
-            if (dist > PEAK_DIST && dist < START_DIST) {
-                strength = (START_DIST - dist) / (START_DIST - PEAK_DIST);
-            } else if (dist <= PEAK_DIST && dist > END_DIST) {
-                strength = (dist - END_DIST) / (PEAK_DIST - END_DIST);
-            }
-
-            if (strength > 0) {
-                const easedStrength = strength * (2 - strength);
-                const dir = door.side === 'left' ? -1 : 1;
-                if (easedStrength > bestStrength) {
-                    bestStrength = easedStrength;
-                    bestDir = dir;
-                }
-            }
-        }
-
-        return bestDir * bestStrength * glanceIntensity * 3.5;
-    }, [segmentLength, glanceIntensity]);
 
     // Function to enable/disable camera override
     const setCameraOverride = useCallback((active) => {

@@ -24,12 +24,10 @@ export const AchievementsProvider = ({ children }) => {
             if (saved) {
                 const parsed = JSON.parse(saved);
                 // Wrzucamy do pule, ale ignorujemy 'corridor_enter' żeby tooltip wejściowy zawsze się pojawiał
-                const filtered = parsed.filter(id => id !== 'corridor_enter');
-                completedRef.current = [...filtered];
-                return filtered;
+                return parsed.filter(id => id !== 'corridor_enter');
             }
             return [];
-        } catch (e) {
+        } catch {
             return [];
         }
     });
@@ -84,7 +82,7 @@ export const AchievementsProvider = ({ children }) => {
             // Audio is muted by start/stop being commented out, but we still ensure context logic is clean
             // osc.start(ctx.currentTime);
             // osc.stop(ctx.currentTime + 0.5);
-        } catch (err) {
+        } catch {
             // console.warn('Failed to play unlock chime', err);
         }
     }, []);
@@ -93,8 +91,14 @@ export const AchievementsProvider = ({ children }) => {
     // Structure: { id: 'corridor_enter', status: 'pending' | 'completed' | 'hiding' }
     const [activePopup, setActivePopup] = useState(null);
 
-    // Save to localStorage when completed changes
+    // Save to localStorage when completed changes — and keep the synchronous
+    // ref mirror in step.
+    //
+    // ⚠️ `completedRef` 原来是在上面 `useState` 的**初始化函数里**赋值的 ——
+    //    那是**渲染期写 ref**，`react-hooks/refs` 会拦。挪到这里：effect 在任何
+    //    用户事件之前就跑完，所以 ref 依旧"一开始就是对的"，而且与 state 永远同步。
     useEffect(() => {
+        completedRef.current = [...completed];
         const toSave = completed.filter(id => id !== 'corridor_enter');
         localStorage.setItem('aispin_achievements', JSON.stringify(toSave));
     }, [completed]);

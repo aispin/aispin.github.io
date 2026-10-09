@@ -9,7 +9,6 @@ import '../shaders/RevealMaterial'; // Registers alpha-discard reveal shader
 import { useScene } from '../../../context/SceneContext';
 import { useSitePreferences } from '../../../context/SitePreferences';
 import { SCENE_FONTS, TEXT } from '../../../config/theme';
-import { useAchievements } from '../../../context/AchievementsContext';
 import { useAudio } from '../../../context/AudioManager';
 import { isTouchDevice } from '../../../utils/deviceDetect';
 import { setGuitarCursor } from '../../../utils/guitarCursor';
@@ -128,9 +127,7 @@ const DoorSection = ({
     side = 'left',
     label,
     roomId, // ID for context updates (gallery, studio, etc)
-    icon,
     onEnter,
-    autoCloseDelay = 3000,
     enterDistance = 8, // Default fly-through distance
     setCameraOverride, // Function to take control of camera from hook
     segmentIndex,
@@ -151,17 +148,17 @@ const DoorSection = ({
     const [isInsideRoom, setIsInsideRoom] = useState(false);
     const [isTiltLocked, setIsTiltLocked] = useState(false); // Lock tilt when entering room
     const [shouldRenderRoom, setShouldRenderRoom] = useState(false); // Lazy loading state
-    const [roomReady, setRoomReady] = useState(false); // Room signaled it's ready
+    const [, setRoomReady] = useState(false); // Room signaled it's ready
     const { camera } = useThree();
     const { language } = useSitePreferences();
     const closeTimerRef = useRef(null);
     const loadTimeoutRef = useRef(null); // Ref for the room loading fallback timeout
+    const roomReadyRef = useRef(false);
 
     // Get exit request signal from context
     const {
         currentRoom, // We need to know if the global room changed (teleportation)
         exitRequested,
-        clearExitRequest,
         exitRoom: contextExitRoom,
         enterRoom,
         pendingDoorClick,
@@ -172,7 +169,6 @@ const DoorSection = ({
         setDoorBusy
     } = useScene();
 
-    const { unlockAchievement } = useAchievements();
     const { globalVolume, isMuted } = useAudio();
 
     // Audio Refs for 3D positional sound
@@ -186,26 +182,6 @@ const DoorSection = ({
     // been removed along with the CabinSketch font it referenced.
     const doorId = roomId ?? null;
 
-    // Listen for pending door click (auto-click after teleport)
-    useEffect(() => {
-        // The same room is mounted more than once at a time: rooms repeat
-        // around the corridor ring (see LOOP_SPACES in CorridorSegment), and
-        // the manager keeps three segments alive, so e.g. `videos` exists in
-        // both segment 1 and segment -1. Matching on a hardcoded segment
-        // number would (a) miss every copy but that one and (b) fire on the
-        // wrong copy whenever the camera happens to be further along the ring.
-        //
-        // The only copy that should react is the one the camera is standing
-        // in. `camera.position.z` is read live here rather than tracked, which
-        // is exactly right: this runs at the moment the teleport publishes its
-        // pending click, after the camera has already been placed.
-        const cameraSegment = Math.floor((10 - camera.position.z) / segmentLength);
-        const isTargetDoor = segmentIndex === cameraSegment;
-
-        if (pendingDoorClick && pendingDoorClick === doorId && isTargetDoor && !isOpen && !isAnimating) {
-            handleClick({ stopPropagation: () => { }, isTeleport: true }); // Trigger click simulation with TELEPORT flag
-        }
-    }, [pendingDoorClick, doorId, segmentIndex, segmentLength, isOpen, isAnimating]);
 
     // --- SILENT RESET FOR TELEPORTATION ---
     // If a teleport starts (users clicks map), and we are inside THIS room,
@@ -487,6 +463,175 @@ const DoorSection = ({
         };
     }, []);
 
+    const closeDoor = useCallback((onDoorClosed) => {
+        // Completion path, defined FIRST and used by every exit below.
+        //
+        // This used to be reachable only from the closing tween's onComplete,
+        // while the guard below returned silently when the door was already shut
+        // or unmounted. `exitRoom` passes its ENTIRE cleanup as this callback
+        // (isAnimating, isInsideRoom, shouldRenderRoom, contextExitRoom and the
+        // camera override), so dropping it stranded all five: the door stayed
+        // locked, the corridor scroll stayed suspended on the override, and the
+        // back button became a no-op because exitRoom's own guard then saw
+        // isAnimating === true forever.
+        const settle = () => {
+            setIsOpen(false);
+            setIsAnimating(false);
+            onDoorClosed?.();
+        };
+
+        if (!doorRef.current || !isOpen) {
+            // Nothing to animate — but the caller is still waiting on us.
+            settle();
+            return;
+        }
+        if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+        if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+
+        setIsAnimating(true);
+
+        if (closeAudioRef.current) {
+            setTimeout(() => {
+                const vol = isMuted ? 0 : DOOR_AUDIO_SETTINGS.closeVolume * globalVolume;
+                if (closeAudioRef.current) {
+                    closeAudioRef.current.setVolume(vol);
+                    if (closeAudioRef.current.isPlaying) closeAudioRef.current.stop();
+                    closeAudioRef.current.play();
+                }
+            }, DOOR_AUDIO_SETTINGS.closeDelay * 1000);
+        }
+
+        // Reset handle
+        if (handleRef.current) {
+            gsap.to(handleRef.current.rotation, {
+                z: 0,
+                duration: dur(0.2),
+                ease: 'power2.out'
+            });
+        }
+
+        // Reverse brush-stroke reveal (un-paint the door)
+        if (doorMaterialRef.current) {
+            gsap.to(doorMaterialRef.current, {
+                uProgress: 0.0,
+                duration: 0.6,
+                ease: 'power2.out',
+                overwrite: true
+            });
+        }
+        if (handleMaterialRef.current) {
+            gsap.to(handleMaterialRef.current, {
+                uProgress: 0.0,
+                duration: 0.6,
+                ease: 'power2.out',
+                overwrite: true
+            });
+        }
+        // Hide painted layers after animation
+        if (handleHideDelayRef.current) handleHideDelayRef.current.kill();
+        handleHideDelayRef.current = gsap.delayedCall(0.65, () => {
+            if (handlePaintedRef.current) handlePaintedRef.current.visible = false;
+            if (doorPaintedRef.current) doorPaintedRef.current.visible = false;
+        });
+
+        gsap.to(doorRef.current.rotation, {
+            y: 0,
+            duration: dur(0.6),
+            ease: 'power2.in',
+            onComplete: settle
+        });
+    }, [isOpen]);
+
+    const openDoor = useCallback((fastMode = false) => {
+        // If the door group isn't mounted we cannot run the fly-in, but we MUST
+        // still release the entry lock. `handleClick` set isAnimating = true
+        // before the room started loading, and this callback is the only place
+        // that clears it. Bailing out here used to leave isAnimating stuck true
+        // forever, which makes handleClick ignore every later click on this door
+        // — the room becomes permanently unenterable.
+        if (!doorRef.current) {
+            setIsAnimating(false);
+            setIsTiltLocked(false);
+            return;
+        }
+
+        setIsOpen(true);
+        const openAngle = side === 'left' ? Math.PI * 0.6 : -Math.PI * 0.6;
+
+        if (!fastMode && openAudioRef.current) {
+            const vol = isMuted ? 0 : DOOR_AUDIO_SETTINGS.openVolume * globalVolume;
+            openAudioRef.current.setVolume(vol);
+            if (openAudioRef.current.isPlaying) openAudioRef.current.stop();
+            openAudioRef.current.play();
+        }
+
+        // FAST MODE: Ultra-fast durations for teleport entry
+        const handleDuration = fastMode ? 0.01 : dur(0.15);
+        const doorDuration = fastMode ? 0.01 : dur(0.7);
+        const flyDuration = fastMode ? 0.01 : dur(1.5);
+
+        // Animate handle down first
+        if (handleRef.current) {
+            gsap.to(handleRef.current.rotation, {
+                z: side === 'left' ? 0.4 : -0.4,
+                duration: handleDuration,
+                ease: fastMode ? 'none' : 'power2.out'
+            });
+        }
+
+        gsap.to(doorRef.current.rotation, {
+            y: openAngle,
+            duration: doorDuration,
+            ease: fastMode ? 'none' : 'power2.out',
+            onComplete: () => {
+                // Door is open, now fly camera through the door
+                // Get the direction the camera is looking AT THE START
+                const direction = new THREE.Vector3();
+                camera.getWorldDirection(direction);
+
+                const flyDistance = enterDistance; // Fly through short vestibule (3) + into room
+
+                // Calculate TARGET position BEFORE animating (so flight path is straight)
+                const targetX = camera.position.x + direction.x * flyDistance;
+                const targetZ = camera.position.z + direction.z * flyDistance;
+
+                // STEP 1: Fly camera forward in a STRAIGHT LINE
+                gsap.to(camera.position, {
+                    x: targetX,
+                    z: targetZ,
+                    duration: flyDuration,
+                    ease: fastMode ? 'none' : 'power2.inOut',
+                    onComplete: () => {
+                        // Save position AFTER flight
+                        roomEntryState.current = {
+                            x: camera.position.x,
+                            y: camera.position.y,
+                            z: camera.position.z,
+                            rotationY: camera.rotation.y
+                        };
+
+                        // NO ROTATION needed - we are already looking perpendicular to corridor
+                        // Just mark as inside
+                        setIsAnimating(false);
+                        setIsInsideRoom(true);
+
+                        // Defer context update exactly 250ms to strictly avoid any
+                        // stutter during the very last frames of the GSAP animation loop.
+                        setTimeout(() => {
+                            enterRoom(doorId); // Use ID ('gallery') not label ('THE GALLERY')
+                            onEnter?.();
+
+                            // FAST TELEPORT: Signal that room is ready - this opens the paper
+                            if (fastMode) {
+                                signalRoomReady();
+                            }
+                        }, 250);
+                    }
+                });
+            }
+        });
+    }, [side, onEnter, camera, enterRoom, doorId, signalRoomReady]);
+
     const handleClick = useCallback((e) => {
         // e might be null or synthetic from teleport
         e?.stopPropagation?.();
@@ -648,99 +793,30 @@ const DoorSection = ({
         });
     }, [camera, side, isOpen, isAnimating, setCameraOverride, isFastTeleport]);
 
-    const openDoor = useCallback((fastMode = false) => {
-        // If the door group isn't mounted we cannot run the fly-in, but we MUST
-        // still release the entry lock. `handleClick` set isAnimating = true
-        // before the room started loading, and this callback is the only place
-        // that clears it. Bailing out here used to leave isAnimating stuck true
-        // forever, which makes handleClick ignore every later click on this door
-        // — the room becomes permanently unenterable.
-        if (!doorRef.current) {
-            setIsAnimating(false);
-            setIsTiltLocked(false);
-            return;
+    // Listen for pending door click (auto-click after teleport)
+    useEffect(() => {
+        // The same room is mounted more than once at a time: rooms repeat
+        // around the corridor ring (see LOOP_SPACES in CorridorSegment), and
+        // the manager keeps three segments alive, so e.g. `videos` exists in
+        // both segment 1 and segment -1. Matching on a hardcoded segment
+        // number would (a) miss every copy but that one and (b) fire on the
+        // wrong copy whenever the camera happens to be further along the ring.
+        //
+        // The only copy that should react is the one the camera is standing
+        // in. `camera.position.z` is read live here rather than tracked, which
+        // is exactly right: this runs at the moment the teleport publishes its
+        // pending click, after the camera has already been placed.
+        const cameraSegment = Math.floor((10 - camera.position.z) / segmentLength);
+        const isTargetDoor = segmentIndex === cameraSegment;
+
+        if (pendingDoorClick && pendingDoorClick === doorId && isTargetDoor && !isOpen && !isAnimating) {
+            handleClick({ stopPropagation: () => { }, isTeleport: true }); // Trigger click simulation with TELEPORT flag
         }
+    }, [pendingDoorClick, doorId, segmentIndex, segmentLength, isOpen, isAnimating]);
 
-        setIsOpen(true);
-        const openAngle = side === 'left' ? Math.PI * 0.6 : -Math.PI * 0.6;
-
-        if (!fastMode && openAudioRef.current) {
-            const vol = isMuted ? 0 : DOOR_AUDIO_SETTINGS.openVolume * globalVolume;
-            openAudioRef.current.setVolume(vol);
-            if (openAudioRef.current.isPlaying) openAudioRef.current.stop();
-            openAudioRef.current.play();
-        }
-
-        // FAST MODE: Ultra-fast durations for teleport entry
-        const handleDuration = fastMode ? 0.01 : dur(0.15);
-        const doorDuration = fastMode ? 0.01 : dur(0.7);
-        const flyDuration = fastMode ? 0.01 : dur(1.5);
-
-        // Animate handle down first
-        if (handleRef.current) {
-            gsap.to(handleRef.current.rotation, {
-                z: side === 'left' ? 0.4 : -0.4,
-                duration: handleDuration,
-                ease: fastMode ? 'none' : 'power2.out'
-            });
-        }
-
-        gsap.to(doorRef.current.rotation, {
-            y: openAngle,
-            duration: doorDuration,
-            ease: fastMode ? 'none' : 'power2.out',
-            onComplete: () => {
-                // Door is open, now fly camera through the door
-                // Get the direction the camera is looking AT THE START
-                const direction = new THREE.Vector3();
-                camera.getWorldDirection(direction);
-
-                const flyDistance = enterDistance; // Fly through short vestibule (3) + into room
-
-                // Calculate TARGET position BEFORE animating (so flight path is straight)
-                const targetX = camera.position.x + direction.x * flyDistance;
-                const targetZ = camera.position.z + direction.z * flyDistance;
-
-                // STEP 1: Fly camera forward in a STRAIGHT LINE
-                gsap.to(camera.position, {
-                    x: targetX,
-                    z: targetZ,
-                    duration: flyDuration,
-                    ease: fastMode ? 'none' : 'power2.inOut',
-                    onComplete: () => {
-                        // Save position AFTER flight
-                        roomEntryState.current = {
-                            x: camera.position.x,
-                            y: camera.position.y,
-                            z: camera.position.z,
-                            rotationY: camera.rotation.y
-                        };
-
-                        // NO ROTATION needed - we are already looking perpendicular to corridor
-                        // Just mark as inside
-                        setIsAnimating(false);
-                        setIsInsideRoom(true);
-
-                        // Defer context update exactly 250ms to strictly avoid any
-                        // stutter during the very last frames of the GSAP animation loop.
-                        setTimeout(() => {
-                            enterRoom(doorId); // Use ID ('gallery') not label ('THE GALLERY')
-                            onEnter?.();
-
-                            // FAST TELEPORT: Signal that room is ready - this opens the paper
-                            if (fastMode) {
-                                signalRoomReady();
-                            }
-                        }, 250);
-                    }
-                });
-            }
-        });
-    }, [side, onEnter, camera, enterRoom, doorId, signalRoomReady]);
 
     // Handle room ready callback - open door when room is fully loaded
     // Use ref to prevent multiple calls (state might not update fast enough)
-    const roomReadyRef = useRef(false);
 
     const handleRoomReady = useCallback(() => {
         // Guard: only call openDoor once
@@ -926,84 +1002,6 @@ const DoorSection = ({
         }
     }, [exitRequested, isInsideRoom, isAnimating, exitRoom]);
 
-    const closeDoor = useCallback((onDoorClosed) => {
-        // Completion path, defined FIRST and used by every exit below.
-        //
-        // This used to be reachable only from the closing tween's onComplete,
-        // while the guard below returned silently when the door was already shut
-        // or unmounted. `exitRoom` passes its ENTIRE cleanup as this callback
-        // (isAnimating, isInsideRoom, shouldRenderRoom, contextExitRoom and the
-        // camera override), so dropping it stranded all five: the door stayed
-        // locked, the corridor scroll stayed suspended on the override, and the
-        // back button became a no-op because exitRoom's own guard then saw
-        // isAnimating === true forever.
-        const settle = () => {
-            setIsOpen(false);
-            setIsAnimating(false);
-            onDoorClosed?.();
-        };
-
-        if (!doorRef.current || !isOpen) {
-            // Nothing to animate — but the caller is still waiting on us.
-            settle();
-            return;
-        }
-        if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-        if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
-
-        setIsAnimating(true);
-
-        if (closeAudioRef.current) {
-            setTimeout(() => {
-                const vol = isMuted ? 0 : DOOR_AUDIO_SETTINGS.closeVolume * globalVolume;
-                if (closeAudioRef.current) {
-                    closeAudioRef.current.setVolume(vol);
-                    if (closeAudioRef.current.isPlaying) closeAudioRef.current.stop();
-                    closeAudioRef.current.play();
-                }
-            }, DOOR_AUDIO_SETTINGS.closeDelay * 1000);
-        }
-
-        // Reset handle
-        if (handleRef.current) {
-            gsap.to(handleRef.current.rotation, {
-                z: 0,
-                duration: dur(0.2),
-                ease: 'power2.out'
-            });
-        }
-
-        // Reverse brush-stroke reveal (un-paint the door)
-        if (doorMaterialRef.current) {
-            gsap.to(doorMaterialRef.current, {
-                uProgress: 0.0,
-                duration: 0.6,
-                ease: 'power2.out',
-                overwrite: true
-            });
-        }
-        if (handleMaterialRef.current) {
-            gsap.to(handleMaterialRef.current, {
-                uProgress: 0.0,
-                duration: 0.6,
-                ease: 'power2.out',
-                overwrite: true
-            });
-        }
-        // Hide painted layers after animation
-        if (handleHideDelayRef.current) handleHideDelayRef.current.kill();
-        handleHideDelayRef.current = gsap.delayedCall(0.65, () => {
-            if (handlePaintedRef.current) handlePaintedRef.current.visible = false;
-            if (doorPaintedRef.current) doorPaintedRef.current.visible = false;
-        });
-
-        gsap.to(doorRef.current.rotation, {
-            y: 0,
-            duration: dur(0.6),
-            ease: 'power2.in',
-            onComplete: settle
-        });
-    }, [isOpen]);
 
     // Handle hover effects
     const handlePointerEnter = () => {
@@ -1129,7 +1127,6 @@ const DoorSection = ({
     const doorMeshX = side === 'left' ? doorWidth / 2 : -doorWidth / 2;
 
     // Handle position on door (based on texture - handle is on the right side for left doors)
-    const handlePivotX = side === 'left' ? doorWidth * 0.25 : -doorWidth * 0.25;
 
     // Sign board — procedural canvas art (utils/corridorArt.js). The room name
     // is drawn on top of it by <Text>, so the board itself is blank.

@@ -21,7 +21,10 @@ const NavigationUI = () => {
     // Audio controls state
     const [isAudioMenuOpen, setIsAudioMenuOpen] = useState(false);
     const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
-    const [bgmVol, setBgmVol] = useState(0.3);
+    // Seeded from the audio manager rather than a hard-coded 0.3 + a mount
+    // effect that immediately overwrote it with the real value (which both
+    // flickered the slider and tripped react-hooks/set-state-in-effect).
+    const [bgmVol, setBgmVol] = useState(getMusicVolume);
 
     // Refs for focus management
     const mapPanelRef = useRef();
@@ -44,8 +47,6 @@ const NavigationUI = () => {
     }, []);
 
     useEffect(() => {
-        setBgmVol(getMusicVolume());
-
         const handleMusicVolumeChange = (e) => {
             setBgmVol(e.detail);
         };

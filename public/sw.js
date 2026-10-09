@@ -67,7 +67,7 @@ self.addEventListener('fetch', (event) => {
           const cache = await caches.open(RUNTIME);
           cache.put('/', fresh.clone());
           return fresh;
-        } catch (err) {
+        } catch {
           const cache = await caches.open(PRECACHE);
           return (await cache.match('/')) || (await cache.match(request)) || Response.error();
         }

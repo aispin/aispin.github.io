@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import gsap from 'gsap';
 import { useAudio } from '../../context/AudioManager';
+import { hashString, mulberry32 } from '../../engine/art';
 
 /* How long to wait for the loading manager to say *anything* before assuming
  * there is nothing left to load. Only used when no asset ever reported — a
@@ -16,6 +17,16 @@ const ASSET_GRACE_MS = 1200;
  * safe, since both phases only ever raise the value (Math.max), so a late
  * onLoad still jumps the bar to 100. */
 const ASSET_STALL_MS = 9000;
+
+/* The value the progress tween most recently wrote into the DOM.
+ *
+ * The tween drives the SVG attributes imperatively (see onUpdate below) to keep
+ * 60 fps off React's render path, so on a re-render the component has no React
+ * state to seed those attributes from. It used to read `displayProgressRef` for
+ * that — which is a ref read during render. A module-level mirror carries the
+ * same number without the anti-pattern. Safe as a module singleton: exactly one
+ * Preloader is ever mounted. */
+let lastDisplayedProgress = 0;
 
 // Reusable SVG Line Component (now accepts ref)
 const TearLineSVG = ({ svgPathData, pathLength, strokeDashoffset, pathRef }) => (
@@ -147,10 +158,6 @@ const Preloader = ({ onComplete, ready }) => {
       setRealProgress(100);
       setActive(false);
       
-      const loadEnd = performance.now();
-      const loadDuration = ((loadEnd - loadStartTime.current) / 1000).toFixed(2);
-      // console.info(`📦 Assets Loaded: ${loadDuration}s`);
-      
       origOnLoad?.();
     };
 
@@ -164,9 +171,6 @@ const Preloader = ({ onComplete, ready }) => {
   const { play } = useAudio();
   // Track audio handle to stop loop
   const pencilSoundRef = useRef(null);
-
-  // Performance Tracking
-  const loadStartTime = useRef(performance.now());
 
   // Use refs for animation targets
   const containerRef = useRef(null);
@@ -188,15 +192,19 @@ const Preloader = ({ onComplete, ready }) => {
   // ----------------------------------------
   // GENERATE TEAR PATH
   // ----------------------------------------
+  // Seeded PRNG, not Math.random(): the tear silhouette must be identical on
+  // every run (project determinism contract) and the value has to be pure
+  // during render. A fixed key gives a stable, jittered-looking edge.
   const tearPoints = useMemo(() => {
     const points = [];
     const segments = 12; // Fewer segments
+    const rand = mulberry32(hashString('paper-tear'));
 
     points.push([50, 0]);
 
     for (let i = 1; i < segments; i++) {
       const y = (i / segments) * 100;
-      const xOffset = (Math.random() - 0.5) * 6;
+      const xOffset = (rand() - 0.5) * 6;
       const x = 50 + xOffset;
       points.push([x, y]);
     }
@@ -272,6 +280,72 @@ const Preloader = ({ onComplete, ready }) => {
     return () => window.clearInterval(id);
   }, [assetsDone, ready]);
 
+  // ----------------------------------------
+  // EXIT SEQUENCE
+  // ----------------------------------------
+  // Declared here, above every effect that can trigger it. `startExit` used to
+  // sit at the bottom of the component, so the progress trigger and the ready
+  // fallback both referenced it from its temporal dead zone.
+  //
+  // The "have we already started" latch lives *inside* startExit and nowhere
+  // else: it used to be set in three places (two of which ran before startExit
+  // had even been entered), so the callers could disagree about the state.
+  const exitStartedRef = useRef(false);
+
+  const startExit = () => {
+    if (exitStartedRef.current) return;
+    exitStartedRef.current = true;
+
+    if (pencilSoundRef.current) {
+      pencilSoundRef.current.stop();
+      pencilSoundRef.current = null;
+    }
+    play('tear', { volume: 0.8 });
+
+    // 背景音乐**不**在这里起播（2026-10-08 用户改的）。
+    //
+    // 曾经在这里调 autoplayBackgroundMusic()：加载完就请求播放，首访被自动播放
+    // 策略拦下时再挂一次性手势补播。问题是"被拦下"是常态（首访必然被拦），
+    // 于是站点一进来就是"要么没声音、要么说不清什么时候会响"，
+    // 而右上角那个图标又画成"有声"，与实际不符。
+    //
+    // 现在改成完全手势驱动：**推开大门**（EntranceDoors 的 handleClick）
+    // 或**面板里取消静音**才起播。图标默认因此画成静音态。
+
+    const tl = gsap.timeline({
+      onComplete: () => {
+        setIsDone(true);
+
+
+        onComplete?.();
+      }
+    });
+
+    // 1. Quick pause before tear
+    tl.to({}, { duration: 0.1 });
+
+    // 2. Tear Apart
+    tl.to(leftHalfRef.current, {
+      xPercent: -100,
+      rotation: -2,
+      duration: 1.8,
+      ease: "power3.inOut"
+    }, 'tear');
+
+    tl.to(rightHalfRef.current, {
+      xPercent: 100,
+      rotation: 2,
+      duration: 1.8,
+      ease: "power3.inOut"
+    }, 'tear');
+
+    // 3. Fade container
+    tl.to(containerRef.current, {
+      opacity: 0,
+      duration: 0.5
+    }, '-=0.5');
+  };
+
   // Handle Pencil Sound & Exit checking dynamically
   const checkProgressTriggers = (val) => {
     // Pencil Sound
@@ -284,8 +358,7 @@ const Preloader = ({ onComplete, ready }) => {
     }
 
     // Exit phase
-    if (val >= 99.5 && readyRef.current && !exitStarted.current) {
-      exitStarted.current = true;
+    if (val >= 99.5 && readyRef.current) {
       startExit();
     }
   };
@@ -321,6 +394,7 @@ const Preloader = ({ onComplete, ready }) => {
       onUpdate: () => {
         const val = trackerRef.current.val;
         displayProgressRef.current = val;
+        lastDisplayedProgress = val;
 
         const safeProgress = Math.min(100, Math.max(0, val));
         const strokeDashoffset = 120 - (120 * safeProgress) / 100;
@@ -339,83 +413,19 @@ const Preloader = ({ onComplete, ready }) => {
   }, [targetProgress]);
 
 
-  // ----------------------------------------
-  // EXIT SEQUENCE
-  // ----------------------------------------
-  const exitStarted = useRef(false);
-
   // Fallback trigger if ready becomes true AFTER 99.5% reached
   useEffect(() => {
-    if (displayProgressRef.current >= 99.5 && ready && !exitStarted.current) {
-      exitStarted.current = true;
+    if (displayProgressRef.current >= 99.5 && ready) {
       startExit();
     }
   }, [ready]);
 
-  const startExit = () => {
-    exitStarted.current = true;
-
-    if (pencilSoundRef.current) {
-      pencilSoundRef.current.stop();
-      pencilSoundRef.current = null;
-    }
-    play('tear', { volume: 0.8 });
-
-    // 背景音乐**不**在这里起播（2026-10-08 用户改的）。
-    //
-    // 曾经在这里调 autoplayBackgroundMusic()：加载完就请求播放，首访被自动播放
-    // 策略拦下时再挂一次性手势补播。问题是"被拦下"是常态（首访必然被拦），
-    // 于是站点一进来就是"要么没声音、要么说不清什么时候会响"，
-    // 而右上角那个图标又画成"有声"，与实际不符。
-    //
-    // 现在改成完全手势驱动：**推开大门**（EntranceDoors 的 handleClick）
-    // 或**面板里取消静音**才起播。图标默认因此画成静音态。
-
-    const tl = gsap.timeline({
-      onComplete: () => {
-        setIsDone(true);
-        
-        const exitEnd = performance.now();
-        const totalDuration = ((exitEnd - loadStartTime.current) / 1000).toFixed(2);
-        // console.group("⏱️ Portfolio Loading Performance");
-        // console.log(`- Start: %c${loadStartTime.current.toFixed(0)}ms`, "color: #888");
-        // console.log(`- Total Duration: %c${totalDuration}s`, "color: #00ff00; font-weight: bold;");
-        // console.groupEnd();
-        
-        onComplete?.();
-      }
-    });
-
-    // 1. Quick pause before tear
-    tl.to({}, { duration: 0.1 });
-
-    // 2. Tear Apart
-    tl.to(leftHalfRef.current, {
-      xPercent: -100,
-      rotation: -2,
-      duration: 1.8,
-      ease: "power3.inOut"
-    }, 'tear');
-
-    tl.to(rightHalfRef.current, {
-      xPercent: 100,
-      rotation: 2,
-      duration: 1.8,
-      ease: "power3.inOut"
-    }, 'tear');
-
-    // 3. Fade container
-    tl.to(containerRef.current, {
-      opacity: 0,
-      duration: 0.5
-    }, '-=0.5');
-  };
-
   if (isDone) return null;
 
   const pathLength = 120;
-  // Initialize values
-  const safeProgress = Math.min(100, Math.max(0, displayProgressRef.current));
+  // Initialize values from the imperative mirror, not from a ref (see
+  // lastDisplayedProgress above).
+  const safeProgress = Math.min(100, Math.max(0, lastDisplayedProgress));
   const strokeDashoffset = pathLength - (pathLength * safeProgress) / 100;
   const percentageText = `${Math.round(safeProgress)}%`;
 

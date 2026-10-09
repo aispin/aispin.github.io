@@ -320,7 +320,7 @@ export function demo() {
     assert(sharedGeometry('plane', 3, 4) === p1, '第二次取同一个尺寸又新建了');
     assert(primitiveCache.map.size >= 3, '图元缓存没记上');
     let threw = false;
-    try { sharedGeometry('dodecahedron', 1); } catch (e) { threw = true; }
+    try { sharedGeometry('dodecahedron', 1); } catch { threw = true; }
     assert(threw, '未知图元应该抛错而不是静默返回 undefined');
 
     mat.clear();

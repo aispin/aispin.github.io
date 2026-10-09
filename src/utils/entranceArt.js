@@ -24,7 +24,7 @@
  */
 
 import * as THREE from 'three';
-import { alphaBBox, hashString, makeCanvas, mulberry32 } from '../engine/art';
+import { hashString, makeCanvas, mulberry32 } from '../engine/art';
 
 const cache = new Map();
 
@@ -816,7 +816,6 @@ export function makeTreeTexture() {
     };
 
     const shootOff = (L, at, ang, len, w, depth) => {
-        const n = L.pts.length;
         const p = L.pts[at];
         const q = L.pts[Math.max(0, at - 1)];
         grow(p[0], p[1], Math.atan2(p[1] - q[1], p[0] - q[0]) + ang, len, w, depth);

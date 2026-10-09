@@ -1,4 +1,3 @@
-/* eslint-disable react/no-unknown-property */
 import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Text, Html, useCursor } from '@react-three/drei';
@@ -476,7 +475,7 @@ const MessagePaper = ({ position = [0, 0.05, 2], onSend }) => {
             } else {
                 throw new Error(result.message || 'Failed to send');
             }
-        } catch (error) {
+        } catch {
             // console.error('❌ Send failed:', error);
             setSubmitStatus('error');
         } finally {
@@ -548,7 +547,7 @@ const MessagePaper = ({ position = [0, 0.05, 2], onSend }) => {
 
     // Store original vertex positions for fold animation
     // Paper animation (flutter)
-    useFrame((state, delta) => {
+    useFrame((state) => {
         if (!paperRef.current) return;
         // 纸面的轻微"飘"是纯装饰；减少动态效果时保持平放
         if (reducedMotion()) return;

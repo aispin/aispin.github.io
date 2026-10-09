@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
+import { useCallback, useEffect } from 'react';
+import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import InfiniteCorridorManager from './corridor/InfiniteCorridorManager';
@@ -28,15 +28,21 @@ const ENTRANCE_DOORS_Z = 22;
  * 2. Click doors -> they open + camera flies through
  * 3. Behind doors: infinite corridor with ZEO
  */
-const Experience = ({ isLoaded, onSceneReady, performanceTier }) => {
+const Experience = ({ onSceneReady, performanceTier }) => {
     // Use SceneContext for room state
-    const { hasEntered, markEntered, enterRoom, isTeleporting, isInRoom, pendingDoorClick, houseExitRequested } = useScene();
+    const { hasEntered, markEntered, enterRoom, isTeleporting, isInRoom, houseExitRequested } = useScene();
 
     const { camera } = useThree();
 
     // Debug hook: allows tests/screenshots to reposition the camera (window.__cam)
     const scene = useThree((state) => state.scene);
-    if (typeof window !== 'undefined') {
+
+    // ⚠️ 这三个赋值必须在 effect 里，**不能写在 render 里**（原来就写在 render
+    //    里）—— 渲染阶段写全局是副作用，`react-hooks/immutability` 会拦下来。
+    //    放 effect 语义完全一样：harness 是等场景稳定后才轮询 `window.__scene`
+    //    的，那时 effect 早就跑过了。
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
         window.__cam = camera;
         window.__scene = scene;
         // `window.__THREE` exists so a harness can raycast from the page
@@ -44,7 +50,7 @@ const Experience = ({ isLoaded, onSceneReady, performanceTier }) => {
         // *what* a stray 5 px bright line on screen actually is degenerates
         // into hiding objects one at a time and guessing from the diff.
         window.__THREE = THREE;
-    }
+    }, [camera, scene]);
 
     // Camera control - both scroll and parallax only work after entering
     // Disable during teleporting to prevent scroll interference

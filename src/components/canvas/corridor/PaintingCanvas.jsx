@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { getPaintingMaterial } from '../../../shaders/paintings';
+import { getPaintingMaterial, PAINTING_CLOCK } from '../../../shaders/paintings';
 import { sharedGeometry } from '../../../engine/resources';
 
 /**
@@ -30,7 +30,11 @@ const PaintingCanvas = ({ name, width, height, isActive = false }) => {
             paintClockLast = now;
             paintClockTime += delta * (isActive ? 1.0 : 0.22);
         }
-        material.uniforms.uTime.value = paintClockTime;
+        // Ticks the shared module-level clock that every painting material was
+        // built with (see PAINTING_CLOCK) instead of assigning into the
+        // material's own uniform bag — the material is a cached, shared object
+        // and must not be mutated from here.
+        PAINTING_CLOCK.value = paintClockTime;
     });
 
     return (

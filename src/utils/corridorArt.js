@@ -98,17 +98,6 @@ function inkSketchRect(ctx, x, y, w, h, { amp = 2.4, r = 0, color = '#2a2320', w
     ctx.restore();
 }
 
-/** A polyline whose vertices wobble by ±amp — a hand-drawn stroke. */
-function wobblePath(ctx, pts, amp, rand) {
-    ctx.beginPath();
-    pts.forEach(([x, y], i) => {
-        const jx = (rand() - 0.5) * amp;
-        const jy = (rand() - 0.5) * amp;
-        if (i === 0) ctx.moveTo(x + jx, y + jy);
-        else ctx.lineTo(x + jx, y + jy);
-    });
-}
-
 /** Stroke `build` once, then echo it with a lighter offset pass. */
 function inkStroke(ctx, build, { color = '#2a2320', width = 5, echo = 0.4 } = {}) {
     ctx.strokeStyle = color;
@@ -430,7 +419,6 @@ export function makeDoorArrowTexture() {
     const H = 64;
     const canvas = makeCanvas(W, H);
     const ctx = canvas.getContext('2d');
-    const rand = mulberry32(hashString(key));
 
     // Shaft, drawn as a shallow arc so it reads as a pencil flick
     const shaft = (c) => {

@@ -32,7 +32,7 @@ const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const PRESETS = {
     /* 风：低频"呼呼"的body + 高频的"嘶"，两层各自慢速起伏，
      * 再加上一条极慢的阵风 LFO 推低通截止点 —— 风的变化全在截止点上。 */
-    wind: (ctx) => [
+    wind: (_ctx) => [
         {
             noise: ['brown', 4],
             filters: [
@@ -63,7 +63,7 @@ const PRESETS = {
 
     /* 城市：远处的车流隆隆（低频）+ 一条中频"嗡嗡"（空调/变压器）+ 偶尔
      * 掠过的更亮的层。三条 LFO 频率互质，叠起来就没有可辨识的周期。 */
-    city: (ctx) => [
+    city: (_ctx) => [
         {
             noise: ['brown', 4],
             filters: [
@@ -94,7 +94,7 @@ const PRESETS = {
     /* 海：浪涌。低频那层用 0.085 Hz（约 12 秒一次）做大幅起伏；泡沫层用
      * **同频率但相位错开四分之一周期**，于是"嘶"声在浪退的时候最响 ——
      * 真实的海边就是浪峰先到、泡沫声随后。 */
-    sea: (ctx) => [
+    sea: (_ctx) => [
         {
             noise: ['brown', 6],
             filters: [

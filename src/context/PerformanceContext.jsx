@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { useThree } from "@react-three/fiber";
 
 // Performance Tiers
 export const TIERS = {

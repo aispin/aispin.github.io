@@ -1,7 +1,5 @@
 /* eslint-disable */
 /* 以下为 vendored 引擎，保留原始代码便于后续随 skill 升级覆盖 */
-/* eslint-disable */
-/* 以下为 vendored 引擎，保留原始代码便于后续随 skill 升级覆盖 */
 /* ============================================================
  * iskill-generative-bgm · 纯前端生成式 BGM 引擎 v1.2.1
  * 零依赖 ESM —— Web Audio 实时合成，无任何音频素材，完全离线。

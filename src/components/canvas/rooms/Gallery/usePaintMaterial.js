@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect } from 'react';
+import { useMemo } from 'react';
 import * as THREE from 'three';
 import gsap from 'gsap';
 
@@ -137,8 +137,21 @@ export const usePaintMaterial = (options = {}) => {
         });
     };
 
+    /**
+     * Jump the reveal straight to a value, cancelling any in-flight tween.
+     *
+     * Rooms used to write `uniformsData.uPaintProgress.value = …` themselves.
+     * That reaches into an object this hook owns, which react-hooks/immutability
+     * rejects, and it silently left a running `animatePaint` tween in place —
+     * the tween would then fight the write on the next tick. gsap.set with
+     * overwrite:'auto' makes "jump to X" actually mean it.
+     */
+    const setPaintProgress = (value) => {
+        gsap.set(uniformsData.uPaintProgress, { value, overwrite: 'auto' });
+    };
+
     const resetPaint = () => {
-        uniformsData.uPaintProgress.value = 0.0;
+        setPaintProgress(0.0);
     };
 
     // Update room origin from a group ref's world position
@@ -152,6 +165,7 @@ export const usePaintMaterial = (options = {}) => {
         onBeforeCompile,
         uniformsData,
         animatePaint,
+        setPaintProgress,
         resetPaint,
         updateRoomOrigin,
         transparent: true,
