@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useScene } from '../../context/SceneContext';
 import { useAudio } from '../../context/AudioManager';
-import { setMusicVolume, getMusicVolume } from '../../utils/audioManager';
+import { setMusicVolume, getMusicVolume, playBackgroundMusic } from '../../utils/audioManager';
 import { useAchievements } from '../../context/AchievementsContext';
 import { useSitePreferences } from '../../context/SitePreferences';
 import { ROOMS, ROOM_COPY } from '../../config/theme';
@@ -57,6 +57,39 @@ const NavigationUI = () => {
     const handleBgmChange = (val) => {
         setBgmVol(val);
         setMusicVolume(val);
+    };
+
+    /**
+     * 音乐现在是不是"开着" —— 面板里那个开关的**文案 / 图标 / 旋钮**都按它取态。
+     *
+     * ⚠️ **不能按 `isMuted` 取态**。首访时浏览器必然拒绝自动播放，所以站点一进来
+     * 就是没声音的，但 `isMuted` 仍是 false（那是"用户偏好位"）。按它取态会显示
+     * 「一键静音」—— 而此刻本来就没声音，这个按钮等于在说废话（用户 2026-10-09 报的：
+     * 「静音时设置面板里应该是『打开音乐』」）。
+     *
+     * 起播点是推门与这个开关本身，两处都会经 audioManager 广播 `musicStateChanged`。
+     */
+    const [musicOn, setMusicOn] = useState(false);
+    useEffect(() => {
+        const onMusicState = (event) => setMusicOn(!!event.detail?.on);
+        window.addEventListener('musicStateChanged', onMusicState);
+        return () => window.removeEventListener('musicStateChanged', onMusicState);
+    }, []);
+
+    /**
+     * 动作必须与文案一致 —— 写着「打开音乐」，点下去就得真有音乐。
+     *
+     * 三种情形（少了哪一条都会出问题）：
+     *   音乐在放              → 静音：停 mp3 / 停合成
+     *   没在放 + 静音位是 true → 取消静音。`syncMuteState` 认得这是"用户主动要听"，
+     *                           会直接 `playBackgroundMusic()`（见 utils/audioManager）
+     *   没在放 + 没静音        → 首访那种状态，直接起播
+     *                           （只调 `toggleMute` 会把它**静**掉，与文案相反）
+     */
+    const handleMusicToggle = () => {
+        if (musicOn) toggleMute();
+        else if (isMuted) toggleMute();
+        else playBackgroundMusic();
     };
 
     // Show entrance hint before entering, and explore hint when user enters
@@ -321,39 +354,49 @@ const NavigationUI = () => {
                                 </svg>
                             </button>
                         </div>
-                        {/* One-tap mute (user request 2026-10-08). Lives above
-                            the two sliders because it is the coarse control:
-                            it silences BGM *and* every SFX at once via
-                            AudioManager's `toggleMute` → `syncMuteState`, which
-                            is the only path that reaches the mp3 element, the
-                            synth engine and the positional door sounds alike.
-                            Dragging either slider above 0 un-mutes again (see
-                            enhancedSetGlobalVolume), so the two never fight. */}
+                        {/* Music on/off switch. Lives above the two sliders
+                            because it is the coarse control.
+
+                            ⚠️ 文案与状态都按 **musicOn** 取，不按 `isMuted`
+                            （原因见上面 `musicOn` 的注释）。用户 2026-10-09 要求：
+                            没在放 → 「打开音乐」；在放 → 「关闭音乐」。
+
+                            动作走 `handleMusicToggle` 而不是裸 `toggleMute` ——
+                            首访时音乐根本没起播（浏览器拦了自动播放），这时只调
+                            `toggleMute` 会把它**静**掉，与「打开音乐」正好相反。
+                            `toggleMute` → `syncMuteState` 会把 BGM(mp3/合成) 与
+                            全部 SFX 一起处理，是唯一能同时够到 mp3 元素、合成引擎
+                            和门声的路径；拉高任一滑杆也会自动取消静音
+                            （见 enhancedSetGlobalVolume），两者不打架。 */}
                         <button
                             type="button"
-                            className={`audio-mute ${isMuted ? 'is-muted' : ''}`}
+                            className={`audio-mute ${musicOn ? 'is-on' : ''}`}
                             role="switch"
-                            aria-checked={isMuted}
-                            onClick={toggleMute}
-                            aria-label={language === 'zh' ? '一键静音' : 'Mute all audio'}
+                            aria-checked={musicOn}
+                            onClick={handleMusicToggle}
+                            aria-label={language === 'zh'
+                                ? (musicOn ? '关闭音乐' : '打开音乐')
+                                : (musicOn ? 'Turn off music' : 'Turn on music')}
                         >
                             <span className="audio-mute__icon" aria-hidden="true">
-                                {isMuted ? (
-                                    <svg viewBox="0 0 24 24">
-                                        <path d="M11 5L6 9H2v6h4l5 4V5z" />
-                                        <line x1="23" y1="9" x2="17" y2="15" />
-                                        <line x1="17" y1="9" x2="23" y2="15" />
-                                    </svg>
-                                ) : (
+                                {musicOn ? (
                                     <svg viewBox="0 0 24 24">
                                         <path d="M11 5L6 9H2v6h4l5 4V5z" />
                                         <path d="M15 9a5 5 0 0 1 0 6" />
                                         <path d="M18 5a9 9 0 0 1 0 14" />
                                     </svg>
+                                ) : (
+                                    <svg viewBox="0 0 24 24">
+                                        <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                                        <line x1="23" y1="9" x2="17" y2="15" />
+                                        <line x1="17" y1="9" x2="23" y2="15" />
+                                    </svg>
                                 )}
                             </span>
                             <span className="audio-mute__label">
-                                {language === 'zh' ? '一键静音' : 'Mute all'}
+                                {language === 'zh'
+                                    ? (musicOn ? '关闭音乐' : '打开音乐')
+                                    : (musicOn ? 'Turn off music' : 'Turn on music')}
                             </span>
                             <span className="audio-mute__pill" aria-hidden="true">
                                 <span className="audio-mute__knob" />

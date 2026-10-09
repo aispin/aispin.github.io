@@ -501,9 +501,13 @@
             transition: transform 0.18s ease;
         }
 
-        // Muted: the whole row inverts so the state is unmistakable even at a
-        // glance from across the room.
-        &.is-muted {
+        // 音乐**在放**：整行反白，一眼就能看出开关是拨开的。
+        //
+        // ⚠️ 这个类以前叫 `is-muted`（旧语义 = "一键静音"）。2026-10-09 用户要求
+        //    面板文案跟着"音乐在不在放"走（没放→打开音乐 / 在放→关闭音乐），
+        //    开关的视觉语义也就跟着翻了过来：**反白 = 音乐开着**，不再是"静音"。
+        //    改名前请先看 NavigationUI.jsx 里 `musicOn` 那段注释。
+        &.is-on {
             background: #1a1a1a;
             color: #fff;
 

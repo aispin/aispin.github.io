@@ -108,10 +108,12 @@
   // 20px detail in a corner the eye skips — and mute is PERSISTED, so the user
   // can come back to a silent site with no idea why. Dim the whole button and
   // drop the fill so "off" reads at a glance.
+  //
+  // ⚠️ 别再改回 `border-style: dashed` —— 虚线在深色场景上看着像"这个按钮坏了/
+  //    是占位符"，用户 2026-10-09 明确要求去掉。实线 + 降低不透明度已经够了。
   &.is-muted {
     color: rgba(90, 70, 54, .5);
     background: transparent;
-    border-style: dashed;
 
     &:hover { background: rgba(255, 246, 233, .6); }
   }
