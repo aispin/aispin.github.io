@@ -72,7 +72,7 @@ jobs:
           # ⚠️ 例外 = **应用图标**。它们不是"内容图片"，且 `apple-touch-icon` 在 iOS 上
           #    只吃 PNG（不支持 SVG）。白名单收窄到**这几个确切文件名**，且必须落在
           #    `dist/` **根目录** —— 子目录里出现任何 jpg/png 一律失败。
-          ICON_ALLOW="favicon-16.png favicon-32.png favicon-48.png apple-touch-icon.png icon-192.png icon-512.png maskable-512.png"
+          ICON_ALLOW="favicon-32.png favicon-48.png apple-touch-icon.png icon-192.png icon-512.png maskable-512.png"
           bad=""
           while IFS= read -r f; do
             [ -n "$f" ] || continue

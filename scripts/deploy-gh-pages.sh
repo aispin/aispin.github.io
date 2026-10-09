@@ -246,7 +246,7 @@ fi
 #
 # 白名单收窄到**这几个确切文件名**，且**必须落在 dist 根目录** ——
 # 子目录里出现任何 jpg/png 一律照报，免得有人把内容图片塞进 images/ 蒙混过关。
-ICON_ALLOW="favicon-16.png favicon-32.png favicon-48.png apple-touch-icon.png icon-192.png icon-512.png maskable-512.png"
+ICON_ALLOW="favicon-32.png favicon-48.png apple-touch-icon.png icon-192.png icon-512.png maskable-512.png"
 RASTERS="$(find dist -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \) | while IFS= read -r f; do
   b="$(basename "$f")"
   if [ "$(dirname "$f")" = "dist" ]; then

@@ -9,9 +9,10 @@
   <link rel="preload" as="font" href="/fonts/maple-ui.woff2" type="font/woff2" crossorigin="anonymous" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <!-- 位图 favicon 是给不认 SVG 图标的浏览器兜底的；apple-touch-icon 在 iOS 上只吃 PNG。
+       favicon.ico 内嵌 16/32/48 三档，所以 16px 不再单独出文件、也不再单列一条 <link>。
        ⚠️ 这是全站唯一被允许的 jpg/png（见 deploy-gh-pages.sh 与 workflow 里的白名单守卫）。 -->
+  <link rel="icon" href="/favicon.ico" sizes="48x48" />
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
