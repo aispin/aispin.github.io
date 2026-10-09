@@ -131,7 +131,10 @@ export default function SiteControls() {
           {zh ? 'EN' : '中文'}
         </button>
 
-        {/* 3 · Colour theme */}
+        {/* 3 · Colour theme —— 用 SVG，别用 `☼` / `☾` 这类文字符号：
+                它们是按 font-size(13px) 渲染的，比旁边 20px 的 SVG 小一大截，
+                在深色模式（显示 ☼）下尤其明显（用户 2026-10-09 报的「图标偏小」）。
+                路径与 /me 页面的主题按钮同源。 */}
         <button
           type="button"
           className="hud-btn"
@@ -139,7 +142,16 @@ export default function SiteControls() {
           onClick={toggleTheme}
           aria-label={zh ? '切换明暗模式' : 'Toggle color theme'}
         >
-          {theme === 'dark' ? '☼' : '☾'}
+          {theme === 'dark' ? (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" />
+            </svg>
+          )}
         </button>
 
         {/* 4 · Audio settings —— 图标按「现在有没有声音」取态（默认静音态），
