@@ -39,13 +39,44 @@
 import { TERM_DAYS, TERM_MONTHS, TERM_NAMES, FESTIVAL_DAYS, FESTIVAL_NAMES } from './coupletCalendar.data';
 
 /**
- * 兜底那一副 —— 也是「日常」那一副。
+ * 日常那几副 —— **按季节分四套**（2026-10-09 用户要求）。
  *
- * 2026-10-08 用户拍板：日常门联改成**基于他中文名「黄泽昊」的藏头诗**，
- * 上下联首字分别嵌「泽」「昊」。所以它不再叫 'literary'，直接叫 'zehao'。
- * 日期表查不到今天时挂的就是它 —— 一年里大多数日子都是它。
+ * 用户原话：「日常对联（非节气、假日）增加到 4 套，分春夏秋冬，横批不要出现
+ * 泽昊两字，只在正文中出现即可。且这两字的位置不加限制，只需出现即可。」
+ *
+ * 于是：
+ * - 四副各对应一个季节，兜底时按**月份**选一副（见 `dailyCoupletFor`）；
+ * - 「泽」「昊」只出现在**正文**（上/下联）里，**横批一律不含这两字**；
+ * - 位置不限 —— 这里仍沿用藏头（上联首字「泽」、下联首字「昊」），它满足
+ *   「只需出现」这一条，同时让四副的读感保持一致。横批因此必须另起四字。
+ *
+ * 版式仍是七言 + 四字横批（见文件头部的硬约束）。四副都逐字对仗、上联收仄
+ * 下联收平，母题仍是书房（砚 / 窗 / 座 / 书 / 案 / 楼 / 炉 / 屏）。
  */
-export const DEFAULT_COUPLET_ID = 'zehao';
+export const DAILY_COUPLETS = [
+    { id: 'zehao-spring', season: '春', banner: '一庭春色', upper: '泽润庭花初入砚', lower: '昊涵云影自临窗' },
+    { id: 'zehao-summer', season: '夏', banner: '荷风满院', upper: '泽生荷气清浮座', lower: '昊送蝉声静入书' },
+    { id: 'zehao-autumn', season: '秋', banner: '桂子飘香', upper: '泽沾桂露香浮案', lower: '昊卷桐阴月满楼' },
+    { id: 'zehao-winter', season: '冬', banner: '围炉夜读', upper: '泽凝炉火温书卷', lower: '昊映雪光冷画屏' },
+];
+
+/**
+ * 季节怎么分：**按月份**（气象季节），不是按节气。
+ *
+ * 3–5 春 / 6–8 夏 / 9–11 秋 / 12–2 冬。
+ * 不按节气算，是因为日常联本来就**只在不是节气、也不是节日的日子**出现；
+ * 按月份切分更直白，也不会在立春 / 立夏那几天出现「某一副只挂一天」。
+ */
+const SEASON_BY_MONTH = ['冬', '冬', '春', '春', '春', '夏', '夏', '夏', '秋', '秋', '秋', '冬'];
+
+/** 某个日期属于哪个季节（'春' | '夏' | '秋' | '冬'）。 */
+export const seasonOf = (date = new Date()) => SEASON_BY_MONTH[date.getMonth()];
+
+/** 某一天该挂哪一副日常联 —— 兜底分支用它。 */
+export const dailyCoupletFor = (date = new Date()) => {
+    const season = seasonOf(date);
+    return DAILY_COUPLETS.find((c) => c.season === season) || DAILY_COUPLETS[0];
+};
 
 /**
  * 每一副联。`label` 是它对应的节气/节日名（要和日期表里的名字**逐字相同**），
@@ -54,25 +85,8 @@ export const DEFAULT_COUPLET_ID = 'zehao';
  * id 只用于贴图缓存键和 ?couplet= 调试参数，所以取英文/pinyin，别用中文。
  */
 export const COUPLET_SETS = [
-    /* ---------------- 日常（兜底）& 彩蛋 ---------------- */
-    /**
-     * 日常那一副：藏头「泽」「昊」，取自用户中文名黄泽昊。
-     *
-     *   上联  泽润庭花春入砚
-     *   下联  昊涵云影月临窗
-     *   横批  泽昊同春
-     *
-     * 逐字对仗：泽润/昊涵（名+动）、庭花/云影（名+名）、春/月、入/临、砚/窗。
-     * 上联收「砚」(yàn, 去声) = 仄，下联收「窗」(chuāng, 阴平) = 平 ✓。
-     * 母题仍是书房（砚、窗），与 24 节气那批同源，门口不会换季变主题。
-     */
-    {
-        id: 'zehao',
-        label: '日常',
-        banner: '泽昊同春',
-        upper: '泽润庭花春入砚',
-        lower: '昊涵云影月临窗',
-    },
+    /* ---------------- 日常（兜底，按季节四选一）& 彩蛋 ---------------- */
+    ...DAILY_COUPLETS,
     /**
      * 彩蛋。**自 2026-10-08 起不再有 UI 入口** —— 用户要求去掉「hover 门联
      * 换成另一幅」的逻辑，门口的字就该老老实实是今天那一副。这一条留着只
@@ -135,7 +149,9 @@ export const COUPLET_SETS = [
 ];
 
 const BY_ID = new Map(COUPLET_SETS.map((s) => [s.id, s]));
-const BY_LABEL = new Map(COUPLET_SETS.map((s) => [s.label, s]));
+// 只有节气 / 节日才带 `label`（要跟日期表里的名字逐字相同）；四副日常联不带，
+// 所以这里要滤掉 —— 否则 Map 里会多出一个 `undefined` 键。
+const BY_LABEL = new Map(COUPLET_SETS.filter((s) => s.label).map((s) => [s.label, s]));
 
 /**
  * 区间命中表，单位是「天」，相对该节日/节气的**公历日期**。
@@ -245,15 +261,15 @@ export function resolveCoupletSet(date = new Date()) {
         }
     }
 
-    // --- 4. 兜底 ---
-    return { set: BY_ID.get(DEFAULT_COUPLET_ID), reason: 'default', label: null };
+    // --- 4. 兜底：日常联（按季节四选一） ---
+    return { set: dailyCoupletFor(date), reason: 'default', label: null };
 }
 
 /**
- * ?couplet= 调试覆盖。传 id（'lichun'）或中文名（'立春'）都认；
- * 传 'off' 强制用兜底那一副。
+ * ?couplet= 调试覆盖。传 id（'lichun' / 'zehao-autumn'）、中文名（'立春'）、
+ * 或季节（'秋'）都认；传 'off' 强制用**今天那一副日常联**。
  *
- * 有它才能验收 —— 否则要看别的节气得改系统时间。
+ * 有它才能验收 —— 否则要看别的节气得改系统时间，要看别的季节得等到那一季。
  *
  * @param {string} [search] 默认读 location.search
  * @returns {object|null} 命中的那一副，没传/没命中返回 null
@@ -261,6 +277,9 @@ export function resolveCoupletSet(date = new Date()) {
 export function coupletOverride(search = (typeof window !== 'undefined' ? window.location.search : '')) {
     const raw = new URLSearchParams(search).get('couplet');
     if (!raw) return null;
-    if (raw === 'off' || raw === 'default') return BY_ID.get(DEFAULT_COUPLET_ID);
+    if (raw === 'off' || raw === 'default') return dailyCoupletFor();
+    // 季节名直接选那一副日常联（?couplet=秋）
+    const bySeason = DAILY_COUPLETS.find((c) => c.season === raw);
+    if (bySeason) return bySeason;
     return BY_ID.get(raw) || BY_LABEL.get(raw) || null;
 }
