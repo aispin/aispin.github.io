@@ -2162,3 +2162,86 @@ export function makeLanternTexture() {
 
     return toTexture(canvas, key);
 }
+
+/* ------------------------------------------------------------------ */
+/* 石桌 / 石凳的**石面**                                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 石面纹理 —— 石桌、石凳的顶面用。
+ *
+ * 🔴 为什么非要有纹理，不能只用纯色（用户 2026-10-09 连报两次「桌面看起来
+ * 倾斜的」）：
+ *
+ * 先证明了几何确实是平的 —— 直接读世界空间的面法线，全是 `(0, 1, 0)`。
+ * 那"倾斜"就是**看出来**的。而一个**纯色的椭圆**在透视下没有任何可读的线索：
+ * 眼睛能判断"这是个水平面"靠的是**面上花纹的透视缩短**（近处疏、远处密）。
+ * 纯色面把这个线索丢掉了，剩下的椭圆就既能读成"平放的圆"，也能读成
+ * "斜对着我的圆盘" —— 尤其当它比周围都亮、又没有影子的时候。
+ *
+ * 对照：兔子的花箱之所以不觉得斜，是因为它的顶面是**矩形**，四条边会往
+ * 灭点收，那个收敛本身就是朝向线索。圆盘没有直边，只能靠花纹。
+ *
+ * 所以这里画的是**各向同性的细石粒**：大尺度斑驳（读"石头"）+ 密集的小点
+ * （读"面"）。刻意**不画**长裂纹与拼缝 —— 那会重新变成"几大块折面"。
+ *
+ * 色号与 `StoneTable` 的 `STONE_TOP` 同族；用 `map` 时材质的 `color` 留白，
+ * 颜色全部由这张图给。
+ */
+export function makeStoneSlabTexture(key = 'stone-slab-top') {
+    if (cache.has(key)) return cache.get(key);
+
+    const S = 512;
+    const canvas = makeCanvas(S, S);
+    const ctx = canvas.getContext('2d');
+    const rand = mulberry32(hashString(key));
+
+    // ---- 1. 底色 ------------------------------------------------------
+    ctx.fillStyle = '#b3aa9c';
+    ctx.fillRect(0, 0, S, S);
+
+    // ---- 2. 大尺度斑驳：几块云状的深浅，读成"石头的云纹" ---------------
+    // 用大半径的径向渐变叠，边缘自然软；数量少（十几个），别让它形成"块面"。
+    for (let i = 0; i < 18; i++) {
+        const cx = rand() * S;
+        const cy = rand() * S;
+        const r = S * (0.16 + rand() * 0.30);
+        const light = rand() > 0.45;
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        const c = light ? '226, 220, 208' : '140, 131, 118';
+        g.addColorStop(0, `rgba(${c}, ${0.10 + rand() * 0.10})`);
+        g.addColorStop(1, `rgba(${c}, 0)`);
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // ---- 3. 细石粒：各向同性的小点，密度足够高才是"面"不是"斑点" --------
+    // 这是**透视缩短的载体** —— 近处被拉稀、远处被压密，眼睛靠它读平面朝向。
+    for (let i = 0; i < 7000; i++) {
+        const x = rand() * S;
+        const y = rand() * S;
+        const r = 0.5 + rand() * 1.5;
+        const light = rand() > 0.5;
+        ctx.fillStyle = light
+            ? `rgba(240, 236, 228, ${0.10 + rand() * 0.22})`
+            : `rgba(96, 88, 76, ${0.08 + rand() * 0.20})`;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // ---- 4. 少量石疵：稍大的暗点，给"石"一点脾气 ------------------------
+    for (let i = 0; i < 90; i++) {
+        const x = rand() * S;
+        const y = rand() * S;
+        const r = 1.6 + rand() * 3.4;
+        ctx.fillStyle = `rgba(74, 66, 56, ${0.10 + rand() * 0.16})`;
+        ctx.beginPath();
+        ctx.ellipse(x, y, r * (0.7 + rand() * 0.8), r, rand() * 3.14, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    return toTexture(canvas, key);
+}

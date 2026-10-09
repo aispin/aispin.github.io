@@ -1414,7 +1414,7 @@ const EntranceDoors = ({
                 平面停在 z = 1，所以摆在 z > 1 的一侧就是"树跟前"。
                 脚下是**草坪**不是甬路 —— 用 GRASS_Y（比 OUTDOOR_Y 低 4 cm，
                 见 entranceMetrics 的 GROUND_DROP）。 */}
-            <StoneTable position={[-2.78, GRASS_Y, 1.62]} worldZ={position[2] + 1.62} />
+            <StoneTable position={[-2.78, GRASS_Y, 1.62]} />
 
             {/* WHITE DOG (Front Facing) — 3D procedural, blinking eyes, wagging tail.
                 On the lawn, clear of the 台明 (which is only APRON_W wide). */}
