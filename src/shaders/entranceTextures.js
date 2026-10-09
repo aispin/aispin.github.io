@@ -496,6 +496,12 @@ uniform vec2 uOrigin; // world XZ of vUv = (0,0)
 // 分成两个 uniform 就会漏 —— 一开始只关了草边，台明的每一条石缝里还留着
 // 苔绿色，整片石台看起来像浮在草地上。
 uniform float uInLawn;
+// 甬路专有的两处绿 —— **必须跟着季节走**，否则冬天草坪白了、石缝还油绿。
+// 原来它们写死在下面的 main() 里（vec3(0.427,0.557,0.302) / vec3(0.302,0.400,0.204)），
+// 用户 2026-10-09 报的「冬天院子过道的草需要处理下」就是这两处。
+// ⚠️ autumn 分发的那两个值**逐位等于原常量**，所以秋天（回归锚点）逐位不变。
+uniform vec3 uMossJoint;
+uniform vec3 uVergeGreen;
 
 ${NOISE_GLSL}
 ${GRASS_GLSL}
@@ -549,7 +555,9 @@ void main() {
     // in front of a gate does not — there is nothing feeding it.
     float m = fbm(world * 2.2 + 3.0);
     vec3 dirt = vec3(0.545, 0.463, 0.353);
-    vec3 gapMoss = vec3(0.427, 0.557, 0.302);
+    // 苔色**跟着季节走**（原来写死成 vec3(0.427,0.557,0.302)）——
+    // 冬天那一片油绿的石缝就是这么来的。
+    vec3 gapMoss = uMossJoint;
     vec3 gap = mix(dirt, gapMoss, smoothstep(0.45, 0.75, m) * uInLawn);
     gap *= 0.9 + 0.2 * noise2(world * 6.0);
 
@@ -586,7 +594,8 @@ void main() {
     // and drawing it is what turns the edge into a planting line rather
     // than a boundary between two materials.
     float border = 1.0 - smoothstep(0.0, 0.30, abs(abs(xc) - (vergeHalf + wobble)));
-    col = mix(col, vec3(0.302, 0.400, 0.204), border * (1.0 - inPath) * 0.38);
+    // 沿阶草的颜色同样跟着季节走（原来写死成 vec3(0.302,0.400,0.204)）。
+    col = mix(col, uVergeGreen, border * (1.0 - inPath) * 0.38);
 
     gl_FragColor = vec4(col, 1.0);
 }
@@ -629,6 +638,19 @@ void main() {
  * 这就是本方案最便宜的回归锚点。改这一栏之前先想清楚：你会失去那个锚点。
  *
  * 花色的第 1 阶（奶白那一档）在 GLSL 里仍是基准常量，这里给的是 2..4 阶。
+ *
+ * 🔴 `uMossJoint` / `uVergeGreen`（2026-10-09 补）
+ * ------------------------------------------------
+ * 这两个是**甬路专有**的两处绿，原先**写死在 STONE_FRAG 的 GLSL 里**：
+ *   石缝里的苔  `vec3(0.427, 0.557, 0.302)`
+ *   贴边的沿阶草 `vec3(0.302, 0.400, 0.204)`
+ * 于是草坪都换成冬色了、甬路的石缝还是一片**油绿** —— 用户报的
+ * 「冬天院子过道的草需要处理下」。它们早该跟 `uMoss` 一起走季节。
+ *
+ * ⚠️ **autumn 两栏逐位等于原来那两个常量**（不是"又调了一遍"）——
+ * 秋天是回归锚点，改了就失去它。其余三季按 `uMoss` 派生：
+ * 石缝苔 ≈ `uMoss × 1.33`（原常量正是秋天 uMoss 的 1.33 倍），
+ * 沿阶草 = 当季 `uMoss`。冬天因此变成**冻土/枯草色**，不再是绿的。
  */
 const SEASON_GROUND = {
     /* 春：返青的嫩绿，花最多（0.16）且偏粉白 —— 春是唯一"多花"的一季。 */
@@ -636,6 +658,8 @@ const SEASON_GROUND = {
         uGrassA: [0.451, 0.588, 0.318],
         uGrassB: [0.302, 0.451, 0.239],
         uMoss: [0.353, 0.478, 0.263],
+        uMossJoint: [0.470, 0.636, 0.350],
+        uVergeGreen: [0.353, 0.478, 0.263],
         uTip: [0.075, 0.105, 0.035],
         uFlowerA: [0.960, 0.878, 0.898],
         uFlowerB: [0.925, 0.760, 0.800],
@@ -648,6 +672,8 @@ const SEASON_GROUND = {
         uGrassA: [0.365, 0.510, 0.247],
         uGrassB: [0.231, 0.376, 0.176],
         uMoss: [0.286, 0.400, 0.196],
+        uMossJoint: [0.380, 0.532, 0.261],
+        uVergeGreen: [0.286, 0.400, 0.196],
         uTip: [0.052, 0.086, 0.024],
         uFlowerA: [0.960, 0.941, 0.878],
         uFlowerB: [0.937, 0.855, 0.549],
@@ -660,6 +686,9 @@ const SEASON_GROUND = {
         uGrassA: [0.408, 0.514, 0.298],
         uGrassB: [0.278, 0.400, 0.220],
         uMoss: [0.322, 0.416, 0.224],
+        // ↓ 这两个就是原来硬编码在 STONE_FRAG 里的常量，**逐位照搬**。
+        uMossJoint: [0.427, 0.557, 0.302],
+        uVergeGreen: [0.302, 0.400, 0.204],
         uTip: [0.040, 0.062, 0.024],
         uFlowerA: [0.937, 0.855, 0.549],
         uFlowerB: [0.906, 0.729, 0.780],
@@ -672,6 +701,10 @@ const SEASON_GROUND = {
         uGrassA: [0.478, 0.463, 0.353],
         uGrassB: [0.365, 0.353, 0.271],
         uMoss: [0.408, 0.400, 0.318],
+        // 石缝：比周围稍亮的**冻土**（仍带一点暖），不是苔。
+        uMossJoint: [0.543, 0.532, 0.423],
+        // 沿阶草：枯草色，和周围的冬草同一族。
+        uVergeGreen: [0.408, 0.400, 0.318],
         uTip: [0.075, 0.071, 0.055],
         uFlowerA: [0.960, 0.941, 0.878],
         uFlowerB: [0.960, 0.941, 0.878],
@@ -688,6 +721,8 @@ export function groundSeasonUniforms(season = 'autumn') {
         uGrassA: { value: p.uGrassA },
         uGrassB: { value: p.uGrassB },
         uMoss: { value: p.uMoss },
+        uMossJoint: { value: p.uMossJoint },
+        uVergeGreen: { value: p.uVergeGreen },
         uTip: { value: p.uTip },
         uFlowerA: { value: p.uFlowerA },
         uFlowerB: { value: p.uFlowerB },
