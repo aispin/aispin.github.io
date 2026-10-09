@@ -553,6 +553,41 @@ function fissure(ctx, x, y0, y1, bow, rgb, alpha, width) {
 }
 
 /**
+ * 树皮顺纹（**会拐弯**）：沿一串点描一条两端渐隐的纹。
+ *
+ * 与 `fissure` 的分工：`fissure` 只能画**直的**（`bow` 是它全部的自由度），
+ * 画主干上那几道竖纹够了；但树皮到了**分叉**要**顺着枝散开**，是弯的。
+ *
+ * 画法：把点串当作控制多边形，**穿过相邻点的中点**收一条二次贝塞尔 ——
+ * 逐段各画一条会在每个拐点露出折角，一条 `stroke()` 才是顺滑的一根。
+ *
+ * 不消耗随机数 —— 位置由调用方（`pick01`）喂进来，见 makeTreeTexture 的说明。
+ */
+function barkGrain(ctx, path, rgb, alpha, width) {
+    if (path.length < 3) return;
+    const a = path[0];
+    const b = path[path.length - 1];
+    // 渐隐方向按**首尾连线**取：纹路弯的时候渐变不必跟着弯 ——
+    // 两端淡出只是"这道纹有头有尾"的提示，不是照明。
+    const g = ctx.createLinearGradient(a[0], a[1], b[0], b[1]);
+    g.addColorStop(0, `rgba(${rgb},0)`);
+    g.addColorStop(0.20, `rgba(${rgb},${alpha})`);
+    g.addColorStop(0.80, `rgba(${rgb},${alpha})`);
+    g.addColorStop(1, `rgba(${rgb},0)`);
+    ctx.strokeStyle = g;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.moveTo(a[0], a[1]);
+    for (let i = 1; i < path.length - 1; i++) {
+        const mx = (path[i][0] + path[i + 1][0]) / 2;
+        const my = (path[i][1] + path[i + 1][1]) / 2;
+        ctx.quadraticCurveTo(path[i][0], path[i][1], mx, my);
+    }
+    ctx.lineTo(b[0], b[1]);
+    ctx.stroke();
+}
+
+/**
  * 0..1 的确定性伪随机，由 (i, x, k) 派生。
  *
  * 用途只有一个：给裂隙挑**位置与长度**。不能再用 `rand()` ——
@@ -1045,6 +1080,58 @@ export function makeTreeTexture(season = 'autumn') {
         fissure(ctx, 0, 0, 12 + pick01(i, 17, 13) * 26,
             (pick01(i, 31, 17) - 0.5) * 4, BARK_DARK_RGB,
             0.10 + pick01(i, 19, 14) * 0.16, 1.5 + pick01(i, 23, 15) * 1.6);
+        ctx.restore();
+    }
+
+    /* --- 分叉处的树皮 ----------------------------------------------------
+     *
+     * ⚠️ 上面**所有**裂隙的 `y0` 都 ≥ 662，也就是**全落在主干上**。分叉
+     * （y=648）以及三条主枝的根部**一丝纹理都没有** —— 放大看就是一整块
+     * 平色。用户 2026-10-09：「分叉的地方可以多加一点纹理模拟树皮吗？
+     * 现在太干净了一点。」
+     *
+     * 真实树的皮在分叉处会**顺着枝散开**：主干上那几道竖纹各自拐进一条枝。
+     * 所以这里补两层：
+     *   ① 顺纹 —— 从主干往上、在叉口拐弯、再沿枝走一段（`barkGrain`）
+     *   ② 叉口的横褶 —— 分叉处两条枝互相"挤"，皮会起横向的皱
+     *
+     * 🔴 位置全部由 `pick01` 派生 —— **一次 rand() 都不能再消耗**（细枝 /
+     * 树冠 / 果实长在下面，多一次就整棵重排）。
+     */
+    // 三条主枝在叉口的方向，取自 LIMBS[0] / LIMBS[4] / LIMBS[8] 的第一段。
+    const ARMS = [[-38, -42], [44, -42], [6, -70]].map(([dx, dy]) => {
+        const L = Math.hypot(dx, dy);
+        return [dx / L, dy / L];
+    });
+    for (let i = 0; i < 13; i++) {
+        const u = -20 + i * (40 / 12);                  // 叉口处的横向偏移
+        const arm = u < -5 ? ARMS[0] : u > 5 ? ARMS[1] : ARMS[2];
+        const [dx, dy] = arm;
+        const [px, py] = [-dy, dx];                      // 垂直于枝、指向画面右侧
+        const yStart = 692 + pick01(i, 53, 31) * 46;     // 起点落在主干上
+        const reach = 34 + pick01(i, 59, 37) * 54;       // 沿枝走多远
+        // 起点按主干的**锥度**把 u 缩一点（越往下主干越宽）
+        const xStart = 391 + u * (0.72 + pick01(i, 61, 41) * 0.2);
+        const fork = [390 + u, 646];
+        // 终点：沿枝前进 reach，横向偏移收窄到 0.55u —— 皮纹本来就会
+        // **朝枝尖收拢**，顺带保证它不会中途跑出并集被硬裁。
+        const ex = 390 + dx * reach + px * u * 0.55;
+        const ey = 648 + dy * reach + py * u * 0.55;
+        barkGrain(ctx,
+            [[xStart, yStart], fork, [ex, ey]],
+            i % 3 === 0 ? BARK_HI_RGB : BARK_DARK_RGB,
+            0.13 + pick01(i, 67, 43) * 0.15,
+            1.6 + pick01(i, 71, 47) * 2.2);
+    }
+    // ② 叉口的横褶。位置比上面那 16 条**高一档**（556..662）—— 那 16 条
+    //    从 672 起，这里正好补上它们够不到的那一段。
+    for (let i = 0; i < 11; i++) {
+        ctx.save();
+        ctx.translate(352 + pick01(i, 79, 53) * 78, 556 + pick01(i, 83, 59) * 106);
+        ctx.rotate(Math.PI / 2 + (pick01(i, 89, 61) - 0.5) * 0.9);
+        fissure(ctx, 0, 0, 9 + pick01(i, 97, 67) * 22,
+            (pick01(i, 101, 71) - 0.5) * 5, BARK_DARK_RGB,
+            0.09 + pick01(i, 103, 73) * 0.13, 1.2 + pick01(i, 107, 79) * 1.6);
         ctx.restore();
     }
     ctx.restore();
