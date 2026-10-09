@@ -11,10 +11,30 @@
     button,
     .map-panel,
     .audio-panel,
+    .settings-panel,
     .menu-overlay {
         pointer-events: auto;
     }
 }
+
+// -----------------------------------------------------------------------------
+// 撕纸边缘：地图面板与设置面板**共用同一串坐标**。
+//
+// 用变量而不是 `@extend` —— 两块面板各自保留自己的盒子语义（宽度、内边距、
+// 有没有 min-height），共享的只有"边缘怎么撕"。写两份一定会漂移：改了一处
+// 忘了另一处，同一屏上就会出现两种撕法。
+// -----------------------------------------------------------------------------
+$torn-paper-clip: polygon(0% 0%, 100% 0%,
+    100% 0%, 99% 3%, 100% 6%, 98% 10%, 100% 14%, 99% 18%, 100% 22%, 98% 26%,
+    100% 30%, 99% 35%, 100% 40%, 98% 45%, 100% 50%, 99% 55%, 100% 60%,
+    98% 65%, 100% 70%, 99% 75%, 100% 80%, 98% 85%, 100% 90%, 99% 95%,
+    100% 100%, 96% 99%, 92% 100%, 88% 98%, 84% 100%, 80% 99%, 76% 100%,
+    72% 98%, 68% 100%, 64% 99%, 60% 100%, 56% 98%, 52% 100%, 48% 99%,
+    44% 100%, 40% 98%, 36% 100%, 32% 99%, 28% 100%, 24% 98%, 20% 100%,
+    16% 99%, 12% 100%, 8% 98%, 4% 100%, 0% 99%,
+    0.5% 99.5%, 1% 95%, 0% 90%, 2% 85%, 0% 80%, 1% 75%, 0% 70%, 2% 65%,
+    0% 60%, 1% 55%, 0% 50%, 2% 45%, 0% 40%, 1% 35%, 0% 30%, 2% 26%,
+    0% 22%, 1% 18%, 0% 14%, 2% 10%, 0% 6%, 1% 3%, 0% 0%);
 
 // The back / audio / achievements buttons used to be styled here as `.nav-btn`:
 // a 50x55 torn-paper card with a hand-drawn SVG border. All on-screen controls
@@ -73,17 +93,9 @@
             pointer-events: none;
         }
 
-        clip-path: polygon(0% 0%, 100% 0%,
-            100% 0%, 99% 3%, 100% 6%, 98% 10%, 100% 14%, 99% 18%, 100% 22%, 98% 26%,
-            100% 30%, 99% 35%, 100% 40%, 98% 45%, 100% 50%, 99% 55%, 100% 60%,
-            98% 65%, 100% 70%, 99% 75%, 100% 80%, 98% 85%, 100% 90%, 99% 95%,
-            100% 100%, 96% 99%, 92% 100%, 88% 98%, 84% 100%, 80% 99%, 76% 100%,
-            72% 98%, 68% 100%, 64% 99%, 60% 100%, 56% 98%, 52% 100%, 48% 99%,
-            44% 100%, 40% 98%, 36% 100%, 32% 99%, 28% 100%, 24% 98%, 20% 100%,
-            16% 99%, 12% 100%, 8% 98%, 4% 100%, 0% 99%,
-            0.5% 99.5%, 1% 95%, 0% 90%, 2% 85%, 0% 80%, 1% 75%, 0% 70%, 2% 65%,
-            0% 60%, 1% 55%, 0% 50%, 2% 45%, 0% 40%, 1% 35%, 0% 30%, 2% 26%,
-            0% 22%, 1% 18%, 0% 14%, 2% 10%, 0% 6%, 1% 3%, 0% 0%);
+        // 与 .settings-content-clipped 共用同一串坐标（见文件顶部的
+        // $torn-paper-clip）—— 两块面板必须是同一种撕法。
+        clip-path: $torn-paper-clip;
     }
 
     .map-header {
@@ -298,6 +310,174 @@
             height: auto;
             filter: drop-shadow(2px 2px 2px rgba(0, 0, 0, 0.3));
         }
+    }
+}
+
+// === SETTINGS PANEL ===
+// 与地图面板**同一张撕纸卡片**：同一个 $torn-paper-clip、同一张 --paper-texture、
+// 同样的 drop-shadow 与 drop-in 过渡。区别只有宽度 —— 里面是两行选择，撑不到
+// 500px。
+//
+// 深色模式下这块纸**仍然是白的**，和地图面板一样。这是有意的：纸就是纸，
+// 一张白纸在暗房间里也还是白的；而深色主题里"白纸 + 深墨"始终是最易读的一组
+// 对比（地图面板的房间卡之所以有 dark 覆盖，是因为 .aispin-map 的底色本身
+// 被压暗了，这里没有）。
+.settings-panel {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%) translateY(-100%);
+    // 与 .map-panel 同样的理由：居中，但绝不去碰两侧的图标列。
+    width: min(90%, calc(100vw - 2 * var(--hud-band)));
+    max-width: 380px;
+    border: none;
+    border-radius: 0;
+    filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.15));
+
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+        opacity 0.3s ease;
+
+    &.open {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateX(-50%) translateY(0);
+    }
+
+    .settings-content-clipped {
+        position: relative;
+        width: 100%;
+        padding: 20px;
+        padding-bottom: 16px;
+        background: #ffffff;
+
+        &::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: var(--paper-texture, none) center center;
+            background-size: cover;
+            transform: rotate(90deg);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        clip-path: $torn-paper-clip;
+    }
+
+    .settings-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+        padding-bottom: 10px;
+        border-bottom: 2px dashed #ccc;
+        position: relative;
+        z-index: 1;
+
+        h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #1a1a1a;
+            font-family: 'Patrick Hand', cursive, sans-serif;
+        }
+
+        // 与 .map-header .close-btn 同一套尺寸（28×28 / 18px / 2.5 描边）
+        .close-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+            opacity: 0.6;
+
+            svg {
+                width: 18px;
+                height: 18px;
+                fill: none;
+                stroke: #1a1a1a;
+                stroke-width: 2.5;
+                stroke-linecap: round;
+            }
+
+            &:hover {
+                opacity: 1;
+                transform: scale(1.1);
+            }
+
+            &:active {
+                transform: scale(0.95);
+            }
+        }
+    }
+
+    .settings-body {
+        position: relative;
+        z-index: 1;
+    }
+
+    .settings-row {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 14px;
+    }
+
+    .settings-row__label {
+        font-family: 'Maple Mono', 'MapleUI', monospace;
+        font-size: 11px;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+        color: #A67958;
+    }
+
+    .settings-choice {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    // 选项卡：与地图的房间卡同族（同一套纸色、圆角、硬投影、hover 抬升），
+    // 只是压扁成一个 chip。季节那行有 5 个（自动 + 四季），所以允许换行。
+    .settings-chip {
+        flex: 1 1 0;
+        min-width: 58px;
+        padding: 9px 10px;
+        border: 1.5px solid rgba(90, 70, 54, .45);
+        border-radius: 12px 14px 11px 13px;
+        background: rgba(255, 251, 243, .94);
+        color: #5A4636;
+        font: 500 13px/1 'Maple Mono', 'MapleUI', monospace;
+        cursor: pointer;
+        box-shadow: 3px 4px 0 rgba(90, 70, 54, .13);
+        transition: transform .18s ease, background .18s ease, box-shadow .18s ease;
+
+        &:hover { background: #FFD9C0; transform: translateY(-2px); }
+        &:focus-visible { outline: 3px solid #A8C69F; outline-offset: 2px; }
+
+        &.is-active {
+            background: #FFD9C0;
+            border-color: #9B755A;
+            box-shadow: 3px 4px 0 rgba(90, 70, 54, .22);
+        }
+    }
+
+    .settings-hint {
+        margin: 0;
+        font-size: 11px;
+        line-height: 1.5;
+        color: #8A6F5C;
     }
 }
 
@@ -693,6 +873,17 @@
         }
     }
 
+    .settings-panel {
+        // Same bound as the map panel. The 5 season chips (自动 + 四季) will
+        // wrap to a second row on a phone — `.settings-choice` is flex-wrap.
+        width: min(95%, calc(100vw - 2 * var(--hud-band)));
+        max-width: none;
+
+        .settings-header h3 {
+            font-size: 14px;
+        }
+    }
+
     .entrance-hint {
         gap: 8px;
         bottom: 24px;
@@ -711,6 +902,7 @@
 @media (max-width: 480px) {
     // Full-bleed is out: it would run under both icon columns.
     .map-panel { width: calc(100vw - 2 * var(--hud-band)); }
+    .settings-panel { width: calc(100vw - 2 * var(--hud-band)); }
 }
 
 .aispin-map {

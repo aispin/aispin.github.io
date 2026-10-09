@@ -123,6 +123,9 @@ const Lantern = ({ x }) => {
     // Same eased-scalar approach as canvas/SceneLighting: one number drives
     // every part of "the lantern is lit", so the emissive skin and the light
     // it throws can never disagree.
+    //
+    // 这个 useFrame **每帧都写**（没有 early-return），所以换季时 `glow` 下一帧
+    // 就自己生效了，不需要像 SceneLighting / 窗光那样加"归零重写"。
     const t = useRef(-1);
 
     useFrame((state, delta) => {

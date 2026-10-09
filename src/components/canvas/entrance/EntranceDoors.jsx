@@ -16,6 +16,8 @@ import { SCENE_FONTS } from '../../../config/theme';
 // 季节：门联与院子共用同一张月份表（config/seasons.js），所以门口挂秋联时
 // 院子就是秋天 —— 这条一致性是免费的。
 import { useSeason } from '../../../hooks/useSeason';
+import { useSeasonUniforms } from '../../../hooks/useSeasonUniforms';
+import { useSitePreferences } from '../../../context/SitePreferences';
 import {
     makeDoorFaceTexture,
     makeDoorFrameTexture,
@@ -166,10 +168,20 @@ const COUPLET_Z = 0.17;
  * Resolved once per mount rather than on a midnight timer: re-baking the gate
  * mid-session would be a visible pop, and a tab left open across midnight is
  * not worth a pop for. Reload and it is correct.
+ *
+ * 2026-10-09：设置面板能选季节，所以这里也**跟着季节偏好重算** —— 否则会
+ * 重演「春天的院子挂着秋天的门联」（用户在四季定妆照里抓到过）。
+ * 传的是**偏好**而不是 `useSeason()` 的结果：后者在「自动」档下返回的是按
+ * 月份算出来的那一季，当成显式指定传进去，节气联/节日联就永远不出现了。
  */
 const CoupletWall = () => {
-    // The date-driven set, or whatever ?couplet= forced.
-    const activeId = useMemo(() => (coupletOverride() || resolveCoupletSet().set).id, []);
+    const { season: seasonPref } = useSitePreferences();
+
+    // The date-driven set, or whatever ?couplet= / the season picker forced.
+    const activeId = useMemo(
+        () => (coupletOverride() || resolveCoupletSet(new Date(), seasonPref)).set.id,
+        [seasonPref]
+    );
 
     const textures = useMemo(() => ({
         upper: makeCoupletTexture(activeId, 'upper'),
@@ -788,7 +800,7 @@ const EntranceDoors = ({
     const wallInk = makeWallInkTexture(FACADE_W, FACADE_H);
     // The cut-outs are the opening plus a small margin, so the doors and the
     // frame show through without the brick clipping their edges.
-    const brickUniforms = useMemo(() => ({
+    const brickUniforms = useSeasonUniforms((season) => ({
         ...makeSurfaceUniforms(
             FACADE_W, FACADE_H,
             [-FACADE_W / 2, facadeCenterY - FACADE_H / 2],
@@ -815,16 +827,19 @@ const EntranceDoors = ({
         // supposed to sit on plaster, and at full strength it competes with the
         // coursing for attention (see the note in entranceTextures.js).
         uInkStrength: { value: 0.96 }
-    }), [facadeCenterY, wallInk, doorCenterY, doorOpeningWidth, doorHeight, season]);
+    }), [facadeCenterY, wallInk, doorCenterY, doorOpeningWidth, doorHeight]);
     // vUv=(0,0) of the rotated walkway plane lands at world z = the plane's
     // centre + half its length (its v axis runs against world +Z). Same frame
     // as the grass field, so the two surfaces are continuous at the seam.
     // ⚠️ 甬路的**草边**走的是共享的 grassSurface()，所以必须跟着季节走 ——
     // 否则草地换了春绿而路边的草边还是秋绿，石路矩形那条直边会重新裂出接缝，
     // 也就是这个项目早就修过一次的「生硬」。
-    const stoneUniforms = useMemo(() => makeSurfaceUniforms(
-        pathWidth, pathLength, [-pathWidth / 2, position[2] + pathCenterZ + pathLength / 2], season
-    ), [pathWidth, pathLength, pathCenterZ, position, season]);
+    const stoneUniforms = useSeasonUniforms(
+        (season) => makeSurfaceUniforms(
+            pathWidth, pathLength, [-pathWidth / 2, position[2] + pathCenterZ + pathLength / 2], season
+        ),
+        [pathWidth, pathLength, pathCenterZ, position]
+    );
 
     return (
         <group ref={groupRef} position={[position[0], 0, position[2]]}>

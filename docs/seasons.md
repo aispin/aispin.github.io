@@ -155,14 +155,28 @@ export function resolveSeason(search = window.location.search) {
 实现只有一处：`couplets.js` 的 `seasonOverrideZh()`（`resolveSeason()` 的
 `source === 'override'` 才生效，所以**自动按月份时行为完全不变**）。
 
-### 3.3 解析时机：**每挂载一次**
+### 3.3 运行时可切换：**偏好** vs **解析结果**
 
-`useSeason()` = `useMemo(() => resolveSeason().id, [])`。
+2026-10-09 加了设置面板（§10），季节不再"一次会话内恒定"，所以 `useSeason()`
+从"每挂载解析一次"改成了读 `SitePreferences`。两个概念必须分开：
 
-**不挂午夜定时器。** 理由与门联完全相同（见 `couplets.js` 的注释）：跨午夜重烘会是一次
-可见的 pop，而一个开着过夜的标签页不值得为它 pop 一次。刷新即正确。
+| 概念 | 取值 | 谁用 |
+|---|---|---|
+| **偏好** `season` | `'auto'` \| `'spring'` … | 设置面板的选中态、`localStorage['aispin-season']`、`resolveCoupletSet()` 的季节参数 |
+| **解析结果** | `'spring'` … （**永不** `'auto'`） | 所有渲染消费者（`useSeason()` 的返回值）、`html[data-season]` |
 
-> **副作用（正面）**：季节在一次会话内**恒定** → 见 §4.2，昼夜的插值机器一行都不用改。
+优先级：**`?season=` > `localStorage` > 自动（按月份）**。
+
+`?season=` 排最前，是因为它是"把这一页摆成冬天"的**一次性命令**，必须能盖住上一轮
+在面板里点过的偏好 —— 四季定妆照正是靠这一条（否则会拍到上次点过的季节）。
+
+**不挂午夜定时器**：`'auto'` 档仍然每挂载解析一次。跨午夜重烘贴图会是一次可见的
+pop，而一个开着过夜的标签页不值得为它 pop 一次。刷新即正确。
+
+> 🔴 **重渲染 ≠ 画面会更新。**
+> 季节变成运行时可切之后，有且只有两类地方**必须自己动手**，漏了会静默停在旧季节：
+> 1. **季节 uniform** —— 不能换对象，只能就地改 `.value`（见 §5.1d）
+> 2. **只在过渡过程中写值、稳定后 early-return 的插值机** —— 见 §4.2b
 
 ---
 
@@ -190,6 +204,34 @@ sky = SEASON_LIGHT[season].day.sky.lerp( SEASON_LIGHT[season].night.sky, k )
 
 > ⚠️ **未来若要加季节切换 UI**，这里才需要升级成**双线性插值**（季节轴 × 昼夜轴）。
 > 届时**必须**给季节轴单独一条缓动（与 `k` 同款写法）。现在不加，是**刻意不做死代码**。
+
+### 4.2b 🔴 换季 = **吸附**，不是插值（✅ 已实现）
+
+上面那个"未来"在 2026-10-09 到了（设置面板能选四季），但**没有**升级成双线性插值
+—— 因为换季应当是**瞬间吸附**：它是"换一副牌"，不是"傍晚来临"。0.9s 的缓动在这里
+会读成一次诡异的黄昏，而且会让季节轴与昼夜轴互相污染。插值机因此仍然只有一维。
+
+但换季必须**让插值机重写一遍**。三个消费者的写法是：
+
+```
+每帧：if (t < 0) t = target; else if (t !== target) { 缓动一步 } else { return }
+```
+
+`else { return }` 是关键 —— **值只在过渡过程中被写**。于是"换季时已经稳定"
+（深色模式下最常见）就永远等不到一次重算，画面停在旧季节的天空/雾/色温/窗光上。
+
+实现：每个消费者持一个 `lastSeason` ref，换季时把标量归零，下一帧立刻吸附重写。
+
+| 消费者 | 有没有这个问题 | 处理 |
+|---|---|---|
+| `SceneLighting`（天空 / 雾 / 三灯 / veil） | **有**（稳定后 early-return） | `lastSeason` ref + `t.current = -1` |
+| `EntranceProps` → `WindowCurtain`（窗光） | **有**（同上） | `lastSeason` ref + `lit.t = -1` |
+| `SignSystem` → `Lantern`（灯笼） | **没有**：那个 useFrame 每帧都写 | 不动（别加死代码） |
+
+> `<fog args={…}>` 的 `args` 换季时确实会变（R3F 的 `is.equ` 对数组做逐元素比较），
+> 于是 R3F 会 `detach` 旧的再 `attach` 新的 —— 这一步是安全的（两个循环在
+> `swapInstances` 里同步跑完）。但**不能只靠它**：`scene.background` 与三盏灯
+> 都不在 `args` 里，必须靠上面那次吸附重写。
 
 ### 4.3 端点表：`src/config/seasonLight.js`（✅ 已实现）
 
@@ -349,6 +391,44 @@ blossoms / windfalls / litter / litterKind / shadow / shadowDx / snow`），
 **短 ≠ 对，得 `continue`。** 现在把折线按 `|ny| >= 0.30` 切成若干段、只给连续段描边；
 树干（`|ny| ≈ 0.08`）自然一段都不画 —— 物理上也对，竖直的枝干挂不住雪。
 **树干那一条调用已经删掉**：留着它看起来像"给树干也上了雪"，但实际一个像素都落不下去。
+
+#### 5.1d 🔴 季节 uniform 只能**就地改 `.value`**，不能换对象（✅ 已实现）
+
+P1 的写法是 `useMemo(() => makeSurfaceUniforms(w, h, origin, season), [..., season])`
+—— 季节变化时造一个**新的 uniforms 对象**。P1 里这没问题（季节每挂载恒定，只会建一次），
+但设置面板让季节变成运行时可切之后，这个写法会**静默失效**。
+
+**为什么**（读了 three 与 R3F 的源码才敢下结论）：
+
+1. three 在材质上缓存 `materialProperties.uniforms` 与 `materialProperties.uniformsList`
+   —— 后者是一串 `{ id, uniform }`，指向 uniform **对象**。上传时读的是这些对象里的 `.value`。
+2. 这两者**只在 program 变化时**才重建（`getProgram()` 末尾
+   `materialProperties.currentProgram = program; materialProperties.uniformsList = null;`）。
+   而 `materialProperties.uniforms` 只在"新 program 被构建"那条分支里被赋值为
+   `programCache.getUniforms(material)`，对 `ShaderMaterial` 来说**就是 `material.uniforms` 本身**。
+3. R3F 更新 `uniforms` prop 走的是 `applyProps()` 的最后一个分支 `root[key] = value`
+   —— **整体替换**。`uniforms` 是个普通对象（没有 `.set`/`.copy`），所以上面 5 条特判
+   一条都不命中。
+4. `material.needsUpdate = true` **也救不了**：program 缓存命中且
+   `currentProgram` 未变时会 early-return，`uniformsList` 照样不重建。
+
+→ 新对象里的值**永远不会被上传**，画面停在旧季节，且没有任何报错。
+
+**修法**：`applyGroundSeason(uniforms, season)` 保留 uniform 对象本身、只改 `.value`
+（数组与数字都是每帧现读的，所以换掉 `.value` 的引用就够）。它只写
+`groundSeasonUniforms()` 里出现的键，调用方自己加的 `uInk` / `uHoleDoor` / `uCapFrac`
+原样不动 —— 台基那块 `uCapFrac = 2.0` 的材质因此**刻意不接季节**，同时也是回归对照。
+
+配套 hook `hooks/useSeasonUniforms(factory, deps)`：对象身份永远不变、`season` 不进 deps，
+季节变化走 `useLayoutEffect` 就地改值（layout effect 是为了在浏览器下一次绘制前写完，
+不闪一帧旧色）。三个调用点：`EmptyCorridor`（草）、`GateBase`（台明/踏跺顶面）、
+`EntranceDoors`（甬路 + 幕墙）。
+
+> 另一个**看起来**可行的方案是在 `<shaderMaterial>` 上加 `key={season}` —— 换季重建
+> 材质，新材质拿到全新的 `materialProperties`，`uniformsList` 自然会重建。但 R3F 卸载时
+> 会 `dispose()` 旧材质，three 的 `releaseProgram` 会递减 program 的 `usedTimes`；
+> 一旦某个 shader 只有这一个用户，程序就被删掉，下次要**重新编译着色器**（可见卡顿）。
+> 就地改 `.value` 没有这个问题。
 
 #### 5.2 草地：**必须改 `grassSurface()`，不能分别改两个 shader**
 
@@ -530,7 +610,7 @@ uniform float uSnow;          // 0..1 积雪覆盖
 | **P1** | L0 光照 + 树的四季 + 草的四季 + 雪的 uniform（**纯数据，零新增几何**） | 8 张定妆照一眼可辨；`?season=autumn` 与改动前逐位一致（**唯一例外见下**） | ✅ 2026-10-09 |
 | **P2** | L3 声音 + 燕子/瓢虫的季生开关 | 关掉画面只听声音也能分辨季节 | ⬜ |
 | **P3** | 常驻新道具（荷花缸 / 石桌石凳 / 竹篱）+ 季生天象（雨 / 雪）+ 藤蔓/花箱四季化 | 每季有自己的"物证"；mesh ≤ 760 | ⬜ |
-| **P4** | （可选）季节切换 UI + 双线性插值 | 见 §4.2 | ⬜ 首版不做 |
+| **P4** | 季节切换 UI（设置面板；**不做**双线性插值，换季改为吸附 —— 见 §4.2b） | 面板能切四季，且**同一次会话内**场景真的跟着变 | ✅ 2026-10-09 |
 
 **P1 是成败判据**：如果只做 L0+L1 就已经能一眼分辨四季，后面都是加分项；如果不能，说明轴选错了。
 
@@ -549,41 +629,110 @@ uniform float uSnow;          // 0..1 积雪覆盖
 | 秋天树 A/B 像素比对 | **1459 px / 0.1855% 不同**，max Δ105，bbox `x 248..538, y 433..899` |
 | 8 组合 × 2 机位定妆照 | 见 `.workbuddy-ai/seasons-2026-10-09/` |
 
+#### 9.2 P4 验收记录（2026-10-09）
+
+| 项 | 结果 |
+|---|---|
+| `npm run lint` | **0 error / 33 warning**（与基线一致） |
+| `npm run build` | ✅ 通过 |
+| `harness/chunk-graph.mjs` | ✅ 无环；react chunk 195.5 KB |
+| `harness/settings-panel-check.mjs` | ✅ 全绿；**同一次会话内**秋→冬→春，三张院子图 sha1 互不相同；换季时场景 uniform 与树贴图都实测改变 |
+| 证据图 | `.workbuddy-ai/settings-2026-10-09/`（面板开/关 × 明暗 + 三季院子） |
+
 ---
 
-## 10. 文件清单
+## 10. 设置面板（2026-10-09 · P4 的 UI 部分）
+
+需求原话：「将那个暗黑模式的图标按钮，改成设置按钮吧，弹设置面板，里面可以选暗黑
+模式、四季。方便用户体验功能。设置面板的样式，参考 MAP 面板」
+
+### 10.1 为什么是**两行选择**，不是一个循环按钮
+
+`theme`（明暗）× `season`（四季）是**正交**的两个轴（§4），共 8 态。一个"点一下轮换"
+的图标按钮表达不了两个轴 —— 四季要盲点三次才知道到了哪一季。所以：
+
+| 位置 | 内容 |
+|---|---|
+| HUD 第 3 个按钮 | 齿轮（`.hud-btn`，与旁边 4 个同款）。原来这里是 ☀/☾ 的明暗切换 |
+| 面板第 1 行 | 外观：`浅色` / `深色` |
+| 面板第 2 行 | 季节：`自动` / `春` / `夏` / `秋` / `冬` |
+| 面板底部 | 一句话说清"现在到底哪一季"（选「自动」时 chip 上看不出来） |
+
+**「自动」必须有**。本站一直以来的默认行为是按月份自动换季；如果面板只有四季四选一，
+用户碰一次面板之后，"以后每个月自己变"就永久变成了"停在这一季"—— 这是一次静默的
+行为回归。所以偏好存的是 `'auto'`（而不是把解析结果存下来）。
+
+### 10.2 样式：照抄 MAP 面板，一处共用
+
+`.settings-panel` 与 `.map-panel` 是**同一张撕纸卡片**：同样的居中下沉、同样的
+`drop-shadow`、同样的 `--paper-texture` 伪元素、同样的 `.close-btn`。
+
+撕纸的 `clip-path` 抽成了 SCSS 变量 **`$torn-paper-clip`**，两块面板共用 ——
+写两份一定会漂移，同一屏上就会出现两种撕法。用变量而不是 `@extend`，是为了让两块
+面板各自保留自己的盒子语义（宽度、内边距），只共享"边缘怎么撕"。
+
+**深色下这块纸仍然是白的**，与 MAP 面板一致，是有意的：纸就是纸，一张白纸在暗房间里
+也还是白的；而"白纸 + 深墨"在两种主题下都是最易读的一组对比。（MAP 的**房间卡**之所以
+有 dark 覆盖，是因为 `.aispin-map` 的底色本身被压暗了 —— 这里没有那层底色。）
+
+### 10.3 顺带修掉的：面板互斥
+
+四个面板（map / audio / achievements / settings）原来各是一个独立布尔，于是
+「地图开着再点音频」会让两张卡片叠在同一角，而 `hudState` 只能报出其中一个
+（按优先级取第一个），另一个的按钮就永远显示成"没打开"。
+
+现在合并成**一个** `openPanel` 状态（`'map' | 'audio' | 'achievements' | 'settings' | null`），
+互斥是构造出来的，`hudState` 直接回传它。`hudToggle` 的语义变成
+`prev === id ? null : id`（点当前打开的那个 = 收起）。
+
+### 10.4 门联：**必须跟着面板走**（否则重演 §3.2b）
+
+`CoupletWall` 原来 `useMemo(..., [])` 只算一次。现在依赖**偏好**（不是解析结果）重算：
+传解析结果会把"按月份算出来的那一季"当成显式指定，**节气联 / 节日联就永远不出现了**。
+`resolveCoupletSet(date, pref)` / `dailyCoupletFor(date, pref)` 因此多了第二个参数，
+`'auto'` 与不传同义（都回落到 `?season=`）。
+
+---
+
+## 11. 文件清单
 
 ### 新增
 
 | 文件 | 职责 | 状态 |
 |---|---|---|
-| `src/config/seasons.js` | 季节 id / 月份表 / `resolveSeason` —— **唯一真源** | ✅ P1 |
+| `src/config/seasons.js` | 季节 id / 月份表 / `resolveSeason` / `SEASON_AUTO` —— **唯一真源** | ✅ P1 · P4 |
 | `src/config/seasonLight.js` | 8 组光照端点（秋天引用 `theme.js`）+ `seasonGlowFor` | ✅ P1 |
-| `src/hooks/useSeason.js` | `useMemo(() => resolveSeason().id, [])` | ✅ P1 |
+| `src/hooks/useSeason.js` | 读**偏好** → 返回**解析后**的季节 id | ✅ P1 · P4 |
+| `src/hooks/useSeasonUniforms.js` | 季节 uniform 的**就地更新**（对象身份不变，见 §5.1d） | ✅ P4 |
 | `src/components/canvas/entrance/CourtyardProps.jsx` | 荷花缸 / 石桌石凳 / 竹篱 | ⬜ P3 |
 | `src/utils/courtyardArt.js` | 上述道具的程序化贴图 | ⬜ P3 |
 | `src/shaders/seasonFx.js` | 雨幕 / 落雪的 shader | ⬜ P3 |
 | `.workbuddy-ai/harness/shots-seasons.mjs` | 8 组合定妆照（每组合换 URL 重载，见文件头） | ✅ |
 | `.workbuddy-ai/harness/shot-page.mjs` | 截 **http URL** 页面（补 `shot-html.mjs` 只走 `file://` 的空） | ✅ |
+| `.workbuddy-ai/harness/settings-panel-check.mjs` | 设置面板证据脚本（面板 / 换季 / 明暗 / 互斥） | ✅ P4 |
 
 ### 修改
 
 | 文件 | 改动 | 状态 |
 |---|---|---|
-| `src/config/couplets.js` | `seasonOf` 改为从 `seasons.js` 引入（**删掉本地月份表**） | ✅ |
-| `src/components/canvas/SceneLighting.jsx` | 端点季节化（`endpointsFor` 带缓存）；插值机器不动 | ✅ |
-| `src/components/canvas/entrance/EntranceDoors.jsx` | 接 `useSeason()`；树与甬路传季节；幕墙压顶积雪 | ✅ |
-| `src/components/canvas/entrance/EntranceProps.jsx` | `WindowCurtain` 乘 `seasonGlowFor` | ✅ |
-| `src/components/canvas/entrance/EmptyCorridor.jsx` | 草地传季节 uniform | ✅ |
-| `src/components/canvas/entrance/GateBase.jsx` | 台明/踏跺顶面传季节（落雪） | ✅ |
-| `src/components/canvas/entrance/SignSystem.jsx` | 灯笼乘 `seasonGlowFor` | ✅ |
+| `src/config/couplets.js` | `seasonOf` 从 `seasons.js` 引入（**删掉本地月份表**）；`resolveCoupletSet/dailyCoupletFor` 收季节**偏好** | ✅ |
+| `src/context/SitePreferences.jsx` | 新增 `season` / `setSeason`（偏好）+ `html[data-season]`；新增 `setTheme` | ✅ P4 |
+| `src/components/canvas/SceneLighting.jsx` | 端点季节化（`endpointsFor` 带缓存）；**换季吸附**（`lastSeason` ref） | ✅ |
+| `src/components/canvas/entrance/EntranceDoors.jsx` | 树与甬路传季节；幕墙压顶积雪；`CoupletWall` 跟偏好重算 | ✅ |
+| `src/components/canvas/entrance/EntranceProps.jsx` | `WindowCurtain` 乘 `seasonGlowFor`；**换季吸附** | ✅ |
+| `src/components/canvas/entrance/EmptyCorridor.jsx` | 草地传季节 uniform（改走 `useSeasonUniforms`） | ✅ |
+| `src/components/canvas/entrance/GateBase.jsx` | 台明/踏跺顶面传季节（落雪；改走 `useSeasonUniforms`） | ✅ |
+| `src/components/canvas/entrance/SignSystem.jsx` | 灯笼乘 `seasonGlowFor`（每帧都写，不需要吸附） | ✅ |
+| `src/components/ui/SiteControls.jsx` | 第 3 个按钮：明暗 → **设置**（齿轮） | ✅ P4 |
+| `src/components/ui/NavigationUI.jsx` | 新增设置面板；四面板合并为单一 `openPanel`（互斥） | ✅ P4 |
+| `src/styles/NavigationUI.scss` | `$torn-paper-clip` 变量 + `.settings-panel` 全套 | ✅ P4 |
 | `src/utils/entranceArt.js` | `makeTreeTexture(season)`；`TREE_SEASON` 表；**树干 `closePath` 修复**；枝上积雪 | ✅ |
-| `src/shaders/entranceTextures.js` | `grassSurface` 季节 palette + `uSnow`；`SONG_WALL_FRAG`/`STONE_FRAG` 积雪；`makeSurfaceUniforms` 分发 | ✅ |
+| `src/shaders/entranceTextures.js` | `grassSurface` 季节 palette + `uSnow`；`SONG_WALL_FRAG`/`STONE_FRAG` 积雪；`applyGroundSeason()` 就地更新 | ✅ |
 | `src/audio/ambience.js` | 4 条季节预设进 `PRESETS` | ⬜ P2 |
 
 ---
 
-## 11. 开放问题
+## 12. 开放问题
 
 1. ~~**冬天的地面**：薄雪盖住 `grassSurface` 之后，甬路的石板是否也要压一层雪？~~
    **✅ 已答（P1 实现时定的）**：压，但**薄得多**，且乘 `inPath` 只落在石板上。

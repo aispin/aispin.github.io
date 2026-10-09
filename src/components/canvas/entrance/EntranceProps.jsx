@@ -613,9 +613,24 @@ export function WindowCurtain({ position }) {
     const season = useSeason();
     const glow = seasonGlowFor(season);
 
+    /**
+     * 换季要把下面这个标量归零、重写一遍。
+     *
+     * 因为那段 useFrame 在插值稳定后会 `return`，`glow` 只在**过渡过程中**被
+     * 乘进去 —— 换季时如果已经稳定（深色模式下最常见），新季节的 glow 永远
+     * 等不到一次重算，窗光就停在旧季节的亮度上。
+     *
+     * 归零 = 瞬间吸附，与 SceneLighting 同策略：换季是"换一副牌"，不是黄昏。
+     */
+    const lastSeason = useRef(season);
+
     useFrame((state, delta) => {
         const target = theme === 'dark' ? 1 : 0;
         const lit = state.__curtainLit ?? (state.__curtainLit = { t: -1 });
+        if (lastSeason.current !== season) {
+            lastSeason.current = season;
+            lit.t = -1;
+        }
         if (lit.t < 0) lit.t = target;
         else if (lit.t !== target) {
             const step = delta / 0.9;

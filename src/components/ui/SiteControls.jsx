@@ -7,25 +7,29 @@ import '../../styles/SiteControls.scss'
  * SiteControls — the single control column in the top-right corner.
  *
  * Five buttons, top to bottom, dropping in one after another once the page has
- * loaded: map, language, colour theme, audio settings, achievements.
+ * loaded: map, language, settings, audio, achievements.
  *
  * Everything lives here so the corner is ONE column with ONE button style.
  * Before this, map/language/theme were here while audio/achievements sat in
  * NavigationUI behind `hasEntered` — a second cluster in the same corner, in a
  * different (torn-paper) style, that only showed up after entering the house.
  *
- * The panels those last two buttons open are still owned by NavigationUI: the
+ * The panels those last three buttons open are still owned by NavigationUI: the
  * audio card is part of its layout and <AchievementsPanel /> is its child. The
  * button and the panel talk over window events, which is the pattern already
  * used for the map — SiteControls asks with `hudToggle`, NavigationUI answers
  * with `hudState` so the button can show its pressed state.
+ *
+ * 2026-10-09：第 3 个按钮由「明暗模式」改为「设置」——明暗与四季都进了设置
+ * 面板，见 NavigationUI 的 settings panel。主题偏好由 SitePreferences 提供，
+ * 面板直接读它，这里不再需要 theme/toggleTheme。
  */
 
 /** Panel ids, in the order they appear as buttons. */
-const PANEL_IDS = ['map', 'audio', 'achievements']
+const PANEL_IDS = ['map', 'settings', 'audio', 'achievements']
 
 export default function SiteControls() {
-  const { language, toggleLanguage, theme, toggleTheme } = useSitePreferences()
+  const { language, toggleLanguage } = useSitePreferences()
   const { isMuted } = useAudio()
   const [updateReady, setUpdateReady] = useState(null)
   const [openPanel, setOpenPanel] = useState(null)
@@ -131,27 +135,25 @@ export default function SiteControls() {
           {zh ? 'EN' : '中文'}
         </button>
 
-        {/* 3 · Colour theme —— 用 SVG，别用 `☼` / `☾` 这类文字符号：
-                它们是按 font-size(13px) 渲染的，比旁边 20px 的 SVG 小一大截，
-                在深色模式（显示 ☼）下尤其明显（用户 2026-10-09 报的「图标偏小」）。
-                路径与 /me 页面的主题按钮同源。 */}
+        {/* 3 · Settings —— 这个位置原来是「明暗模式」的图标按钮（☀/☾）。
+                用户 2026-10-09 要求换成设置按钮：明暗与四季都收进面板里。
+                四季是新功能，塞进一个"点一下轮换"的图标里会很难用（四个季节
+                要盲点三次才知道到了哪一季），而设置面板本来就要有。 */}
         <button
           type="button"
-          className="hud-btn"
+          className={`hud-btn ${openPanel === 'settings' ? 'is-open' : ''}`}
           style={dropDelay(2)}
-          onClick={toggleTheme}
-          aria-label={zh ? '切换明暗模式' : 'Toggle color theme'}
+          onClick={() => togglePanel('settings')}
+          aria-label={zh ? '设置' : 'Settings'}
+          aria-expanded={openPanel === 'settings'}
         >
-          {theme === 'dark' ? (
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="4" />
-              <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-            </svg>
-          ) : (
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" />
-            </svg>
-          )}
+          {/* 齿轮 = 外圈 + 八颗齿 + 轮毂。齿的写法与上面那枚太阳同构
+              （同半径区间、同相对命令），所以两者并排也不会一个粗一个细。 */}
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3.3" />
+            <circle cx="12" cy="12" r="6.4" />
+            <path d="M18.4 12h2.6M16.53 16.53l1.84 1.84M12 18.4v2.6M7.47 16.53l-1.84 1.84M5.6 12h-2.6M7.47 7.47l-1.84-1.84M12 5.6V3M16.53 7.47l1.84-1.84" />
+          </svg>
         </button>
 
         {/* 4 · Audio settings —— 图标按「现在有没有声音」取态（默认静音态），

@@ -35,9 +35,9 @@ import { useSeason } from '../../hooks/useSeason'
  * `endpointsFor(season)` 给出的那一季的两组。下面的插值机器
  * —— `t` 的 0.9s 缓动、首帧吸附、veil 的 lerp —— **一行都没动**。
  *
- * 之所以能这么省，是因为季节在一次会话内**恒定**（`useSeason()` 每挂载解析
- * 一次，与门联同理）。所以不需要第二级缓动；将来若要加季节切换 UI，
- * 这里才要升级成双线性插值（季节轴 × 昼夜轴）。现在不做，是刻意不留死代码。
+ * 2026-10-09：设置面板能选季节之后，季节不再是"一次会话内恒定"的。这里
+ * **没有**升级成双线性插值（季节轴 × 昼夜轴），因为换季应当是**瞬间吸附**
+ * 而不是一次黄昏 —— 见下面 `lastSeason` 的注释。所以插值机依然只有一维。
  *
  * 秋天直接引用 `theme.js` 的现有常量（见 config/seasonLight.js），
  * 所以 `?season=autumn` 与加季节之前**逐位一致**。
@@ -159,7 +159,25 @@ const SceneLighting = ({ isLowTier = false }) => {
     // daylight, so a page opened in dark mode is dark on frame one.
     const t = useRef(-1)
 
+    /**
+     * 换季：把插值机归零，让它**立刻**按新季节重写一遍。
+     *
+     * 背景 / 雾 / 三盏灯都只在**插值过程中**被写，稳定后下面那个 `return` 会
+     * 直接跳过整段。而 `endpointsFor(season)` 换的是端点，不是结果 —— 不归零
+     * 的话，深色模式下换季会停在旧季节的天空、雾与色温里（白天换季更隐蔽：
+     * 端点表整个换了，但画面只在下一次切昼夜时才更新）。
+     *
+     * 归零 = 瞬间吸附，不插值。这是有意的：换季是"换一副牌"，不是"傍晚来临"，
+     * 0.9s 的缓动在这里会读成一次诡异的黄昏。
+     */
+    const lastSeason = useRef(season)
+
     useFrame((_, delta) => {
+        if (lastSeason.current !== season) {
+            lastSeason.current = season
+            t.current = -1
+        }
+
         const target = night ? 1 : 0
         if (t.current < 0) {
             t.current = target

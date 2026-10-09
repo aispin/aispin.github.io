@@ -656,6 +656,40 @@ export function groundSeasonUniforms(season = 'autumn') {
     };
 }
 
+/**
+ * 把某一季的地面色板**写进已有的 uniform 对象**（就地改 `.value`），返回同一个对象。
+ *
+ * ⚠️ 为什么不能直接换掉 `material.uniforms`
+ * ----------------------------------------
+ * three 在材质上缓存 `materialProperties.uniformsList` —— 一串指向 uniform
+ * **对象**的引用（`{ id, uniform }`），上传时读的是这些对象里的 `.value`。
+ * 它只在 **program 变化**时被置 null 重建（见 three 的 `getProgram()` 末尾
+ * `materialProperties.uniformsList = null`），而 R3F 更新 `uniforms` prop 走的是
+ * `applyProps` 的最后一个分支 `root[key] = value` —— **整体替换**。
+ *
+ * 于是「把 season 放进 useMemo 依赖、换一个新 uniforms 对象」这种写法会：
+ * 对象换了 → 上传的还是旧对象 → 画面**静默停在旧季节**，没有任何报错。
+ * （`material.needsUpdate = true` 也救不了：program 缓存命中且 currentProgram
+ * 未变时会 early-return，`uniformsList` 照样不重建。）
+ *
+ * 唯一稳的写法：**保留 uniform 对象本身，只改 `.value`**。数组与数字都是每帧
+ * 现读的，所以直接换掉 `.value` 的引用就够，不必逐元素写。
+ *
+ * 只写 `groundSeasonUniforms` 里出现的那些键 —— 调用方自己加的
+ * `uInk` / `uHoleDoor` / `uCapFrac` 等**原样不动**。
+ *
+ * @param {object} uniforms 就地更新，并原样返回
+ * @param {string} season
+ */
+export function applyGroundSeason(uniforms, season) {
+    const next = groundSeasonUniforms(season);
+    for (const key in next) {
+        const slot = uniforms[key];
+        if (slot) slot.value = next[key].value;
+    }
+    return uniforms;
+}
+
 export function makeSurfaceUniforms(width, height, origin = [0, 0], season = 'autumn') {
     return {
         uSize: { value: [width, height] },

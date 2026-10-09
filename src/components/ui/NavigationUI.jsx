@@ -5,22 +5,45 @@ import { setMusicVolume, getMusicVolume, playBackgroundMusic } from '../../utils
 import { useAchievements } from '../../context/AchievementsContext';
 import { useSitePreferences } from '../../context/SitePreferences';
 import { ROOMS, ROOM_COPY } from '../../config/theme';
+// 设置面板里的「四季」。表只有一份（config/seasons.js）。
+import { SEASON_IDS, SEASONS, SEASON_AUTO } from '../../config/seasons';
+// 「自动」档下实际生效的是哪一季 —— 面板底部那句话要说出来。
+import { useSeason } from '../../hooks/useSeason';
 import AchievementPopup from './AchievementPopup';
 import AchievementsPanel from './AchievementsPanel';
 import '../../styles/NavigationUI.scss';
+
+/**
+ * 面板 id —— `hudToggle`（SiteControls 请求）与 `hudState`（本组件回答）用它们
+ * 对话。**一次只开一个**，见下面 `openPanel` 的说明。
+ */
+const PANEL_IDS = ['map', 'audio', 'achievements', 'settings'];
 
 const NavigationUI = () => {
     const { currentRoom, isInRoom, requestExit, hasEntered, teleportTo, isTeleporting, markEntered, requestHouseExit, doorBusy } = useScene();
     const { globalVolume, setGlobalVolume, isMuted, toggleMute } = useAudio();
     const { showTutorial } = useAchievements();
-    const { language } = useSitePreferences();
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const { language, theme, setTheme, season, setSeason } = useSitePreferences();
+    // 解析后的季节（'auto' 时按月份算出来的那个）。只用于面板底部那句提示。
+    const resolvedSeason = useSeason();
+
+    /**
+     * 当前打开的面板：'map' | 'audio' | 'achievements' | 'settings' | null。
+     *
+     * 四个面板共用一个状态，而不是四个独立布尔 —— 因为它们本来就不该同时
+     * 出现。各自 toggle 时「地图开着再点音频」会把两张卡片叠在同一角，而且
+     * `hudState` 只能报出其中一个（按优先级取第一个），另一个的按钮就永远
+     * 显示成"没打开"。互斥现在是**构造出来**的，不靠每次记得关别人。
+     */
+    const [openPanel, setOpenPanel] = useState(null);
+    const isMenuOpen = openPanel === 'map';
+    const isAudioMenuOpen = openPanel === 'audio';
+    const isAchievementsOpen = openPanel === 'achievements';
+    const isSettingsOpen = openPanel === 'settings';
+
     const [hoveredRoom, setHoveredRoom] = useState(null);
     const [isExiting, setIsExiting] = useState(false); // Track when back button is clicked
 
-    // Audio controls state
-    const [isAudioMenuOpen, setIsAudioMenuOpen] = useState(false);
-    const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
     // Seeded from the audio manager rather than a hard-coded 0.3 + a mount
     // effect that immediately overwrote it with the real value (which both
     // flickered the slider and tripped react-hooks/set-state-in-effect).
@@ -29,6 +52,8 @@ const NavigationUI = () => {
     // Refs for focus management
     const mapPanelRef = useRef();
     const mapCloseRef = useRef();
+    const settingsPanelRef = useRef();
+    const settingsCloseRef = useRef();
 
     useEffect(() => {
         // Starting an inspection (the gallery card close-up) closes any open
@@ -36,11 +61,7 @@ const NavigationUI = () => {
         // stay put: they live in the always-visible SiteControls column, and the
         // user asked for them to be permanently fixed in the corner.
         const handleInspectChange = (e) => {
-            if (e.detail) {
-                setIsMenuOpen(false);
-                setIsAudioMenuOpen(false);
-                setIsAchievementsOpen(false);
-            }
+            if (e.detail) setOpenPanel(null);
         };
         window.addEventListener('inspectChange', handleInspectChange);
         return () => window.removeEventListener('inspectChange', handleInspectChange);
@@ -105,9 +126,7 @@ const NavigationUI = () => {
     // Close menu when entering a room or starting teleport
     useEffect(() => {
         if (isInRoom || isTeleporting) {
-            setIsMenuOpen(false);
-            setIsAudioMenuOpen(false);
-            setIsAchievementsOpen(false);
+            setOpenPanel(null);
             setIsExiting(false);
         }
     }, [isInRoom, isTeleporting]);
@@ -133,48 +152,54 @@ const NavigationUI = () => {
     // They talk to us over window events: `hudToggle` asks us to flip a panel,
     // `hudState` tells them which panel is now open so the button can show its
     // pressed state. This replaced the map-only toggleMap/mapStateChange pair.
+    //
+    // 因为只有一个 `openPanel`，"打开一个就必然关掉别的"是天然的 —— 点当前
+    // 打开的那个则关掉它（`prev === id ? null : id`）。
     useEffect(() => {
         const onToggle = (event) => {
             const id = event.detail
-            if (id === 'map') setIsMenuOpen((prev) => !prev)
-            else if (id === 'audio') setIsAudioMenuOpen((prev) => !prev)
-            else if (id === 'achievements') setIsAchievementsOpen((prev) => !prev)
+            if (PANEL_IDS.includes(id)) setOpenPanel((prev) => (prev === id ? null : id))
         }
         window.addEventListener('hudToggle', onToggle)
         return () => window.removeEventListener('hudToggle', onToggle)
     }, [])
 
     useEffect(() => {
-        const open = isMenuOpen ? 'map' : isAudioMenuOpen ? 'audio' : isAchievementsOpen ? 'achievements' : null
-        window.dispatchEvent(new CustomEvent('hudState', { detail: open }))
-    }, [isMenuOpen, isAudioMenuOpen, isAchievementsOpen])
+        window.dispatchEvent(new CustomEvent('hudState', { detail: openPanel }))
+    }, [openPanel])
 
-    // A4: Focus management for map panel — auto-focus, Escape, and focus trap
+    // A4: Focus management for the top-anchored panels — auto-focus the close
+    // button when one opens, so Escape/Tab land inside it immediately.
     useEffect(() => {
         if (isMenuOpen) {
-            // Auto-focus on close button when map opens
             setTimeout(() => mapCloseRef.current?.focus(), 100);
         }
     }, [isMenuOpen]);
 
+    useEffect(() => {
+        if (isSettingsOpen) {
+            setTimeout(() => settingsCloseRef.current?.focus(), 100);
+        }
+    }, [isSettingsOpen]);
+
     // Global Escape key handler — closes any open panel
     useEffect(() => {
         const handleEscape = (e) => {
-            if (e.key === 'Escape') {
-                if (isMenuOpen) setIsMenuOpen(false);
-                if (isAudioMenuOpen) setIsAudioMenuOpen(false);
-                if (isAchievementsOpen) setIsAchievementsOpen(false);
-            }
+            if (e.key === 'Escape') setOpenPanel(null);
         };
         window.addEventListener('keydown', handleEscape);
         return () => window.removeEventListener('keydown', handleEscape);
-    }, [isMenuOpen, isAudioMenuOpen, isAchievementsOpen]);
+    }, []);
 
-    // Focus trap handler for map panel
-    const handleMapKeyDown = (e) => {
-        if (e.key !== 'Tab' || !mapPanelRef.current) return;
+    /**
+     * Focus trap for a top-anchored panel: Tab cycles inside it instead of
+     * walking off into the HUD buttons behind. Shared by the map and settings
+     * panels so the two cannot drift apart.
+     */
+    const trapFocus = (e, panelRef) => {
+        if (e.key !== 'Tab' || !panelRef.current) return;
 
-        const focusable = mapPanelRef.current.querySelectorAll(
+        const focusable = panelRef.current.querySelectorAll(
             'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
         );
         if (focusable.length === 0) return;
@@ -207,9 +232,7 @@ const NavigationUI = () => {
         if (!hasEntered) markEntered();
 
         // Close map first, then start teleport
-        setIsMenuOpen(false);
-        setIsAudioMenuOpen(false);
-        setIsAchievementsOpen(false);
+        setOpenPanel(null);
         teleportTo(roomId);
     };
 
@@ -264,7 +287,7 @@ const NavigationUI = () => {
             {/* Map Panel - Drops from top when open. Not gated on hasEntered:
                 the menu button lives in the always-visible SiteControls
                 cluster, and picking a room from the map enters the scene. */}
-            <div className={`map-panel ${isMenuOpen ? 'open' : ''}`} inert={!isMenuOpen ? true : undefined} ref={mapPanelRef} onKeyDown={handleMapKeyDown} role="dialog" aria-label="Map">
+            <div className={`map-panel ${isMenuOpen ? 'open' : ''}`} inert={!isMenuOpen ? true : undefined} ref={mapPanelRef} onKeyDown={(e) => trapFocus(e, mapPanelRef)} role="dialog" aria-label="Map">
                 {/* SVG Border Overlay */}
                 <svg
                     className="map-border-overlay"
@@ -297,7 +320,7 @@ const NavigationUI = () => {
                         <button
                             ref={mapCloseRef}
                             className="close-btn"
-                            onClick={() => setIsMenuOpen(false)}
+                            onClick={() => setOpenPanel(null)}
                             aria-label="Close map"
                         >
                             <svg viewBox="0 0 24 24">
@@ -347,7 +370,7 @@ const NavigationUI = () => {
                             <h3>AUDIO SETTINGS</h3>
                             <button
                                 className="close-btn"
-                                onClick={() => setIsAudioMenuOpen(false)}
+                                onClick={() => setOpenPanel(null)}
                                 aria-label="Close audio settings"
                             >
                                 <svg viewBox="0 0 24 24">
@@ -439,22 +462,124 @@ const NavigationUI = () => {
                     </div>
             </div>
 
+            {/* Settings Panel —— 与地图面板同一张撕纸卡片（样式见
+                NavigationUI.scss 的 .settings-panel，两者共用 $torn-paper-clip）。
+
+                里面是本站的两个**正交**偏好：
+                  外观（明暗主题）× 季节（四季院子）
+                这两个轴是独立的（2 × 4 = 8 态），所以做成两行选择而不是一个
+                循环按钮 —— 循环按钮表达不了两个轴。
+
+                「自动」是季节的默认档：跟月份走。它必须存在，否则用户碰一次
+                面板，"以后每个月自己变"就永久变成了"停在这一季"。 */}
+            <div
+                className={`settings-panel ${isSettingsOpen ? 'open' : ''}`}
+                inert={!isSettingsOpen ? true : undefined}
+                ref={settingsPanelRef}
+                onKeyDown={(e) => trapFocus(e, settingsPanelRef)}
+                role="dialog"
+                aria-label={language === 'zh' ? '设置' : 'Settings'}
+            >
+                <div className="settings-content-clipped">
+                    <div className="settings-header">
+                        {/* 与 MAP / AUDIO SETTINGS 一致：标题保持英文大写，
+                            行标签才走双语（地图的房间名也是这么分的）。 */}
+                        <h3>SETTINGS</h3>
+                        <button
+                            ref={settingsCloseRef}
+                            className="close-btn"
+                            onClick={() => setOpenPanel(null)}
+                            aria-label={language === 'zh' ? '关闭设置' : 'Close settings'}
+                        >
+                            <svg viewBox="0 0 24 24">
+                                <path d="M18 6L6 18M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div className="settings-body">
+                        <div className="settings-row">
+                            <span className="settings-row__label">
+                                {language === 'zh' ? '外观' : 'Appearance'}
+                            </span>
+                            <div className="settings-choice" role="radiogroup" aria-label={language === 'zh' ? '外观' : 'Appearance'}>
+                                <button
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={theme === 'light'}
+                                    className={`settings-chip ${theme === 'light' ? 'is-active' : ''}`}
+                                    onClick={() => setTheme('light')}
+                                >
+                                    {language === 'zh' ? '浅色' : 'Light'}
+                                </button>
+                                <button
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={theme === 'dark'}
+                                    className={`settings-chip ${theme === 'dark' ? 'is-active' : ''}`}
+                                    onClick={() => setTheme('dark')}
+                                >
+                                    {language === 'zh' ? '深色' : 'Dark'}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="settings-row">
+                            <span className="settings-row__label">
+                                {language === 'zh' ? '季节' : 'Season'}
+                            </span>
+                            <div className="settings-choice settings-choice--seasons" role="radiogroup" aria-label={language === 'zh' ? '季节' : 'Season'}>
+                                <button
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={season === SEASON_AUTO}
+                                    className={`settings-chip ${season === SEASON_AUTO ? 'is-active' : ''}`}
+                                    onClick={() => setSeason(SEASON_AUTO)}
+                                >
+                                    {language === 'zh' ? '自动' : 'Auto'}
+                                </button>
+                                {SEASON_IDS.map((id) => (
+                                    <button
+                                        key={id}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={season === id}
+                                        className={`settings-chip ${season === id ? 'is-active' : ''}`}
+                                        onClick={() => setSeason(id)}
+                                        // 无头验收靠它精确点到某一季（按文字选会
+                                        // 随语言变，按索引选会被「自动」错位）。
+                                        data-season={id}
+                                    >
+                                        {language === 'zh' ? SEASONS[id].zh : SEASONS[id].en}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 说清楚"现在到底是哪一季" —— 选「自动」时面板上只有
+                            「自动」是亮的，看不出实际生效的是哪一季。 */}
+                        <p className="settings-hint">
+                            {season === SEASON_AUTO
+                                ? (language === 'zh'
+                                    ? `跟随月份 · 当前 ${SEASONS[resolvedSeason].zh}季`
+                                    : `Follows the calendar · now ${SEASONS[resolvedSeason].en}`)
+                                : (language === 'zh'
+                                    ? `已固定在${SEASONS[season].zh}季 · 院子与门联都会跟着变`
+                                    : `Pinned to ${SEASONS[season].en} · the courtyard and the couplet follow`) }
+                        </p>
+                    </div>
+                </div>
+            </div>
+
             {/* Achievements Panel */}
             <AchievementsPanel
                 isOpen={isAchievementsOpen}
-                onClose={() => setIsAchievementsOpen(false)}
+                onClose={() => setOpenPanel(null)}
             />
 
             {/* Overlay to close menus */}
-            {(isMenuOpen || isAudioMenuOpen || isAchievementsOpen) && (
-                <div
-                    className="menu-overlay"
-                    onClick={() => {
-                        setIsMenuOpen(false);
-                        setIsAudioMenuOpen(false);
-                        setIsAchievementsOpen(false);
-                    }}
-                />
+            {openPanel && (
+                <div className="menu-overlay" onClick={() => setOpenPanel(null)} />
             )}
         </div>
     );

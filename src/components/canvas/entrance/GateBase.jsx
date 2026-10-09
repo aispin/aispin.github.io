@@ -16,7 +16,7 @@ import {
 import { sharedGeometry } from '../../../engine/resources';
 // 台明 / 踏跺的顶面用 STONE_FRAG，冬天会落一层薄雪（见 shader 里的 uSnow），
 // 所以这两块也要跟着季节走 —— 否则雪后的院子里只有门前那块石头是干的。
-import { useSeason } from '../../../hooks/useSeason';
+import { useSeasonUniforms } from '../../../hooks/useSeasonUniforms';
 
 /**
  * GateBase — 门座：台基 / 台明 / 踏跺 / 门槛 / 门枕石
@@ -58,7 +58,6 @@ import { useSeason } from '../../../hooks/useSeason';
  * 而不是地面。冷暖分开是有意的：青石是墙，石板是路。
  */
 const GateBase = ({ worldZ = 0 }) => {
-    const season = useSeason();
     // 台明：从门平面稍后一点一直伸到踏跺前缘
     const apronCenterZ = APRON_FRONT_Z - APRON_DEPTH / 2;
     const stepCenterZ = APRON_FRONT_Z + STEP_DEPTH / 2;
@@ -79,23 +78,29 @@ const GateBase = ({ worldZ = 0 }) => {
     // 顶面：uInLawn = 0 —— 这块石板不挨着草。抬高的石台不会长草边，
     // 石缝里也不会长苔；草边和石缝的苔都是"铺装与草坪相接"的解法，
     // 用在一块悬空的台面上就变成了错的。
-    const apronTopUniforms = useMemo(() => ({
-        ...makeSurfaceUniforms(
-            APRON_W, APRON_DEPTH,
-            [-APRON_W / 2, worldZ + apronCenterZ + APRON_DEPTH / 2],
-            season
-        ),
-        uInLawn: { value: 0 },
-    }), [apronCenterZ, worldZ, season]);
+    const apronTopUniforms = useSeasonUniforms(
+        (season) => ({
+            ...makeSurfaceUniforms(
+                APRON_W, APRON_DEPTH,
+                [-APRON_W / 2, worldZ + apronCenterZ + APRON_DEPTH / 2],
+                season
+            ),
+            uInLawn: { value: 0 },
+        }),
+        [apronCenterZ, worldZ]
+    );
 
-    const stepTopUniforms = useMemo(() => ({
-        ...makeSurfaceUniforms(
-            STEP_W, STEP_DEPTH,
-            [-STEP_W / 2, worldZ + stepCenterZ + STEP_DEPTH / 2],
-            season
-        ),
-        uInLawn: { value: 0 },
-    }), [stepCenterZ, worldZ, season]);
+    const stepTopUniforms = useSeasonUniforms(
+        (season) => ({
+            ...makeSurfaceUniforms(
+                STEP_W, STEP_DEPTH,
+                [-STEP_W / 2, worldZ + stepCenterZ + STEP_DEPTH / 2],
+                season
+            ),
+            uInLawn: { value: 0 },
+        }),
+        [stepCenterZ, worldZ]
+    );
 
     const thresholdTexture = useMemo(() => makeThresholdTexture(), []);
 

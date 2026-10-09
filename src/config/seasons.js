@@ -50,6 +50,21 @@ export const seasonIdOf = (date = new Date()) => BY_MONTH[date.getMonth()];
 export const seasonZhOf = (date = new Date()) => SEASONS[seasonIdOf(date)].zh;
 
 /**
+ * 季节偏好里的「自动」档 —— 跟着月份走（= 本站一直以来的默认行为）。
+ *
+ * 它是**偏好**，不是季节：`useSeason()` 永远不会返回 `'auto'`，只会返回一个
+ * 具体的 id。分开这两个概念是必要的 —— 设置面板里选了「自动」之后，用户
+ * 期望的是"以后每个月自己变"，而不是"永远停在今天这一季"。
+ */
+export const SEASON_AUTO = 'auto';
+
+/** 某个值是不是合法季节 id（用来挡住 localStorage 里的脏数据）。 */
+export const isSeasonId = (value) => SEASON_IDS.includes(value);
+
+/** 季节偏好（`'auto'` | 四季 id）→ 实际要渲染的季节 id。 */
+export const seasonIdOfPref = (pref) => (isSeasonId(pref) ? pref : seasonIdOf());
+
+/**
  * `?season=` 调试覆盖。传 id（`winter`）或中文名（`冬`）都认，大小写不敏感。
  *
  * 与 `?couplet=` **同构**（那个也同时认 id 与中文名）—— 验收时要一眼看懂，

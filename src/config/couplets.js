@@ -39,7 +39,7 @@
 import { TERM_DAYS, TERM_MONTHS, TERM_NAMES, FESTIVAL_DAYS, FESTIVAL_NAMES } from './coupletCalendar.data';
 // 季节的月份表**不在这里** —— 它是 config/seasons.js 的唯一真源，
 // 四季院子也用同一张表（今天挂秋联，院子就是秋天）。
-import { seasonZhOf, resolveSeason, SEASONS } from './seasons';
+import { seasonZhOf, resolveSeason, SEASONS, SEASON_AUTO } from './seasons';
 
 /**
  * 日常那几副 —— **按季节分四套**（2026-10-09 用户要求）。
@@ -84,18 +84,30 @@ export const seasonOf = seasonZhOf;
  * 只认系统日期。于是 `?season=spring` 在十月会得到**春天的院子挂着秋天的门联**
  * —— 两个真源互相打脸，四季定妆照也没法看。
  *
- * 优先级：**`?couplet=` > `?season=` > 日期链（节日 > 假期 > 节气 > 季节兜底）**。
- * `?season=` 是硬覆盖，会**跳过整条日期链** —— 否则十月的寒露节气联会盖掉
+ * 优先级：**`?couplet=` > 设置面板选的那一季 > `?season=` > 日期链
+ * （节日 > 假期 > 节气 > 季节兜底）**。
+ * 季节类的覆盖是硬覆盖，会**跳过整条日期链** —— 否则十月的寒露节气联会盖掉
  * 你指定的春天。
+ *
+ * @param {string} [pref] 设置面板里的季节偏好（`'auto'` | 四季 id）。
+ *                        `'auto'` 与不传**同义**：都回落到 `?season=`。
+ *                        这个区分是必须的 —— 把「按月份解析出的那一季」当成
+ *                        显式偏好传进来，会让节气联永远不出现。
  */
-function seasonOverrideZh() {
+function seasonOverrideZh(pref) {
+    if (pref && pref !== SEASON_AUTO) return SEASONS[pref]?.zh ?? null;
     const r = resolveSeason();
     return r.source === 'override' ? SEASONS[r.id].zh : null;
 }
 
-/** 某一天该挂哪一副日常联 —— 兜底分支用它。 */
-export const dailyCoupletFor = (date = new Date()) => {
-    const season = seasonOverrideZh() || seasonOf(date);
+/**
+ * 某一天该挂哪一副日常联 —— 兜底分支用它。
+ *
+ * @param {Date} [date]
+ * @param {string} [pref] 见 `seasonOverrideZh`
+ */
+export const dailyCoupletFor = (date = new Date(), pref = null) => {
+    const season = seasonOverrideZh(pref) || seasonOf(date);
     return DAILY_COUPLETS.find((c) => c.season === season) || DAILY_COUPLETS[0];
 };
 
@@ -227,14 +239,16 @@ const parseMmdd = (y, mmdd) => {
  *
  * @param {Date} [date] 默认现在。传参是为了能单测，也让 ?couplet= 之外
  *                      还能在控制台里试别的日期。
+ * @param {string} [pref] 设置面板里的季节偏好（`'auto'` | 四季 id），见
+ *                        `seasonOverrideZh`。'auto' 等价于不传。
  * @returns {{set: object, reason: 'season'|'festival'|'holiday'|'term'|'default', label: string|null}}
  */
-export function resolveCoupletSet(date = new Date()) {
+export function resolveCoupletSet(date = new Date(), pref = null) {
     const y = date.getFullYear();
     const today = dayNumber(y, date.getMonth() + 1, date.getDate());
 
-    // --- 0. `?season=` 是硬覆盖，整条日期链跳过（见 seasonOverrideZh） ---
-    const sZh = seasonOverrideZh();
+    // --- 0. 季节硬覆盖（面板选的那一季 / `?season=`），整条日期链跳过 ---
+    const sZh = seasonOverrideZh(pref);
     if (sZh) {
         const set = DAILY_COUPLETS.find((c) => c.season === sZh);
         if (set) return { set, reason: 'season', label: null };
@@ -290,7 +304,7 @@ export function resolveCoupletSet(date = new Date()) {
     }
 
     // --- 4. 兜底：日常联（按季节四选一） ---
-    return { set: dailyCoupletFor(date), reason: 'default', label: null };
+    return { set: dailyCoupletFor(date, pref), reason: 'default', label: null };
 }
 
 /**

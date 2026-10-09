@@ -4,7 +4,9 @@ import { SURFACE_VERT, GRASS_FRAG, makeSurfaceUniforms } from '../../../shaders/
 import { OUTDOOR_DROP } from '../../../config/entranceMetrics';
 import { sharedGeometry } from '../../../engine/resources';
 // 草地也要跟着季节走 —— 它与甬路的草边共用 grassSurface()，见下面的说明。
-import { useSeason } from '../../../hooks/useSeason';
+// 用 useSeasonUniforms 而不是 useMemo(..., [season])：换季只能**就地**改
+// uniform 的 .value，换对象 three 不会重新上传（原因见那个 hook 的注释）。
+import { useSeasonUniforms } from '../../../hooks/useSeasonUniforms';
 
 /**
  * EmptyCorridor Component
@@ -57,7 +59,6 @@ const EmptyCorridor = ({ camera }) => {
 const CorridorSegmentEmpty = ({ zStart, corridorWidth, corridorHeight }) => {
     const length = 40;
     const zCenter = zStart - length / 2;
-    const season = useSeason();
 
     // The outdoor ground sits a deliberate 0.34 below the indoor floor plane.
     //
@@ -96,12 +97,15 @@ const CorridorSegmentEmpty = ({ zStart, corridorWidth, corridorHeight }) => {
     // longer repeats every 40 units — and, more importantly, it now shares a
     // frame with the stone path's verge, which is what removes the seam
     // between the path and the lawn (see GRASS_GLSL in shaders/entranceTextures.js).
-    const grassUniforms = useMemo(() => makeSurfaceUniforms(
-        corridorWidth,
-        length,
-        [-corridorWidth / 2, zCenter],
-        season
-    ), [corridorWidth, length, zCenter, season]);
+    const grassUniforms = useSeasonUniforms(
+        (season) => makeSurfaceUniforms(
+            corridorWidth,
+            length,
+            [-corridorWidth / 2, zCenter],
+            season
+        ),
+        [corridorWidth, length, zCenter]
+    );
 
     return (
         <group>
