@@ -13,6 +13,7 @@ import { setGuitarCursor } from '../../../utils/guitarCursor';
 import { SURFACE_VERT, SONG_WALL_FRAG, INK_OVERLAY_FRAG, STONE_FRAG, makeSurfaceUniforms } from '../../../shaders/entranceTextures';
 import GateBase from './GateBase';
 import { WindChime, WhiteDog, WoodenPlanter, WoodenWindowFrame, WindowCurtain, SwallowNest } from './EntranceProps';
+import StoneTable from './StoneTable';
 import { SCENE_FONTS } from '../../../config/theme';
 // 季节：门联与院子共用同一张月份表（config/seasons.js），所以门口挂秋联时
 // 院子就是秋天 —— 这条一致性是免费的。
@@ -58,6 +59,7 @@ import {
     BANNER_Y,
     OUTDOOR_Y,
     PATH_Y,
+    GRASS_Y,
     STEP_FRONT_Z,
 } from '../../../config/entranceMetrics';
 import { sharedGeometry } from '../../../engine/resources';
@@ -1405,6 +1407,14 @@ const EntranceDoors = ({
                     树枝上」.) */}
                 <WindChime position={[0.75, -0.4375, 0.05]} />
             </group>
+
+            {/* STONE TABLE + TWO STOOLS —— 树下、树跟前（用户 2026-10-09 定）。
+                树干在 local x ≈ -2.82（见 entranceArt 的 trunk 骨架：canvas 394
+                按 128 px/单位 折回来，再加上树组自己的 -2.9）；树是一张 billboard
+                平面停在 z = 1，所以摆在 z > 1 的一侧就是"树跟前"。
+                脚下是**草坪**不是甬路 —— 用 GRASS_Y（比 OUTDOOR_Y 低 4 cm，
+                见 entranceMetrics 的 GROUND_DROP）。 */}
+            <StoneTable position={[-2.78, GRASS_Y, 1.62]} worldZ={position[2] + 1.62} />
 
             {/* WHITE DOG (Front Facing) — 3D procedural, blinking eyes, wagging tail.
                 On the lawn, clear of the 台明 (which is only APRON_W wide). */}
