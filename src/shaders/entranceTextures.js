@@ -161,6 +161,26 @@ vec4 flowerHead(vec2 p, float seed, vec3 petal, vec3 core) {
     return vec4(col, max(petalMask, coreMask));
 }
 
+/* ---- 雪：颜色与覆盖度**只在这里定义一次** -------------------------------
+ *
+ * 草地（grassSurface）与石板（STONE_FRAG 的冬季薄雪）必须共用同一场雪。
+ *
+ * 2026-10-10 用户报「即使是冬季，石板路上的积雪也没有和周边雪地做到自然
+ * 融合的效果」。原因就是两边各写各的：颜色虽然都是同一个 vec3，但**噪声
+ * 是两条**（草地 fbm(gw*0.62+61.0)、石板 fbm(gw*0.85+17.0)），于是边界
+ * 两侧的斑驳互不相关 —— 雪是同一片白，但"哪块露底、哪块积厚"对不上，
+ * 眼睛读到的就是两种材料。
+ *
+ * 这与 GRASS_GLSL 顶上那条教训是同一个：**接缝的解法是删掉它，不是柔化它。**
+ */
+const vec3 SNOW_COL = vec3(0.930, 0.947, 0.972);
+
+/** 世界坐标处的积雪覆盖度 0..1（低频斑驳：没盖满、还露着枯草）。 */
+float snowCoverage(vec2 gw) {
+    float snowN = fbm(gw * 0.62 + 61.0);
+    return 0.42 + 0.58 * smoothstep(0.28, 0.66, snowN);
+}
+
 vec3 grassSurface(vec2 gw) {
     // --- Grass base: two octaves of noise for patchy tone ---
     // Muted deliberately. A Song garden is not a lawn: the greens are pulled
@@ -234,13 +254,11 @@ vec3 grassSurface(vec2 gw) {
 
     // --- 积雪 ---------------------------------------------------------
     // 雪是**一次 mix**，不是新增几何：地面薄雪全靠这一个 uniform。
-    // 用低频噪声做出"没盖满、还露着枯草"的斑驳 —— 纯白平铺会像塑料布。
+    // 颜色与覆盖度都取自上面共用的 SNOW_COL / snowCoverage()，石板那边同一套。
     //
     // ⚠️ 其余三季 uSnow = 0，而「mix(col, x, 0.0)」在数值上严格等于 col，
     // 所以这三季的画面**逐位不受影响**（这是秋天回归锚点成立的前提之一）。
-    float snowN = fbm(gw * 0.62 + 61.0);
-    float snowMask = 0.42 + 0.58 * smoothstep(0.28, 0.66, snowN);
-    col = mix(col, vec3(0.930, 0.947, 0.972), uSnow * snowMask);
+    col = mix(col, SNOW_COL, uSnow * snowCoverage(gw));
 
     // Paper-like grain to match the sketchy art direction. Keyed off the
     // world frame so it does not band across the ground tiles.
@@ -538,11 +556,20 @@ void main() {
     float interior = f2 - f1;
     float stoneMask = smoothstep(0.05, 0.16, interior);
 
-    // Per-stone warm grey/tan variation
+    // Per-stone warm grey/tan variation.
+    //
+    // 🔴 2026-10-10：整体压暗（原 0.722 / 0.816 / 0.639 → 现 0.520 / 0.600 / 0.442），
+    // **色相不动**（仍是 ~33° 的暖调石板，与青砖墙的冷调对比是有意为之）。
+    //
+    // 原值太亮：叠上倒角（×1.06）与石材噪声（×1.08）后峰值到 0.934 ⇒ sRGB 238，
+    // 也就是**接近纯白**。实测台明顶面 p95 = (221,202,175)，而春/夏/秋三季
+    // 逐通道差 ≤ 1 —— 用户 2026-10-10 报的「四季石板路上都是积雪」其实是
+    // **石头本身太白**，不是雪（那三季 uSnow 恒为 0）。
+    // 判据脚本：harness/shot-apron-seasons.mjs（读 uniform + 采多边形内部像素）。
     vec2 h = hash22(id1);
-    vec3 s1 = vec3(0.722, 0.663, 0.592);
-    vec3 s2 = vec3(0.816, 0.745, 0.639);
-    vec3 s3 = vec3(0.639, 0.580, 0.514);
+    vec3 s1 = vec3(0.520, 0.470, 0.408);
+    vec3 s2 = vec3(0.600, 0.545, 0.472);
+    vec3 s3 = vec3(0.442, 0.396, 0.340);
     vec3 stone = mix(s1, s2, h.x);
     stone = mix(stone, s3, step(0.72, h.y));
     stone *= 0.92 + 0.16 * noise2(world * 4.0);
@@ -581,13 +608,20 @@ void main() {
     // 的雪：积在石缝和低处，露出石头的暖色。满铺会把甬路变成一条白布，
     // 而雪后的院子恰恰是靠"哪块扫了、哪块没扫"读出来的。
     //
-    // 「* inPath」是必须的：草边已经吃过 grassSurface 的厚雪了，再叠一层
+    // 🔴 2026-10-10 改：**与草地同一场雪**（同 SNOW_COL、同 snowCoverage()）。
+    // 原来这里是一条独立的噪声 fbm(gw*0.85+17.0)，于是边界两侧的斑驳对不上，
+    // 雪是同一片白但"哪块露底"各说各话 —— 用户报的「冬季石板的雪和周边雪地
+    // 不融合」就是它。现在两边共用一个覆盖度，只差一个**折率**：
+    // 路中间扫得干净、靠边留雪堆（swept 走位置 + 噪声），
+    // 于是雪在石板上是"扫剩的斑块"，而不是一层均匀的膜。
+    //
+    // 「* inPath」仍然必须：草边已经吃过 grassSurface 的厚雪了，再叠一层
     // 就会比草地还白，接缝立刻回来。
     //
     // ⚠️ uSnow = 0 时逐位不变（秋天回归锚点）。
-    float stoneSnow = fbm(gw * 0.85 + 17.0);
-    col = mix(col, vec3(0.930, 0.947, 0.972),
-              uSnow * inPath * (0.18 + 0.30 * smoothstep(0.34, 0.72, stoneSnow)));
+    float swept = mix(0.30, 1.0, smoothstep(vergeHalf * 0.45, vergeHalf + 0.25, abs(xc)));
+    swept *= mix(0.75, 1.0, fbm(gw * 1.4 + 5.0));
+    col = mix(col, SNOW_COL, uSnow * snowCoverage(gw) * inPath * swept);
 
     // 沿阶草 border: a real garden path never goes stone-straight-to-lawn.
     // There is always a strip of damp, darker growth hugging the slabs,
