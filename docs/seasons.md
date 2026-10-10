@@ -162,16 +162,32 @@ export function resolveSeason(search = window.location.search) {
 
 | 概念 | 取值 | 谁用 |
 |---|---|---|
-| **偏好** `season` | `'auto'` \| `'spring'` … | 设置面板的选中态、`localStorage['aispin-season']`、`resolveCoupletSet()` 的季节参数 |
+| **偏好** `season` | `'auto'` \| `'spring'` … | 设置面板的选中态、`resolveCoupletSet()` 的季节参数 |
 | **解析结果** | `'spring'` … （**永不** `'auto'`） | 所有渲染消费者（`useSeason()` 的返回值）、`html[data-season]` |
 
-优先级：**`?season=` > `localStorage` > 自动（按月份）**。
+优先级：**`?season=` > 自动（按月份）**。
 
-`?season=` 排最前，是因为它是"把这一页摆成冬天"的**一次性命令**，必须能盖住上一轮
-在面板里点过的偏好 —— 四季定妆照正是靠这一条（否则会拍到上次点过的季节）。
+`?season=` 排最前，是因为它是"把这一页摆成冬天"的**一次性命令** —— 四季定妆照正是
+靠这一条。
+
+> 🔴 **2026-10-10：季节偏好不再落盘。** 它曾经存 `localStorage['aispin-season']`，
+> 现已**整个删掉** —— 每次刷新都重新判定（`?season=` 覆盖，否则按当月）。
+>
+> **为什么删**：存档把「季节」变成了一个**粘性状态**。用户在面板里点过一次「冬」，
+> 此后无论几月打开都是冬天；更糟的是验收时 `?season=` 只是**初始值**，一旦点过面板
+> 就被存档盖住，四季定妆照会拍到上一轮点过的季节。站点本来的设计意图是
+> 「**今天几月，院子就是哪一季**」（`config/seasons.js`），存档恰恰破坏了它。
+>
+> **行为**：面板里点「冬」→ 本次会话立刻变冬；**刷新后回到当月**。所以面板选的季节
+> 是"预览"，不是"设置"。`SitePreferences` 的季节 `useEffect` 只写 `html[data-season]`，
+> 并顺手 `removeItem` 清掉历史版本留下的键。
+>
+> 证据：`harness/settings-panel-check.mjs` §0/§2 断言 `localStorage` 里**没有**
+> 季节键；§6 手选「春」后刷新，断言 `data-season` 回到当月（autumn）。
 
 **不挂午夜定时器**：`'auto'` 档仍然每挂载解析一次。跨午夜重烘贴图会是一次可见的
-pop，而一个开着过夜的标签页不值得为它 pop 一次。刷新即正确。
+pop，而一个开着过夜的标签页不值得为它 pop 一次。刷新即正确 —— 而"刷新即重判"
+现在是不落盘的直接推论，不再依赖"用户没点过面板"。
 
 > 🔴 **重渲染 ≠ 画面会更新。**
 > 季节变成运行时可切之后，有且只有两类地方**必须自己动手**，漏了会静默停在旧季节：
@@ -1047,7 +1063,11 @@ x∈[548,620] 的绿是同一个 `(92,128,69)`，差 ≤1 —— 这是"共用 g
 
 **「自动」必须有**。本站一直以来的默认行为是按月份自动换季；如果面板只有四季四选一，
 用户碰一次面板之后，"以后每个月自己变"就永久变成了"停在这一季"—— 这是一次静默的
-行为回归。所以偏好存的是 `'auto'`（而不是把解析结果存下来）。
+行为回归。所以偏好里有 `'auto'` 这一档。
+
+> 2026-10-10 又往前走了一步：**季节偏好根本不落盘**（§3.3）。面板选的季节是"本次
+> 会话的预览"，刷新即回到「自动」。这样即使将来有人把「自动」档删掉，也最多影响一次
+> 会话 —— 存档这条把回归变永久的路已经被封死了。
 
 ### 10.2 样式：照抄 MAP 面板，一处共用
 
@@ -1106,7 +1126,7 @@ x∈[548,620] 的绿是同一个 `(92,128,69)`，差 ≤1 —— 这是"共用 g
 | 文件 | 改动 | 状态 |
 |---|---|---|
 | `src/config/couplets.js` | `seasonOf` 从 `seasons.js` 引入（**删掉本地月份表**）；`resolveCoupletSet/dailyCoupletFor` 收季节**偏好** | ✅ |
-| `src/context/SitePreferences.jsx` | 新增 `season` / `setSeason`（偏好）+ `html[data-season]`；新增 `setTheme` | ✅ P4 |
+| `src/context/SitePreferences.jsx` | 新增 `season` / `setSeason`（偏好）+ `html[data-season]`；新增 `setTheme`。**2026-10-10：季节偏好不再落盘**（删掉 `localStorage['aispin-season']` 读写，刷新即重判） | ✅ P4 |
 | `src/components/canvas/SceneLighting.jsx` | 端点季节化（`endpointsFor` 带缓存）；**换季吸附**（`lastSeason` ref） | ✅ |
 | `src/components/canvas/Experience.jsx` | 挂 `CourtyardAmbience`（与 `EntranceDoors` 同一个 `!hasEntered` 分支） | ✅ P2 |
 | `src/components/canvas/entrance/EntranceDoors.jsx` | 树与甬路传季节；幕墙压顶积雪；`CoupletWall` 跟偏好重算；**瓢虫冬季不挂** | ✅ |
