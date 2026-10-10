@@ -657,6 +657,14 @@ uniform float uSnow;          // 0..1 积雪覆盖
 | `npm run build` | ✅ 通过 |
 | `harness/chunk-graph.mjs` | ✅ 无环（react 195.5 KB） |
 | 生产冒烟 `smoke.mjs` @70s | `rootChildren 1` / `hasCanvas true` / **meshes 701** / `ERRORS (0)` / RASTERS **2 张** |
+| 物证图 | `.workbuddy-ai/wo2-2026-10-10/nest-4seasons.png`（四季燕子窝特写，春2/夏2/秋1/冬空窝） |
+
+> 物证图用 `harness/shot-wo2-nest.mjs`：**不动相机**，把燕子窝的世界坐标
+> `[0.86, 1.14, 22.22]` 投影到 NDC 算出屏幕矩形，再 clip 截图放大。
+> ⚠️ 刻意**不用** `shot-at.mjs` —— 那个走 rAF 每帧写 `camera.position`，
+> 而 R3F 在自己的 rAF 里"先更新控制器、再 render"，读回 `camera.position`
+> 确实是你的值但**渲染用的是控制器的机位**（MEMORY.md 记过这个坑）。
+> 不碰相机 ⇒ 不可能拍错。
 
 ⚠️ **`meshes` 必须读 plateau（`waitMs ≥ 65000`）**。`smoke.mjs` 文件头自己记着实测曲线：
 55 s 读到 1005（RoomWarmup 预热的房间还挂着）、65 s+ 才落到 696 —— **同一个构建**。
@@ -769,6 +777,7 @@ uniform float uSnow;          // 0..1 积雪覆盖
 | `src/hooks/useSeasonUniforms.js` | 季节 uniform 的**就地更新**（对象身份不变，见 §5.1d） | ✅ P4 |
 | `src/components/canvas/audio/CourtyardAmbience.jsx` | 院子四季声床的挂载点（读 `useSeason` + `useAudio`，按季选预设） | ✅ P2 |
 | `.workbuddy-ai/harness/verify-wo2-seasons.mjs` | WO-2 验收：四声床 / 换季 / 互斥 / 燕子瓢虫季生 | ✅ P2 |
+| `.workbuddy-ai/harness/shot-wo2-nest.mjs` | 燕子窝四季特写（投影定框 + clip 截图，**不动相机**） | ✅ P2 |
 | `src/components/canvas/entrance/CourtyardProps.jsx` | 荷花缸 / 石桌石凳 / 竹篱 | ⬜ P3 |
 | `src/utils/courtyardArt.js` | 上述道具的程序化贴图 | ⬜ P3 |
 | `src/shaders/seasonFx.js` | 雨幕 / 落雪的 shader | ⬜ P3 |
