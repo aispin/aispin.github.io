@@ -21,6 +21,11 @@ import { useScene } from '../../context/SceneContext';
 // - Camera starts at Z=28, ends at Z=8 (in front of avatar)
 const ENTRANCE_DOORS_Z = 22;
 
+// ⚠️ 提成模块常量，**不要**在 JSX 里写内联的 `[0, 0, ENTRANCE_DOORS_Z]`：
+// 内联数组每次渲染都是新引用，会一路传进子组件的 `useMemo` deps（EntranceDoors
+// 的甬路 uniform 就吃过这个亏 —— 对象被反复重建，换季时画面冻在首季）。
+const ENTRANCE_POSITION = [0, 0, ENTRANCE_DOORS_Z];
+
 /**
  * Experience Component
  * 
@@ -123,14 +128,14 @@ const Experience = ({ onSceneReady, performanceTier }) => {
             {/* === ENTRANCE DOORS (visible until entered) === */}
             {!hasEntered && (
                 <EntranceDoors
-                    position={[0, 0, ENTRANCE_DOORS_Z]}
+                    position={ENTRANCE_POSITION}
                     onComplete={handleEntranceComplete}
                 />
             )}
 
             {/* Separate SignSystem to avoid fragment nesting issues if any */}
             {!hasEntered && (
-                <SignSystem position={[0, 0, ENTRANCE_DOORS_Z]} />
+                <SignSystem position={ENTRANCE_POSITION} />
             )}
 
             {/* === INFINITE CORRIDOR (segment -1 SegmentDoors hidden during entrance) === */}

@@ -915,7 +915,13 @@ const EntranceDoors = ({
         (season) => makeSurfaceUniforms(
             pathWidth, pathLength, [-pathWidth / 2, position[2] + pathCenterZ + pathLength / 2], season
         ),
-        [pathWidth, pathLength, pathCenterZ, position]
+        // 🔴 2026-10-10：deps 里**不能放 `position` 本身**。它是父组件内联的
+        //    `position={[0, 0, 22]}`，每次渲染都是**新数组** ⇒ useMemo 重建
+        //    uniforms 对象 ⇒ three 的 uniformsList 还指着第一个 ⇒ 甬路**静默冻在
+        //    首季**（用户报的「石板永远停在首次进入的那个季节」）。
+        //    `useSeasonUniforms` 现在已用 ref 锁死身份兜底，但这里仍然只依赖**原始值**，
+        //    免得每次渲染白跑一遍 factory。
+        [pathWidth, pathLength, pathCenterZ, position[0], position[2]]
     );
 
     return (

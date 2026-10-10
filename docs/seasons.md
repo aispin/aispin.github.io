@@ -943,6 +943,91 @@ if (/\.(js|css|woff2?|png|jpe?g|webp|svg|ico|json)$/i.test(url.pathname) || url.
 
 ---
 
+**9.4i 「石板永远停在首次进入的那个季节」—— `useSeasonUniforms` 的对象身份被换掉了**
+
+用户原话（2026-10-10 15:0x）：**「页面首次进去是什么季节，此时切换其他季节，石板就永远是
+页面首次进去时那个季节的样式。石板两边依然与相连的地面没有很融合，有明显分界线。」**
+
+**这两句是同一个 bug。** 而且它**不是**季节色板的问题 —— 色板每季都算对了。
+
+### 机制
+
+`hooks/useSeasonUniforms.js` 原来写的是：
+
+```js
+const uniforms = useMemo(() => factory(season), deps);   // ❌
+```
+
+而 `EntranceDoors` 给甬路那组传的 deps 是
+`[pathWidth, pathLength, pathCenterZ, position]`，其中 **`position` 是父组件内联的
+`position={[0, 0, 22]}`** —— 每次渲染都是**新数组**。于是：
+
+1. `useMemo` 每次都重建一个 **新的 uniforms 对象**；
+2. R3F 把 `material.uniforms` **整体替换**成新对象；
+3. 但 three 的 `materialProperties.uniformsList` 是 **program 建立时**抓住的
+   —— 它指着**第一个**对象，且只在 program 变化时才重建；
+4. 换季时 `applyGroundSeason` 改的是**新**对象，GPU 读的是**旧**对象 ⇒
+   **甬路静默冻在首季**。
+
+⚠️ **最阴的一点：读 `material.uniforms` 会读出"已经更新了"的假象** ——
+那里是新对象、值是 winter；GPU 用的却是旧对象。所以这个 bug **必须靠对象身份指纹查**
+（`harness/probe-stone-season-stuck.mjs` 给每个 `uniforms` 与 `uniforms.uSnow`
+打 id），**不能靠读值，也不能靠眼睛**。
+
+**为什么只有甬路中招**：六个 `useSeasonUniforms` 调用点里，只有它是 deps 里带了
+**不稳定引用**的。其余（草皮 `[corridorWidth, length, zCenter]`、台基/台明/踏跺
+`[apronCenterZ, worldZ]` 等）全是数字 ⇒ 探针实测只有 `z=26.52` 那块的
+`uniforms#11 → #21`（对象被换），其余 9 块 `#N → #N`。
+
+### 第二句「石板两边有明显分界线」是同一件事
+
+甬路两侧那条"草边"（verge）走的是**共享的 `grassSurface(gw)`** —— 它**也是季节色**。
+冻住之后：甬路的草边还是**首季的绿**，而旁边的草坪已经**换成冬天的白**
+⇒ 石路两侧各出现一条**绿边**，夹在白雪里 = 用户说的"明显分界线"。
+
+（顺带确认：**接缝本身早就删干净了**。春季实测 y=870 上，草坪 x<548 与甬路草边
+x∈[548,620] 的绿是同一个 `(92,128,69)`，差 ≤1 —— 这是"共用 grassSurface + 同一世界
+坐标系"的功劳。所以那条线**不是**接缝回来了，是**季节没同步**。）
+
+### 修法（三处，`aae7746` 之后的新提交）
+
+1. 🔴 **`useSeasonUniforms` 改成身份由 `useRef` 锁死**：首帧建一次，之后**永不替换**，
+   deps / season 变化时只把新值**就地**写进同一批 uniform 对象（新增的键只在第一次补进去）。
+   这样**deps 里再混进不稳定引用也不会再破坏身份** —— 治的是病根。
+2. `EntranceDoors` 的 deps 只依赖**原始值**：`[pathWidth, pathLength, pathCenterZ,
+   position[0], position[2]]`。
+3. `Experience.jsx` 把内联数组提成模块常量 `ENTRANCE_POSITION`（`EntranceDoors` 与
+   `SignSystem` 共用），从源头去掉这个 footgun。
+
+### 判据
+
+**① 对象身份**（`harness/probe-stone-season-stuck.mjs`）：
+
+| | 修前 | 修后 |
+| --- | --- | --- |
+| 甬路 `uniforms` 身份 | `#11 → #21`（被换掉 ⇒ 冻住） | **`#11 → #11`** |
+| 被替换的块数 | 1 | **0** |
+| 换季后"变了"的块数 | 10（读值假象） | **10（真变了）** |
+
+**② 渲染级 A/B**（`harness/verify-path-season-live.mjs` + `harness/compare-two.py`）——
+同一流程「`?season=spring` 冷启动 → 面板点冬 → 截图」，只换代码：
+
+| 区域 | mean_abs | >8 的像素 |
+| --- | --- | --- |
+| **甬路带** `(520,790,1090,900)` | **33.48** | **50.70%** |
+| 左草坪 `(60,650,470,890)` | **0.00** | 0.00%（逐位相同） |
+| 右草坪 `(1130,650,1560,890)` | **0.00** | 0.00%（逐位相同） |
+| 门脸/台阶以上 | 0.00 | 0.01% |
+| 树冠/墙顶 | 0.01 | 0.12% |
+
+⇒ 改动**只**影响甬路，其余全画面逐位不变。甬路带均色 `(146,145,120) → (178,172,162)`
+（暖石 → 积雪）；对照图 `.workbuddy-ai/wo7-2026-10-10/ab-band.png` 里能直接看到
+**修前那两条绿边**。
+
+**本轮质量门**：`npm run lint` → **0 error / 33 warning**（基线）。
+
+---
+
 ## 10. 设置面板（2026-10-09 · P4 的 UI 部分）
 
 需求原话：「将那个暗黑模式的图标按钮，改成设置按钮吧，弹设置面板，里面可以选暗黑
