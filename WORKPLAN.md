@@ -27,7 +27,7 @@
 
 ---
 
-# 📊 滚动快照（2026-10-10 19:1x）
+# 📊 滚动快照（2026-10-10 21:2x）
 
 主题：**四季院子**。需求原文：「院子目前只有白天、晚上两种场景，想拓展多春夏秋冬四个季节场景。」
 技术方案唯一真源 = `docs/seasons.md`（本表只放指针，不复制结论）。
@@ -46,16 +46,24 @@
 
 ## 🔔 不用等你拍板、但别忘的事
 
-1. **推送策略**：你 2026-10-10 定「做完一起推」。本轮（WO-3 / 花箱冬枯黄 /
-   白板）**待推**。之后仍按"做完再推"。⚠️ 按本项目规则 **推 `main` = 上线**。
-2. **`docs/seasons.md` §12 剩余两条开放问题**（春夏树冠是否太"满"、冬秃枝是否保留风铃挂点）
+1. **推送策略**：你 2026-10-10 定「做完一起推」。本轮（WO-3 / 花箱冬枯黄 / 白板 /
+   天象平面修复）**已推** —— `main` = `9659b8b`。之后仍按"做完再推"。
+   ⚠️ 按本项目规则 **推 `main` = 上线**。
+2. **推送通道**：本机代理对 `github.com:443` 会**间歇性 502**（`api.github.com` 正常）。
+   遇到 `CONNECT tunnel failed, response 502` 就改走 SSH：
+   `git push git@github.com:aispin/aispin.github.io.git main`
+   （remote 仍保持 HTTPS，没改）。**判据永远是** `gh api repos/<slug>/commits/main --jq .sha`。
+3. **`docs/seasons.md` §12 剩余两条开放问题**（春夏树冠是否太"满"、冬秃枝是否保留风铃挂点）
    **不阻塞开工**，你哪次看定妆照时顺手定即可。
-3. **截图工具**：用 `harness/shot-table-crop.mjs` / `shot-apron-seasons.mjs` /
-   **`shot-wo3.mjs`**（四季 × props 近景 / wide 看天象）；
+4. **截图工具**：用 `harness/shot-table-crop.mjs` / `shot-apron-seasons.mjs` /
+   **`shot-wo3.mjs`**（四季 × props 近景 / wide 看天象）/
+   **`shot-weather.mjs`**（天象，**横竖两种视口** —— 屏幕空间的效果必须两种都拍）。
    ⚠️ **别再用 `shot-at.mjs`** —— 它走 rAF 每帧写 `camera.position`，会被控制器盖掉，
    而**读回 `camera.position` 还是对的**（静默拍错）。
    ⚠️ 注入机位前**先量世界坐标**（`harness/probe-planter-pos.mjs` 按几何签名量）——
    入口整体有 `+22` 的 `ENTRANCE_POSITION`，按 JSX 的局部 z 推会拍进走廊。
+5. **`.workbuddy-ai/dist-old-*` 会随每次构建累积**（现在 24 个 ≈ 168 MB）。
+   你 2026-10-09 说过要删；构建前顺手 `mv dist …` 就会长新的，**需要定期清**。
 
 ---
 
