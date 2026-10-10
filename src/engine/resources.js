@@ -159,10 +159,14 @@ const PRIMITIVES = {
     plane: (w, h, ws = 1, hs = 1) => new THREE.PlaneGeometry(w, h, ws, hs),
     box: (w, h, d, ws = 1, hs = 1, ds = 1) => new THREE.BoxGeometry(w, h, d, ws, hs, ds),
     sphere: (r, ws = 32, hs = 16) => new THREE.SphereGeometry(r, ws, hs),
-    cylinder: (rt, rb, h, rs = 32, hs = 1, open = false) =>
-        new THREE.CylinderGeometry(rt, rb, h, rs, hs, open),
+    // ⚠️ `thetaStart` 不是装饰：**低棱数圆柱/圆盘的「哪一条棱朝哪」全靠它**。
+    //    石桌/凳面用 16 边形顶面，必须让一条棱精确平行世界 X 轴 —— 因为
+    //    「平行于 X 轴的世界直线恒投影为屏幕水平线」，那条棱就是画面上唯一
+    //    能读出「这个面是平的」的线索（矩形花箱顶面一直靠这个）。取值 = π/棱数。
+    cylinder: (rt, rb, h, rs = 32, hs = 1, open = false, thetaStart = 0) =>
+        new THREE.CylinderGeometry(rt, rb, h, rs, hs, open, thetaStart),
     cone: (r, h, rs = 32, hs = 1, open = false) => new THREE.ConeGeometry(r, h, rs, hs, open),
-    circle: (r, seg = 32) => new THREE.CircleGeometry(r, seg),
+    circle: (r, seg = 32, thetaStart = 0) => new THREE.CircleGeometry(r, seg, thetaStart),
     ring: (ri, ro, ts = 32) => new THREE.RingGeometry(ri, ro, ts),
     torus: (r, t, rs = 12, ts = 48) => new THREE.TorusGeometry(r, t, rs, ts),
     // ⚠️ CapsuleGeometry 的第二个参数叫 `height` 但其实是**圆柱段长度**
