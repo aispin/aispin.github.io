@@ -2182,11 +2182,16 @@ export function makeLanternTexture() {
  * 对照：兔子的花箱之所以不觉得斜，是因为它的顶面是**矩形**，四条边会往
  * 灭点收，那个收敛本身就是朝向线索。圆盘没有直边，只能靠花纹。
  *
- * 所以这里画的是**各向同性的细石粒**：大尺度斑驳（读"石头"）+ 密集的小点
- * （读"面"）。刻意**不画**长裂纹与拼缝 —— 那会重新变成"几大块折面"。
+ * 所以这里画的是**各向同性的细石粒**：淡到几乎看不出的大尺度斑驳（读"石头"）
+ * + 密集的小点（读"面"）。刻意**不画**长裂纹与拼缝 —— 那会重新变成"几大块折面"。
  *
- * 色号与 `StoneTable` 的 `STONE_TOP` 同族；用 `map` 时材质的 `color` 留白，
- * 颜色全部由这张图给。
+ * 🔴 2026-10-10 第三次报「还是倾斜」之后修正了两处（见下面每一段的注释）：
+ *   1. **大云斑的 alpha 砍到 1/3** —— 它在平面上会被读成**起伏**，正对着"面是平的"打架；
+ *   2. **细石粒加密到 9000** —— 面不能靠云斑撑，得靠粒子。
+ * ⚠️ 但要说清楚：**这张贴图只管"实不实"，管不了"歪不歪"**。斜不斜由
+ * `StoneTable` 的「视线轴反补」负责（顶面绕视线轴反转 φ），跟贴图无关。
+ *
+ * 色号与 `StoneTable` 的顶面同族；用 `map` 时材质的 `color` 留白，颜色全部由这张图给。
  */
 export function makeStoneSlabTexture(key = 'stone-slab-top') {
     if (cache.has(key)) return cache.get(key);
@@ -2197,19 +2202,26 @@ export function makeStoneSlabTexture(key = 'stone-slab-top') {
     const rand = mulberry32(hashString(key));
 
     // ---- 1. 底色 ------------------------------------------------------
-    ctx.fillStyle = '#b3aa9c';
+    // 🔴 比原来（#b3aa9c）提亮一档：场景是平光，顶面必须**从底色上**就比侧壁亮，
+    // 光靠光照拉不开（见 StoneTable 里 STONE_SIDE 的注释）。
+    ctx.fillStyle = '#c2b9a9';
     ctx.fillRect(0, 0, S, S);
 
-    // ---- 2. 大尺度斑驳：几块云状的深浅，读成"石头的云纹" ---------------
-    // 用大半径的径向渐变叠，边缘自然软；数量少（十几个），别让它形成"块面"。
-    for (let i = 0; i < 18; i++) {
+    // ---- 2. 大尺度斑驳：**必须很淡** -----------------------------------
+    // 🔴 2026-10-10 用户第三次报「还是倾斜」，并给了正确的线索：「你去看看花箱」。
+    // 复查发现**上一版就是这里帮了倒忙**：18 块半径 0.16~0.46×S 的云斑、alpha 到 0.20，
+    // 糊在顶面上会被读成**起伏**（像被水浸过的波浪）—— 而"这个面是平的"正是我们要
+    // 它读出来的东西。一个平面上任何**大尺度**的明暗，眼睛都会当成形状。
+    // 所以这里把 alpha 砍到原来的 1/3（0.03~0.08）、半径也收小，只留"石头的呼吸"，
+    // 不构成形状。判据：把它单独排成一屏看，应当是**一块石头**，不是**一堆云**。
+    for (let i = 0; i < 12; i++) {
         const cx = rand() * S;
         const cy = rand() * S;
-        const r = S * (0.16 + rand() * 0.30);
+        const r = S * (0.12 + rand() * 0.20);
         const light = rand() > 0.45;
         const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
         const c = light ? '226, 220, 208' : '140, 131, 118';
-        g.addColorStop(0, `rgba(${c}, ${0.10 + rand() * 0.10})`);
+        g.addColorStop(0, `rgba(${c}, ${0.03 + rand() * 0.05})`);
         g.addColorStop(1, `rgba(${c}, 0)`);
         ctx.fillStyle = g;
         ctx.beginPath();
@@ -2219,14 +2231,15 @@ export function makeStoneSlabTexture(key = 'stone-slab-top') {
 
     // ---- 3. 细石粒：各向同性的小点，密度足够高才是"面"不是"斑点" --------
     // 这是**透视缩短的载体** —— 近处被拉稀、远处被压密，眼睛靠它读平面朝向。
-    for (let i = 0; i < 7000; i++) {
+    // 2026-10-10 加密到 9000：大云斑退下去之后，面的"实"就全靠它撑。
+    for (let i = 0; i < 9000; i++) {
         const x = rand() * S;
         const y = rand() * S;
         const r = 0.5 + rand() * 1.5;
         const light = rand() > 0.5;
         ctx.fillStyle = light
-            ? `rgba(240, 236, 228, ${0.10 + rand() * 0.22})`
-            : `rgba(96, 88, 76, ${0.08 + rand() * 0.20})`;
+            ? `rgba(244, 240, 232, ${0.12 + rand() * 0.24})`
+            : `rgba(92, 84, 72, ${0.10 + rand() * 0.22})`;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
