@@ -979,34 +979,65 @@ float hash21(vec2 p) {
 `;
 
 /**
- * 落雪：三层不同尺度/速度的雪花。
+ * 天象：雨幕 + 落雪，**同一个 pass**。
  *
- * 为什么是三层：单层要么密到糊成一片白噪声（把整个画面洗淡），要么稀到
- * 只有几颗孤零零的点、读不出"下雪"。三层各自 scale / speed 不同，
- * 近处大而快、远处小而慢，眼睛才读出**纵深**。
+ * 🔴 **为什么合成一个 shader 而不是叠两个 mesh**（2026-10-10）
+ * ---------------------------------------------------------------------------
+ * 需求要「冬天下雪（固定）+ 预报在下雨时再叠一场雨」。最直白的写法是挂两个
+ * 平面，但那要付**两倍的全屏填充 + 两次 draw** —— 天象平面是 `depthTest:false`、
+ * 盖满屏幕的纯 fill 负载，叠一层就是实打实翻倍。
  *
- * 🔴 **vUv 就是屏幕**：`WeatherLayer` 每帧把平面缩放到当前视锥的尺寸
- * （`2·DIST·tan(fov/2)` × aspect），所以这里的格数是「屏幕上有几格」，
- * **与视口宽窄无关**。之前平面写死 11×6，竖屏只看得见中间 ~15% 的宽度，
- * 雨雪都稀到读不出来 —— 见 §9.4n。
+ * 合成一个 pass 之后：**1 个 mesh、1 次 draw、1 次全屏填充**，不论开几层。
+ * 代价只是「雨 + 雪都开」时多算一段 ALU（≈ 3 层雪 + 1 层雨，比只下雪多 ~1/3），
+ * 而 `if (uRain > 0.001)` 是**一致分支**（整个 quad 同一个值）—— 不下雨时
+ * GPU 直接跳过，等于没写。所以「冬天雪雨叠加」的性能影响可以忽略。
+ *
+ * 两层按 **src-over** 累加，最后把预乘色除回去（three 的普通混合要非预乘）。
+ *
+ * ⚠️ **vUv 就是屏幕**：`WeatherLayer` 每帧把平面缩放到当前视锥尺寸
+ * （`2·DIST·tan(fov/2)` × aspect），所以下面的格数是「屏幕上有几格」，
+ * **与视口宽窄无关**。旧的固定 11×6 平面在竖屏只露出 ~15% 的宽度，
+ * 于是「雨」变成屏幕右边几道光 —— 见 `docs/seasons.md`。
  */
-export const SNOW_FRAG = /* glsl */ `
+export const WEATHER_FRAG = /* glsl */ `
 varying vec2 vUv;
 uniform float uTime;
 uniform float uOpacity;
+uniform float uAspect;
+uniform float uSnow;
+uniform float uRain;
 ${WEATHER_HASH}
-void main() {
+
+/**
+ * 雨：斜向细丝。每格只画一小段（len），丝间留空。
+ * 倾角在**屏幕空间**恒定 —— p.x 的剪切量要除以 uAspect，
+ * 否则「竖屏几乎垂直、横屏很斜」。
+ */
+float rainAlpha(vec2 uv) {
+    vec2 p = uv * vec2(24.0, 7.0);
+    p.x += uv.y * 4.2 / uAspect;
+    p.y += uTime * 9.0;
+    vec2 cell = floor(p);
+    vec2 f = fract(p);
+    float h = hash21(cell);
+    if (h <= 0.74) return 0.0;
+    float len = 0.34 + hash21(cell + 5.7) * 0.36;
+    float line = smoothstep(0.055, 0.0, abs(f.x - 0.5));
+    float head = smoothstep(0.0, 0.22 * len, f.y) * smoothstep(len, 0.55 * len, f.y);
+    return line * head * (0.11 + h * 0.23);
+}
+
+/**
+ * 雪：三层不同尺度 / 速度 —— 单层要么糊成白噪声、要么只剩几颗孤点。
+ * 近处大而快、远处小而慢，眼睛才读出**纵深**。
+ */
+float snowAlpha(vec2 uv) {
     float a = 0.0;
     for (int i = 0; i < 3; i++) {
         float fi = float(i);
-        // 屏幕相对：竖屏/横屏的**每屏密度**一致。旧值 11/18/25 是按「11 单位宽的
-        // 固定平面」调的，换算成"每屏"要除以 ~1.9 ⇒ 6/10/14。
         float scale = 6.0 + fi * 4.0;
-        // ⚠️ 换成屏幕相对之后，**速度的含义变了**：旧平面高 6 而可见高只有 3，
-        // 所以旧的 speed 在屏幕上要**乘 2**。这里直接把旧值翻倍，保持手感。
         float speed = 0.11 + fi * 0.09;
-        vec2 p = vUv * vec2(scale * 1.9, scale);
-        // 下落 + 横向摆动（雪不是直着掉的）
+        vec2 p = uv * vec2(scale * 1.9, scale);
         p.y += uTime * speed * scale;
         p.x += sin(uTime * (0.25 + fi * 0.18) + p.y * 0.55) * 0.4;
         vec2 cell = floor(p);
@@ -1014,55 +1045,30 @@ void main() {
         float h = hash21(cell + fi * 37.0);
         if (h > 0.80) {
             vec2 c = vec2(0.22 + hash21(cell + 1.3) * 0.56, 0.22 + hash21(cell + 2.7) * 0.56);
-            float d = length(f - c);
             float r = 0.05 + hash21(cell + 3.1) * 0.06;
-            a += smoothstep(r, 0.0, d) * (0.34 + fi * 0.22);
+            a += smoothstep(r, 0.0, length(f - c)) * (0.34 + fi * 0.22);
         }
     }
-    a = clamp(a, 0.0, 1.0) * uOpacity;
-    // 略偏冷白 —— 纯白在灰墙前会糊掉
-    gl_FragColor = vec4(vec3(0.94, 0.965, 1.0), a);
+    return clamp(a, 0.0, 1.0);
 }
-`;
 
-/**
- * 雨幕：斜向的细长雨丝。
- *
- * 做法 = 把 uv 沿 y 剪切（这就是"斜"），再在格子里画一条细线，
- * 每格只画**一小段**（`len`），剩下的留空 ⇒ 雨丝之间有间隙。
- *
- * 🔴 **vUv 就是屏幕**（平面按视锥尺寸缩放，见 `WeatherLayer`）。
- * 所以 `vec2(24, 7)` = 「屏幕上 24 列 × 7 行格子」。旧的 `vec2(16, 3)` 是按
- * 11 单位宽的固定平面调的：竖屏只看得见 ~15% 的宽度 ⇒ 屏幕上只剩两三条，
- * 且一条跨掉半个屏幕高 —— 看起来就是「右边几道光」，不是雨（§9.4n）。
- *
- * 🔴 **倾角要除以 uAspect**：`p.x` 加 `vUv.y * S` 时，屏幕上的斜率是
- * `(S / NX) · uAspect`。不除就会「竖屏几乎垂直、横屏很斜」。
- */
-export const RAIN_FRAG = /* glsl */ `
-varying vec2 vUv;
-uniform float uTime;
-uniform float uOpacity;
-uniform float uAspect;
-${WEATHER_HASH}
 void main() {
-    vec2 p = vUv * vec2(24.0, 7.0);
-    // 剪切 ⇒ 雨丝的倾角（屏幕空间恒定，与视口无关）
-    p.x += vUv.y * 4.2 / uAspect;
-    p.y += uTime * 9.0;            // 下落（≈1.3 屏高/秒 —— 雨要"落"得起来）
-    vec2 cell = floor(p);
-    vec2 f = fract(p);
-    float h = hash21(cell);
+    vec3 rgb = vec3(0.0);
     float a = 0.0;
-    if (h > 0.74) {
-        // 每格一条：长度不一（短丝/长丝混着才不像"光线"），头尾都渐隐
-        float len = 0.34 + hash21(cell + 5.7) * 0.36;
-        float x = abs(f.x - 0.5);
-        float line = smoothstep(0.055, 0.0, x);
-        float head = smoothstep(0.0, 0.22 * len, f.y) * smoothstep(len, 0.55 * len, f.y);
-        a = line * head * (0.11 + h * 0.23);
+
+    if (uRain > 0.001) {
+        float ra = rainAlpha(vUv) * uRain;
+        rgb += (1.0 - a) * vec3(0.80, 0.87, 0.95) * ra;
+        a += (1.0 - a) * ra;
     }
+    if (uSnow > 0.001) {
+        float sa = snowAlpha(vUv) * uSnow;
+        rgb += (1.0 - a) * vec3(0.94, 0.965, 1.0) * sa;
+        a += (1.0 - a) * sa;
+    }
+
+    float denom = max(a, 1e-4);
     a *= uOpacity;
-    gl_FragColor = vec4(vec3(0.80, 0.87, 0.95), a);
+    gl_FragColor = vec4(rgb / denom, a);
 }
 `;

@@ -1,19 +1,40 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { sharedGeometry } from '../../../engine/resources';
 import { useSeason } from '../../../hooks/useSeason';
-import { WEATHER_VERT, SNOW_FRAG, RAIN_FRAG } from '../../../shaders/entranceTextures';
+import { useWeather } from '../../../hooks/useWeather';
+import { weatherLevels } from '../../../config/weather';
+import { WEATHER_VERT, WEATHER_FRAG } from '../../../shaders/entranceTextures';
 
 /**
  * WeatherLayer — 季生天象：雨幕 / 落雪（§6.4，C 档）
  * ==================================================
  *
- * 天象是三分法里**唯一允许"在 / 不在"**的一档（§2 C）。对照表：
+ * 天象是三分法里**唯一允许"在 / 不在"**的一档（§2 C）。原来是一张固定对照表：
  *
  *   春 雨 ✔   ·  夏 雷雨 ✔   ·  秋 ✘   ·  冬 落雪 ✔
  *
- * 所以本组件**整个条件挂载**：秋天 `return null`，一个 mesh 都不进场景图。
+ * 现在**雨这一层改由真实天气预报驱动**（2026-10-10，见 `hooks/useWeather.js`）：
+ *
+ *   · 春 / 夏 / 秋 —— 预报在下雨才下，不下就不下；
+ *   · 冬 —— **落雪是固定的**（不受预报影响），另外**若预报在下雨就再叠一场雨**。
+ *
+ * 「冬天雪 + 雨叠一层」没有性能代价：两层合成在**同一个 fragment shader**里
+ * （`WEATHER_FRAG` 的 `uSnow` / `uRain`），还是 1 个 mesh、1 次 draw、
+ * 1 次全屏填充。`if (uRain > 0.001)` 是**一致分支**，不下雨时 GPU 整个跳过。
+ *
+ * ---------------------------------------------------------------------------
+ * 🔴 拿不到天气 → **静默回落到原设计**，绝不阻塞场景
+ * ---------------------------------------------------------------------------
+ * 纯静态站、无后端，离线 / 被墙 / 限流都必须无感。三个状态各有明确行为：
+ *
+ *   status='ready'   → 预报说了算（`raining ? intensity : 0`）；
+ *   status='error'   → 回落**原设计**：春/夏下雨、秋/冬不下雨；
+ *   status='idle'/'loading' → **先不画**。宁可晚 0.5 秒出现，也不要
+ *                      「先下一场再收回去」——`useWeather` 的文档里写了这条。
+ *
+ * ⚠️ 冬天落雪**与 weather 无关**，`loading` 期间照下（`uSnow` 只由 season 决定）。
  *
  * ---------------------------------------------------------------------------
  * 怎么"挂在相机前"
@@ -39,7 +60,7 @@ import { WEATHER_VERT, SNOW_FRAG, RAIN_FRAG } from '../../../shaders/entranceTex
  *
  * 改成每帧按视锥缩放之后，`vUv ∈ [0,1]²` 就**正好铺满屏幕**，
  * shader 里的格数 = 「屏幕上有几格」，横屏竖屏一致。
- * 代价：雨的倾角要按 aspect 换算（`RAIN_FRAG` 里除以 `uAspect`）。
+ * 代价：雨的倾角要按 aspect 换算（`WEATHER_FRAG` 里除以 `uAspect`）。
  *
  * ⚠️ 顺序：`useInfiniteCamera` 也在自己的 useFrame 里写相机。若本组件的
  * useFrame 排在它前面，用的就是**上一帧**的机位 —— 2.6 单位的差距在
@@ -52,9 +73,6 @@ import { WEATHER_VERT, SNOW_FRAG, RAIN_FRAG } from '../../../shaders/entranceTex
  * 2.6 单位、天然就比场景近，但相机是可以走进门洞的（那时平面可能穿过门框），
  * 关掉深度测试 + 排在最后画，行为就和"贴了一层玻璃"完全一致。
  * 它本身 `depthWrite: false`，不会污染深度。
- *
- * 季节切换时用 `key={mode}` 强制**重建材质** —— 雪和雨是两段不同的
- * fragment shader，不是同一个 shader 换个 uniform。
  */
 
 /** 平面离相机的距离。太近会有"贴脸"感，太远会被雾吃掉。 */
@@ -77,21 +95,36 @@ const MARGIN = 1.02;
 
 export function WeatherLayer() {
     const season = useSeason();
+    const weather = useWeather();
     const ref = useRef();
     const matRef = useRef();
 
-    const mode = season === 'winter' ? 'snow'
-        : (season === 'spring' || season === 'summer') ? 'rain'
-            : null;
+    // ---- 季节 × 天气 → 两层强度（0..1）----
+    // 🔴 规则表**只有一份**，在 `config/weather.js` 的 `weatherLevels()`：
+    //   雪只由季节定（冬天固定下雪，与预报无关）；雨在四季都由预报定，
+    //   拿不到预报时按 status 回落（error → 原设计；loading → 先不画）。
+    //   写成纯函数是为了能单测（`.workbuddy-ai/harness/weather-levels-test.mjs`）。
+    const { snow: uSnow, rain: uRain, active } = weatherLevels(season, weather);
 
     // 身份稳定 —— 绝不在渲染里新建 uniforms 对象（R3F 的 applyProps 会整个替换
     // `material.uniforms`，那正是 WO-8「甬路冻在首季」的机制）。
     const uniforms = useMemo(() => ({
         uTime: { value: 0 },
         uOpacity: { value: 1 },
-        // 雨丝倾角要按屏幕宽高比换算（见 RAIN_FRAG）；初值给 1，避免第一帧除 0。
+        // 雨丝倾角要按屏幕宽高比换算（见 WEATHER_FRAG）；初值给 1，避免第一帧除 0。
         uAspect: { value: 1 },
+        // 两层的强度每帧从 `level` 这个 ref 里取 —— 见下面的 useEffect。
+        uSnow: { value: 0 },
+        uRain: { value: 0 },
     }), []);
+
+    // 🔴 渲染期**不许写值**（react-compiler 那套规则会报 "cannot be modified"），
+    // 所以用 effect 把"本帧该用多少强度"交给一个 ref，再由 useFrame 搬进 uniform。
+    const level = useRef({ snow: uSnow, rain: uRain });
+    useEffect(() => {
+        level.current.snow = uSnow;
+        level.current.rain = uRain;
+    }, [uSnow, uRain]);
 
     useFrame((state) => {
         const m = ref.current;
@@ -117,10 +150,12 @@ export function WeatherLayer() {
         if (!mat) return;
         mat.uniforms.uTime.value = state.clock.elapsedTime;
         mat.uniforms.uAspect.value = cam.aspect;
+        mat.uniforms.uSnow.value = level.current.snow;
+        mat.uniforms.uRain.value = level.current.rain;
     });
 
-    // 秋：没有天象。整层不挂载 —— 0 个 mesh、0 次 draw。
-    if (!mode) return null;
+    // 两层都空：整层不挂载 —— 0 个 mesh、0 次 draw。
+    if (!active) return null;
 
     return (
         <mesh ref={ref} renderOrder={999} frustumCulled={false}>
@@ -128,9 +163,8 @@ export function WeatherLayer() {
             <primitive object={sharedGeometry('plane', 1, 1)} attach="geometry" />
             <shaderMaterial
                 ref={matRef}
-                key={mode}
                 vertexShader={WEATHER_VERT}
-                fragmentShader={mode === 'snow' ? SNOW_FRAG : RAIN_FRAG}
+                fragmentShader={WEATHER_FRAG}
                 uniforms={uniforms}
                 transparent
                 depthWrite={false}

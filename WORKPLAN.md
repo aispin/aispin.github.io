@@ -7,7 +7,8 @@
 > 过程记录、实测数据、踩坑结论一律进 `.workbuddy-ai/memory/`（入口 `MEMORY.md`）。
 >
 > **新一轮迭代开始时，WO 和 DR 都应该是空的。**
-> **已交付的东西不留在这里** —— 技术结论在 `docs/seasons.md` §9，过程在 git 历史。
+> **已交付的东西不留在这里** —— 技术结论在 `docs/seasons.md`
+> （§9 = 经验与陷阱，§10 = 天气驱动的天象），过程在 git 历史。
 
 ## 规范
 
@@ -36,13 +37,14 @@
 | --- | --- | --- |
 | — | **本轮 WO 已全部交付，白板清空** | ✅ |
 
-> **已交付的不在这里。** P1 / P2 / P3 / P4 与 WO-3 ~ WO-11
+> **已交付的不在这里。** P1 / P2 / P3 / P4 / P5 与 WO-3 ~ WO-11
 > （四季光照+树草雪 / 声床 / 切换 UI / 环境音配平 / dev SW / 地面层级重划 /
 > 石板太白 / 甬路冻首季 / 季节不落盘 / 四季草地 / 藤蔓+花箱随季 /
-> **荷花缸 + 竹篱 + 雨雪天象 / 花箱冬天改枯黄**）
-> 均已于 2026-10-10 交付 —— 见 `docs/seasons.md` §9 与 git 历史。
+> **荷花缸 + 竹篱 + 雨雪天象 / 花箱冬天改枯黄 / 荷花缸外移 / 天象平面按视锥缩放 /
+> 天象改由真实天气预报驱动（§10）**）
+> 均已于 2026-10-09 ~ 10-10 交付 —— 见 `docs/seasons.md` §9 / §10 与 git 历史。
 >
-> **DR-1 ~ DR-5 全部关闭**（DR-4 = 选项 B：藤蔓与花箱都要随季变，见 §9.4k）。
+> **DR-1 ~ DR-5 全部关闭**（DR-4 = 选项 B：藤蔓与花箱都要随季变，见 §5.1e）。
 
 ## 🔔 不用等你拍板、但别忘的事
 
@@ -53,17 +55,19 @@
    遇到 `CONNECT tunnel failed, response 502` 就改走 SSH：
    `git push git@github.com:aispin/aispin.github.io.git main`
    （remote 仍保持 HTTPS，没改）。**判据永远是** `gh api repos/<slug>/commits/main --jq .sha`。
-3. **`docs/seasons.md` §12 剩余两条开放问题**（春夏树冠是否太"满"、冬秃枝是否保留风铃挂点）
-   **不阻塞开工**，你哪次看定妆照时顺手定即可。
+3. **`docs/seasons.md` §13 剩余开放问题**（春夏树冠是否太"满"、冬秃枝是否保留风铃挂点、
+   天气的精度/城市语义、雨天"湿反光"）**不阻塞开工**，你哪次看定妆照时顺手定即可。
 4. **截图工具**：用 `harness/shot-table-crop.mjs` / `shot-apron-seasons.mjs` /
    **`shot-wo3.mjs`**（四季 × props 近景 / wide 看天象）/
-   **`shot-weather.mjs`**（天象，**横竖两种视口** —— 屏幕空间的效果必须两种都拍）。
+   **`shot-weather.mjs`**（天象，**横竖两种视口** —— 屏幕空间的效果必须两种都拍）/
+   **`shot-weather-forecast.mjs`**（天气驱动天象：预置 `sessionStorage` 推到指定天气，
+   断言 store 快照 **+ 场景里 mesh 的 `uSnow/uRain`**；含预热页，别删）。
    ⚠️ **别再用 `shot-at.mjs`** —— 它走 rAF 每帧写 `camera.position`，会被控制器盖掉，
    而**读回 `camera.position` 还是对的**（静默拍错）。
    ⚠️ 注入机位前**先量世界坐标**（`harness/probe-planter-pos.mjs` 按几何签名量）——
    入口整体有 `+22` 的 `ENTRANCE_POSITION`，按 JSX 的局部 z 推会拍进走廊。
-5. **`.workbuddy-ai/dist-old-*` 会随每次构建累积**（现在 24 个 ≈ 168 MB）。
-   你 2026-10-09 说过要删；构建前顺手 `mv dist …` 就会长新的，**需要定期清**。
+5. **`.workbuddy-ai/dist-old-*`** 已按你的要求清空（2026-10-10，删了 24 个 ≈ 159 MB）。
+   ⚠️ 它**会随每次构建重新累积**（构建前 `mv dist …` 就会长新的），**需要定期清**。
 
 ---
 
