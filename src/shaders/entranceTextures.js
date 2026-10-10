@@ -857,15 +857,20 @@ export const SEASON_INK_TINT = {
 /**
  * 窗下花箱那丛绿植的四季配色（`EntranceProps.jsx` 的 `WoodenPlanter`）。
  *
- * 与 `SEASON_GROUND` 是同一个思路的两套数：春嫩、夏浓、秋转黄、冬沉。
+ * 与 `SEASON_GROUND` 是同一个思路的两套数：春嫩、夏浓、秋转黄、**冬枯黄**。
  * **`summer` 就是改动前写死的那三个值**（`#3F7A35` / `#4C8A3F` / `#5FA24A`），
  * 所以夏天看起来和以前一模一样 —— 这也让 A/B 有了一个"必须逐位不变"的对照季。
+ *
+ * ⚠️ 花箱这丛**不是常绿**（和上面那株常春藤不同）。用户 2026-10-10 看过定妆照后
+ * 点名「冬天的花箱绿植太绿了，改为黄色的叶子」⇒ 冬天是**枯黄**（干、冷、不带绿味）。
+ * 跟秋天的"转黄"靠两轴拉开：**色相**（冬 ≈51° 金黄 vs 秋 ≈78° 黄绿）+ **饱和/明度**
+ * （冬更淡更干，秋更浓更油）。原冬季绿 `#2F5A2B/#3A6B36/#48793F` 已作废。
  */
 export const SEASON_PLANT = {
     spring: { stem: '#4E8F42', leafA: '#5C9E4B', leafB: '#72B65C' },
-    summer: { stem: '#3F7A35', leafA: '#4C8A3F', leafB: '#5FA24A' },
-    autumn: { stem: '#5A7A2E', leafA: '#6B8A33', leafB: '#86A244' },
-    winter: { stem: '#2F5A2B', leafA: '#3A6B36', leafB: '#48793F' },
+    summer: { stem: '#3F7A35', leafA: '#4C8A3F', leafB: '#5FA24A' },  // 参照季（= 改动前原值）
+    autumn: { stem: '#5A7A2E', leafA: '#6B8A33', leafB: '#86A244' },  // 转黄：仍带绿味，H≈78°
+    winter: { stem: '#6B5D33', leafA: '#B0A044', leafB: '#CBBB64' },  // 枯黄：干冷无绿味，H≈51°
 };
 
 /** 某一季的地面色板 → three 的 uniform 对象。未知季节落到秋天。 */
