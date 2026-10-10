@@ -10,6 +10,9 @@ import { makeCurtainTexture, makeWindowInteriorTexture } from '../../../utils/en
 import { useSitePreferences } from '../../../context/SitePreferences';
 import { seasonGlowFor } from '../../../config/seasonLight';
 import { useSeason } from '../../../hooks/useSeason';
+// 四季的植物配色和地面色板（SEASON_GROUND）放同一个文件 —— 见那边的注释：
+// 「同一张表写两遍，迟早在某个文件里漂移」。
+import { SEASON_PLANT } from '../../../shaders/entranceTextures';
 
 /**
  * Procedural entrance props — built purely from Three.js geometry,
@@ -399,6 +402,14 @@ export function WoodenPlanter({ position, yaw = 0 }) {
     const rabbitHeadRef = useRef();
     const rabbitPupilRefs = useRef([]);
 
+    // 这丛绿植跟着季节走（WO-11，2026-10-10）。
+    // ⚠️ 只换**颜色**：木箱本体（WOOD / WOOD_DARK）、土、兔子一律不随季 ——
+    //    用户要的是「花箱的绿植跟着换季」，不是"花箱跟着换季"。
+    //    颜色走 `material.color` 这个 prop（R3F 会就地更新），不是 shader
+    //    uniform，所以没有 useSeasonUniforms 那套对象身份的坑。
+    const season = useSeason();
+    const plant = SEASON_PLANT[season] || SEASON_PLANT.summer;
+
     // Same GAZE contract as the dog's (see RABBIT_GAZE_* above). Note there is
     // deliberately no `reducedMotion()` gate: the glance is driven by the
     // pointer, i.e. by the user, so it is not an ambient animation — the dog's
@@ -449,20 +460,23 @@ export function WoodenPlanter({ position, yaw = 0 }) {
                 <meshStandardMaterial color="#4A382A" roughness={1} />
             </mesh>
 
-            {/* green plant */}
+            {/* green plant —— 四季配色见 SEASON_PLANT。
+                ⚠️ 叶色的两种明暗仍然按 `i % 2` 交替（改前就是如此）：`plant.leafA`
+                对应原来的 `#4C8A3F`、`plant.leafB` 对应 `#5FA24A`，而 summer 那组
+                就是这两个原值 ⇒ 夏天逐位等于改动前。 */}
             {GREEN_STEMS.map((s, i) => (
                 <group key={i} position={[s.x, 0.54, 0]} rotation={[0, 0, s.tilt]}>
                     <mesh position={[0, s.h / 2, 0]}>
                         <primitive object={sharedGeometry('cylinder', 0.013, 0.02, s.h, 6)} attach="geometry" />
-                        <meshStandardMaterial color="#3F7A35" roughness={0.8} />
+                        <meshStandardMaterial color={plant.stem} roughness={0.8} />
                     </mesh>
                     <mesh position={[0.06, s.h * 0.65, 0]} rotation={[0.4, 0, 0.6]} scale={[1, 0.35, 0.6]}>
                         <primitive object={sharedGeometry('sphere', 0.11, 10, 10)} attach="geometry" />
-                        <meshStandardMaterial color={i % 2 ? '#4C8A3F' : '#5FA24A'} roughness={0.8} />
+                        <meshStandardMaterial color={i % 2 ? plant.leafA : plant.leafB} roughness={0.8} />
                     </mesh>
                     <mesh position={[-0.07, s.h * 0.45, 0]} rotation={[-0.4, 0, -0.6]} scale={[1, 0.35, 0.6]}>
                         <primitive object={sharedGeometry('sphere', 0.1, 10, 10)} attach="geometry" />
-                        <meshStandardMaterial color={i % 2 ? '#5FA24A' : '#4C8A3F'} roughness={0.8} />
+                        <meshStandardMaterial color={i % 2 ? plant.leafB : plant.leafA} roughness={0.8} />
                     </mesh>
                 </group>
             ))}

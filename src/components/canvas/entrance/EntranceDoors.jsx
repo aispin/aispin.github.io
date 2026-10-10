@@ -10,7 +10,7 @@ import { playInsectChirp, playRabbitSqueak } from '../../../audio/sfx';
 import { useAchievements } from '../../../context/AchievementsContext';
 import { isTouchDevice } from '../../../utils/deviceDetect';
 import { setGuitarCursor } from '../../../utils/guitarCursor';
-import { SURFACE_VERT, SONG_WALL_FRAG, INK_OVERLAY_FRAG, STONE_FRAG, makeSurfaceUniforms } from '../../../shaders/entranceTextures';
+import { SURFACE_VERT, SONG_WALL_FRAG, INK_OVERLAY_FRAG, STONE_FRAG, makeSurfaceUniforms, SEASON_INK_TINT } from '../../../shaders/entranceTextures';
 import GateBase from './GateBase';
 import { WindChime, WhiteDog, WoodenPlanter, WoodenWindowFrame, WindowCurtain, SwallowNest } from './EntranceProps';
 import StoneTable from './StoneTable';
@@ -900,10 +900,18 @@ const EntranceDoors = ({
         uInkStrength: { value: 0 }
     }), [facadeCenterY, wallInk, doorCenterY, doorOpeningWidth, doorHeight]);
 
-    /* The creeper, as its own layer in front of the couplets. */
-    const inkOverlayUniforms = useMemo(() => ({
+    /* The creeper, as its own layer in front of the couplets.
+     *
+     * 🔴 走 `useSeasonUniforms` 而不是 `useMemo`（2026-10-10 · WO-10）：藤蔓现在
+     * 要跟着季节改叶色深浅，而**换季只能就地改 `.value`** —— 换掉 uniforms 对象
+     * 会让 three 缓存的 `uniformsList` 还指着旧对象，画面**静默冻在首季**
+     * （WO-8 就是栽在这上面，见 hooks/useSeasonUniforms.js 的长注释）。
+     * 这个 hook 把对象身份用 ref 锁死，所以这里安全。
+     * `uInkTint` 只乘 rgb、不动 alpha ⇒ 藤蔓的枝形/轮廓逐季逐位不变。 */
+    const inkOverlayUniforms = useSeasonUniforms((season) => ({
         uInk: { value: wallInk },
-        uInkStrength: { value: WALL_INK_STRENGTH }
+        uInkStrength: { value: WALL_INK_STRENGTH },
+        uInkTint: { value: SEASON_INK_TINT[season] || SEASON_INK_TINT.summer }
     }), [wallInk]);
     // vUv=(0,0) of the rotated walkway plane lands at world z = the plane's
     // centre + half its length (its v axis runs against world +Z). Same frame

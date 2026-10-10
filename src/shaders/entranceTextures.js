@@ -53,17 +53,29 @@ void main() {
  * The only real difference is *when* it lands — after the paper grain and the
  * snow rather than before — which is a fraction of a percent and, for the
  * snow, arguably more correct: the vine lies on top of the coping's snow.
+ *
+ * SEASONAL LEAF COLOUR (2026-10-10)
+ * ---------------------------------
+ * The vine is painted into the canvas texture (`makeWallInkTexture`), so its
+ * colour is baked. Rather than re-bake a 1280x768 canvas every time the season
+ * changes, `uInkTint` multiplies the sampled rgb here. The user's note was
+ * 「把它当作是常春藤，季节稍微改下叶子颜色深浅即可」 — a *tint*, not a
+ * repaint, and the multiplier is deliberately within ±25 % (see
+ * `SEASON_INK_TINT`). ⚠️ It multiplies `rgb` only: `a` is untouched, so the
+ * vine's silhouette and branch shapes are bit-identical across seasons and
+ * only the colour moves.
  */
 export const INK_OVERLAY_FRAG = /* glsl */ `
 varying vec2 vUv;
 uniform sampler2D uInk;
 uniform float uInkStrength;
+uniform vec3  uInkTint;     // 季节叶色乘数（只乘 rgb，不动 alpha）
 void main() {
     vec4 ink = texture2D(uInk, vUv);
     float a = ink.a * uInkStrength;
     // Almost the whole quad is empty; discarding it keeps the extra pass free.
     if (a < 0.004) discard;
-    gl_FragColor = vec4(ink.rgb, a);
+    gl_FragColor = vec4(ink.rgb * uInkTint, a);
 }
 `;
 
@@ -803,6 +815,57 @@ const SEASON_GROUND = {
         uLitterCol: LITTER_COL,
         uLitter: 0,
     },
+};
+
+/* ------------------------------------------------------------------ */
+/* 季节调色板（JS 侧）—— 外墙藤蔓 + 窗下花箱                            */
+/*                                                                      */
+/* 为什么和 SEASON_GROUND 挤在一个文件里                                 */
+/* ------------------------------------------------------------------ */
+/* 「同一张表写两遍，迟早在某个文件里漂移」是这个项目最贵的一课（见        */
+/* config/seasons.js 开头）。四季的颜色现在有三组消费者：                 */
+/*   · 地面 / 幕墙 / 甬路 → SEASON_GROUND（shader uniform）              */
+/*   · 外墙藤蔓（常春藤）→ SEASON_INK_TINT（shader uniform，乘在贴图上）  */
+/*   · 窗下花箱的绿植    → SEASON_PLANT（**JS 颜色**，喂 meshStandardMaterial）*/
+/* 前两组必须是 sRGB 0..1 的数组（shader 要），第三组是 CSS 字符串        */
+/* （three 的 material.color 要）。都放这儿 —— 改一季能一眼看全。         */
+
+/**
+ * 外墙藤蔓（当常春藤看）的**季节叶色乘数**，乘在 `makeWallInkTexture` 画出来的
+ * 贴图上（见 `INK_OVERLAY_FRAG`）。
+ *
+ * 为什么是"乘"而不是重烘贴图
+ * --------------------------
+ * 藤蔓是 canvas 画的，重烘一次是 1280×768 的画布；为一次换季重烘不值得。
+ * 而且用户要的只是「**稍微**改下叶子颜色深浅」（2026-10-10 原话）。
+ * 乘法只动 rgb、**不动 alpha** ⇒ 藤蔓的枝形与轮廓逐位不变。
+ *
+ * 取值的分寸
+ * ----------
+ * **夏 = [1,1,1]，即完全不动** —— 它是参照季，也是常春藤最绿的时候；改前
+ * 那套颜色就是夏天的样子。其余三季都在 **±25 %** 以内，色相只动一点点：
+ * 要的是"同一株常春藤的四季"，不是"四种不同的植物"。
+ * ⚠️ 常春藤是**常绿**的 —— 冬天只变暗变闷，**不许变白、也不许掉叶**。
+ */
+export const SEASON_INK_TINT = {
+    spring: [1.14, 1.20, 0.92],  // 嫩：最亮、偏黄绿（G 抬得最多）
+    summer: [1.00, 1.00, 1.00],  // 参照季（= 改动前本来的样子）
+    autumn: [1.24, 1.02, 0.62],  // 转黄：R 抬、B 砍掉近四成 ⇒ 偏橄榄/黄绿
+    winter: [0.78, 0.83, 0.85],  // 暗：整体压暗、略偏灰（但仍然是绿的）
+};
+
+/**
+ * 窗下花箱那丛绿植的四季配色（`EntranceProps.jsx` 的 `WoodenPlanter`）。
+ *
+ * 与 `SEASON_GROUND` 是同一个思路的两套数：春嫩、夏浓、秋转黄、冬沉。
+ * **`summer` 就是改动前写死的那三个值**（`#3F7A35` / `#4C8A3F` / `#5FA24A`），
+ * 所以夏天看起来和以前一模一样 —— 这也让 A/B 有了一个"必须逐位不变"的对照季。
+ */
+export const SEASON_PLANT = {
+    spring: { stem: '#4E8F42', leafA: '#5C9E4B', leafB: '#72B65C' },
+    summer: { stem: '#3F7A35', leafA: '#4C8A3F', leafB: '#5FA24A' },
+    autumn: { stem: '#5A7A2E', leafA: '#6B8A33', leafB: '#86A244' },
+    winter: { stem: '#2F5A2B', leafA: '#3A6B36', leafB: '#48793F' },
 };
 
 /** 某一季的地面色板 → three 的 uniform 对象。未知季节落到秋天。 */
