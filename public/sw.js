@@ -5,8 +5,13 @@
  *  - 静态资源（同源 js/css/字体/图片）：stale-while-revalidate
  *  - 跨域（GitHub API 等）：不做缓存
  * 更新：版本号变化 -> 旧缓存清理 -> 页面通过 updatefound 感知（见 main.jsx）
+ *
+ * ⚠️ 开发态**不注册**本 SW（见 `src/main.jsx`）：stale-while-revalidate 是按
+ *    **扩展名**匹配的，而 Vite dev 服务的是 `/src/**.js` 这种**不带内容哈希**
+ *    的模块 —— 正好命中，于是「改了代码、页面还是旧画面」。生产产物带哈希，
+ *    缓存它们是安全的。
  */
-const VERSION = 'aispin-v5';
+const VERSION = 'aispin-v6';
 const PRECACHE = `${VERSION}-precache`;
 const RUNTIME = `${VERSION}-runtime`;
 

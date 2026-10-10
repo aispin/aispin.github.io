@@ -818,6 +818,7 @@ uniform float uSnow;          // 0..1 积雪覆盖
 commit message 里用户的原话就是「冬天院子过道的草需要处理下」。
 
 ⇒ **结论：先向用户确认构建来源 / 硬刷新，再决定是否动藤蔓与花箱。** 见 §12-6。
+（2026-10-10 下午**已找到"用户为什么看到旧画面"的机制**，见 §9.4g。）
 
 **9.4f 本轮质量门**
 
@@ -827,6 +828,48 @@ commit message 里用户的原话就是「冬天院子过道的草需要处理�
 - 生产冒烟（`waitMs = 70000`）→ `rootChildren 1` / `hasCanvas true` / **meshes 704** /
   `ERRORS (0)` / 只有 2 张白名单位图
 - `verify-wo2-seasons.mjs` → 全 ✅
+
+**9.4g 「为什么用户会看到旧画面」查清了：dev 也注册了 service worker（真 bug，已修）**
+
+§9.4e 把"用户看到绿草"归到"可能不是当前构建"，但**没查出机制**。这一轮补齐了，
+并且它是**真 bug**，不是用户操作问题。
+
+`public/sw.js` 的静态资源分支是**按扩展名**匹配的：
+
+```js
+if (/\.(js|css|woff2?|png|jpe?g|webp|svg|ico|json)$/i.test(url.pathname) || url.pathname.startsWith('/textures/')) {
+  const cached = await cache.match(request);
+  return cached || network;            // ← stale-while-revalidate
+}
+```
+
+而 `src/main.jsx` 里注册 SW **没有按环境分流**（`import.meta.env.PROD` 那个判断根本不存在）。
+于是 **Vite dev 也注册**了 SW，而 dev 服务的正是 `/src/shaders/entranceTextures.js`
+这种**不带内容哈希**的模块 —— 路径以 `.js` 结尾，**正好命中**。后果是一种很迷惑的错位：
+
+| 文件 | dev 路径 | 命中 SW 缓存？ |
+|---|---|---|
+| `StoneTable.jsx` / `GateBase.jsx`（组件） | `/src/**.jsx` | ❌ 不命中 → **总是最新** |
+| `entranceTextures.js`（**四季色板就在这**） | `/src/**.js` | ✅ 命中 → **可能是旧的** |
+
+⇒ 用户看到的画面**组件是新的、shader 是旧的**：石桌石凳都在（组件新），
+但地面色板停在缓存里的那一版 —— 这就是"过道两边的草冬天还是绿的"。
+
+**修法**（两处）：
+
+1. `src/main.jsx`：注册按环境分流 —— `PROD` 才注册；**dev 反过来主动注销 SW + 清空所有 cache**。
+   只加 `PROD` 判断不够：已经注册过的 SW 会一直留着，必须显式注销。
+2. `public/sw.js`：`VERSION` `aispin-v5` → **`aispin-v6`**，让线上已存在的旧缓存
+   在 `activate` 时被清掉。
+
+**判据**：`harness/check-sw-dev.mjs` —— dev 页面载入后
+`registrations === 0 && caches.length === 0`。实测：
+`dev: controller=false registrations=0 caches=[] ✅`。
+生产侧：`dist/sw.js` 含 `aispin-v6`，`main-*.js` 保留 `sw-update-ready`
+（`getRegistrations` 被 `import.meta.env.PROD` 判定为死代码后正常 DCE 掉，计数 0）。
+
+⚠️ 这是本仓库第一次出现"**dev 与生产用了同一套缓存语义**"的事故。生产产物带内容哈希，
+缓存它们是安全的；dev 的模块路径不带哈希，**任何缓存都是错的**。
 
 ---
 

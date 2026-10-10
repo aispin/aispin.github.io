@@ -29,26 +29,50 @@ if (typeof window !== 'undefined') {
 
 // --- PWA: service worker registration + update awareness ---
 // 新版本就绪时向页面派发 'sw-update-ready'，由 SiteControls 展示更新提示。
+//
+// 🔴 **开发态一律注销 SW，绝不注册。**
+// 原因：`public/sw.js` 的静态资源分支按扩展名匹配
+// （`/\.(js|css|woff2?|png|…)$/`）走 stale-while-revalidate，而 Vite dev
+// 服务的就是 `/src/shaders/entranceTextures.js` 这种**不带内容哈希**的模块
+// —— 路径以 `.js` 结尾，正好命中。于是「改了源码，页面还是旧画面」：
+// 组件（`.jsx`，不匹配）是新的，shader / 音频这些 `.js` 模块却是缓存里的旧版。
+// 2026-10-10 用户报「过道两边的草冬天还是绿的」就是这一路：
+// 地面色板在 `entranceTextures.js` 里，页面拿到的是**修好之前**的那份。
+// 生产构建的产物带内容哈希，缓存它们是安全的，所以只有 dev 需要这份清理。
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/sw.js')
-      .then((registration) => {
-        registration.addEventListener('updatefound', () => {
-          const installing = registration.installing;
-          if (!installing) return;
-          installing.addEventListener('statechange', () => {
-            // 有旧 SW 接管中 + 新 SW 已安装待激活 => 可提示用户刷新
-            if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-              window.dispatchEvent(new CustomEvent('sw-update-ready', { detail: registration }));
-            }
+  if (import.meta.env.PROD) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker
+        .register('/sw.js')
+        .then((registration) => {
+          registration.addEventListener('updatefound', () => {
+            const installing = registration.installing;
+            if (!installing) return;
+            installing.addEventListener('statechange', () => {
+              // 有旧 SW 接管中 + 新 SW 已安装待激活 => 可提示用户刷新
+              if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+                window.dispatchEvent(new CustomEvent('sw-update-ready', { detail: registration }));
+              }
+            });
           });
+        })
+        .catch(() => {
+          /* SW 注册失败不影响主体验（如 file:// 或受限环境） */
         });
-      })
-      .catch(() => {
-        /* SW 注册失败不影响主体验（如 file:// 或受限环境） */
-      });
-  });
+    });
+  } else {
+    // 清掉历史会话留下的 SW 与缓存 —— 否则旧模块会一直被优先命中。
+    navigator.serviceWorker
+      .getRegistrations()
+      .then((regs) => regs.forEach((reg) => reg.unregister()))
+      .catch(() => {});
+    if (typeof caches !== 'undefined') {
+      caches
+        .keys()
+        .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+        .catch(() => {});
+    }
+  }
 }
 
 
