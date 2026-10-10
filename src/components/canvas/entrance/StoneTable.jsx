@@ -3,17 +3,16 @@ import { useSeason } from '../../../hooks/useSeason';
 import { makeStoneSlabTexture } from '../../../utils/entranceArt';
 
 /**
- * StoneTable — 院子里的石桌 + 两个小石凳
+ * StoneTable — 院子里的石条桌 + 两条石条凳
  * ======================================
  *
  * 位置由调用方给：用户 2026-10-09 定的是「树下，树跟前」。
  *
  * ---------------------------------------------------------------------------
- * 🔴 用户连报三次「桌面/凳面看起来往地面倾斜」—— 前两轮的修法都是错的
+ * 🔴 用户连报四次「桌面/凳面看起来往地面倾斜」—— 前三轮的修法都是错的
  * ---------------------------------------------------------------------------
- * 第三轮用户给了决定性的线索：「**为什么花箱没有这个问题**」，并说
- * 「其他的应用也圆顶，但不会出现倾斜问题」。于是不再靠推理，直接量
- * （`harness/probe-table-tilt.mjs`）：
+ * 第三轮用户给了决定性的线索：「**为什么花箱没有这个问题**」。于是不再靠推理，
+ * 直接量（`harness/probe-table-tilt.mjs`）：
  *
  *   | 面        | 世界法线 | **屏幕椭圆长轴角**   |
  *   | 石桌面    | (0,1,0)  | **−9.06°**           |
@@ -33,12 +32,8 @@ import { makeStoneSlabTexture } from '../../../utils/entranceArt';
  * 投影、长轴和原圆的任何一条直径都没关系。业界做法（Panini 柱面投影、
  * iPhone 广角自拍把边缘人脸往平行投影拉）与本次查证见 `memory/` 专题。
  *
- * 花箱为什么没事：顶面是矩形，远棱/近棱**平行于世界 X 轴**，而
- * `v = f·(y−y_cam)/(z_cam−z)` ⇒ **任何平行于 X 轴的世界直线，投影后恒为屏幕
- * 水平线**。所以它永远有两条精确 0.00° 的边可读。**是形状救了它。**
- *
  * ---------------------------------------------------------------------------
- * ❌ 试过、已撤销的两条错路（留档，别再走）
+ * ❌ 试过、已撤销的三条错路（留档，别再走）
  * ---------------------------------------------------------------------------
  * 1. **改材质 / 贴图 / 厚度 / 倒角 / 放射缝 / 接触阴影** —— 8 个变体全量对照，
  *    倾角**一个都没变**（全是 −9.06°）。轮廓就是那个转过的椭圆，面里画什么
@@ -56,116 +51,122 @@ import { makeStoneSlabTexture } from '../../../utils/entranceArt';
  *
  *    ⇒ **逐物体地骗投影 = 死路。** 真要骗只能骗**整帧**（Panini 那类后处理），
  *    那样全场景仍然共享同一套投影。
+ * 3. **顶面改成正十六边形**（提交 905a952）：`thetaStart = π/16` 让**前棱/后棱
+ *    精确平行于世界 X 轴**，那两条棱在屏幕上**确实是 0.00°**（`probe-poly-edge`
+ *    实测，与花箱同尺）。**但用户 2026-10-10 第四轮反馈：「也是斜的，感觉和圆
+ *    一模一样」—— 逐字准确。** 因为人眼读的是**轮廓的主轴**，不是某一条棱：
+ *
+ *      圆 32 边  轮廓主轴 −9.44°
+ *      16 边形   轮廓主轴 −9.44°   ← 一个像素都没动
+ *
+ *    16 条棱里只有 2 条是 0.00°，而且只有 36~45 px 长；眼睛把整圈一拟合，读回来
+ *    的还是那个转过的椭圆。**「有直边」不够，得「有足够长、且能主导轮廓的直边」。**
  *
  * ---------------------------------------------------------------------------
- * ✅ 现在的解法：顶面改成正十六边形（用户 2026-10-10 定案）
+ * ✅ 现在的解法：改成矩形（用户 2026-10-10 定案：「改成和花箱一样的矩形看看」）
  * ---------------------------------------------------------------------------
- * 圆 → 16 边形之后，**前棱/后棱精确平行于世界 X 轴**（推导见 `POLY_THETA`），
- * 于是它们在屏幕上**精确是水平的** —— 和花箱同一把尺子、0.00°。物理保持水平、
- * 全场景投影保持一致、凑多近都不露馅：**没有一处是在骗投影。**
+ * 这一轮把花箱当成**标尺**量了（`probe-poly-edge.mjs` 的 controls 段），才把
+ * 「多少度算看起来没事」定下来 —— 花箱顶沿 1.25 × 0.6（长宽比 **2.08**）：
  *
- * 代价：不再是**完美**的圆。16 边形内切于原圆，半径差只有
- * `1 − cos(π/16) = 1.9%`，轮廓仍读作圆桌；中式石作的鼓腿/桌面本来就常做多边形
- * 拼料，这个形状本身站得住。
+ *     花箱顶沿  轮廓主轴 **1.68°**   ← 用户认为「没问题」的那一件
+ *     石桌面    轮廓主轴 **−9.44°**  ← 用户认为「斜」的那一件
  *
- * ⚠️ 板侧壁 / 凳身 / 雪盖**必须一起改**（同棱数 + 同 `thetaStart`）：否则顶面的
- * 直棱会落在一个圆的沿口里，读成「圆板里嵌了一块十六边形」。
+ * 也就是说：**花箱不斜不是因为它是什么材质、什么颜色，是因为它是矩形**，而且
+ * 长宽比够大。矩形顶面被剪切之后是一个**平行四边形**，它的主轴由
+ *
+ *     tan(2θ) = 2·b²·s·t / (a² + b²·s² − b²·t²)      s = X/d, t = Y/d
+ *     a, b = 顶面 X 向 / Z 向半宽
+ *
+ * 给出 —— **a/b 越大 θ 越小**，而且分母里 `a²` 直接把长边压成主轴。a → ∞ 时
+ * θ → 0。16 边形没有这个机制：它外接圆不变，长宽比恒为 1。
+ *
+ * 本文件取 **桌面 1.20 × 0.54（2.22）**、**凳面 0.70 × 0.26（2.69）**，
+ * 预测 2.39° / 2.59° / 1.40°，即**与花箱同一档**（1.68°）。
+ *
+ * ⚠️ 为什么不是「把桌子挪到画面中轴」：`X → 0` 确实让 φ → 0，但树干在
+ * local x ≈ −2.82、桌子在 −2.78 —— 它就是「树跟前」那张桌子（EntranceDoors
+ * 的注释），挪开就毁掉这个构图。**而且 `X` 只是分子里的一项：`X` 减半、`d`
+ * 不变时 φ 也才减半**（−2.78 → −1.39 只到 4.9°）。改形状是唯一能一步到位的杠杆。
+ *
+ * ⚠️ **桌面/凳面/侧壁/雪盖必须一起改矩形**：侧壁留在圆柱上会读成「方板架在
+ * 圆鼓上」。底座/柱身/束腰**保持圆**（车削石鼓）—— 它们是竖直的，横截面不参与
+ * 「面平不平」的判读，改成方的纯属审美、治不了倾斜。
  */
 
 /**
- * 十六边形构件的棱数 —— 桌面/座面/板侧壁/凳身/雪盖统一用它。
+ * 桌面：X 向长边 / Z 向短边 / 板厚。
  *
- * ⚠️ 必须是 **4 的倍数**：只有这时「一条棱的中点落在世界 ±Z 方向」与「顶点
- * 关于世界 XZ 轴对称」才能同时成立（推导见 `POLY_THETA`）。
- * 12 边形也满足，棱更长更好读，但「圆」的感觉更弱 —— 现取 16。
+ * ⚠️ 尺度按 DOOR_HEIGHT 反推：2.55 世界单位 ≈ 2.2 m 的实木门扇，即
+ * **1 世界单位 ≈ 0.863 m**。真石条桌长约 1.0~1.2 m、宽约 0.45 m，
+ * 于是 1.20 × 0.54 世界单位 ≈ **1.04 m × 0.47 m**，总高 0.78 ≈ 0.67 m。
+ *
+ * 🔴 **长宽比是这里的全部意义**（见文件头 tan(2θ)）：2.22 是为了把轮廓主轴
+ * 压到 2.4°（花箱 2.08 → 1.68°）。想更平就加大比值，但**别缩小 Z 向**——
+ * 0.54 已经是「坐得下人」的桌宽下限，再窄就不像桌子了。
  */
-const POLY_SIDES = 16;
+const TOP_W = 1.20;
+const TOP_D = 0.54;
+const TOP_H = 0.15;
 
 /**
- * 让一条棱**精确平行于世界 X 轴**所需的 `thetaStart`。
- *
- * 两个图元的参数化不一样，但巧合地共用同一个值：
- *
- *   CircleGeometry：`x = r·cos θ, y = r·sin θ`，再被 mesh 绕 X 转 −π/2 →
- *     世界 `(r cos θ, 0, −r sin θ)`。棱平行于 X ⇔ 两端点**世界 z 相等** ⇔
- *     `sin θ_k = sin θ_{k+1}`；相邻点差 `2π/n` ⇒ `θ_k + θ_{k+1} = π`。取
- *     `thetaStart = π/n` 时顶点表是 **π/n 的奇数倍**，`θ = 7π/16` 正在其中。
- *   CylinderGeometry：`x = r·sin θ, z = r·cos θ`。棱平行于 X ⇔
- *     `cos θ_k = cos θ_{k+1}` ⇔ 需要一对 `θ = ±α`；`thetaStart = π/n` 时顶点表
- *     同样是 π/n 的奇数倍，**关于 0 对称** ⇒ 成立。
- *
- * 两者取同一值时，**顶面的顶点与柱面顶沿的顶点落在同一批世界方位角上**
- * （都是 π/n 的奇数倍）—— 这才是顶面能严丝合缝坐进板侧壁里的原因。
- *
- * 而且这么取之后，**离相机最近的那条棱的中点正好在世界 +Z 方向**，也就是画面
- * 里最近的那条边 —— 它正是被读到「平」的那条线。
- */
-const POLY_THETA = Math.PI / POLY_SIDES;
-
-/**
- * 立柱/底座/板侧壁：压暗。
+ * 立柱/底座/束腰/石板侧壁：压暗。
  *
  * 🔴 为什么要单独压暗：场景是 `AmbientLight 2.2` 压过 `DirectionalLight 0.9`
  * 的**平光** —— 顶面 2.93、侧壁 2.2~2.72，**只差 8%**。这个差值下「顶面」和
  * 「侧壁」糊成一坨同色，整件东西读成**一张 2D 剪影**。把它们拉开（和花箱的
- * `WOOD` / `WOOD_DARK` 同一套路）之后，物件才读得成「实心石鼓 + 受光顶面」。
+ * `WOOD` / `WOOD_DARK` 同一套路）之后，物件才读得成「实心石作 + 受光顶面」。
  *
  * ⚠️ 这一条**治不了**倾斜（第 1 条错路就是它），它治的是「剪纸感」。
  */
 const STONE_SIDE = '#7A7266';
 /** 冬天的雪盖。比台明/甬路那层「扫过的薄雪」更厚 —— 路扫过了，桌子没人扫。 */
 const SNOW_TOP = '#E4E9EF';
-/** 雪盖比桌面略小：露出一圈石头边，才读得出「雪**落在**石头上」而不是「桌子是白的」。 */
-const SNOW_R = 0.93;
-
 /**
- * 桌子：面半径 / 总高。
- *
- * ⚠️ 尺度按 DOOR_HEIGHT 反推：2.55 世界单位 ≈ 2.2 m 的实木门扇，即
- * **1 世界单位 ≈ 0.863 m**。真石桌面高约 0.70 m、面径约 0.86 m，
- * 于是总高 ≈ 0.78 世界单位、面半径 ≈ 0.50。
- *
- * ⚠️ 半径是**外接圆**半径（顶点所在圆）。16 边形内切圆半径 = 0.9808 × 这个值，
- * 差 1.9% —— 按外接圆给，物件的视觉尺寸就和改形状之前一致。
+ * 雪盖比顶面**每边缩进**这么多：露出一圈石头边，才读得出「雪**落在**石头上」
+ * 而不是「桌子是白的」。（原来是「半径 × 0.93」，矩形改成按边缩进。）
  */
-const TOP_R = 0.50;
-const TOP_H = 0.15;
+const SNOW_INSET = 0.05;
+
 const COLLAR_R = 0.15;
 const COLLAR_H = 0.19;
 const SHAFT_R = 0.115;
 const SHAFT_H = 0.35;
 const BASE_R = 0.26;
 const BASE_H = 0.09;
-/** 凳子：鼓形，座面比腰粗一点。真石凳高约 0.42 m、面径约 0.32 m。 */
-const STOOL_R = 0.185;
-const STOOL_TOP_H = 0.12;
-const STOOL_BODY_R = 0.145;
-const STOOL_BODY_H = 0.33;
 
 /**
- * 两张凳子的相对位姿 —— 分列桌子左右。
+ * 石条凳：X 向长边 / Z 向短边。
  *
- * 间距让得过：桌沿 0.50 + 凳沿 0.185 = 0.685 才会相碰，这里放到 0.88，
- * 中间留出能过脚的一道缝。
+ * ⚠️ 凳面比桌面**更细长**（0.70 / 0.26 = **2.69** vs 桌面的 2.22）—— 这不是
+ * 审美，是量出来的：凳子更矮（`Y_cam` 更大）又更偏轴（左边那张在世界 x −3.76，
+ * 离相机中轴 3.76 个单位），`t = Y/d` 比桌面大得多，同一个长宽比会给出更大的 θ。
+ * 实测预测：凳面 2.69 才追平桌面的 2.22。
+ */
+const BENCH_W = 0.70;
+const BENCH_D = 0.26;
+const BENCH_TOP_H = 0.12;
+const BENCH_BODY_W = 0.54;
+const BENCH_BODY_D = 0.20;
+const BENCH_BODY_H = 0.33;
+
+/**
+ * 两条凳子的位置 —— 分列桌子左右（沿世界 X，和桌面长边同向）。
  *
- * 🔴 **`yaw` 必须为 0，这是量出来的，不是审美选择。**
- * 绕 Y 转 φ 会把「棱平行于世界 X 轴」这个性质转掉，屏幕倾角变成
+ * ⚠️ `±0.98` 是**间隙算出来的**，不是拍的：桌面半宽 0.60 + 凳面半长 0.35 = 0.95，
+ * 再加 3 cm 让得过，取 0.98。改桌/凳尺寸必须重算这个数。
+ *
+ * 🔴 **不转 yaw**（原来写过 0.22 / −0.15，已删）。绕 Y 转 φ 会把「长边平行于
+ * 世界 X 轴」这个性质转掉，屏幕倾角变成
  *
  *     Δ ≈ atan( Y_cam·sin φ / (D·cos φ − X_cam·sin φ) )
  *
- * 一开始我按「相机在 z=28、桌子在 z≈0」估成 0.12°（`Y/D ≈ 0.009`）——**错了**：
- * 凳子其实离相机只有 **4.3 个单位**（`D` 小一个数量级），而座面比相机低
- * 1.84 个单位 ⇒ `Y_cam/D ≈ −0.43`，比估计大了 **47 倍**。
- * 实测：φ = 12.6° ⇒ **4.38° / 3.90°**（`harness/probe-poly-edge.mjs`）。
- *
- * 也就是说「转角让两张凳子不像复制品」这个初衷，代价正好是**把刚拿到的
- * 0.00° 线索又还回去一半**。这个交易不划算 —— 两张凳子相距 1.76 世界单位
- * （屏幕上约 320px），而每张只有 67px 宽，棱线方向对不对得上一眼根本看不出来。
- * 于是改用 z 上的那点错位（+0.06 / −0.05）来避免「复制品」感。
+ * 凳面离相机只有 4.3 个单位（`Y_cam/D ≈ −0.43`），比「相机在 z=28」那种直觉
+ * 大 **47 倍** —— 12.6° 的 yaw 就会还回去 4.4°。用 z 上的那点错位（+0.06 / −0.05）
+ * 来避免「复制品」感就够了。
  */
-const STOOLS = [
-    { x: 0.88, z: 0.06, yaw: 0 },
-    { x: -0.88, z: -0.05, yaw: 0 },
+const BENCHES = [
+    { x: 0.98, z: 0.06 },
+    { x: -0.98, z: -0.05 },
 ];
 
 export function StoneTable({ position }) {
@@ -175,13 +176,13 @@ export function StoneTable({ position }) {
     const stoneTop = makeStoneSlabTexture();
 
     const tableTopY = BASE_H + SHAFT_H + COLLAR_H + TOP_H;      // 0.78（板厚算在里面）
-    const stoolTopY = STOOL_BODY_H + STOOL_TOP_H;               // 0.45
+    const benchTopY = BENCH_BODY_H + BENCH_TOP_H;               // 0.45
 
     return (
         <group position={position}>
-            {/* === 石桌 === */}
+            {/* === 石条桌 === */}
             <group>
-                {/* 底座 —— 24 棱。**不改 16**：它的横截面不会被当成"面"看，
+                {/* 底座 —— 24 棱。**保持圆**：它的横截面不会被当成"面"看，
                     保持圆润的剪影更像车削出来的鼓腿。 */}
                 <mesh position={[0, BASE_H / 2, 0]}>
                     <primitive object={sharedGeometry('cylinder', BASE_R, BASE_R * 1.06, BASE_H, 24)} attach="geometry" />
@@ -198,47 +199,53 @@ export function StoneTable({ position }) {
                     <meshStandardMaterial color={STONE_SIDE} roughness={0.92} />
                 </mesh>
 
-                {/* 桌面 —— 十六边形石鼓：板侧壁 + 顶面 + 冬雪。
-                    group 原点落在**顶面圆心**，各子件按原来的相对高度摆。 */}
+                {/* 桌面 —— 矩形石板：板侧壁 + 顶面 + 冬雪。
+                    group 原点落在**顶面中心**，各子件按原来的相对高度摆。 */}
                 <group position={[0, tableTopY + 0.004, 0]}>
-                    {/* 板侧壁（厚度）—— 顶面亮、侧壁暗，靠这条明暗差读出板厚 */}
+                    {/* 板侧壁（厚度）—— 顶面亮、侧壁暗，靠这条明暗差读出板厚。
+                        🔴 顶面比侧壁高 0.004：不让两个面共面（z-fighting）。 */}
                     <mesh position={[0, -TOP_H / 2 - 0.004, 0]}>
-                        <primitive object={sharedGeometry('cylinder', TOP_R, TOP_R * 0.96, TOP_H, POLY_SIDES, 1, false, POLY_THETA)} attach="geometry" />
+                        <primitive object={sharedGeometry('box', TOP_W, TOP_H, TOP_D)} attach="geometry" />
                         <meshStandardMaterial color={STONE_SIDE} roughness={0.92} />
                     </mesh>
-                    {/* 顶面 —— 受光 + 石面贴图；颜色全部由贴图给 */}
+                    {/* 顶面 —— 受光 + 石面贴图；颜色全部由贴图给。
+                        ⚠️ `plane` 绕 X 转 −π/2 之后：局部 x → 世界 X，局部 y → 世界 **−Z**，
+                        所以 `plane(TOP_W, TOP_D)` 正好是「X 向长、Z 向短」。
+                        ⚠️ 贴图会被拉伸成 2.22:1（贴图本身是各向同性的方图）。这个尺度下
+                        512² 的细石粒投到屏幕上只有 0.1~0.35 px/texel，拉伸不可见，
+                        所以不额外 clone + 设 repeat（那要动 wrapS/T，容易出静默 bug）。 */}
                     <mesh rotation={[-Math.PI / 2, 0, 0]}>
-                        <primitive object={sharedGeometry('circle', TOP_R * 0.99, POLY_SIDES, POLY_THETA)} attach="geometry" />
+                        <primitive object={sharedGeometry('plane', TOP_W * 0.995, TOP_D * 0.995)} attach="geometry" />
                         <meshStandardMaterial map={stoneTop} roughness={0.85} />
                     </mesh>
                     {/* 冬：雪盖 */}
                     <mesh visible={isWinter} position={[0, 0.010, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                        <primitive object={sharedGeometry('circle', TOP_R * SNOW_R, POLY_SIDES, POLY_THETA)} attach="geometry" />
+                        <primitive object={sharedGeometry('plane', TOP_W - SNOW_INSET * 2, TOP_D - SNOW_INSET * 2)} attach="geometry" />
                         <meshStandardMaterial color={SNOW_TOP} roughness={0.95} />
                     </mesh>
                 </group>
             </group>
 
-            {/* === 两个小石凳 === */}
-            {STOOLS.map((s, i) => (
-                <group key={i} position={[s.x, 0, s.z]} rotation={[0, s.yaw, 0]}>
-                    {/* 凳身：坐在地上。同棱数同 thetaStart，棱线才和座面对得上 */}
-                    <mesh position={[0, STOOL_BODY_H / 2, 0]}>
-                        <primitive object={sharedGeometry('cylinder', STOOL_BODY_R, STOOL_BODY_R * 1.05, STOOL_BODY_H, POLY_SIDES, 1, false, POLY_THETA)} attach="geometry" />
+            {/* === 两条石条凳 === */}
+            {BENCHES.map((b, i) => (
+                <group key={i} position={[b.x, 0, b.z]}>
+                    {/* 凳身：坐在地上。也是矩形，长边同向 —— 否则凳面和凳身对不上 */}
+                    <mesh position={[0, BENCH_BODY_H / 2, 0]}>
+                        <primitive object={sharedGeometry('box', BENCH_BODY_W, BENCH_BODY_H, BENCH_BODY_D)} attach="geometry" />
                         <meshStandardMaterial color={STONE_SIDE} roughness={0.92} />
                     </mesh>
-                    {/* 座面 */}
-                    <group position={[0, stoolTopY + 0.004, 0]}>
-                        <mesh position={[0, -STOOL_TOP_H / 2 - 0.004, 0]}>
-                            <primitive object={sharedGeometry('cylinder', STOOL_R, STOOL_R * 0.95, STOOL_TOP_H, POLY_SIDES, 1, false, POLY_THETA)} attach="geometry" />
+                    {/* 凳面 */}
+                    <group position={[0, benchTopY + 0.004, 0]}>
+                        <mesh position={[0, -BENCH_TOP_H / 2 - 0.004, 0]}>
+                            <primitive object={sharedGeometry('box', BENCH_W, BENCH_TOP_H, BENCH_D)} attach="geometry" />
                             <meshStandardMaterial color={STONE_SIDE} roughness={0.92} />
                         </mesh>
                         <mesh rotation={[-Math.PI / 2, 0, 0]}>
-                            <primitive object={sharedGeometry('circle', STOOL_R * 0.99, POLY_SIDES, POLY_THETA)} attach="geometry" />
+                            <primitive object={sharedGeometry('plane', BENCH_W * 0.995, BENCH_D * 0.995)} attach="geometry" />
                             <meshStandardMaterial map={stoneTop} roughness={0.85} />
                         </mesh>
                         <mesh visible={isWinter} position={[0, 0.010, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                            <primitive object={sharedGeometry('circle', STOOL_R * SNOW_R, POLY_SIDES, POLY_THETA)} attach="geometry" />
+                            <primitive object={sharedGeometry('plane', BENCH_W - SNOW_INSET * 2, BENCH_D - SNOW_INSET * 2)} attach="geometry" />
                             <meshStandardMaterial color={SNOW_TOP} roughness={0.95} />
                         </mesh>
                     </group>

@@ -160,9 +160,11 @@ const PRIMITIVES = {
     box: (w, h, d, ws = 1, hs = 1, ds = 1) => new THREE.BoxGeometry(w, h, d, ws, hs, ds),
     sphere: (r, ws = 32, hs = 16) => new THREE.SphereGeometry(r, ws, hs),
     // ⚠️ `thetaStart` 不是装饰：**低棱数圆柱/圆盘的「哪一条棱朝哪」全靠它**。
-    //    石桌/凳面用 16 边形顶面，必须让一条棱精确平行世界 X 轴 —— 因为
-    //    「平行于 X 轴的世界直线恒投影为屏幕水平线」，那条棱就是画面上唯一
-    //    能读出「这个面是平的」的线索（矩形花箱顶面一直靠这个）。取值 = π/棱数。
+    //    来历见 `StoneTable` 的历史：曾用 16 边形顶面 + `thetaStart = π/棱数`
+    //    让一条棱精确平行世界 X 轴（依据是「平行于 X 轴的世界直线恒投影为屏幕
+    //    水平线」）。那个方案**已被否** —— 棱确实到了 0.00°，但**轮廓主轴一个
+    //    像素都没动**（−9.44°），而人眼读的是轮廓主轴。参数保留是因为它是通用
+    //    能力，且默认 0 不影响任何现有调用点。
     cylinder: (rt, rb, h, rs = 32, hs = 1, open = false, thetaStart = 0) =>
         new THREE.CylinderGeometry(rt, rb, h, rs, hs, open, thetaStart),
     cone: (r, h, rs = 32, hs = 1, open = false) => new THREE.ConeGeometry(r, h, rs, hs, open),
