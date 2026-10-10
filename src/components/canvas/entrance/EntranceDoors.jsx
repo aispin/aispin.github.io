@@ -1310,7 +1310,14 @@ const EntranceDoors = ({
                 when the click interaction was added (a bigger target), which
                 read on screen as a beetle the size of the door handle — the
                 user asked for it halved. The *target* is not halved with it:
-                the invisible child below is what takes the pointer. */}
+                the invisible child below is what takes the pointer.
+
+                季节：瓢虫**冬季不出现**（见 docs/seasons.md §6.4）。
+                成虫是越冬的，天冷就钻进墙缝枯叶里，不会在十一月的墙面上
+                遛弯。挂在 `season !== 'winter'` 上 —— `season` 来自
+                `useSeason()`，所以面板里换成冬天时它会当场消失，不用刷新。
+                下面的 useFrame 里对 `bugRef.current` 有 null 守卫，卸载安全。 */}
+            {season !== 'winter' && (
             <mesh
                 ref={bugRef}
                 position={[2.5, floorY + 2.8, 0.16]}
@@ -1347,6 +1354,7 @@ const EntranceDoors = ({
                     />
                 </mesh>
             </mesh>
+            )}
 
 
 

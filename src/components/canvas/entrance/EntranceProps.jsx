@@ -949,10 +949,35 @@ function Swallow({ position, rotation = [0, 0, 0], scale = 1, phase = 0, flutter
 }
 
 /**
+ * 燕子的季节数量 —— 家燕是候鸟，这不是装饰，是物候。
+ *
+ *   春 2   归来、修巢
+ *   夏 2   育雏
+ *   秋 1   陆续南迁，只剩最后一只
+ *   冬 0   **空窝**（窝留着 —— 冬天本来就有旧窝挂在墙上）
+ *
+ * 见 `docs/seasons.md` §6.4「燕子 / 瓢虫：已有，只改数量与显隐」。
+ *
+ * ⚠️ 季节是**运行时可切**的偏好，所以这个数量必须每次渲染从 `useSeason()`
+ * 现取（本文件里 WindowCurtain 也是这么做的）。别写成"挂载时解析一次"。
+ */
+const SWALLOW_PERCHES = [
+    { position: [0.055, 0.118, 0.066], rotation: [0, 0.34, 0], scale: 1.12, phase: 0 },
+    { position: [-0.064, 0.116, 0.048], rotation: [0, -0.26, 0], scale: 1.06, phase: 1.7 },
+];
+
+const SWALLOWS_BY_SEASON = { spring: 2, summer: 2, autumn: 1, winter: 0 };
+
+/**
  * 燕子窝 — mud bowl + swallows, perched in the corner above the door.
  * Click it: the birds twitter (playSwallow) and flap.
+ *
+ * 冬天窝里没有鸟，命中盒也一并去掉 —— 留一个"指针变手型、点下去却没反应"
+ * 的死交互，比没有交互更像坏了。空窝就是墙上一个泥碗，不假装能点。
  */
 export function SwallowNest({ position }) {
+    const season = useSeason();
+    const count = SWALLOWS_BY_SEASON[season] ?? 2;
     const flutter = useRef({ amp: 0 });
     const nestGeo = useMemo(() => new THREE.LatheGeometry(NEST_PROFILE, 26), []);
 
@@ -1008,20 +1033,31 @@ export function SwallowNest({ position }) {
                 </mesh>
             ))}
 
-            {/* the two swallows — perched on the rim, leaning over the edge */}
-            <Swallow position={[0.055, 0.118, 0.066]} rotation={[0, 0.34, 0]} scale={1.12} phase={0} flutter={flutter} />
-            <Swallow position={[-0.064, 0.116, 0.048]} rotation={[0, -0.26, 0]} scale={1.06} phase={1.7} flutter={flutter} />
+            {/* the swallows — perched on the rim, leaning over the edge.
+                数量按季（见 SWALLOWS_BY_SEASON）；冬天一只都没有，窝照旧。 */}
+            {SWALLOW_PERCHES.slice(0, count).map((p, i) => (
+                <Swallow
+                    key={i}
+                    position={p.position}
+                    rotation={p.rotation}
+                    scale={p.scale}
+                    phase={p.phase}
+                    flutter={flutter}
+                />
+            ))}
 
-            {/* invisible hitbox */}
-            <mesh
-                position={[0, 0.075, 0]}
-                onClick={handleClick}
-                onPointerEnter={() => setGuitarCursor('pointer')}
-                onPointerLeave={() => setGuitarCursor('auto')}
-            >
-                <primitive object={sharedGeometry('box', 0.36, 0.32, 0.36)} attach="geometry" />
-                <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-            </mesh>
+            {/* invisible hitbox —— 只在有鸟的时候挂（见上面的注释） */}
+            {count > 0 && (
+                <mesh
+                    position={[0, 0.075, 0]}
+                    onClick={handleClick}
+                    onPointerEnter={() => setGuitarCursor('pointer')}
+                    onPointerLeave={() => setGuitarCursor('auto')}
+                >
+                    <primitive object={sharedGeometry('box', 0.36, 0.32, 0.36)} attach="geometry" />
+                    <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+                </mesh>
+            )}
         </group>
     );
 }

@@ -608,8 +608,8 @@ uniform float uSnow;          // 0..1 积雪覆盖
 | 期 | 内容 | 完成判据 | 状态 |
 |---|---|---|---|
 | **P1** | L0 光照 + 树的四季 + 草的四季 + 雪的 uniform（**纯数据，零新增几何**） | 8 张定妆照一眼可辨；`?season=autumn` 与改动前逐位一致（**唯一例外见下**） | ✅ 2026-10-09 |
-| **P2** | L3 声音 + 燕子/瓢虫的季生开关 | 关掉画面只听声音也能分辨季节 | ⬜ |
-| **P3** | 常驻新道具（荷花缸 / 石桌石凳 / 竹篱）+ 季生天象（雨 / 雪）+ 藤蔓/花箱四季化 | 每季有自己的"物证"；mesh ≤ 760 | ⬜ |
+| **P2** | L3 声音 + 燕子/瓢虫的季生开关 | 关掉画面只听声音也能分辨季节 | ✅ 2026-10-10（§9.3） |
+| **P3** | 常驻新道具（荷花缸 / 石桌石凳 / 竹篱）+ 季生天象（雨 / 雪）+ 藤蔓/花箱四季化 | 每季有自己的"物证"；mesh ≤ 760 | 🟡 石桌石凳已交付；荷花缸（位置已定：**与花箱并列**）/ 竹篱 / 雨雪 ⬜ |
 | **P4** | 季节切换 UI（设置面板；**不做**双线性插值，换季改为吸附 —— 见 §4.2b） | 面板能切四季，且**同一次会话内**场景真的跟着变 | ✅ 2026-10-09 |
 
 **P1 是成败判据**：如果只做 L0+L1 就已经能一眼分辨四季，后面都是加分项；如果不能，说明轴选错了。
@@ -638,6 +638,69 @@ uniform float uSnow;          // 0..1 积雪覆盖
 | `harness/chunk-graph.mjs` | ✅ 无环；react chunk 195.5 KB |
 | `harness/settings-panel-check.mjs` | ✅ 全绿；**同一次会话内**秋→冬→春，三张院子图 sha1 互不相同；换季时场景 uniform 与树贴图都实测改变 |
 | 证据图 | `.workbuddy-ai/settings-2026-10-09/`（面板开/关 × 明暗 + 三季院子） |
+
+#### 9.3 P2 验收记录（2026-10-10）
+
+`harness/verify-wo2-seasons.mjs`（新增，一次加载内走完四季 + 推门进走廊）：
+
+| 判据 | 结果 |
+|---|---|
+| A 不做加载即播 | 手势前 `AudioBufferSource` = **0** |
+| B 秋（冷启动）声床搭得起来 | 5 层 / 8 条 LFO；外层增益淡入目标 **0.250**（非静音） |
+| C 换季换声床 | 面板切 春/夏/秋/冬，声床每次都重建；**六对签名两两不同** |
+| D 无谐波锁相 | 慢速 LFO 合成包络 max\|ACF\|（3–90 s）**0.603 / 0.654 / 0.660 / 0.697**，上限 0.80 |
+| E 与走廊互斥 | 推门后燕子 **4 → 0**（院子卸载）、`stop()` **+10**（= 4 噪声层 + 6 LFO，一个不剩） |
+| F 燕子数量 | 春 2 / 夏 2 / 秋 1 / 冬 **0** 只 |
+| F2 瓢虫 | 春/夏/秋在、冬 **不在** |
+| G 无整页 reload | 页面实例指纹未变 |
+| `npm run lint` | **0 error / 33 warning**（与基线一致） |
+| `npm run build` | ✅ 通过 |
+| `harness/chunk-graph.mjs` | ✅ 无环（react 195.5 KB） |
+| 生产冒烟 `smoke.mjs` @70s | `rootChildren 1` / `hasCanvas true` / **meshes 701** / `ERRORS (0)` / RASTERS **2 张** |
+
+⚠️ **`meshes` 必须读 plateau（`waitMs ≥ 65000`）**。`smoke.mjs` 文件头自己记着实测曲线：
+55 s 读到 1005（RoomWarmup 预热的房间还挂着）、65 s+ 才落到 696 —— **同一个构建**。
+生产 701 与 dev 下 `verify-wo2-seasons.mjs` 的秋天 **701 逐数吻合**。
+相对 P1 的 697：石桌石凳 **+17**、秋天少一只燕子 **−13** ⇒ 净 **+4**。
+（⚠️ 秋天**不再**与改动前逐位一致 —— §9 那条锚点是 **P1 的产物**，P2 故意改了它。）
+
+**⚠️ 第一版判据是错的，两条都记在这里以免重犯：**
+
+1. 「任意两条 LFO 之比不得接近整数（±2%）」——**方向反了**。它把 φ⁵ = 11.0885
+   （离整数 11 只差 0.8%）判成失败，而那对恰恰最好（0.0113 vs 0.1253 相差
+   0.001 Hz ⇒ 拍频周期 1000 s）。真正会死循环的是比值**正好**等于整数。
+   改成量**自相关峰值**：φ 梯子 0.60–0.70、现有 `wind` 0.558、
+   故意整数倍（0.02/0.04/0.06）**1.000** —— 阈值 0.80 分得很干净。
+2. 「推门后燕子归零」在**冬天**测是**假绿** —— 冬天燕子本来就是 0，
+   点中门与没点中给出同一个结果。改成先切回**春**（4 个燕子 mesh）再推门。
+
+**四季声床的可辨识度**（"关掉画面只听声音也能分辨季节"的可测代理）：
+
+| 季 | 层数 | 慢速 LFO | 快速调制 | 结构 |
+|---|---|---|---|---|
+| 春 `spring-rain` | 4 | 6 | — | 2.4 kHz 带通白噪的"沙沙" + 极慢雨势 |
+| 夏 `summer-cicada` | 4 | 4 | **43.0 / 69.6 Hz** | 窄带（Q=13）噪声被高频 AM ⇒ 振鸣 |
+| 秋 `autumn-insects` | 5 | 5 | **5.0 / 8.1 / 13.1 Hz** | 大深度增益 LFO ⇒ 一串串"唧唧" |
+| 冬 `winter-hush` | 4 | 5 | — | 极低电平风噪（总增益 ≈ 别季的 60%） |
+
+**实现要点（都不是"加数据"那么免费）：**
+
+- **频率阶梯**：`SLOW = r₀·φᵏ`（φ = 黄金比）。四条声床共 15 条 LFO 全靠这把
+  梯子取，任意两条之比都是 φ 的幂 —— 那条"互不成谐波"的硬规则从"手挑数字"
+  变成了**结构保证**。⚠️ 别把 0.0113 这种值"四舍五入成好记的数"，那会把
+  φ 的幂破坏掉（见 `ambience.js` 的阶梯注释）。
+- **AM 也是 LFO**：本模块只有"往 `filter.frequency` 或 `gain.gain` 上叠正弦"
+  一种调制。蝉的振鸣 = 窄带噪声 + `depth ≈ gain` 的 43 Hz 增益 LFO ——
+  不需要新的音频原语。虫鸣的"短促脉冲"同理，只是频率落在 5–13 Hz。
+- **挂载边界写在结构上**：`CourtyardAmbience` 挂在 `Experience.jsx` 里
+  **和 `EntranceDoors` 同一个 `!hasEntered` 分支**，互斥是免费得到的。
+  ⚠️ 别改成读 `isInRoom` —— 院子阶段它一直是 false。
+- **起播沿用既有闸门**：`createAmbience` 内部走 `whenUnlocked`，所以手势前
+  只排队、不建 AudioContext（判据 A 实测 0）。`whenUnlocked` 在已解锁时会
+  **立即执行**，所以从大门走出去（`markExited` → `hasEntered` 翻假 → 院子
+  重新挂载）时声床会立刻重建，不会哑掉。
+- **燕子窝冬天连命中盒一起撤**：留一个"指针变手型、点下去没反应"的死交互，
+  比没有交互更像坏了。
 
 ---
 
@@ -704,6 +767,8 @@ uniform float uSnow;          // 0..1 积雪覆盖
 | `src/config/seasonLight.js` | 8 组光照端点（秋天引用 `theme.js`）+ `seasonGlowFor` | ✅ P1 |
 | `src/hooks/useSeason.js` | 读**偏好** → 返回**解析后**的季节 id | ✅ P1 · P4 |
 | `src/hooks/useSeasonUniforms.js` | 季节 uniform 的**就地更新**（对象身份不变，见 §5.1d） | ✅ P4 |
+| `src/components/canvas/audio/CourtyardAmbience.jsx` | 院子四季声床的挂载点（读 `useSeason` + `useAudio`，按季选预设） | ✅ P2 |
+| `.workbuddy-ai/harness/verify-wo2-seasons.mjs` | WO-2 验收：四声床 / 换季 / 互斥 / 燕子瓢虫季生 | ✅ P2 |
 | `src/components/canvas/entrance/CourtyardProps.jsx` | 荷花缸 / 石桌石凳 / 竹篱 | ⬜ P3 |
 | `src/utils/courtyardArt.js` | 上述道具的程序化贴图 | ⬜ P3 |
 | `src/shaders/seasonFx.js` | 雨幕 / 落雪的 shader | ⬜ P3 |
@@ -718,8 +783,9 @@ uniform float uSnow;          // 0..1 积雪覆盖
 | `src/config/couplets.js` | `seasonOf` 从 `seasons.js` 引入（**删掉本地月份表**）；`resolveCoupletSet/dailyCoupletFor` 收季节**偏好** | ✅ |
 | `src/context/SitePreferences.jsx` | 新增 `season` / `setSeason`（偏好）+ `html[data-season]`；新增 `setTheme` | ✅ P4 |
 | `src/components/canvas/SceneLighting.jsx` | 端点季节化（`endpointsFor` 带缓存）；**换季吸附**（`lastSeason` ref） | ✅ |
-| `src/components/canvas/entrance/EntranceDoors.jsx` | 树与甬路传季节；幕墙压顶积雪；`CoupletWall` 跟偏好重算 | ✅ |
-| `src/components/canvas/entrance/EntranceProps.jsx` | `WindowCurtain` 乘 `seasonGlowFor`；**换季吸附** | ✅ |
+| `src/components/canvas/Experience.jsx` | 挂 `CourtyardAmbience`（与 `EntranceDoors` 同一个 `!hasEntered` 分支） | ✅ P2 |
+| `src/components/canvas/entrance/EntranceDoors.jsx` | 树与甬路传季节；幕墙压顶积雪；`CoupletWall` 跟偏好重算；**瓢虫冬季不挂** | ✅ |
+| `src/components/canvas/entrance/EntranceProps.jsx` | `WindowCurtain` 乘 `seasonGlowFor`；**换季吸附**；**`SwallowNest` 按季 2/2/1/0 只** | ✅ |
 | `src/components/canvas/entrance/EmptyCorridor.jsx` | 草地传季节 uniform（改走 `useSeasonUniforms`） | ✅ |
 | `src/components/canvas/entrance/GateBase.jsx` | 台明/踏跺顶面传季节（落雪；改走 `useSeasonUniforms`） | ✅ |
 | `src/components/canvas/entrance/SignSystem.jsx` | 灯笼乘 `seasonGlowFor`（每帧都写，不需要吸附） | ✅ |
@@ -738,11 +804,14 @@ uniform float uSnow;          // 0..1 积雪覆盖
    **✅ 已答（P1 实现时定的）**：压，但**薄得多**，且乘 `inPath` 只落在石板上。
    石板是**扫过的路**，草边已经吃过厚雪 —— 不乘 `inPath` 草边会比草地还白，
    那条直边接缝立刻回来（§5.2 的历史教训）。见 §5.2b。
-2. **荷花缸的位置**：窗下（与花箱并列）还是台明一侧？需要 P1 截图后定。⬜ 仍待定
-3. **夏天的蝉声**：是走 `ambience` 的常驻铺底，还是走 `sfx` 的偶发？
-   （蝉是**持续**的，倾向 `ambience`；但要有"忽远忽近"的起伏，不能是死循环）⬜ P2
+2. ~~**荷花缸的位置**：窗下（与花箱并列）还是台明一侧？~~ 
+   **✅ 已答（2026-10-10，用户）**：**与花箱并列**（窗下木花箱外侧）。P3 照此实现。
+3. ~~**夏天的蝉声**：是走 `ambience` 的常驻铺底，还是走 `sfx` 的偶发？~~ 
+   **✅ 已答（2026-10-10，用户）**：走 **`ambience` 的常驻铺底**。
+   已按此实现（§5.3 的 `summer-cicada`）：两条 43.0 / 69.6 Hz 的 AM 振鸣，
+   各自的滤波截止上再挂一条慢 LFO 做"忽远忽近" —— 是持续声床，但不是死循环。
 4. **春/夏的树冠是不是太"满"了**：`spring`/`summer` 的 rosette 半径分别取
    `[30,26]` / `[36,30]`，夏天明显更浓 —— 但夏天**没有果实**，所以"浓"是它唯一的
    识别特征。若验收觉得春夏两季分不开，第一个该动的就是这个数。⬜ 待验收
-4. **冬天的树**：秃枝是否要**保留 wind chime 的挂点**？现在风铃挂在树上
+5. **冬天的树**：秃枝是否要**保留 wind chime 的挂点**？现在风铃挂在树上
    （`EntranceDoors` 的 tree group 内 `[0.45, 0.15, 0.05]`），冬秃枝时挂点视觉上还成立吗？

@@ -9,6 +9,7 @@ import TeleportRoom from './corridor/TeleportRoom';
 import HouseExit from './corridor/HouseExit';
 import RoomWarmup from './corridor/RoomWarmup';
 import { SpatialAudioListener } from './audio/SpatialSfx';
+import CourtyardAmbience from './audio/CourtyardAmbience';
 import useInfiniteCamera from '../../hooks/useInfiniteCamera';
 import SignSystem from './entrance/SignSystem';
 import { useScene } from '../../context/SceneContext';
@@ -109,6 +110,14 @@ const Experience = ({ onSceneReady, performanceTier }) => {
             {/* === EMPTY CORRIDOR (provides context during entrance) === */}
             {!hasEntered && (
                 <EmptyCorridor camera={camera} />
+            )}
+
+            {/* === COURTYARD SEASON BED (四季声床) ===
+                与下面的 EntranceDoors 共用同一个 `!hasEntered` 边界 ——
+                进走廊 / 房间它自然卸载，不需要任何额外条件。
+                详见 audio/CourtyardAmbience.jsx 的注释。 */}
+            {!hasEntered && (
+                <CourtyardAmbience />
             )}
 
             {/* === ENTRANCE DOORS (visible until entered) === */}
