@@ -41,6 +41,35 @@ export const SEASON_BED = {
     winter: 'winter-hush',
 };
 
+/**
+ * 季节声床的**电平配平** —— 用户 2026-10-10 反馈「春夏秋听感整体比冬天大」。
+ *
+ * 每条床的层增益都是各自按音色手调的（雨要亮、蝉要冲、冬要空），**从来没有
+ * 对齐过响度**，所以四条床的听感电平差了近 3 倍。实测各层增益的均方根：
+ *
+ *     春 spring-rain    0.1544        ×0.69 → 0.1065
+ *     夏 summer-cicada  0.3055        ×0.35 → 0.1069
+ *     秋 autumn-insects 0.1690        ×0.63 → 0.1065
+ *     冬 winter-hush    0.1065        ×1.00 → 0.1065   ← 以冬天为基准
+ *
+ * 配平**只动增益**，不动任何频率 —— 四条床的"音色身份"（雨的沙沙、蝉的振鸣、
+ * 虫的脉冲、冬的留白）一个都没改，改的只是"多大声"。
+ *
+ * ⚠️ 增益 LFO 的深度（`layer.lfo.depth`）必须**按同一比例缩** —— 它调制的是
+ * 增益本身，不跟着缩的话，缩完的层会被 LFO 推回原来的响度（蝉那层 depth≈gain，
+ * 尤其明显）。滤波 LFO 的深度是 Hz，**不缩**。
+ *
+ * ⚠️ 冬天是 1.00 是**有意的**：这条表的意义是"把春夏秋拉到冬天"，不是"把冬天
+ * 抬到别人那儿"。要整体再降，改 `CourtyardAmbience` 的 `COURTYARD_VOLUME`，
+ * 别在这里动 —— 那是"铺底音量"这个单一旋钮，这张表是"四季之间的相对关系"。
+ */
+export const BED_TRIM = {
+    'spring-rain': 0.69,
+    'summer-cicada': 0.35,
+    'autumn-insects': 0.63,
+    'winter-hush': 1.00,
+};
+
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
 /* ============================================================
@@ -367,6 +396,9 @@ function build(ctx, bus, name, dest) {
     const spec = PRESETS[name];
     if (!spec) return null;
 
+    // 季节声床的电平配平（见 BED_TRIM）。wind/city/sea 不在表里，trim = 1。
+    const trim = BED_TRIM[name] ?? 1;
+
     const started = [];   // 需要 stop() 的 source / oscillator
     const t0 = ctx.currentTime;
 
@@ -389,6 +421,7 @@ function build(ctx, bus, name, dest) {
                 o.type = 'sine';
                 o.frequency.value = f.lfo.rate;
                 const d = ctx.createGain();
+                // ⚠️ 滤波 LFO 的深度是 **Hz**，与电平无关，**不乘 trim**。
                 d.gain.value = f.lfo.depth;
                 o.connect(d).connect(filter.frequency);
                 o.start(t0);
@@ -398,13 +431,15 @@ function build(ctx, bus, name, dest) {
         }
 
         const g = ctx.createGain();
-        g.gain.value = layer.gain;
+        g.gain.value = layer.gain * trim;
         if (layer.lfo) {
             const o = keep(ctx.createOscillator());
             o.type = 'sine';
             o.frequency.value = layer.lfo.rate;
             const d = ctx.createGain();
-            d.gain.value = layer.lfo.depth;
+            // ⚠️ 这是**增益** LFO —— 深度必须跟着 trim 一起缩，
+            // 否则调制会把缩下去的层再推回去（见 BED_TRIM 的注释）。
+            d.gain.value = layer.lfo.depth * trim;
             o.connect(d).connect(g.gain);
             // 相位错开：同频 LFO 起播时间往后挪，就得到错开的相位
             o.start(t0 + (layer.lfo.phase || 0) / layer.lfo.rate);

@@ -64,8 +64,21 @@ const GateBase = ({ worldZ = 0 }) => {
 
     // 台基用墙的 shader，但关掉压顶（uCapFrac > 1 = 这面"墙"没有瓦顶），
     // 于是 0.30 高的整块面都落在勒脚那一段里，直接就是青石。
-    const plinthUniforms = useMemo(() => ({
-        ...makeSurfaceUniforms(PLINTH_W, PLINTH_H, [-PLINTH_W / 2, OUTDOOR_Y]),
+    //
+    // 🔴 2026-10-10：这**也要走季节** —— 它原来是 `useMemo(() => ({...makeSurfaceUniforms(
+    //    PLINTH_W, PLINTH_H, [-PLINTH_W/2, OUTDOOR_Y])...}))`，**没传 season**，
+    //    于是吃到 `makeSurfaceUniforms` 的默认值 `autumn` ⇒ `uSnow` 恒为 0。
+    //    后果：台明/踏跺的顶面（下面两块，走了 useSeasonUniforms）冬天都落雪了，
+    //    唯独**它们脚下那圈台基还是干的** —— 正是本文件开头那句"雪后的院子里只有
+    //    门前那块石头是干的"又犯了一次，只是换了一层。
+    //
+    //    查法（可复现）：`harness/identify-stuck-ground.mjs` —— 它遍历整个场景，
+    //    打印所有 `uSnow === 0` 的贴地 mesh。修之前恰好命中这一块
+    //    （PlaneGeometry 10×0.3 @ world z=22.1，uGrassA 是秋天的 0.408,0.514,0.298）。
+    //    ⚠️ 这类 bug **不会报错、也不会崩**，只会让一块面停在旧季节 —— 所以
+    //    "给 makeSurfaceUniforms 传 season" 这条必须靠工具查，不能靠眼睛。
+    const plinthUniforms = useSeasonUniforms((season) => ({
+        ...makeSurfaceUniforms(PLINTH_W, PLINTH_H, [-PLINTH_W / 2, OUTDOOR_Y], season),
         // 台基上没有门窗洞，把洞推到很远 —— 否则门洞的 discard 会在石台中间
         // 挖掉一块。
         uHoleDoor: { value: [0, 9999, 0, 0] },

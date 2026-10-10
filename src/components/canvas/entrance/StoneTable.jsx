@@ -1,6 +1,6 @@
 import { sharedGeometry } from '../../../engine/resources';
 import { useSeason } from '../../../hooks/useSeason';
-import { makeStoneSlabTexture } from '../../../utils/entranceArt';
+import { makeStoneSlabTexture, makeSnowCapTexture, makeLeafLitterTexture } from '../../../utils/entranceArt';
 
 /**
  * StoneTable — 院子里的石条桌 + 两条石条凳
@@ -121,13 +121,42 @@ const TOP_H = 0.15;
  * ⚠️ 这一条**治不了**倾斜（第 1 条错路就是它），它治的是「剪纸感」。
  */
 const STONE_SIDE = '#7A7266';
-/** 冬天的雪盖。比台明/甬路那层「扫过的薄雪」更厚 —— 路扫过了，桌子没人扫。 */
-const SNOW_TOP = '#E4E9EF';
 /**
- * 雪盖比顶面**每边缩进**这么多：露出一圈石头边，才读得出「雪**落在**石头上」
- * 而不是「桌子是白的」。（原来是「半径 × 0.93」，矩形改成按边缩进。）
+ * 冬天的雪盖。比台明/甬路那层「扫过的薄雪」更厚 —— 路扫过了，桌子没人扫。
+ *
+ * 🔴 2026-10-10 用户报「冬季、桌凳上面的积雪不自然」。原来的写法是
+ * **一块 `#E4E9EF` 的纯色矩形平面**，每边缩进 `SNOW_INSET`：直边 + 均匀色
+ * + 零厚度 ⇒ 读成一张白贴纸。现在这三件事全部画进贴图，见
+ * `entranceArt.js` 的 `makeSnowCapTexture`。**几何仍然是那块平面，没加 mesh。**
+ *
+ * ⚠️ `SNOW_INSET` 的语义变了（值也调过一次）：它原来是**几何**每边缩进的量
+ * （所以边界必然是直线），现在是贴图里啃边圆的**平均**半径 —— 边界因此
+ * 是起伏的。所以雪盖平面现在铺**整块顶面**，缩进交给 alpha。
+ *
+ * 🔴 0.05 → 0.09（2026-10-10）：0.05 时啃边半径 ≈ 6~27 texel，而桌面在默认
+ * 机位下只有 ~180 px 宽、贴图 569 px ⇒ **屏幕降采样 ~3 倍**，啃边只剩 2~8 px，
+ * 读不出来。0.09 让咬痕在屏幕上到 3~11 px，边界的不规则才看得见。
+ *
+ * ⚠️ 雪的**颜色**也不在这里了 —— 它在 `makeSnowCapTexture` 里（贴图自带色，
+ * 材质的 `color` 保持白）。别再在这里写一个 `SNOW_TOP` 常量：两处各写一份
+ * 颜色，改一处漏一处，雪就会和贴图对不上。
  */
-const SNOW_INSET = 0.05;
+const SNOW_INSET = 0.09;
+
+/**
+ * 秋天落在桌上的两枚柿子 —— 用户 2026-10-10 提的「秋季是否放几张落叶和
+ * 2 个果实」。位置是**桌面局部坐标**（group 原点 = 顶面中心），
+ * y 让球心正好坐在桌面上：半径 × 压扁系数 = 0.038 × 0.8 = 0.0304。
+ *
+ * 色号与柿子树的果同族（树上是画的，这里是实体）—— 桌上这两枚读起来
+ * 才是"树上掉下来的"，而不是"摆了两颗橙色的球"。
+ */
+const FRUIT_R = 0.038;
+const FRUIT_SQUASH = 0.8;
+const FRUITS = [
+    { position: [0.30, FRUIT_R * FRUIT_SQUASH, 0.055], color: '#E8722A' },
+    { position: [-0.22, FRUIT_R * FRUIT_SQUASH, -0.075], color: '#D9621F' },
+];
 
 const COLLAR_R = 0.15;
 const COLLAR_H = 0.19;
@@ -188,10 +217,16 @@ const BENCHES = [
 ];
 
 export function StoneTable({ position }) {
-    // 只有冬天需要雪盖 —— 其余季节它 `visible={false}`，一次 draw 都不发。
-    const isWinter = useSeason() === 'winter';
-    // 按 key 缓存，每次 render 调都是同一张
+    // 只有冬天需要雪盖、只有秋天需要落叶 —— 其余季节它们 `visible={false}`，
+    // 一次 draw 都不发。
+    const season = useSeason();
+    const isWinter = season === 'winter';
+    const isAutumn = season === 'autumn';
+    // 三张画法都按 key 缓存，每次 render 调都是同一张（就是一次 Map 查表）
     const stoneTop = makeStoneSlabTexture();
+    const snowTable = makeSnowCapTexture('snow-cap-table', TOP_W / TOP_D, SNOW_INSET);
+    const snowBench = makeSnowCapTexture('snow-cap-bench', BENCH_W / BENCH_D, SNOW_INSET);
+    const leafLitter = makeLeafLitterTexture('leaf-litter-table', TOP_W / TOP_D);
 
     const tableTopY = BASE_H + SHAFT_H + COLLAR_H + TOP_H;      // 0.78（板厚算在里面）
     const benchTopY = BENCH_BODY_H + BENCH_TOP_H;               // 0.45
@@ -236,11 +271,25 @@ export function StoneTable({ position }) {
                         <primitive object={sharedGeometry('plane', TOP_W * 0.995, TOP_D * 0.995)} attach="geometry" />
                         <meshStandardMaterial map={stoneTop} roughness={0.85} />
                     </mesh>
-                    {/* 冬：雪盖 */}
+                    {/* 冬：雪盖 —— 贴图自带不规则落雪边与起伏，见 SNOW_INSET 的注释。
+                        ⚠️ 几何铺**整块顶面**（不再按 SNOW_INSET 缩进）：缩进现在
+                        是贴图的 alpha，边界因此是起伏的而不是一条直线。 */}
                     <mesh visible={isWinter} position={[0, 0.010, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                        <primitive object={sharedGeometry('plane', TOP_W - SNOW_INSET * 2, TOP_D - SNOW_INSET * 2)} attach="geometry" />
-                        <meshStandardMaterial color={SNOW_TOP} roughness={0.95} />
+                        <primitive object={sharedGeometry('plane', TOP_W, TOP_D)} attach="geometry" />
+                        <meshStandardMaterial map={snowTable} alphaTest={0.5} roughness={0.95} />
                     </mesh>
+                    {/* 秋：落叶（一张贴图 + 一块平面 —— 叶子是平的，贴在桌面上读起来
+                        完全对，还省 3 个 mesh）+ 两枚柿子。 */}
+                    <mesh visible={isAutumn} position={[0, 0.008, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                        <primitive object={sharedGeometry('plane', TOP_W, TOP_D)} attach="geometry" />
+                        <meshStandardMaterial map={leafLitter} alphaTest={0.5} roughness={0.9} />
+                    </mesh>
+                    {isAutumn && FRUITS.map((f, i) => (
+                        <mesh key={i} position={f.position} scale={[1, FRUIT_SQUASH, 1]}>
+                            <primitive object={sharedGeometry('sphere', FRUIT_R, 12, 10)} attach="geometry" />
+                            <meshStandardMaterial color={f.color} roughness={0.62} />
+                        </mesh>
+                    ))}
                 </group>
             </group>
 
@@ -263,8 +312,8 @@ export function StoneTable({ position }) {
                             <meshStandardMaterial map={stoneTop} roughness={0.85} />
                         </mesh>
                         <mesh visible={isWinter} position={[0, 0.010, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                            <primitive object={sharedGeometry('plane', BENCH_W - SNOW_INSET * 2, BENCH_D - SNOW_INSET * 2)} attach="geometry" />
-                            <meshStandardMaterial color={SNOW_TOP} roughness={0.95} />
+                            <primitive object={sharedGeometry('plane', BENCH_W, BENCH_D)} attach="geometry" />
+                            <meshStandardMaterial map={snowBench} alphaTest={0.5} roughness={0.95} />
                         </mesh>
                     </group>
                 </group>

@@ -2265,3 +2265,188 @@ export function makeStoneSlabTexture(key = 'stone-slab-top') {
 
     return toTexture(canvas, key);
 }
+
+/* ------------------------------------------------------------------ */
+/* 石桌的季生物证：冬雪盖 / 秋落叶                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 石桌 / 石凳顶面的**积雪**（RGBA，带 alpha 边）。
+ *
+ * 🔴 2026-10-10 用户报「冬季、桌凳上面的积雪不自然」。原来是一块
+ * `#E4E9EF` 的**纯色矩形平面**，每边缩进 0.05 —— 三个毛病叠在一起：
+ *
+ *   1. **直边**。真雪的边界是"积到哪儿算哪儿"，没有一条直边；一条笔直的
+ *      边会立刻读成"贴上去的"。
+ *   2. **均匀色**。平光场景里一块均匀的浅灰 = 零信息，眼睛读不出这是雪
+ *      还是刷了白漆。雪需要**起伏**（哪怕只是画出来的）。
+ *   3. **厚度为零**。平面没有侧壁，边缘没有任何"厚"的暗示。
+ *
+ * 修法就是把这三件事画进贴图（几何仍然是那块平面，**不加 mesh**）：
+ *   - 用 `destination-out` 沿周长啃一圈大小不一的圆 ⇒ 不规则落雪线；
+ *   - 中心的提亮 + 靠边的冷暗 ⇒ 鼓起来的感觉；
+ *   - 几十个极淡的亮/暗斑 ⇒ 雪面的起伏。
+ *
+ * 缩进从几何搬到了贴图：原来 `SNOW_INSET` 是**几何**每边缩 0.05（所以边界
+ * 是直线），现在它是啃边圆的**平均**半径，边界因此是起伏的 —— 语义没变，
+ * 但不再是矩形。调用方传**整块顶面**的几何即可。
+ *
+ * @param {string} key   缓存键（同一个 key 只会烘一次）
+ * @param {number} aspect 顶面宽高比（画布按真实宽高比出，别让贴图被拉伸）
+ * @param {number} inset  平均缩进，占短边的比例
+ */
+export function makeSnowCapTexture(key = 'snow-cap', aspect = 2.22, inset = 0.05) {
+    if (cache.has(key)) return cache.get(key);
+
+    const H = 256;
+    const W = Math.max(64, Math.round(H * aspect));
+    const canvas = makeCanvas(W, H);
+    const ctx = canvas.getContext('2d');
+    const rand = mulberry32(hashString(key));
+
+    // ---- 1. 底色：**不是纯白** ----------------------------------------
+    // 纯白在平光下是一块死白；比石面略冷、略亮的那一点点色差才是"雪"。
+    ctx.fillStyle = '#E4E9EF';
+    ctx.fillRect(0, 0, W, H);
+
+    // ---- 2. 厚度：中心提亮 + 靠边冷暗 ---------------------------------
+    // ⚠️ 必须在"啃边"**之前**画：啃完之后边界就不是矩形了，径向渐变对不上。
+    const g = ctx.createRadialGradient(W * 0.40, H * 0.32, H * 0.05, W * 0.50, H * 0.50, W * 0.62);
+    g.addColorStop(0.00, 'rgba(255, 255, 255, 0.52)');
+    g.addColorStop(0.42, 'rgba(244, 247, 251, 0.20)');
+    g.addColorStop(1.00, 'rgba(194, 203, 217, 0.34)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    // ---- 3. 雪面的起伏：几十个极淡的亮/暗斑 ---------------------------
+    for (let i = 0; i < 70; i++) {
+        const cx = rand() * W;
+        const cy = rand() * H;
+        const r = H * (0.05 + rand() * 0.16);
+        const light = rand() > 0.42;
+        const rg = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        rg.addColorStop(0, light ? 'rgba(255,255,255,0.30)' : 'rgba(186,196,211,0.26)');
+        rg.addColorStop(1, light ? 'rgba(255,255,255,0)' : 'rgba(186,196,211,0)');
+        ctx.fillStyle = rg;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // ---- 3b. 周长采样点（啃边与"薄雪"共用同一组，见下） ----------------
+    const m = Math.min(W, H) * inset;
+    const per = 2 * (W + H);
+    const steps = Math.round(per / 3);       // ≈3 px 一个，保证 stamp 彼此重叠
+    const pts = [];
+    for (let i = 0; i < steps; i++) {
+        const d = (i / steps) * per;
+        let x, y;
+        if (d < W) { x = d; y = 0; }
+        else if (d < W + H) { x = W; y = d - W; }
+        else if (d < 2 * W + H) { x = W - (d - W - H); y = H; }
+        else { x = 0; y = H - (d - 2 * W - H); }
+        pts.push([x, y, rand()]);
+    }
+
+    // ---- 4. 贴边的「薄雪」：沿周长压一圈**软**的冷色 -------------------
+    // 真雪的边是薄的，薄到透出底下的石色 —— 所以边缘比中心更冷、更暗。
+    // 这一笔给"厚度递减"，下面的啃边给"形状"，两者是一对。
+    // ⚠️ 必须画在啃边**之前**：啃边会把这一圈的外侧连色一起擦掉，于是最终
+    //    可见的边界是这条冷带的**内侧**，而不是一个硬框。
+    //
+    // 🔴 强度只能到这个量级（2026-10-10 调过一版）：alpha 0.50 + 色号
+    //    (164,178,199) 时，桌上会读出一圈明显的**蓝边**，像一汪水/一块冰，
+    //    而不是雪。雪边的冷是"一点点"，所以现在压到 0.30 且色号更中性。
+    for (const [x, y, j] of pts) {
+        const r = m * (1.5 + j * 1.3);
+        const cr = ctx.createRadialGradient(x, y, 0, x, y, r);
+        cr.addColorStop(0.00, 'rgba(178, 188, 205, 0.30)');
+        cr.addColorStop(0.50, 'rgba(186, 195, 210, 0.12)');
+        cr.addColorStop(1.00, 'rgba(192, 200, 214, 0)');
+        ctx.fillStyle = cr;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // ---- 5. 啃边：把矩形边界咬成不规则的落雪线 ------------------------
+    // 🔴 这是整张图存在的理由。沿周长 stamp 一串大小不一的圆，比"按噪声算
+    //    半径再连成多边形"简单得多，而且**天然不可能留下直边**。
+    //
+    // 🔴🔴 **`fillStyle` 必须在这里显式设成不透明的**（2026-10-10 修的真 bug）。
+    //    原来这一行漏了：`fillStyle` 还是第 3 步最后一次 `createRadialGradient`
+    //    留下的**那个局部渐变**（半径 r、r 以外 alpha 恒为 0）。而
+    //    `destination-out` 的擦除量 = **源的 alpha** ⇒ 整圈啃边**一个像素都没擦掉**，
+    //    边界仍是直线；唯一擦到的，是恰好落在最后那个斑圆心附近的一小块
+    //    （凳面贴图右下角那块深色圆斑就是这么来的）。
+    //    后果：雪盖读起来还是"一张白贴纸"—— 用户报的正是这个。
+    //    ⚠️ 这类 bug **不报错、不警告**，只有把贴图单独画出来看才发现
+    //      （根目录 `__artpreview.html`，5 秒）。
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = '#000';
+    const bite = (x, y, r) => { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
+    for (const [x, y, j] of pts) bite(x, y, m * (0.35 + j * 1.15));
+    // 再往内撒几个孔：雪没盖满、露着石头的点（纯白平铺会像塑料布）。
+    // ⚠️ 每个孔由 3~5 个小圆**错位叠成**，不能是单个正圆 —— 单个正圆在
+    //    2.2:1 的贴图上会读成一排"波点"，比不画还假。
+    // ⚠️ 也不能大：`alphaTest = 0.5` 之下，孔是"石头直接露出来"（不是薄雪），
+    //    半径超过 ~m×0.3 就会变成一个个黑洞。
+    for (let i = 0; i < 4; i++) {
+        const hx = W * (0.14 + rand() * 0.72);
+        const hy = H * (0.18 + rand() * 0.64);
+        const n = 3 + Math.floor(rand() * 3);
+        for (let k = 0; k < n; k++) {
+            bite(hx + (rand() - 0.5) * m * 0.6, hy + (rand() - 0.5) * m * 0.6, m * (0.08 + rand() * 0.10));
+        }
+    }
+    ctx.globalCompositeOperation = 'source-over';
+
+    return toTexture(canvas, key);
+}
+
+/**
+ * 桌面上的**落叶**（RGBA，透明底，一片平面铺上去）。
+ *
+ * 用户 2026-10-10：「秋季是否放几张落叶和 2 个果实」。叶形复用 `drawLeaf`
+ * —— 和柿子树上的叶子是同一套笔法，所以落在桌上的叶子和长在树上的
+ * **看起来是一棵树掉下来的**。（这与 memory 里那条"共用画法要检查形状是否
+ * 适用"的教训不冲突：这里要的就是一致，不是复用带来的错位。）
+ *
+ * 用**一张贴图 + 一块平面**而不是四块平面：落叶是平的，贴在桌面上读起来
+ * 完全对，而且省 3 个 mesh。
+ */
+export function makeLeafLitterTexture(key = 'leaf-litter', aspect = 2.22) {
+    if (cache.has(key)) return cache.get(key);
+
+    const H = 256;
+    const W = Math.max(64, Math.round(H * aspect));
+    const canvas = makeCanvas(W, H);
+    const ctx = canvas.getContext('2d');
+    const rand = mulberry32(hashString(key));
+
+    // 秋天落叶的四档色：赭 / 砖 / 枯 / 黄。压得比树上的果略暗，
+    // 免得桌上比树上还抢眼。
+    const FILL = ['#C9762B', '#A9532A', '#8E5A2A', '#D19A3C'];
+    // 6 片主体叶 + 2 片碎叶。
+    // ⚠️ 桌面在默认机位下只有 ~180 px 宽，而这张贴图 569 px ⇒ 屏幕上被**降采样
+    //    ~3 倍**。所以叶片不能太小：`len` 取 0.10..0.20 的 H（≈26..51 px 贴图
+    //    ≈ 8..16 px 屏幕），再小就糊成土色噪点、读不出"叶子"了。
+    // ⚠️ 位置避开四周 10% —— 叶尖探出矩形会被 `alphaTest` 直接切掉半个。
+    for (let i = 0; i < 6; i++) {
+        const x = W * (0.10 + rand() * 0.76);
+        const y = H * (0.18 + rand() * 0.62);
+        const ang = rand() * Math.PI * 2;
+        const len = H * (0.10 + rand() * 0.10);
+        const wid = len * (0.30 + rand() * 0.16);
+        drawLeaf(ctx, x, y, ang, len, wid, FILL[i % FILL.length], '#7A4318', 0.95);
+    }
+    // 两片碎叶：真实的落叶堆里总有几片只剩一半的
+    for (let i = 0; i < 2; i++) {
+        drawLeaf(ctx, W * (0.14 + rand() * 0.70), H * (0.22 + rand() * 0.56),
+            rand() * Math.PI * 2, H * (0.05 + rand() * 0.03), H * 0.020,
+            FILL[(i + 1) % FILL.length], '#7A4318', 0.85);
+    }
+
+    return toTexture(canvas, key);
+}
+
