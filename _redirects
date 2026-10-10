@@ -1,0 +1,11 @@
+# Cloudflare Pages 的路径重写规则。GitHub Pages 会忽略这个文件。
+# 语法：<来源> <目标> <状态码>
+#
+# 精确规则必须排在 SPA 兜底之前，否则会被兜底先吃掉。
+
+# 名片页（me/index.html 是 Vite 的第二个 entry）。
+# 带斜杠的 /me/ 本来就能命中目录里的 index.html，这里只补不带斜杠的情况。
+/me   /me/index.html   200
+
+# 其余路径（/gallery、/about 等）由 Cloudflare Pages 的 SPA 兜底处理，
+# 落到 404.html —— 构建时由 vite.config.js 从 index.html 复制而来。

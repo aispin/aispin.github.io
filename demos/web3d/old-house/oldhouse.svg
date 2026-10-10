@@ -1,0 +1,202 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 1010" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FDF8F3"/>
+      <stop offset="100%" stop-color="#F3E3D2"/>
+    </linearGradient>
+    <linearGradient id="titleBar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#C2410C"/>
+      <stop offset="60%" stop-color="#EA580C"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+    <linearGradient id="doorGlow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFD28A"/>
+      <stop offset="100%" stop-color="#FFB347"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1100" height="1010" fill="url(#bg)"/>
+
+  <!-- 顶部标题 -->
+  <rect x="35" y="28" width="6" height="52" rx="3" fill="url(#titleBar)"/>
+  <text x="55" y="58" font-size="25" font-weight="700" fill="#1C1917">Web 3D 实战及技术拆解</text>
+  <text x="55" y="82" font-size="13" fill="#78716C">黄昏小院 · 老房子 · 柿子树 · 石桌 · 祖孙三人 · 小狗 · 门内黄光</text>
+
+  <!-- ① 场景拆解 -->
+  <text x="35" y="132" font-size="15" font-weight="700" fill="#C2410C">① 场景拆解</text>
+  <line x1="130" y1="126" x2="1065" y2="126" stroke="#E7D5C0" stroke-width="1"/>
+
+  <!-- 卡片 1 老房子 -->
+  <rect x="35" y="148" width="160" height="128" rx="12" fill="#FFFFFF" stroke="#F0DCC6" stroke-width="1.5"/>
+  <g transform="translate(115,190)">
+    <rect x="-22" y="-4" width="44" height="24" fill="#B08968"/>
+    <polygon points="-26,-4 0,-22 26,-4" fill="#7A5B42"/>
+    <rect x="-6" y="8" width="12" height="12" fill="url(#doorGlow)"/>
+  </g>
+  <text x="115" y="238" font-size="13" font-weight="600" fill="#1C1917" text-anchor="middle">老房子</text>
+  <text x="115" y="258" font-size="10.5" fill="#78716C" text-anchor="middle">几何体拼装</text>
+  <text x="115" y="272" font-size="10.5" fill="#78716C" text-anchor="middle">程序化木纹</text>
+
+  <!-- 卡片 2 柿子树 -->
+  <rect x="208" y="148" width="160" height="128" rx="12" fill="#FFFFFF" stroke="#F0DCC6" stroke-width="1.5"/>
+  <g transform="translate(288,182)">
+    <rect x="-3" y="0" width="6" height="30" fill="#5C4632"/>
+    <circle cx="0" cy="-6" r="20" fill="#4A7A3E" opacity="0.9"/>
+    <circle cx="-11" cy="2" r="14" fill="#3F7A3A" opacity="0.9"/>
+    <circle cx="11" cy="0" r="13" fill="#4A7A3E" opacity="0.9"/>
+    <circle cx="-6" cy="-12" r="2.6" fill="#FF6A18"/>
+    <circle cx="8" cy="-4" r="2.6" fill="#FF6A18"/>
+    <circle cx="2" cy="6" r="2.6" fill="#FF6A18"/>
+  </g>
+  <text x="288" y="238" font-size="13" font-weight="600" fill="#1C1917" text-anchor="middle">柿子树</text>
+  <text x="288" y="258" font-size="10.5" fill="#78716C" text-anchor="middle">递归生长</text>
+  <text x="288" y="272" font-size="10.5" fill="#78716C" text-anchor="middle">实例化 + 风动</text>
+
+  <!-- 卡片 3 圆石桌 -->
+  <rect x="381" y="148" width="160" height="128" rx="12" fill="#FFFFFF" stroke="#F0DCC6" stroke-width="1.5"/>
+  <g transform="translate(461,196)">
+    <ellipse cx="0" cy="-6" rx="34" ry="9" fill="#A89E92"/>
+    <rect x="-4" y="-6" width="8" height="26" fill="#918879"/>
+    <ellipse cx="0" cy="20" rx="14" ry="4" fill="#7E7568"/>
+  </g>
+  <text x="461" y="238" font-size="13" font-weight="600" fill="#1C1917" text-anchor="middle">圆石桌</text>
+  <text x="461" y="258" font-size="10.5" fill="#78716C" text-anchor="middle">圆柱几何</text>
+  <text x="461" y="272" font-size="10.5" fill="#78716C" text-anchor="middle">石材 PBR</text>
+
+  <!-- 卡片 4 祖孙三人 -->
+  <rect x="554" y="148" width="160" height="128" rx="12" fill="#FFFFFF" stroke="#F0DCC6" stroke-width="1.5"/>
+  <g transform="translate(634,196)">
+    <circle cx="-22" cy="-8" r="7" fill="#D9B38C"/>
+    <rect x="-29" y="0" width="14" height="20" rx="7" fill="#7A5B8E"/>
+    <circle cx="0" cy="-12" r="6" fill="#D9B38C"/>
+    <rect x="-6" y="-5" width="12" height="17" rx="6" fill="#4A6B8E"/>
+    <circle cx="22" cy="-8" r="7" fill="#D9B38C"/>
+    <rect x="15" y="0" width="14" height="20" rx="7" fill="#8E5B5B"/>
+  </g>
+  <text x="634" y="238" font-size="13" font-weight="600" fill="#1C1917" text-anchor="middle">祖孙三人</text>
+  <text x="634" y="258" font-size="10.5" fill="#78716C" text-anchor="middle">低多边形胶囊</text>
+  <text x="634" y="272" font-size="10.5" fill="#78716C" text-anchor="middle">剪影构图</text>
+
+  <!-- 卡片 5 小狗 -->
+  <rect x="727" y="148" width="160" height="128" rx="12" fill="#FFFFFF" stroke="#F0DCC6" stroke-width="1.5"/>
+  <g transform="translate(807,200)">
+    <rect x="-20" y="-6" width="34" height="14" rx="5" fill="#D8B078"/>
+    <rect x="12" y="-14" width="14" height="13" rx="4" fill="#D8B078"/>
+    <rect x="23" y="-11" width="5" height="5" rx="2" fill="#8B6B48"/>
+    <rect x="-18" y="7" width="4" height="10" fill="#C09A66"/>
+    <rect x="2" y="7" width="4" height="10" fill="#C09A66"/>
+    <rect x="-24" y="-14" width="4" height="12" rx="2" fill="#C09A66" transform="rotate(-25 -22 -8)"/>
+  </g>
+  <text x="807" y="238" font-size="13" font-weight="600" fill="#1C1917" text-anchor="middle">小狗</text>
+  <text x="807" y="258" font-size="10.5" fill="#78716C" text-anchor="middle">基础几何</text>
+  <text x="807" y="272" font-size="10.5" fill="#78716C" text-anchor="middle">尾巴顶点摆动</text>
+
+  <!-- 卡片 6 门内黄光 -->
+  <rect x="900" y="148" width="165" height="128" rx="12" fill="#FFFFFF" stroke="#FFC97A" stroke-width="2"/>
+  <g transform="translate(982,196)">
+    <rect x="-26" y="-22" width="52" height="44" rx="3" fill="#2A1E18"/>
+    <rect x="-14" y="-14" width="28" height="36" rx="2" fill="url(#doorGlow)"/>
+    <circle cx="0" cy="4" r="30" fill="#FFB347" opacity="0.16"/>
+    <circle cx="0" cy="4" r="18" fill="#FFD28A" opacity="0.22"/>
+  </g>
+  <text x="982" y="238" font-size="13" font-weight="600" fill="#C2410C" text-anchor="middle">门内黄光 ★</text>
+  <text x="982" y="258" font-size="10.5" fill="#78716C" text-anchor="middle">点光源 + 光锥</text>
+  <text x="982" y="272" font-size="10.5" fill="#78716C" text-anchor="middle">场景的灵魂</text>
+
+  <!-- ② 技术分工 -->
+  <text x="35" y="320" font-size="15" font-weight="700" fill="#C2410C">② 技术分工</text>
+  <line x1="130" y1="314" x2="1065" y2="314" stroke="#E7D5C0" stroke-width="1"/>
+
+  <!-- Three.js -->
+  <rect x="35" y="336" width="1030" height="58" rx="12" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1.5"/>
+  <rect x="35" y="336" width="6" height="58" rx="3" fill="#10B981"/>
+  <text x="62" y="362" font-size="15" font-weight="700" fill="#047857">Three.js</text>
+  <text x="62" y="381" font-size="11" fill="#059669">场景主框架</text>
+  <text x="175" y="371" font-size="12.5" fill="#064E3B">几何 · 相机 · 光照 · 阴影 · 雾 · 实例化 · 渲染循环 · OrbitControls</text>
+
+  <!-- GLSL -->
+  <rect x="35" y="402" width="1030" height="58" rx="12" fill="#F5F3FF" stroke="#DDD6FE" stroke-width="1.5"/>
+  <rect x="35" y="402" width="6" height="58" rx="3" fill="#8B5CF6"/>
+  <text x="62" y="428" font-size="15" font-weight="700" fill="#6D28D9">GLSL</text>
+  <text x="62" y="447" font-size="11" fill="#7C3AED">注入灵魂</text>
+  <text x="175" y="437" font-size="12.5" fill="#4C1D95">黄昏天空渐变 · 程序化木纹 · 光锥体积感 · 风吹树动 · 萤火虫闪烁</text>
+
+  <!-- SVG / Canvas -->
+  <rect x="35" y="468" width="1030" height="58" rx="12" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="1.5"/>
+  <rect x="35" y="468" width="6" height="58" rx="3" fill="#3B82F6"/>
+  <text x="62" y="494" font-size="15" font-weight="700" fill="#1D4ED8">SVG / Canvas</text>
+  <text x="62" y="513" font-size="11" fill="#2563EB">页面皮相</text>
+  <text x="175" y="503" font-size="12.5" fill="#1E3A8A">标题装饰 · 图标按钮 · 加载动画 · 数据可视化 · 不上场做 3D</text>
+
+  <!-- CloudBase -->
+  <rect x="35" y="534" width="1030" height="58" rx="12" fill="#ECFEFF" stroke="#A5F3FC" stroke-width="1.5"/>
+  <rect x="35" y="534" width="6" height="58" rx="3" fill="#06B6D4"/>
+  <text x="62" y="560" font-size="15" font-weight="700" fill="#0E7490">CloudBase</text>
+  <text x="62" y="579" font-size="11" fill="#0891B2">薄后端</text>
+  <text x="175" y="569" font-size="12.5" fill="#155E75">一个 HTTP 云函数装多路由 · 登录 · 分享 · 场景配置同步 · 支付独立函数</text>
+
+  <!-- ③ 光照设计与性能 -->
+  <text x="35" y="628" font-size="15" font-weight="700" fill="#C2410C">③ 光照设计与性能</text>
+  <line x1="175" y1="622" x2="1065" y2="622" stroke="#E7D5C0" stroke-width="1"/>
+
+  <!-- 左：光照 -->
+  <rect x="35" y="644" width="510" height="300" rx="14" fill="#FFFFFF" stroke="#F0DCC6" stroke-width="1.5"/>
+  <rect x="35" y="644" width="510" height="5" rx="2.5" fill="#F59E0B"/>
+  <text x="58" y="678" font-size="14" font-weight="700" fill="#92400E">光照设计 —— 不是打亮，是讲故事</text>
+
+  <rect x="58" y="696" width="464" height="34" rx="8" fill="#FFFBEB"/>
+  <text x="72" y="718" font-size="12" font-weight="600" fill="#78350F">天空光</text>
+  <text x="152" y="718" font-size="11.5" fill="#92400E">HemisphereLight · 暖顶冷底 · 0.55</text>
+  <text x="432" y="718" font-size="11" fill="#B45309">环境底</text>
+
+  <rect x="58" y="736" width="464" height="34" rx="8" fill="#FEF3C7"/>
+  <text x="72" y="758" font-size="12" font-weight="600" fill="#78350F">太阳</text>
+  <text x="152" y="758" font-size="11.5" fill="#92400E">DirectionalLight · 低角度 · 1.4 · 投长影</text>
+  <text x="432" y="758" font-size="11" fill="#B45309">时间感</text>
+
+  <rect x="58" y="776" width="464" height="34" rx="8" fill="#FFEDD5"/>
+  <text x="72" y="798" font-size="12" font-weight="600" fill="#C2410C">门内黄光 ★</text>
+  <text x="152" y="798" font-size="11.5" fill="#9A3412">PointLight 0xFFB347 · 强度 15 · 光锥 mesh</text>
+  <text x="432" y="798" font-size="11" fill="#C2410C">灵魂</text>
+
+  <rect x="58" y="816" width="464" height="34" rx="8" fill="#EFF6FF"/>
+  <text x="72" y="838" font-size="12" font-weight="600" fill="#1E40AF">补光</text>
+  <text x="152" y="838" font-size="11.5" fill="#1D4ED8">冷色 DirectionalLight · 0.3 · 勾轮廓</text>
+  <text x="432" y="838" font-size="11" fill="#2563EB">层次</text>
+
+  <text x="58" y="880" font-size="11.5" fill="#78716C">雾：FogExp2(0xD9955E, 0.018) · 远处融进黄昏 · ACESFilmic 收敛高光</text>
+  <text x="58" y="902" font-size="11.5" fill="#78716C">阴影只给太阳和门内光 · 其余光源关闭阴影 · 性能与画质平衡</text>
+  <text x="58" y="924" font-size="11.5" fill="#B45309" font-weight="600">黄光打在石桌后方，把祖孙三人的轮廓勾出暖边</text>
+
+  <!-- 右：性能 -->
+  <rect x="565" y="644" width="500" height="300" rx="14" fill="#FFFFFF" stroke="#F0DCC6" stroke-width="1.5"/>
+  <rect x="565" y="644" width="500" height="5" rx="2.5" fill="#10B981"/>
+  <text x="588" y="678" font-size="14" font-weight="700" fill="#047857">性能与体验</text>
+
+  <circle cx="596" cy="708" r="4" fill="#10B981"/>
+  <text x="612" y="713" font-size="12" fill="#1C1917">柿子 / 叶 / 萤火虫全部 <tspan font-weight="600">InstancedMesh + Points</tspan></text>
+
+  <circle cx="596" cy="740" r="4" fill="#10B981"/>
+  <text x="612" y="745" font-size="12" fill="#1C1917">draw call 控制在 <tspan font-weight="600">30 以内</tspan></text>
+
+  <circle cx="596" cy="772" r="4" fill="#10B981"/>
+  <text x="612" y="777" font-size="12" fill="#1C1917">阴影贴图：太阳 <tspan font-weight="600">2048</tspan> · 门光 <tspan font-weight="600">1024</tspan></text>
+
+  <circle cx="596" cy="804" r="4" fill="#10B981"/>
+  <text x="612" y="809" font-size="12" fill="#1C1917">材质全程序化 · <tspan font-weight="600">零贴图请求</tspan> · 首屏只加载 JS</text>
+
+  <circle cx="596" cy="836" r="4" fill="#10B981"/>
+  <text x="612" y="841" font-size="12" fill="#1C1917">移动端降级：关 Bloom · 阴影 1024 · 粒子减半</text>
+
+  <circle cx="596" cy="868" r="4" fill="#10B981"/>
+  <text x="612" y="873" font-size="12" fill="#1C1917">按需渲染 · 静止时降帧 · 保 60fps</text>
+
+  <rect x="588" y="892" width="454" height="36" rx="8" fill="#ECFDF5"/>
+  <text x="602" y="915" font-size="12" font-weight="600" fill="#047857">浏览器与硬件已成熟：WebGL 2 覆盖率 &gt; 97%</text>
+
+  <!-- 金句 -->
+  <rect x="35" y="962" width="1030" height="36" rx="10" fill="#1C1917"/>
+  <text x="550" y="985" font-size="13" font-weight="600" fill="#FCD9A8" text-anchor="middle">
+    真正让画面动人的，不是多边形数量，而是那盏从门里透出来的黄光。
+  </text>
+</svg>

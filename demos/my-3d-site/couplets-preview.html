@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<title>门联文案 · 24 节气 + 传统节日</title>
+<meta name="description" content="3D 院子里那副门联的全部文案底稿：42 副七言对联 —— 4 副四季日常联 + 1 副彩蛋 + 24 节气 + 10 个传统节日 + 3 个法定假期，外加日期解析规则与 2026–2027 年的实际命中日期。">
+<meta name="robots" content="noindex">
+<style>
+  :root{--cream:#fff6e9;--ink:#3a2e28;--red:#c9331f;--gold:#a8801f;--line:#e3d3bd}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--cream);color:var(--ink);
+    font:15px/1.7 "Songti SC","STSong","Noto Serif CJK SC",serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:40px 24px 80px}
+  h1{font-size:30px;margin:0 0 6px;letter-spacing:.04em}
+  .sub{color:#8a7460;margin:0 0 28px}
+  .todaybox{background:#fff;border:1px solid var(--line);border-left:5px solid var(--red);
+    border-radius:10px;padding:16px 20px;margin-bottom:32px}
+  .todaybox b{color:var(--red)}
+  h2{font-size:20px;margin:40px 0 6px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+  .sect-note{color:#8a7460;font-size:13px;margin:0 0 14px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px}
+  .card{position:relative;background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px 14px}
+  .card.today{border-color:var(--red);box-shadow:0 0 0 3px rgba(201,51,31,.12)}
+  .badge{position:absolute;top:-11px;right:14px;background:var(--red);color:#fff;
+    font-size:12px;padding:2px 10px;border-radius:20px}
+  .card header{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px}
+  .card h3{margin:0;font-size:18px}
+  .card code{font:11px/1 ui-monospace,monospace;color:#a8927c}
+  .banner{display:inline-block;background:linear-gradient(#e04230,#a3200f);color:#f7e3a1;
+    padding:4px 14px;border-radius:5px;letter-spacing:.34em;font-size:16px;margin-bottom:12px}
+  .strips{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .strip{background:#fdf3e6;border:1px solid var(--line);border-radius:8px;padding:9px 10px}
+  .strip .tag{font-size:11px;color:var(--gold);letter-spacing:.06em}
+  .strip p{margin:4px 0 0;font-size:17px;letter-spacing:.12em}
+  .when{margin:12px 0 0;font-size:12px;color:#8a7460;word-break:break-all;line-height:1.9}
+  .when b{color:#6b5844}
+  .when .yr{display:inline-block;min-width:34px;color:#a8801f;font-weight:700}
+  .legend{font-size:13px;color:#8a7460;margin:8px 0 0}
+</style></head>
+<body><div class="wrap">
+  <h1>门联文案 · 24 节气 + 传统节日</h1>
+  <p class="sub">共 42 副。全部七言，横批四字 —— 这是 <code>makeCoupletTexture</code> 的版式硬约束，不是风格选择。</p>
+
+  <div class="todaybox">
+    今天（2026-10-09）自动挂的是 <b>秋季日常联</b>
+    —— 命中原因 <code>default</code>（兜底），即
+    「桂子飘香 / 泽沾桂露香浮案 / 昊卷桐阴月满楼」。
+    <div class="legend">下面标红的那张卡就是它。本页由 <code>.workbuddy-ai/harness/gen-couplets-preview.mjs</code> 生成，别手改。</div>
+  </div>
+
+  <h2>日常 · 按季节四选一</h2>
+  <p class="sect-note">兜底分支。3–5 春 / 6–8 夏 / 9–11 秋 / 12–2 冬，按公历月份切。</p>
+  <div class="grid">
+    <article class="card">
+      <header>
+        <h3>春季</h3>
+        <code>zehao-spring</code>
+      </header>
+      <div class="banner">一庭春色</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>泽润庭花初入砚</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>昊涵云影自临窗</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b>2026：<b>79</b> 天（3–5 月）　2027：<b>78</b> 天（3–5 月）</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>夏季</h3>
+        <code>zehao-summer</code>
+      </header>
+      <div class="banner">荷风满院</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>泽生荷气清浮座</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>昊送蝉声静入书</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b>2026：<b>83</b> 天（6–8 月）　2027：<b>84</b> 天（6–8 月）</p>
+    </article>
+    <article class="card today">
+      <div class="badge">今天就是这一副</div>
+      <header>
+        <h3>秋季</h3>
+        <code>zehao-autumn</code>
+      </header>
+      <div class="banner">桂子飘香</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>泽沾桂露香浮案</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>昊卷桐阴月满楼</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b>2026：<b>76</b> 天（9–11 月）　2027：<b>77</b> 天（9–11 月）</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>冬季</h3>
+        <code>zehao-winter</code>
+      </header>
+      <div class="banner">围炉夜读</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>泽凝炉火温书卷</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>昊映雪光冷画屏</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b>2026：<b>74</b> 天（1–12 月）　2027：<b>72</b> 天（1–12 月）</p>
+    </article></div>
+
+  <h2>彩蛋</h2>
+  <p class="sect-note">没有 UI 入口，只在 `?couplet=funny` 时出现。</p>
+  <div class="grid">
+    <article class="card">
+      <header>
+        <h3>搞笑</h3>
+        <code>funny</code>
+      </header>
+      <div class="banner">能跑就行</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>代码千行无告警</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>咖啡三盏到天明</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><i>不出现</i></p>
+    </article></div>
+
+  <h2>24 节气</h2>
+  <p class="sect-note">当天命中。清明例外：前后各一天（法定假期是 3 天）。</p>
+  <div class="grid">
+    <article class="card">
+      <header>
+        <h3>立春</h3>
+        <code>lichun</code>
+      </header>
+      <div class="banner">东风解冻</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>檐冰滴砚初濡墨</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>庭草回青已报春</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 02-04<br><span class="yr">2027</span> 02-04</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>雨水</h3>
+        <code>yushui</code>
+      </header>
+      <div class="banner">润物无声</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>一犁好雨匀春垄</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>半砚新泉养墨花</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2027</span> 02-19</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>惊蛰</h3>
+        <code>jingzhe</code>
+      </header>
+      <div class="banner">春雷启蛰</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>雷惊蛰户虫初动</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>雨润新芽绿渐肥</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 03-05<br><span class="yr">2027</span> 03-06</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>春分</h3>
+        <code>chunfen</code>
+      </header>
+      <div class="banner">昼夜均分</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>昼夜均分春正半</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>燕莺初到日方长</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2027</span> 03-21</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>清明</h3>
+        <code>qingming</code>
+      </header>
+      <div class="banner">春和景明</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>梨花落后春犹在</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>燕子归时雨亦香</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 04-04 04-05 04-06<br><span class="yr">2027</span> 04-04 04-05 04-06</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>谷雨</h3>
+        <code>guyu</code>
+      </header>
+      <div class="banner">雨生百谷</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>雨生百谷催耕急</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>风落千花入砚香</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 04-20<br><span class="yr">2027</span> 04-20</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>立夏</h3>
+        <code>lixia</code>
+      </header>
+      <div class="banner">绿阴初密</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>树阴初密春归去</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>荷气微生夏始来</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2027</span> 05-06</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>小满</h3>
+        <code>xiaoman</code>
+      </header>
+      <div class="banner">麦齐榴绽</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>麦穗初齐蚕欲老</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>榴花半放雨初晴</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 05-21<br><span class="yr">2027</span> 05-21</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>芒种</h3>
+        <code>mangzhong</code>
+      </header>
+      <div class="banner">梅雨催耕</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>芒种催耕梅雨近</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>竹风送爽墨花香</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 06-05<br><span class="yr">2027</span> 06-06</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>夏至</h3>
+        <code>xiazhi</code>
+      </header>
+      <div class="banner">日长蝉噪</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>日长至后阴初动</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>蝉噪声中昼正闲</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 06-21<br><span class="yr">2027</span> 06-21</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>小暑</h3>
+        <code>xiaoshu</code>
+      </header>
+      <div class="banner">温风始至</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>温风始至蝉初噪</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>溽暑方来扇未停</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 07-07<br><span class="yr">2027</span> 07-07</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>大暑</h3>
+        <code>dashu</code>
+      </header>
+      <div class="banner">炎威正炽</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>炎威正炽蝉声急</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>凉雨忽来荷气清</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 07-23<br><span class="yr">2027</span> 07-23</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>立秋</h3>
+        <code>liqiu</code>
+      </header>
+      <div class="banner">一叶知秋</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>一叶初惊秋信至</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>新凉暗入晚窗来</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 08-07</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>处暑</h3>
+        <code>chushu</code>
+      </header>
+      <div class="banner">暑去秋来</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>暑气渐消秋意近</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>蝉声欲歇雁初来</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 08-23<br><span class="yr">2027</span> 08-23</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>白露</h3>
+        <code>bailu</code>
+      </header>
+      <div class="banner">露白雁斜</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>露凝阶白秋光冷</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>月满庭空雁字斜</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 09-07<br><span class="yr">2027</span> 09-08</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>秋分</h3>
+        <code>qiufen</code>
+      </header>
+      <div class="banner">秋色平分</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>昼夜均分秋过半</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>桂香初动月当空</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 09-23<br><span class="yr">2027</span> 09-23</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>寒露</h3>
+        <code>hanlu</code>
+      </header>
+      <div class="banner">露重菊黄</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>露重霜寒秋欲老</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>菊黄蟹壮酒初香</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 10-08</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>霜降</h3>
+        <code>shuangjiang</code>
+      </header>
+      <div class="banner">霜清叶落</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>霜清叶落山初瘦</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>菊绽橙黄酒正香</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 10-23<br><span class="yr">2027</span> 10-23</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>立冬</h3>
+        <code>lidong</code>
+      </header>
+      <div class="banner">霜叶炉红</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>霜叶尽时冬始立</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>炉火初红夜渐长</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 11-07<br><span class="yr">2027</span> 11-07</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>小雪</h3>
+        <code>xiaoxue</code>
+      </header>
+      <div class="banner">初雪炉温</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>初雪飘阶寒渐重</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>新炉煮酒夜方长</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 11-22<br><span class="yr">2027</span> 11-22</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>大雪</h3>
+        <code>daxue</code>
+      </header>
+      <div class="banner">雪满炉红</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>雪满空庭人迹少</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>炉红小阁墨香浓</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 12-07<br><span class="yr">2027</span> 12-07</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>冬至</h3>
+        <code>dongzhi</code>
+      </header>
+      <div class="banner">一阳来复</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>数九寒天阳渐动</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>围炉夜话岁将新</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 12-22<br><span class="yr">2027</span> 12-22</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>小寒</h3>
+        <code>xiaohan</code>
+      </header>
+      <div class="banner">梅雪争春</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>小寒初至梅将放</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>残雪未消炉正温</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 01-05<br><span class="yr">2027</span> 01-05</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>大寒</h3>
+        <code>dahan</code>
+      </header>
+      <div class="banner">岁除春近</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>大寒已极春将近</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>旧岁将除酒正香</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 01-20<br><span class="yr">2027</span> 01-20</p>
+    </article></div>
+
+  <h2>传统节日</h2>
+  <p class="sect-note">日期来自农历表。春节跨除夕→正月初六，其余都是当天。</p>
+  <div class="grid">
+    <article class="card">
+      <header>
+        <h3>春节</h3>
+        <code>spring-festival</code>
+      </header>
+      <div class="banner">万象更新</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>爆竹声中辞旧岁</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>桃符门上换新春</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 02-16 02-17 02-18 02-19 02-20 02-21 02-22 02-23<br><span class="yr">2027</span> 02-05 02-06 02-07 02-08 02-09 02-10 02-11 02-12</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>元宵</h3>
+        <code>lantern</code>
+      </header>
+      <div class="banner">灯火可亲</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>千门灯火明如昼</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>一碗汤圆暖似春</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 03-03<br><span class="yr">2027</span> 02-20</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>龙抬头</h3>
+        <code>dragon-head</code>
+      </header>
+      <div class="banner">抬头见喜</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>龙抬头日春耕始</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>燕剪风时柳色新</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 03-20<br><span class="yr">2027</span> 03-09</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>端午</h3>
+        <code>duanwu</code>
+      </header>
+      <div class="banner">端午安康</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>艾叶香中驱百毒</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>龙舟声里竞千帆</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 06-19<br><span class="yr">2027</span> 06-09</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>七夕</h3>
+        <code>qixi</code>
+      </header>
+      <div class="banner">金风玉露</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>银汉迢迢双星会</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>金风细细一叶秋</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 08-19<br><span class="yr">2027</span> 08-08</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>中元</h3>
+        <code>zhongyuan</code>
+      </header>
+      <div class="banner">月色如故</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>一盏心灯温旧梦</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>半庭月色照新秋</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 08-27<br><span class="yr">2027</span> 08-16</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>中秋</h3>
+        <code>mid-autumn</code>
+      </header>
+      <div class="banner">千里共月</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>一轮明月同千里</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>半盏清茶共此时</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 09-25<br><span class="yr">2027</span> 09-15</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>重阳</h3>
+        <code>chongyang</code>
+      </header>
+      <div class="banner">九九重阳</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>登高望远秋光好</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>采菊簪萸酒味长</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 10-18<br><span class="yr">2027</span> 10-08</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>腊八</h3>
+        <code>laba</code>
+      </header>
+      <div class="banner">腊八粥香</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>腊八粥香迎岁近</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>一庭梅影报春回</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 01-26<br><span class="yr">2027</span> 01-15</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>小年</h3>
+        <code>xiaonian</code>
+      </header>
+      <div class="banner">祭灶迎年</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>糖瓜祭灶迎新岁</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>扫舍除尘换旧符</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 02-10<br><span class="yr">2027</span> 01-30</p>
+    </article></div>
+
+  <h2>法定假期</h2>
+  <p class="sect-note">公历固定日期，不进日期表。</p>
+  <div class="grid">
+    <article class="card">
+      <header>
+        <h3>元旦</h3>
+        <code>new-year</code>
+      </header>
+      <div class="banner">一元复始</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>一夜春风辞旧岁</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>半窗晓日启新程</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 01-01<br><span class="yr">2027</span> 01-01</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>劳动节</h3>
+        <code>labour-day</code>
+      </header>
+      <div class="banner">五月清和</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>且停手上千般事</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>来享人间五月天</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 05-01 05-02 05-03 05-04 05-05<br><span class="yr">2027</span> 05-01 05-02 05-03 05-04 05-05</p>
+    </article>
+    <article class="card">
+      <header>
+        <h3>国庆</h3>
+        <code>national-day</code>
+      </header>
+      <div class="banner">国庆同欢</div>
+      <div class="strips">
+        <div class="strip"><span class="tag">上联 · 右</span><p>七日闲身游胜景</p></div>
+        <div class="strip"><span class="tag">下联 · 左</span><p>一庭秋色伴归人</p></div>
+      </div>
+      <p class="when"><b>2026–2027 命中：</b><span class="yr">2026</span> 10-01 10-02 10-03 10-04 10-05 10-06 10-07<br><span class="yr">2027</span> 10-01 10-02 10-03 10-04 10-05 10-06 10-07</p>
+    </article></div>
+
+  <h2>命中规则</h2>
+  <div class="todaybox">
+    <p style="margin:0 0 8px"><b>优先级</b>：农历节日 &gt; 法定假期 &gt; 节气 &gt; 兜底。所以中秋落在国庆区间里时挂中秋，春节落在立春当天时挂春节。</p>
+    <p style="margin:0 0 8px"><b>区间</b>：春节 = 除夕 → 正月初六（7 天）；国庆 = 10/1–10/7；劳动节 = 5/1–5/5；清明 = 节气当天 ±1（法定假期 3 天）。其余都是当天。</p>
+    <p style="margin:0 0 8px"><b>兜底怎么选</b>：不在任何节气 / 节日上的日子，按<b>公历月份</b>落到四季之一 —— 3–5 春 / 6–8 夏 / 9–11 秋 / 12–2 冬。四副日常联都是七言 + 四字横批，「泽」「昊」只出现在上下联正文里，横批一律不含。</p>
+    <p style="margin:0"><b>日期来源</b>：节气与农历节日都不是算出来的，是离线用 lunar-javascript 生成后固化在
+    <code>src/config/coupletCalendar.data.js</code>（2026–2045）。寿星公式在 2026 年雨水上会差一天，所以没有采用。</p>
+  </div>
+</div></body></html>

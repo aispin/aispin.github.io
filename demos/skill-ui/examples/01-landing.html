@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lumen — API 可观测性平台</title>
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+<style>
+:root{
+  color-scheme:light;
+  --n-0:#fff;--n-50:#f8f9fb;--n-100:#f1f3f7;--n-200:#e4e7ee;--n-300:#cdd2dd;
+  --n-400:#9aa2b1;--n-500:#6b7280;--n-600:#4a5262;--n-700:#333a48;--n-800:#1f2530;--n-900:#12161d;
+  --brand:#3b5bfd;--brand-h:#2f4ce0;--brand-bg:#eef1ff;
+  --ok:#12855f;--ok-bg:#e6f6f0;
+  --sh-sm:0 1px 2px rgba(18,22,29,.05);
+  --sh-md:0 1px 2px rgba(18,22,29,.04),0 2px 8px rgba(18,22,29,.06);
+  --sh-lg:0 2px 6px rgba(18,22,29,.04),0 12px 32px rgba(18,22,29,.10);
+  --nav-bg:rgba(255,255,255,.85);
+}
+[data-theme="dark"]{
+  color-scheme:dark;
+  --n-0:#1a1f28;--n-50:#0f1319;--n-100:#232a35;--n-200:#2d3542;--n-300:#3a4351;
+  --n-400:#6b7280;--n-500:#9aa2b1;--n-600:#b8bfcc;--n-700:#cdd2dd;--n-800:#e4e7ee;--n-900:#f1f3f7;
+  --brand:#6b85ff;--brand-h:#8499ff;--brand-bg:rgba(107,133,255,.14);
+  --ok:#34d399;--ok-bg:rgba(52,211,153,.14);
+  --sh-sm:0 1px 2px rgba(0,0,0,.4);
+  --sh-md:0 1px 2px rgba(0,0,0,.3),0 2px 8px rgba(0,0,0,.35);
+  --sh-lg:0 2px 6px rgba(0,0,0,.3),0 12px 32px rgba(0,0,0,.5);
+  --nav-bg:rgba(15,19,25,.85);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --n-0:#1a1f28;--n-50:#0f1319;--n-100:#232a35;--n-200:#2d3542;--n-300:#3a4351;
+    --n-400:#6b7280;--n-500:#9aa2b1;--n-600:#b8bfcc;--n-700:#cdd2dd;--n-800:#e4e7ee;--n-900:#f1f3f7;
+    --brand:#6b85ff;--brand-h:#8499ff;--brand-bg:rgba(107,133,255,.14);
+    --ok:#34d399;--ok-bg:rgba(52,211,153,.14);
+    --sh-sm:0 1px 2px rgba(0,0,0,.4);
+    --sh-md:0 1px 2px rgba(0,0,0,.3),0 2px 8px rgba(0,0,0,.35);
+    --sh-lg:0 2px 6px rgba(0,0,0,.3),0 12px 32px rgba(0,0,0,.5);
+    --nav-bg:rgba(15,19,25,.85);
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--n-50);color:var(--n-800);line-height:1.6;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;
+  transition:background-color .18s,color .18s}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:4px}
+
+.nav{position:sticky;top:0;z-index:10;background:var(--nav-bg);
+  backdrop-filter:blur(12px);border-bottom:1px solid var(--n-200);
+  transition:background-color .18s,border-color .18s}
+.nav-in{display:flex;align-items:center;justify-content:space-between;height:64px}
+.logo{display:flex;align-items:center;gap:8px;font-weight:600;font-size:16px;letter-spacing:-.01em}
+.logo svg{color:var(--brand)}
+.nav-links{display:flex;gap:32px;font-size:14px;color:var(--n-600)}
+.nav-links a{transition:color .15s}
+.nav-links a:hover{color:var(--n-900)}
+.nav-cta{display:flex;gap:12px;align-items:center}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  height:40px;padding:0 18px;border-radius:8px;font-size:14px;font-weight:500;
+  border:1px solid transparent;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-primary{background:var(--brand);color:var(--n-50)}
+[data-theme="dark"] .btn-primary{color:#0f1319}
+.btn-primary:hover{background:var(--brand-h);box-shadow:var(--sh-md)}
+.btn-primary:active{transform:translateY(1px)}
+.btn-ghost{background:transparent;color:var(--n-700)}
+.btn-ghost:hover{background:var(--n-100)}
+.btn-outline{background:var(--n-0);color:var(--n-800);border-color:var(--n-200)}
+.btn-outline:hover{border-color:var(--n-300);background:var(--n-50)}
+.btn-lg{height:48px;padding:0 24px;font-size:15px}
+
+.theme-toggle{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;
+  justify-content:center;color:var(--n-500);border:1px solid var(--n-200);
+  background:var(--n-0);cursor:pointer;transition:all .15s}
+.theme-toggle:hover{color:var(--n-900);border-color:var(--n-300)}
+.theme-toggle .sun{display:none}
+[data-theme="dark"] .theme-toggle .sun{display:block}
+[data-theme="dark"] .theme-toggle .moon{display:none}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .theme-toggle .sun{display:block}
+  :root:not([data-theme="light"]) .theme-toggle .moon{display:none}
+}
+
+.hero{padding:96px 0 64px;text-align:center}
+.badge{display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 12px;
+  border-radius:999px;background:var(--brand-bg);color:var(--brand);
+  font-size:12px;font-weight:500;margin-bottom:24px}
+.badge-dot{width:6px;height:6px;border-radius:50%;background:var(--brand);
+  animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+h1{font-size:clamp(32px,5vw,56px);line-height:1.15;letter-spacing:-.025em;
+  font-weight:600;margin:0 0 20px;color:var(--n-900);max-width:16ch;margin-inline:auto}
+h1 em{font-style:normal;color:var(--brand)}
+.sub{font-size:clamp(15px,1.6vw,18px);color:var(--n-500);max-width:52ch;
+  margin:0 auto 32px;line-height:1.65}
+.hero-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.hero-note{margin-top:16px;font-size:13px;color:var(--n-400)}
+
+.shot{margin-top:64px;border-radius:16px;border:1px solid var(--n-200);
+  background:var(--n-50);box-shadow:var(--sh-lg);overflow:hidden}
+.shot-bar{height:36px;background:var(--n-100);border-bottom:1px solid var(--n-200);
+  display:flex;align-items:center;gap:6px;padding:0 14px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--n-300)}
+.shot svg{display:block;width:100%;height:auto}
+
+.logos{padding:48px 0;border-bottom:1px solid var(--n-200)}
+.logos p{text-align:center;font-size:12px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--n-400);margin:0 0 24px}
+.logo-row{display:flex;justify-content:center;align-items:center;gap:48px;flex-wrap:wrap;
+  color:var(--n-400);font-size:15px;font-weight:600;letter-spacing:-.01em}
+.logo-row span{opacity:.7;transition:opacity .2s}
+.logo-row span:hover{opacity:1}
+
+.section{padding:96px 0}
+.section-head{max-width:56ch;margin-bottom:48px}
+.section-head h2{font-size:clamp(24px,3vw,32px);line-height:1.25;letter-spacing:-.02em;
+  font-weight:600;color:var(--n-900);margin:0 0 12px}
+.section-head p{font-size:16px;color:var(--n-500);margin:0}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.card{padding:28px;border-radius:12px;border:1px solid var(--n-200);
+  background:var(--n-0);transition:border-color .2s,box-shadow .2s,background-color .18s}
+.card:hover{border-color:var(--n-300);box-shadow:var(--sh-md)}
+.card-icon{width:40px;height:40px;border-radius:10px;background:var(--brand-bg);
+  color:var(--brand);display:flex;align-items:center;justify-content:center;margin-bottom:20px}
+.card h3{font-size:16px;font-weight:600;margin:0 0 8px;color:var(--n-900)}
+.card p{font-size:14px;color:var(--n-500);margin:0;line-height:1.65}
+
+.metrics{background:var(--n-900);border-radius:16px;padding:56px 48px;
+  display:grid;grid-template-columns:repeat(3,1fr);gap:32px;color:var(--n-50);
+  transition:background-color .18s}
+.metric .n{font-size:clamp(28px,4vw,40px);font-weight:600;letter-spacing:-.02em;
+  line-height:1;margin-bottom:8px}
+.metric .n em{font-style:normal;color:var(--brand);font-size:.6em;margin-left:2px}
+.metric .l{font-size:14px;color:var(--n-400)}
+
+.cta-final{text-align:center;padding:96px 0}
+.cta-final h2{font-size:clamp(24px,3.5vw,36px);letter-spacing:-.02em;font-weight:600;
+  margin:0 0 16px;color:var(--n-900)}
+.cta-final p{color:var(--n-500);margin:0 0 32px;font-size:16px}
+
+footer{border-top:1px solid var(--n-200);padding:40px 0;color:var(--n-400);font-size:13px}
+.foot-in{display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap}
+.foot-links{display:flex;gap:24px}
+.foot-links a:hover{color:var(--n-700)}
+
+@media(max-width:860px){
+  .nav-links{display:none}
+  .grid-3{grid-template-columns:1fr}
+  .metrics{grid-template-columns:1fr;padding:40px 28px;gap:28px}
+  .hero{padding:64px 0 40px}
+  .section{padding:64px 0}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap nav-in">
+    <a class="logo" href="#">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>
+        <circle cx="12" cy="12" r="3.5"/>
+      </svg>
+      Lumen
+    </a>
+    <div class="nav-links">
+      <a href="#">产品</a><a href="#">定价</a><a href="#">文档</a><a href="#">博客</a>
+    </div>
+    <div class="nav-cta">
+      <button class="theme-toggle" id="theme-toggle" aria-label="切换主题">
+        <svg class="moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/></svg>
+        <svg class="sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+      <a class="btn btn-ghost" href="#">登录</a>
+      <a class="btn btn-primary" href="#">免费开始</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero wrap">
+  <div class="badge"><span class="badge-dot"></span>v2.4 已发布 · 支持 OpenTelemetry</div>
+  <h1>让每一次 API 调用<em>都可追溯</em></h1>
+  <p class="sub">Lumen 把日志、指标、链路追踪合并到一个视图里。上线 5 分钟接入，定位一次线上故障平均只需要 47 秒。</p>
+  <div class="hero-cta">
+    <a class="btn btn-primary btn-lg" href="#">
+      免费开始
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+    <a class="btn btn-outline btn-lg" href="#">预约演示</a>
+  </div>
+  <p class="hero-note">无需信用卡 · 每月 100 万次调用免费</p>
+
+  <div class="shot">
+    <div class="shot-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+    <svg viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="产品界面示意">
+      <rect width="1000" height="420" fill="var(--n-0)"/>
+      <rect x="0" y="0" width="180" height="420" fill="var(--n-50)"/>
+      <rect x="20" y="28" width="90" height="10" rx="5" fill="var(--n-300)"/>
+      <rect x="20" y="66" width="140" height="32" rx="8" fill="var(--brand-bg)"/>
+      <rect x="36" y="76" width="76" height="12" rx="6" fill="var(--brand)"/>
+      <rect x="20" y="110" width="120" height="10" rx="5" fill="var(--n-200)"/>
+      <rect x="20" y="138" width="100" height="10" rx="5" fill="var(--n-200)"/>
+      <rect x="20" y="166" width="130" height="10" rx="5" fill="var(--n-200)"/>
+      <rect x="20" y="194" width="88" height="10" rx="5" fill="var(--n-200)"/>
+      <rect x="180" y="0" width="820" height="56" fill="var(--n-0)"/>
+      <rect x="180" y="55" width="820" height="1" fill="var(--n-200)"/>
+      <rect x="204" y="22" width="140" height="12" rx="6" fill="var(--n-700)"/>
+      <rect x="820" y="18" width="64" height="20" rx="10" fill="var(--ok-bg)"/>
+      <g>
+        <rect x="204" y="80" width="184" height="88" rx="12" fill="var(--n-0)" stroke="var(--n-200)"/>
+        <rect x="224" y="100" width="56" height="8" rx="4" fill="var(--n-400)"/>
+        <rect x="224" y="120" width="88" height="20" rx="6" fill="var(--n-800)"/>
+        <rect x="224" y="150" width="44" height="8" rx="4" fill="var(--ok)"/>
+        <rect x="404" y="80" width="184" height="88" rx="12" fill="var(--n-0)" stroke="var(--n-200)"/>
+        <rect x="424" y="100" width="56" height="8" rx="4" fill="var(--n-400)"/>
+        <rect x="424" y="120" width="70" height="20" rx="6" fill="var(--n-800)"/>
+        <rect x="424" y="150" width="44" height="8" rx="4" fill="var(--ok)"/>
+        <rect x="604" y="80" width="184" height="88" rx="12" fill="var(--n-0)" stroke="var(--n-200)"/>
+        <rect x="624" y="100" width="56" height="8" rx="4" fill="var(--n-400)"/>
+        <rect x="624" y="120" width="96" height="20" rx="6" fill="var(--n-800)"/>
+        <rect x="624" y="150" width="44" height="8" rx="4" fill="var(--ok)"/>
+        <rect x="804" y="80" width="176" height="88" rx="12" fill="var(--n-0)" stroke="var(--n-200)"/>
+        <rect x="824" y="100" width="56" height="8" rx="4" fill="var(--n-400)"/>
+        <rect x="824" y="120" width="60" height="20" rx="6" fill="var(--n-800)"/>
+        <rect x="824" y="150" width="44" height="8" rx="4" fill="var(--ok)"/>
+      </g>
+      <rect x="204" y="188" width="776" height="200" rx="12" fill="var(--n-0)" stroke="var(--n-200)"/>
+      <rect x="224" y="208" width="100" height="10" rx="5" fill="var(--n-700)"/>
+      <path d="M224 340 L300 312 L376 322 L452 280 L528 296 L604 246 L680 262 L756 216 L832 232 L908 200 L960 208"
+            fill="none" stroke="var(--brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M224 340 L300 312 L376 322 L452 280 L528 296 L604 246 L680 262 L756 216 L832 232 L908 200 L960 208 L960 368 L224 368 Z"
+            fill="var(--brand)" opacity=".08"/>
+      <circle cx="960" cy="208" r="4" fill="var(--brand)"/>
+    </svg>
+  </div>
+</header>
+
+<section class="logos">
+  <div class="wrap">
+    <p>已有 4,200+ 团队在用</p>
+    <div class="logo-row">
+      <span>Vercel</span><span>Linear</span><span>Supabase</span>
+      <span>Railway</span><span>Fly.io</span><span>PlanetScale</span>
+    </div>
+  </div>
+</section>
+
+<section class="section wrap">
+  <div class="section-head">
+    <h2>一个视图，看清全链路</h2>
+    <p>不用在三个工具之间来回跳。请求进来那一刻，日志、指标、Trace 已经对齐在同一条时间轴上。</p>
+  </div>
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+      </div>
+      <h3>实时指标</h3>
+      <p>P50 / P95 / P99 延迟、错误率、QPS，秒级粒度，支持自定义聚合维度。</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H14a4 4 0 0 1 4 4v5.5"/></svg>
+      </div>
+      <h3>分布式追踪</h3>
+      <p>跨服务、跨队列的完整调用链。慢在哪一跳，一眼就能看到，不用猜。</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 4.5-3.2 8.2-8 9-4.8-.8-8-4.5-8-9V7l8-4z"/><path d="M9 12l2 2 4-4"/></svg>
+      </div>
+      <h3>异常告警</h3>
+      <p>基于基线自动学习正常波动，只在真正异常时打扰你，支持 Slack / 飞书 / Webhook。</p>
+    </div>
+  </div>
+</section>
+
+<section class="wrap" style="padding-bottom:96px">
+  <div class="metrics">
+    <div class="metric"><div class="n">47<em>s</em></div><div class="l">平均故障定位时间</div></div>
+    <div class="metric"><div class="n">99.98<em>%</em></div><div class="l">过去 12 个月可用性</div></div>
+    <div class="metric"><div class="n">4.2<em>k</em></div><div class="l">正在使用的团队</div></div>
+  </div>
+</section>
+
+<section class="cta-final wrap">
+  <h2>五分钟接入，今天就看清你的 API</h2>
+  <p>一条命令装好 SDK，剩下的交给 Lumen。</p>
+  <div class="hero-cta">
+    <a class="btn btn-primary btn-lg" href="#">免费开始</a>
+    <a class="btn btn-outline btn-lg" href="#">阅读文档</a>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-in">
+    <span>© 2025 Lumen Labs, Inc.</span>
+    <div class="foot-links">
+      <a href="#">隐私</a><a href="#">条款</a><a href="#">状态</a><a href="#">联系我们</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var r=document.documentElement,b=document.getElementById('theme-toggle');
+  b&&b.addEventListener('click',function(){
+    var cur=r.dataset.theme||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
+    var next=cur==='dark'?'light':'dark';
+    r.dataset.theme=next;try{localStorage.setItem('theme',next)}catch(e){}
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,989 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <!-- The paper sheet used to be preloaded here at fetchpriority=high. It is
+       drawn on canvas at boot now (src/utils/paperArt.js), so the only asset
+       still worth a preload is the UI font. -->
+  <link rel="preload" as="font" href="/fonts/maple-ui.woff2" type="font/woff2" crossorigin="anonymous" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <!-- 位图 favicon 是给不认 SVG 图标的浏览器兜底的；apple-touch-icon 在 iOS 上只吃 PNG。
+       favicon.ico 内嵌 16/32/48 三档，所以 16px 不再单独出文件、也不再单列一条 <link>。
+       ⚠️ 这是全站唯一被允许的 jpg/png（见 deploy-gh-pages.sh 与 workflow 里的白名单守卫）。 -->
+  <link rel="icon" href="/favicon.ico" sizes="48x48" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#FFF6E9" />
+
+  <!-- PWA -->
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="ZEO" />
+
+  <!-- SEO Meta Tags -->
+  <title>ZEO · 泽昊 · WEB3D HOUSE</title>
+  <meta name="description"
+    content="AISPIN 的温馨动漫风 3D 个人主页：一条手绘走廊串起八个房间——档案、摄影、项目与实验室、文章、短视频、原创音乐、AI Skills 与联系方式。A warm anime-styled 3D personal site." />
+  <meta name="author" content="aispin" />
+  <meta name="keywords" content="aispin, 3D portfolio, React Three Fiber, 个人主页, AI Skills, 摄影, 音乐, 随笔" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://aispin.github.io/" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="ZEO · 泽昊 · WEB3D HOUSE" />
+  <meta property="og:description"
+    content="一条手绘走廊串起八个房间：档案、摄影、项目、文章、视频、音乐、AI Skills 与联系方式。Walk the warm hand-drawn corridor and step into each room." />
+  <meta property="og:url" content="https://aispin.github.io/" />
+  <meta property="og:site_name" content="ZEO" />
+  <meta property="og:image" content="https://aispin.github.io/og-image.webp" />
+  <meta property="og:locale" content="zh_CN" />
+  <meta property="og:locale:alternate" content="en_US" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="ZEO · 泽昊 · WEB3D HOUSE" />
+  <meta name="twitter:description" content="温馨动漫风的 3D 个人主页，八个房间等你推门而入。" />
+  <meta name="twitter:image" content="https://aispin.github.io/og-image.webp" />
+
+  <style>
+    /* SEO text hidden from users, fully accessible to crawlers (WebGL SPA fallback) */
+    .sr-only-seo {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      padding: 0 !important;
+      margin: -1px !important;
+      overflow: hidden !important;
+      clip: rect(0, 0, 0, 0) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
+    }
+  </style>
+  <script type="module" crossorigin src="/assets/main-fQIYfOcC.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/site-DT7SkjFf.js">
+  <link rel="modulepreload" crossorigin href="/assets/react-RlAp7hkb.js">
+  <link rel="modulepreload" crossorigin href="/assets/three-2KHAYl0f.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-CuxrqAfx.js">
+  <link rel="modulepreload" crossorigin href="/assets/r3f-DpCn7sWs.js">
+  <link rel="modulepreload" crossorigin href="/assets/gsap-BeMJux2l.js">
+  <link rel="stylesheet" crossorigin href="/assets/main-Cp7y_FTB.css">
+  <meta name="description" content="一个可以走进去的个人主页：8 个 3D 房间，装着档案、摄影、项目、文章、视频、音乐与 AI 技能。" />
+
+  <!-- Structured data generated from local JSON at build time -->
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Person",
+      "@id": "https://aispin.github.io/#person",
+      "name": "黄泽昊",
+      "alternateName": [
+        "mamboer",
+        "Levin Wong",
+        "AISPIN"
+      ],
+      "url": "https://aispin.github.io",
+      "jobTitle": "Engineering Manager / Web Developer / Indie Musician",
+      "description": "15+ 年互联网研发经验，其中 7 年研发管理。做过美团歪马送酒、京东羚珑智能设计平台，也写歌、拍照、做 AI 技能。现居深圳。",
+      "knowsAbout": [
+        "JavaScript",
+        "TypeScript",
+        "React",
+        "Vue",
+        "Nuxt",
+        "Node.js",
+        "Three.js",
+        "React Three Fiber",
+        "WebGL",
+        "GSAP",
+        "Engineering Management",
+        "Swift",
+        "SwiftUI"
+      ],
+      "sameAs": [
+        "https://github.com/aispin",
+        "https://zeobooks.app.workbuddy.host"
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://aispin.github.io/#website",
+      "url": "https://aispin.github.io",
+      "name": "ZEO · 泽昊 · WEB3D HOUSE",
+      "description": "一个可以走进去的个人主页：8 个 3D 房间，装着档案、摄影、项目、文章、视频、音乐与 AI 技能。",
+      "inLanguage": [
+        "zh-CN",
+        "en-US"
+      ],
+      "publisher": {
+        "@id": "https://aispin.github.io/#person"
+      }
+    },
+    {
+      "@type": "ProfilePage",
+      "@id": "https://aispin.github.io/#profilepage",
+      "url": "https://aispin.github.io",
+      "mainEntity": {
+        "@id": "https://aispin.github.io/#person"
+      },
+      "about": {
+        "@id": "https://aispin.github.io/#person"
+      }
+    },
+    {
+      "@type": "ItemList",
+      "@id": "https://aispin.github.io/#projects",
+      "name": "Projects & Labs",
+      "numberOfItems": 18,
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "item": {
+            "@type": "CreativeWork",
+            "description": "地铁轨道交通查询机系统主要面向乘客提供乘车相关的信息查询以及广告播放服务，为响应落实央国企信息技术应用创新发展战略，本项目核心目标为将西安地铁存量的查询机系统替换为完全国产化的系统能力。",
+            "url": "https://docs.qq.com/doc/DQmlrQXRNdXhGdXZk",
+            "creator": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "item": {
+            "@type": "CreativeWork",
+            "description": "支撑美团自营歪马送酒业务线上营销运营的微信小程序，基于美团自研的小程序多端框架进行开发，产品功能主要由 6 个核心页面「首页」、「酒单页」、「商详页」、「购物车」、「个人中心」及「搜索页」，以及 3 大常驻营销页面「限时抢购」、「歪马精选」、「会员中心」构成。23 年 DAU 万级，用户总量数百万级。",
+            "url": "https://docs.qq.com/doc/DQnl3VUVXaW9xc3dM",
+            "creator": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "item": {
+            "@type": "CreativeWork",
+            "description": "支撑美团歪马送酒业务 C 端（歪马送酒微信小程序）营销运营开展的中后台系统，涵盖 「供应商管理（SRM）、商品管理、采购管理（PMS）、仓储管理（WMS）、运输管理（TMS）、订单管理（OMS）、配送履约管理、门店管理、财务结算」 等子系统。当前除了 「运输管理」 为外采，及「财务结算」使用美团基建能力外，其他系统能力均为歪马自建。",
+            "url": "https://docs.qq.com/doc/DQmhTaUJsaXpBWEti",
+            "creator": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "item": {
+            "@type": "CreativeWork",
+            "description": "羚珑（ling.jd.com）是一个京东自主研发的聚焦电商领域的多场景营销内容在线设计平台，汇集营销创意内容与设计工具于一体，为不同场景下的设计需求提供优质的解决方案。其核心产品功能矩阵包括「图片设计」、「动图设计」、「视频设计」，以及面向外部企业、内部业务部门提供的集「设计、管理、协作于一体」的「内容专区」。此外羚珑还提供「一键抠图」、「智能配色」、「URL实时合图」等实用工具和接口服务。",
+            "url": "https://docs.qq.com/doc/DQmhQSUllVlF2T2FR",
+            "creator": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 5,
+          "item": {
+            "@type": "CreativeWork",
+            "description": "“一千个人眼中就有一千个哈姆雷特”，用户的不同个性不同背景决定了一千个用户对于设计式样会有一千个看法。千人千面内容营销项目是羚珑项目的延伸（第二增长曲线），2021年年初正式立项，作为部门重点项目由 10 人跨职能团队（包含产品、前后端、算法等角色）进行攻坚。其核心目标是在京东 APP 首焦广告图千人千面的基础上深化提炼完整可靠的千人千面内容营销解决方案，包括「广告图千人千面」、「营销页千人千面」、「商品文案千人千面」三大部分，以帮助京东流量阵地里的营销内容最大化提升转化率。",
+            "url": "https://docs.qq.com/doc/DQlhjQmFQb0dIV2JX",
+            "creator": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 6,
+          "item": {
+            "@type": "CreativeWork",
+            "description": "🌟🎨📸🎥🎶 一个“AIGC+PGC”的媒体素材（包括图片、视频、音效、音乐、字体、AI模型等）内容平台，核心的产品能力为：面向内容消费者提供海量的高质的媒体素材内容，提供多维度的信息聚合检索手段（基础分类、专题场景等）帮助消费者快速找到所需素材；面向内容生产者提供AI模型信息、AI提示词（prompts）、字体和相关媒体设计工具。直接竞对产品为 Pixabay，使命是「帮助大家用上最优质的媒体素材」。",
+            "url": "https://aifire.art",
+            "creator": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 7,
+          "item": {
+            "@type": "CreativeWork",
+            "description": "Gitalk 是一个基于 GitHub Issue 和 Preact 开发的开源评论插件，截止 2023 年 12 月共计 6.9 K 个 Star。它将 GitHub Issue 转换为评论系统，集成 Github 登陆，为开发者用户提供了一个简单、无缝和可定制的评论系统，可以轻松集成到个人网站或博客中，简化评论管理并促进协作。它开源且免费，用户可以自由地使用和修改它以满足自己的需求。",
+            "url": "https://github.com/gitalk/gitalk/",
+            "creator": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 8,
+          "item": {
+            "@type": "CreativeWork",
+            "description": "一个简单的 Vue.js 甘特图插件，用于展示每周任务。",
+            "url": "https://mamboer.github.io/vue-easy-gantt/",
+            "creator": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 9,
+          "item": {
+            "@type": "CreativeWork",
+            "description": "一个前端领域知名的技术品牌，创建于 2015 年 10 月，是一个专注于用户体验及产品价值提升的开源研发组织。围绕多端开发、服务端开发、人工智能、产品设计、视觉设计等方向沉淀与传播相关的专业知识及案例，为业界贡献经验价值。核心产品包括「羚珑 - 智能设计平台」、「Taro - 多端统一开发解决方案」等，深耕智慧设计、智能研发、跨端云研发体系的能力，助力泛零售业务实现智慧营销。",
+            "url": "https://github.com/o2team",
+            "creator": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 10,
+          "item": {
+            "@type": "CreativeWork",
+            "description": "The Metro Rail Transit Inquiry System is primarily aimed at providing passengers with travel-related information inquiries and advertising services. In response to the implementation of the central state-owned enterprise information technology application innovation development strategy, the core goal of this project is to replace Xi'an Metro's existing inquiry system with a fully domestic system capability.",
+            "url": "https://docs.qq.com/doc/DQmlrQXRNdXhGdXZk",
+            "creator": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 11,
+          "item": {
+            "@type": "CreativeWork",
+            "description": "The WeChat Mini Program supports the online marketing and operation of Meituan's self-operated Waima business. Developed based on Meituan's self-developed multi-end framework for Mini Programs, the product features 6 core pages: 'Home', 'Product Details', 'Product Details Page', 'Shopping Cart', 'Personal Center', and 'Search Page', as well as 3 major permanent marketing pages: 'Limited Time Sale', 'Waima Selection', and 'Member Center'.",
+            "url": "https://docs.qq.com/doc/DQnl3VUVXaW9xc3dM",
+            "creator": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 12,
+          "item": {
+            "@type": "CreativeWork",
+            "description": "This is a back-end system that supports the marketing and operation of the C-end (Waima WeChat Mini Program) of Meituan Waima business. It includes sub-systems such as 'Supplier Management (SRM), Product Management, Procurement Management (PMS), Warehouse Management (WMS), Transportation Management (TMS), Order Management (OMS), Delivery Fulfillment Management, Store Management, and Financial Settlement'. Currently, except for 'Transportation Management' which is outsourced, and 'Financial Settlement' which uses Meituan's infrastructure capabilities, all other system capabilities are self-built by Waima.",
+            "url": "https://docs.qq.com/doc/DQmhTaUJsaXpBWEti",
+            "creator": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 13,
+          "item": {
+            "@type": "CreativeWork",
+            "description": "Linglong (ling.jd.com) is a self-developed marketing content online design platform by JD, focusing on the e-commerce field. It integrates marketing creative content and design tools to provide high-quality solutions for design needs in different scenarios. Its core product feature matrix includes 'Image Design', 'Animation Design', 'Video Design', as well as a 'Content Zone' that integrates 'Design, Management, and Collaboration' for external enterprises and internal business departments. In addition, Linglong also provides practical tools and interface services such as 'One-click Image Background Extraction', 'Intelligent Color Matching', and 'Real-time Image Composition via URL'.",
+            "url": "https://docs.qq.com/doc/DQmhQSUllVlF2T2FR",
+            "creator": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 14,
+          "item": {
+            "@type": "CreativeWork",
+            "description": "Every person has their own perspective, and this applies to design styles as well. The diverse personalities and backgrounds of users result in a thousand different opinions on design. The Personalized Content Marketing project is an extension of the Linglong project (the second growth curve) and was officially launched at the beginning of 2021. It is a key project of the department, led by a cross-functional team of 10 members (including product, front-end, back-end, and algorithm roles). The core goal of this project is to deepen and refine a comprehensive and reliable solution for personalized content marketing based on the foundation of personalized advertising images, personalized marketing pages, and personalized product copy. This solution aims to maximize the conversion rate of marketing content in JD's traffic ecosystem.",
+            "url": "https://docs.qq.com/doc/DQlhjQmFQb0dIV2JX",
+            "creator": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 15,
+          "item": {
+            "@type": "CreativeWork",
+            "description": "🌟🎨📸🎥🎶 A platform for ‘AIGC+PGC’ media content, which includes images, videos, sound effects, music, fonts, AI models, etc. The core product capability is to provide content consumers with a vast array of high-quality media materials and offer multi-dimensional information aggregation and retrieval methods (such as basic categorization, thematic scenarios, etc.) to help consumers quickly find the materials they need. For content producers, it provides AI model information, AI prompts, fonts, and related media design tools. The direct competitor is Pixabay, with the mission of ‘helping everyone use the highest quality media materials.’",
+            "url": "https://aifire.art",
+            "creator": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 16,
+          "item": {
+            "@type": "CreativeWork",
+            "description": "Gitalk is an open-source commenting plugin based on GitHub Issue and Preact. It has a total of 6.9K stars as of December 2023. It transforms GitHub Issue into a commenting system, integrates with GitHub login, and provides a simple, seamless, and customizable commenting system for developer users. It can be easily integrated into personal websites or blogs, simplifying comment management and promoting collaboration. It is open-source and free, allowing users to use and modify it freely to meet their own needs.",
+            "url": "https://github.com/gitalk/gitalk/",
+            "creator": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 17,
+          "item": {
+            "@type": "CreativeWork",
+            "description": "A simple Vue.js gantt chart plugin for presenting weekly tasks.",
+            "url": "https://mamboer.github.io/vue-easy-gantt/",
+            "creator": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 18,
+          "item": {
+            "@type": "CreativeWork",
+            "description": "A well-known technology brand in the front-end domain, established in October 2015, is an open-source R&D organization focused on enhancing user experience and product value. It consolidates and disseminates professional knowledge and cases in various directions such as multi-end development, server-side development, artificial intelligence, product design, and visual design, contributing experiential value to the industry.",
+            "url": "https://github.com/o2team",
+            "creator": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "ItemList",
+      "@id": "https://aispin.github.io/#articles",
+      "name": "Articles & Essays",
+      "numberOfItems": 18,
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "item": {
+            "@type": "Article",
+            "headline": "使用 Express.js 构建你的第一个 API：初学者指南",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "item": {
+            "@type": "Article",
+            "headline": "使用 Semantic-Release 和 Github Workflow 实现自动化版本发布",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "item": {
+            "@type": "Article",
+            "headline": "Vitest 模拟第三方模块指南",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "item": {
+            "@type": "Article",
+            "headline": "Neon serverless-driver 结合 Vercel、阿里云实战指南",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 5,
+          "item": {
+            "@type": "Article",
+            "headline": "教大家更直观的理解 Docker",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 6,
+          "item": {
+            "@type": "Article",
+            "headline": "如何使用 Canvas 将 SVG 转换为 PNG",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 7,
+          "item": {
+            "@type": "Article",
+            "headline": "亚马逊和美团的领导力原则",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 8,
+          "item": {
+            "@type": "Article",
+            "headline": "美团公司的目标管理实践总结",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 9,
+          "item": {
+            "@type": "Article",
+            "headline": "SWOT 在业务策划及组织管理中的应用",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 10,
+          "item": {
+            "@type": "Article",
+            "headline": "京东公司的过程管理实践总结",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 11,
+          "item": {
+            "@type": "Article",
+            "headline": "Building Your First API with Express.js: A Beginner's Guide",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 12,
+          "item": {
+            "@type": "Article",
+            "headline": "Automating Releases with Semantic-Release and GitHub Actions",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 13,
+          "item": {
+            "@type": "Article",
+            "headline": "A more intuitive understanding of Docker",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 14,
+          "item": {
+            "@type": "Article",
+            "headline": "How to convert a SVG to PNG using Canvas",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 15,
+          "item": {
+            "@type": "Article",
+            "headline": "Leadership Principles of Amazon and Meituan",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 16,
+          "item": {
+            "@type": "Article",
+            "headline": "Summary of Meituan's Goal Management Practices",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 17,
+          "item": {
+            "@type": "Article",
+            "headline": "SWOT in Business Planning and Organizational Management",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 18,
+          "item": {
+            "@type": "Article",
+            "headline": "Summary of Process Management Practices at JD.com",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "ImageGallery",
+      "@id": "https://aispin.github.io/#photography",
+      "name": "Photography",
+      "numberOfItems": 8,
+      "creator": {
+        "@id": "https://aispin.github.io/#person"
+      }
+    },
+    {
+      "@type": "ItemList",
+      "@id": "https://aispin.github.io/#ai-projects",
+      "name": "AI Skills & Apps",
+      "numberOfItems": 24,
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-video-clipper",
+            "description": "实拍素材短视频剪辑——ffmpeg 快出片+剪映草稿双引擎（爆款短视频工作流 6/6）",
+            "url": "https://github.com/aispin/iskill-video-clipper",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-content-precheck",
+            "description": "发布预检——违禁词扫描+四维爆款评估（爆款短视频工作流 5/6）",
+            "url": "https://github.com/aispin/iskill-content-precheck",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-viral-teardown",
+            "description": "爆款短视频拆解——下载转写+五维拆解（爆款短视频工作流 2/6）",
+            "url": "https://github.com/aispin/iskill-viral-teardown",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-hot-topic-scout",
+            "description": "每日热点选题——多平台热点搜集+画像打分+选题卡（爆款短视频工作流 1/6）",
+            "url": "https://github.com/aispin/iskill-hot-topic-scout",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 5,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-viral-copywriter",
+            "description": "爆款文案生成——四段式口播稿（爆款短视频工作流 3/6）",
+            "url": "https://github.com/aispin/iskill-viral-copywriter",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 6,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-promo-page",
+            "description": "给 AI skill / 开源项目一键生成落地推广页：零依赖零构建、可插拔槽位、支持 GitHub Pages 部署",
+            "url": "https://github.com/aispin/iskill-promo-page",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 7,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-pipeline-dashboard",
+            "description": "短视频操盘可视化交互台——专家团六步流水线实时看板（JSONL 事件流 + React/Tailwind/Vite，底层技能）",
+            "url": "https://github.com/aispin/iskill-pipeline-dashboard",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 8,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-ui-verify",
+            "description": "无头浏览器截图与断言薄封装：UI 验收批量截图 / 多视口断言 / 视觉回归",
+            "url": "https://github.com/aispin/iskill-ui-verify",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 9,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-app-icon",
+            "description": "零依赖图标生成器：几何手绘矢量图形 → SVG/PNG 全套图标（favicon / apple-touch-icon / maskable / PWA）",
+            "url": "https://github.com/aispin/iskill-app-icon",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 10,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-generate-sponsors",
+            "description": "收款码 → 一整套可直接用的赞助页：FUNDING.yml + Markdown 区块 + 响应式双语 html + 零依赖 React/Vue 组件。One QR image → a full sponsor kit.",
+            "url": "https://github.com/aispin/iskill-generate-sponsors",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 11,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-workbuddy-deepseek",
+            "description": "在 WorkBuddy 内置浏览器里用免费的 DeepSeek 网页版做讨论，一句话把对话交给 agent 执行 —— 不用外部 Chrome，不用切应用。",
+            "url": "https://github.com/aispin/iskill-workbuddy-deepseek",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 12,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-headroom-workbuddy2api",
+            "description": "把 WorkBuddy 桌面端内置模型接成 OpenAI 兼容 API（hub 负责能用、headroom 负责耐用）；跨平台双击启动器 + 本机控制台",
+            "url": "https://github.com/aispin/iskill-headroom-workbuddy2api",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 13,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-github-publisher",
+            "description": "WorkBuddy 技能：把本地 AI skill 一键发布到 GitHub（iskill- 前缀 + SSH 推送 + SkillHub 认领）。",
+            "url": "https://github.com/aispin/iskill-github-publisher",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 14,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-super-mark",
+            "description": "个人收藏册：把微信转发/收藏的短视频与链接，变成可检索、可分类、有深度解读的 Web 应用",
+            "url": "https://github.com/aispin/iskill-super-mark",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 15,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-pwa-guideline",
+            "description": "PWA 更新感知 skill：Vite + vite-plugin-pwa 项目的版本检测/静默提醒/一键清缓存更新",
+            "url": "https://github.com/aispin/iskill-pwa-guideline",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 16,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-music-beats",
+            "description": "音乐节拍点分析——BPM/节拍时间轴/强节拍 → beats.json，供视频剪辑卡点转场（librosa）",
+            "url": "https://github.com/aispin/iskill-music-beats",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 17,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-media-transcribe",
+            "description": "视频/音频 → mp4 + mp3 + srt + json 三件套：yt-dlp 下载（含微信视频号元宝桥接）+ ffmpeg 抽音轨 + 本地 Whisper 转写，全程离线",
+            "url": "https://github.com/aispin/iskill-media-transcribe",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 18,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-huggingface-ext",
+            "description": "将 HuggingFace hub 缓存迁移到指定目录并软链回去，跨 macOS/Windows（iskill- 技能）",
+            "url": "https://github.com/aispin/iskill-huggingface-ext",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 19,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-geometric-bg",
+            "description": "Geometric background image generator — seeded, deterministic, zero-dependency SVG (6 styles × 8 palettes × dark/light)",
+            "url": "https://github.com/aispin/iskill-geometric-bg",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 20,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-generative-bgm",
+            "description": "纯前端生成式 BGM 引擎：Web Audio 实时合成，ABC 记谱定义主题，零素材离线",
+            "url": "https://github.com/aispin/iskill-generative-bgm",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 21,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-dig-media",
+            "description": "网络素材与 BGM 挖掘——Pixabay 视频 + Wikimedia Commons 音乐，manifest 溯源",
+            "url": "https://github.com/aispin/iskill-dig-media",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 22,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-crop-qrcode",
+            "description": "二维码自动裁剪 CLI —— 零依赖定位码主体并裁成统一正方形（macOS sips，Node ≥18）",
+            "url": "https://github.com/aispin/iskill-crop-qrcode",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 23,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-copy-deslop",
+            "description": "口播文案去AI味+三视角真人点评（爆款短视频工作流 4/6）",
+            "url": "https://github.com/aispin/iskill-copy-deslop",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 24,
+          "item": {
+            "@type": "SoftwareApplication",
+            "name": "iskill-script-launcher",
+            "description": "写给用户双击运行的跨平台脚本（macOS .command / Windows .ps1+.cmd）：一份 Python 真源 + 各平台薄壳，附按症状归档的真机踩坑与可抄骨架",
+            "url": "https://github.com/aispin/iskill-script-launcher",
+            "applicationCategory": "DeveloperApplication",
+            "author": {
+              "@id": "https://aispin.github.io/#person"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+  </script>
+</head>
+
+<body>
+  <!-- SEO Fallback for WebGL SPA -->
+  <div id="seo-content" class="sr-only-seo">
+    <header>
+      <h1>AISPIN | 温馨动漫风的 3D 个人主页</h1>
+      <p>
+        这是一个用 React Three Fiber 构建的沉浸式 3D 个人网站：你将走进一条手绘风格的温暖走廊，
+        沿途的八扇门通向八个房间——ABOUT 档案、GALLERY 摄影、STUDIO 项目与实验室、POSTS 文章、
+        VIDEOS 短视频、MUSIC 原创、AI+ 技能，以及 CONTACT 联系方式。走廊尽头还挂着一枚通往小说站
+        ZeoBooks 的书签挂件。
+      </p>
+    </header>
+
+    <nav aria-label="站点导航">
+      <ul>
+        <li><a href="/about">关于我 / About</a></li>
+        <li><a href="/gallery">摄影 / Gallery</a></li>
+        <li><a href="/studio">项目与实验室 / Studio</a></li>
+        <li><a href="/posts">文章 / Posts</a></li>
+        <li><a href="/videos">短视频 / Videos</a></li>
+        <li><a href="/music">音乐 / Music</a></li>
+        <li><a href="/ai">AI Skills / AI+</a></li>
+        <li><a href="/contact">联系 / Contact</a></li>
+        <li><a href="https://zeobooks.app.workbuddy.host">小说 / Novels (ZeoBooks)</a></li>
+      </ul>
+    </nav>
+
+    <main>
+      <article id="about">
+        <h2>关于 AISPIN</h2>
+        <p>
+          AISPIN 是一名开发者与创作者：写代码、做 AI 技能、拍照片、写文章、做音乐。
+          这个网站本身就是一份作品——整站基于 React Three Fiber 与 Three.js，
+          搭配 GSAP 动画与 Maple Mono 字体，支持中英双语、明暗模式与 PWA 离线安装。
+        </p>
+      </article>
+
+      <article id="ai-plus">
+        <h2>AI+ 房间：AI Skills 与应用</h2>
+        <p>
+          AI+ 房间陈列 AISPIN 在 GitHub 上开源的 iskill- 系列技能包与 ai- 前缀应用，
+          数据由 GitHub Actions 每周自动刷新，欢迎在房间里逐个翻阅。
+        </p>
+      </article>
+
+      <article id="contact">
+        <h2>联系方式</h2>
+        <p>
+          欢迎通过 CONTACT 房间里的漂流瓶与我联系，或访问
+          <a href="https://github.com/aispin" target="_blank" rel="noopener noreferrer">GitHub 主页</a>。
+        </p>
+      </article>
+    </main>
+  </div>
+
+  <noscript>
+    本站是一段 3D 互动体验，需要启用 JavaScript 才能走进走廊。This interactive 3D experience requires JavaScript.
+  </noscript>
+
+  <div id="root"></div>
+</body>
+
+</html>

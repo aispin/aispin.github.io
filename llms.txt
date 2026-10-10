@@ -1,0 +1,111 @@
+# ZEO · 泽昊 · WEB3D HOUSE
+> 一个可以走进去的个人主页：8 个 3D 房间，装着档案、摄影、项目、文章、视频、音乐与 AI 技能。
+
+## About
+15+ 年互联网研发经验，其中 7 年研发管理。做过美团歪马送酒、京东羚珑智能设计平台，也写歌、拍照、做 AI 技能。现居深圳。
+
+## Skills
+- JavaScript
+- TypeScript
+- React
+- Vue
+- Nuxt
+- Node.js
+- Three.js
+- React Three Fiber
+- WebGL
+- GSAP
+- Engineering Management
+- Swift
+- SwiftUI
+
+## Projects
+- undefined (https://docs.qq.com/doc/DQmlrQXRNdXhGdXZk): 地铁轨道交通查询机系统主要面向乘客提供乘车相关的信息查询以及广告播放服务，为响应落实央国企信息技术应用创新发展战略，本项目核心目标为将西安地铁存量的查询机系统替换为完全国产化的系统能力。
+- undefined (https://docs.qq.com/doc/DQnl3VUVXaW9xc3dM): 支撑美团自营歪马送酒业务线上营销运营的微信小程序，基于美团自研的小程序多端框架进行开发，产品功能主要由 6 个核心页面「首页」、「酒单页」、「商详页」、「购物车」、「个人中心」及「搜索页」，以及 3 大常驻营销页面「限时抢购」、「歪马精选」、「会员中心」构成。23 年 DAU 万级，用户总量数百万级。
+- undefined (https://docs.qq.com/doc/DQmhTaUJsaXpBWEti): 支撑美团歪马送酒业务 C 端（歪马送酒微信小程序）营销运营开展的中后台系统，涵盖 「供应商管理（SRM）、商品管理、采购管理（PMS）、仓储管理（WMS）、运输管理（TMS）、订单管理（OMS）、配送履约管理、门店管理、财务结算」 等子系统。当前除了 「运输管理」 为外采，及「财务结算」使用美团基建能力外，其他系统能力均为歪马自建。
+- undefined (https://docs.qq.com/doc/DQmhQSUllVlF2T2FR): 羚珑（ling.jd.com）是一个京东自主研发的聚焦电商领域的多场景营销内容在线设计平台，汇集营销创意内容与设计工具于一体，为不同场景下的设计需求提供优质的解决方案。其核心产品功能矩阵包括「图片设计」、「动图设计」、「视频设计」，以及面向外部企业、内部业务部门提供的集「设计、管理、协作于一体」的「内容专区」。此外羚珑还提供「一键抠图」、「智能配色」、「URL实时合图」等实用工具和接口服务。
+- undefined (https://docs.qq.com/doc/DQlhjQmFQb0dIV2JX): “一千个人眼中就有一千个哈姆雷特”，用户的不同个性不同背景决定了一千个用户对于设计式样会有一千个看法。千人千面内容营销项目是羚珑项目的延伸（第二增长曲线），2021年年初正式立项，作为部门重点项目由 10 人跨职能团队（包含产品、前后端、算法等角色）进行攻坚。其核心目标是在京东 APP 首焦广告图千人千面的基础上深化提炼完整可靠的千人千面内容营销解决方案，包括「广告图千人千面」、「营销页千人千面」、「商品文案千人千面」三大部分，以帮助京东流量阵地里的营销内容最大化提升转化率。
+- undefined (https://aifire.art): 🌟🎨📸🎥🎶 一个“AIGC+PGC”的媒体素材（包括图片、视频、音效、音乐、字体、AI模型等）内容平台，核心的产品能力为：面向内容消费者提供海量的高质的媒体素材内容，提供多维度的信息聚合检索手段（基础分类、专题场景等）帮助消费者快速找到所需素材；面向内容生产者提供AI模型信息、AI提示词（prompts）、字体和相关媒体设计工具。直接竞对产品为 Pixabay，使命是「帮助大家用上最优质的媒体素材」。
+- undefined (https://github.com/gitalk/gitalk/): Gitalk 是一个基于 GitHub Issue 和 Preact 开发的开源评论插件，截止 2023 年 12 月共计 6.9 K 个 Star。它将 GitHub Issue 转换为评论系统，集成 Github 登陆，为开发者用户提供了一个简单、无缝和可定制的评论系统，可以轻松集成到个人网站或博客中，简化评论管理并促进协作。它开源且免费，用户可以自由地使用和修改它以满足自己的需求。
+- undefined (https://mamboer.github.io/vue-easy-gantt/): 一个简单的 Vue.js 甘特图插件，用于展示每周任务。
+- undefined (https://github.com/o2team): 一个前端领域知名的技术品牌，创建于 2015 年 10 月，是一个专注于用户体验及产品价值提升的开源研发组织。围绕多端开发、服务端开发、人工智能、产品设计、视觉设计等方向沉淀与传播相关的专业知识及案例，为业界贡献经验价值。核心产品包括「羚珑 - 智能设计平台」、「Taro - 多端统一开发解决方案」等，深耕智慧设计、智能研发、跨端云研发体系的能力，助力泛零售业务实现智慧营销。
+- undefined (https://docs.qq.com/doc/DQmlrQXRNdXhGdXZk): The Metro Rail Transit Inquiry System is primarily aimed at providing passengers with travel-related information inquiries and advertising services. In response to the implementation of the central state-owned enterprise information technology application innovation development strategy, the core goal of this project is to replace Xi'an Metro's existing inquiry system with a fully domestic system capability.
+- undefined (https://docs.qq.com/doc/DQnl3VUVXaW9xc3dM): The WeChat Mini Program supports the online marketing and operation of Meituan's self-operated Waima business. Developed based on Meituan's self-developed multi-end framework for Mini Programs, the product features 6 core pages: 'Home', 'Product Details', 'Product Details Page', 'Shopping Cart', 'Personal Center', and 'Search Page', as well as 3 major permanent marketing pages: 'Limited Time Sale', 'Waima Selection', and 'Member Center'.
+- undefined (https://docs.qq.com/doc/DQmhTaUJsaXpBWEti): This is a back-end system that supports the marketing and operation of the C-end (Waima WeChat Mini Program) of Meituan Waima business. It includes sub-systems such as 'Supplier Management (SRM), Product Management, Procurement Management (PMS), Warehouse Management (WMS), Transportation Management (TMS), Order Management (OMS), Delivery Fulfillment Management, Store Management, and Financial Settlement'. Currently, except for 'Transportation Management' which is outsourced, and 'Financial Settlement' which uses Meituan's infrastructure capabilities, all other system capabilities are self-built by Waima.
+- undefined (https://docs.qq.com/doc/DQmhQSUllVlF2T2FR): Linglong (ling.jd.com) is a self-developed marketing content online design platform by JD, focusing on the e-commerce field. It integrates marketing creative content and design tools to provide high-quality solutions for design needs in different scenarios. Its core product feature matrix includes 'Image Design', 'Animation Design', 'Video Design', as well as a 'Content Zone' that integrates 'Design, Management, and Collaboration' for external enterprises and internal business departments. In addition, Linglong also provides practical tools and interface services such as 'One-click Image Background Extraction', 'Intelligent Color Matching', and 'Real-time Image Composition via URL'.
+- undefined (https://docs.qq.com/doc/DQlhjQmFQb0dIV2JX): Every person has their own perspective, and this applies to design styles as well. The diverse personalities and backgrounds of users result in a thousand different opinions on design. The Personalized Content Marketing project is an extension of the Linglong project (the second growth curve) and was officially launched at the beginning of 2021. It is a key project of the department, led by a cross-functional team of 10 members (including product, front-end, back-end, and algorithm roles). The core goal of this project is to deepen and refine a comprehensive and reliable solution for personalized content marketing based on the foundation of personalized advertising images, personalized marketing pages, and personalized product copy. This solution aims to maximize the conversion rate of marketing content in JD's traffic ecosystem.
+- undefined (https://aifire.art): 🌟🎨📸🎥🎶 A platform for ‘AIGC+PGC’ media content, which includes images, videos, sound effects, music, fonts, AI models, etc. The core product capability is to provide content consumers with a vast array of high-quality media materials and offer multi-dimensional information aggregation and retrieval methods (such as basic categorization, thematic scenarios, etc.) to help consumers quickly find the materials they need. For content producers, it provides AI model information, AI prompts, fonts, and related media design tools. The direct competitor is Pixabay, with the mission of ‘helping everyone use the highest quality media materials.’
+- undefined (https://github.com/gitalk/gitalk/): Gitalk is an open-source commenting plugin based on GitHub Issue and Preact. It has a total of 6.9K stars as of December 2023. It transforms GitHub Issue into a commenting system, integrates with GitHub login, and provides a simple, seamless, and customizable commenting system for developer users. It can be easily integrated into personal websites or blogs, simplifying comment management and promoting collaboration. It is open-source and free, allowing users to use and modify it freely to meet their own needs.
+- undefined (https://mamboer.github.io/vue-easy-gantt/): A simple Vue.js gantt chart plugin for presenting weekly tasks.
+- undefined (https://github.com/o2team): A well-known technology brand in the front-end domain, established in October 2015, is an open-source R&D organization focused on enhancing user experience and product value. It consolidates and disseminates professional knowledge and cases in various directions such as multi-end development, server-side development, artificial intelligence, product design, and visual design, contributing experiential value to the industry.
+
+## Labs
+- Gradient Neon Text Effect: Gradient Neon text with css.
+- Neon Text Effect: Neon text with css.
+- 3D Text Effect: 3D text with css.
+- Speech Recognition: Test with Speech Recognition.
+- Text Rotator: Rotate text with tailwindcss.
+- Hacker button: Randomize text on click with vue
+- Animated number counter: Animate numbers with a counter using tailwindcss and vue.
+- Shapes with Tailwindcss: Some random shapes made with tailwindcss
+- Rocket: A super fast rocket animation
+- Encrypted text: The encrypted text from evervault
+
+## Articles
+- 使用 Express.js 构建你的第一个 API：初学者指南: 
+- 使用 Semantic-Release 和 Github Workflow 实现自动化版本发布: 
+- Vitest 模拟第三方模块指南: 
+- Neon serverless-driver 结合 Vercel、阿里云实战指南: 
+- 教大家更直观的理解 Docker: 
+- 如何使用 Canvas 将 SVG 转换为 PNG: 
+- 亚马逊和美团的领导力原则: 
+- 美团公司的目标管理实践总结: 
+- SWOT 在业务策划及组织管理中的应用: 
+- 京东公司的过程管理实践总结: 
+- Building Your First API with Express.js: A Beginner's Guide: 
+- Automating Releases with Semantic-Release and GitHub Actions: 
+- A more intuitive understanding of Docker: 
+- How to convert a SVG to PNG using Canvas: 
+- Leadership Principles of Amazon and Meituan: 
+- Summary of Meituan's Goal Management Practices: 
+- SWOT in Business Planning and Organizational Management: 
+- Summary of Process Management Practices at JD.com: 
+
+## Music
+- Bb - Rooftop's rain: 
+- Unreasonable: 
+- Spinach girl（波菜女孩）: 
+- 你会在下一个夏天等我吗(Plastic Memories): 
+- Goodbye: 
+- Levin Thunder: 
+
+## AI Skills & Apps
+- iskill-video-clipper: 实拍素材短视频剪辑——ffmpeg 快出片+剪映草稿双引擎（爆款短视频工作流 6/6）
+- iskill-content-precheck: 发布预检——违禁词扫描+四维爆款评估（爆款短视频工作流 5/6）
+- iskill-viral-teardown: 爆款短视频拆解——下载转写+五维拆解（爆款短视频工作流 2/6）
+- iskill-hot-topic-scout: 每日热点选题——多平台热点搜集+画像打分+选题卡（爆款短视频工作流 1/6）
+- iskill-viral-copywriter: 爆款文案生成——四段式口播稿（爆款短视频工作流 3/6）
+- iskill-promo-page: 给 AI skill / 开源项目一键生成落地推广页：零依赖零构建、可插拔槽位、支持 GitHub Pages 部署
+- iskill-pipeline-dashboard: 短视频操盘可视化交互台——专家团六步流水线实时看板（JSONL 事件流 + React/Tailwind/Vite，底层技能）
+- iskill-ui-verify: 无头浏览器截图与断言薄封装：UI 验收批量截图 / 多视口断言 / 视觉回归
+- iskill-app-icon: 零依赖图标生成器：几何手绘矢量图形 → SVG/PNG 全套图标（favicon / apple-touch-icon / maskable / PWA）
+- iskill-generate-sponsors: 收款码 → 一整套可直接用的赞助页：FUNDING.yml + Markdown 区块 + 响应式双语 html + 零依赖 React/Vue 组件。One QR image → a full sponsor kit.
+- iskill-workbuddy-deepseek: 在 WorkBuddy 内置浏览器里用免费的 DeepSeek 网页版做讨论，一句话把对话交给 agent 执行 —— 不用外部 Chrome，不用切应用。
+- iskill-headroom-workbuddy2api: 把 WorkBuddy 桌面端内置模型接成 OpenAI 兼容 API（hub 负责能用、headroom 负责耐用）；跨平台双击启动器 + 本机控制台
+- iskill-github-publisher: WorkBuddy 技能：把本地 AI skill 一键发布到 GitHub（iskill- 前缀 + SSH 推送 + SkillHub 认领）。
+- iskill-super-mark: 个人收藏册：把微信转发/收藏的短视频与链接，变成可检索、可分类、有深度解读的 Web 应用
+- iskill-pwa-guideline: PWA 更新感知 skill：Vite + vite-plugin-pwa 项目的版本检测/静默提醒/一键清缓存更新
+- iskill-music-beats: 音乐节拍点分析——BPM/节拍时间轴/强节拍 → beats.json，供视频剪辑卡点转场（librosa）
+- iskill-media-transcribe: 视频/音频 → mp4 + mp3 + srt + json 三件套：yt-dlp 下载（含微信视频号元宝桥接）+ ffmpeg 抽音轨 + 本地 Whisper 转写，全程离线
+- iskill-huggingface-ext: 将 HuggingFace hub 缓存迁移到指定目录并软链回去，跨 macOS/Windows（iskill- 技能）
+- iskill-geometric-bg: Geometric background image generator — seeded, deterministic, zero-dependency SVG (6 styles × 8 palettes × dark/light)
+- iskill-generative-bgm: 纯前端生成式 BGM 引擎：Web Audio 实时合成，ABC 记谱定义主题，零素材离线
+- iskill-dig-media: 网络素材与 BGM 挖掘——Pixabay 视频 + Wikimedia Commons 音乐，manifest 溯源
+- iskill-crop-qrcode: 二维码自动裁剪 CLI —— 零依赖定位码主体并裁成统一正方形（macOS sips，Node ≥18）
+- iskill-copy-deslop: 口播文案去AI味+三视角真人点评（爆款短视频工作流 4/6）
+- iskill-script-launcher: 写给用户双击运行的跨平台脚本（macOS .command / Windows .ps1+.cmd）：一份 Python 真源 + 各平台薄壳，附按症状归档的真机踩坑与可抄骨架
+
+## Links
+- https://github.com/aispin
+- https://zeobooks.app.workbuddy.host
+- Novels: https://zeobooks.app.workbuddy.host

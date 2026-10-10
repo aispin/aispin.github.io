@@ -1,0 +1,110 @@
+{
+  "generatedAt": "2026-10-10T17:49:31.352Z",
+  "count": 7,
+  "demos": [
+    {
+      "id": "door",
+      "title": "大展宏图 · 门神",
+      "description": "",
+      "url": "/demos/door.html",
+      "dir": "public/demos",
+      "entry": "door.html",
+      "readme": false,
+      "variants": []
+    },
+    {
+      "id": "my-3d-site",
+      "title": "门联文案 · 24 节气 + 传统节日",
+      "description": "3D 院子里那副门联的全部文案底稿：42 副七言对联 —— 4 副四季日常联 + 1 副彩蛋 + 24 节气 + 10 个传统节日 + 3 个法定假期，外加日期解析规则与 2026–2027 年的实际命中日期。",
+      "url": "/demos/my-3d-site/couplets-preview.html",
+      "dir": "public/demos/my-3d-site",
+      "entry": "couplets-preview.html",
+      "readme": true,
+      "variants": []
+    },
+    {
+      "id": "skill-ui/examples",
+      "title": "Lumen — API 可观测性平台",
+      "description": "Lumen 把日志、指标、链路追踪合并到一个视图里。上线 5 分钟接入，定位一次线上故障平均只需要 47 秒。",
+      "url": "/demos/skill-ui/examples/01-landing.html",
+      "dir": "public/demos/skill-ui/examples",
+      "entry": "01-landing.html",
+      "readme": true,
+      "variants": [
+        {
+          "name": "02-dashboard",
+          "url": "/demos/skill-ui/examples/02-dashboard.html"
+        },
+        {
+          "name": "03-desktop-app",
+          "url": "/demos/skill-ui/examples/03-desktop-app.html"
+        },
+        {
+          "name": "04-settings",
+          "url": "/demos/skill-ui/examples/04-settings.html"
+        },
+        {
+          "name": "05-state-gallery",
+          "url": "/demos/skill-ui/examples/05-state-gallery.html"
+        },
+        {
+          "name": "06-3d-personal-ip",
+          "url": "/demos/skill-ui/examples/06-3d-personal-ip.html"
+        }
+      ]
+    },
+    {
+      "id": "web3d/3d-ip-landing",
+      "title": "Hugo — 独立开发者 · 创意设计师 · 音乐人",
+      "description": "在代码、像素和声音之间游走。做一些安静的、需要耐心的东西。",
+      "url": "/demos/web3d/3d-ip-landing/",
+      "dir": "public/demos/web3d/3d-ip-landing",
+      "entry": "index.html",
+      "readme": true,
+      "variants": []
+    },
+    {
+      "id": "web3d/life-meaning",
+      "title": "人生的意义 · v0.0.1 · AI Matrix",
+      "description": "- 入口：index.html",
+      "url": "/demos/web3d/life-meaning/",
+      "dir": "public/demos/web3d/life-meaning",
+      "entry": "index.html",
+      "readme": true,
+      "variants": []
+    },
+    {
+      "id": "web3d/old-house",
+      "title": "黄昏小院 1.8 · 层级重构",
+      "description": "",
+      "url": "/demos/web3d/old-house/",
+      "dir": "public/demos/web3d/old-house",
+      "entry": "index.html",
+      "readme": false,
+      "variants": [
+        {
+          "name": "index-a",
+          "url": "/demos/web3d/old-house/index-a.html"
+        },
+        {
+          "name": "index-b",
+          "url": "/demos/web3d/old-house/index-b.html"
+        },
+        {
+          "name": "tree",
+          "url": "/demos/web3d/old-house/tree.html"
+        }
+      ]
+    },
+    {
+      "id": "web3d/rainy-night",
+      "title": "雨夜古镇 v0.0.1 — AI Matrix",
+      "description": "- 入口：index.html",
+      "url": "/demos/web3d/rainy-night/",
+      "dir": "public/demos/web3d/rainy-night",
+      "entry": "index.html",
+      "readme": true,
+      "variants": []
+    }
+  ]
+}
