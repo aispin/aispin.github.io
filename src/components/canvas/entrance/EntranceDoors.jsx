@@ -14,6 +14,8 @@ import { SURFACE_VERT, SONG_WALL_FRAG, INK_OVERLAY_FRAG, STONE_FRAG, makeSurface
 import GateBase from './GateBase';
 import { WindChime, WhiteDog, WoodenPlanter, WoodenWindowFrame, WindowCurtain, SwallowNest } from './EntranceProps';
 import StoneTable from './StoneTable';
+import LotusVat from './LotusVat';
+import BambooFence from './BambooFence';
 import { SCENE_FONTS } from '../../../config/theme';
 // 季节：门联与院子共用同一张月份表（config/seasons.js），所以门口挂秋联时
 // 院子就是秋天 —— 这条一致性是免费的。
@@ -1315,6 +1317,21 @@ const EntranceDoors = ({
                     </Text>
                 </group>
             </group>
+
+            {/* BAMBOO FENCE (Right Side - along the wall) —— §6.3，WO-3。
+                z = 0.24：在门脸砖面（0.15）**之前**、花箱前脸（0.65）**之后**，
+                于是它与花箱 / 荷花缸重叠的那几段被不透明的容器挡住，读成
+                「竹篱沿墙一路铺过去、被容器打断」—— 真院子就是这个样子。
+                整道篱笆只有 1 个 mesh：26 根立竹、2 道横档、34 片叶全在贴图里。 */}
+            <BambooFence position={[3.175, OUTDOOR_Y, 0.24]} />
+
+            {/* LOTUS VAT (Right Side - beside the planter) —— §6.1，WO-3。
+                位置由用户 2026-10-09 定：「与花箱并列」（窗下木花箱外侧）。
+                花箱占 x ∈ [1.925, 3.075]，缸半径 0.305 取 x = 3.6
+                ⇒ 缸占 x ∈ [3.295, 3.905]，两边各留 0.2 以上。
+                内容物按季**条件挂载**（见 LotusVat 的注释：四季全挂上会白吃
+                约 20 个网格，而验收判据是 mesh ≤ 760）。 */}
+            <LotusVat position={[3.6, OUTDOOR_Y, 0.4]} />
 
             {/* ANIMATED BUG (Right Side - Above Window) */}
             {/* Clicking it no longer splashes ink — it dodges (see

@@ -352,7 +352,9 @@ const shadow = ctx.createRadialGradient(0, 0, 14, 0, 0, 300);
 | **草** | `shaders/entranceTextures.js` | ✅ 见 §5.2；雪见 §5.2b |
 | 藤蔓（常春藤） | `entranceTextures.SEASON_INK_TINT` → `INK_OVERLAY_FRAG` 的 `uInkTint` | ✅ 见 §9.4k |
 | 花箱植物 | `entranceTextures.SEASON_PLANT` → `EntranceProps.WoodenPlanter` | ✅ 见 §9.4k |
-| 荷花缸内容物 | 新组件 | ⬜ P3，见 §6.1 |
+| 荷花缸内容物 | `entrance/LotusVat.jsx`（**条件挂载**四季内容物） | ✅ 见 §9.4m |
+| 竹篱爬藤 | `entranceArt.makeBambooFenceTexture(season)`（复用 `SEASON_PLANT`） | ✅ 见 §9.4m |
+| 季生天象 | `entrance/WeatherLayer.jsx` + `SNOW_FRAG` / `RAIN_FRAG` | ✅ 见 §9.4m |
 
 > ⚠️ **签名注意**：这里原本写的是 `makeWallInkTexture(w, h, season)`（按季重烘贴图）。
 > **那个写法没有采用。** 藤蔓**不重烘贴图** —— 那是一张 1280×768 的画布，为一次换季
@@ -558,6 +560,20 @@ uniform float uSnow;          // 0..1 积雪覆盖
 
 预算 ≈ 12 mesh。
 
+**✅ 已实现（2026-10-10 · WO-3）** —— `components/canvas/entrance/LotusVat.jsx`
+
+- 位置**已定**：与花箱并列，局部 `[3.6, OUTDOOR_Y, 0.4]`。花箱占 x ∈ [1.925, 3.075]，
+  缸半径 0.305 ⇒ 缸占 [3.295, 3.905]，两边各留 0.2 以上。四季不动。
+- 陶缸 = `LatheGeometry`（16 点剖面 × 26 段，与燕子窝同款做法），陶色 `#6E5B4A`；
+  水面 = 1 个 `circle`，贴图 `makeVatWaterTexture(season)`（冬 = 薄冰 + 裂纹）。
+- 🔴 **内容物是条件挂载**（`{isSummer && …}`），不是 `visible={false}`：
+  四季内容物加起来约 20 个网格，而任意时刻只该有一季在场 —— 全挂上再靠
+  `visible` 关掉，`scene.traverse` 仍然数得到它们，会白吃三分之一的 mesh 预算
+  （验收 ≤ 760，基线 704）。几何全走 `sharedGeometry` ⇒ 换季重挂是 Map 查表。
+- 实测峰值 = 夏天 9 个（4 荷叶 + 2 荷花 + 3 蜻蜓）+ 缸 + 水面 = **11 个**。
+- 蜻蜓刻意做成"一根身子 + 两片翅膀"的最小可读形态：这个尺度上它本来就读作
+  "荷叶上方一个十字"，再加细节只是烧网格。
+
 ### 6.2 石桌石凳（P3）
 
 庭院最经典的固定陈设。石桌 1（桌面 + 柱 + 基座）+ 石凳 2（座 + 柱）。
@@ -568,6 +584,18 @@ uniform float uSnow;          // 0..1 积雪覆盖
 沿墙矮竹篱。**用程序化贴图 + alphaTest 平面**（与树、藤蔓同款做法），
 **不做实体几何** —— 1–2 mesh 就够。季节只改攀爬植物的配色。
 
+**✅ 已实现（2026-10-10 · WO-3）** —— `components/canvas/entrance/BambooFence.jsx`
+
+- **1 个 mesh**：26 根立竹 + 2 道横档 + 34 片叶全在 `makeBambooFenceTexture(season)` 里
+  （贴图缓存键**含季节**，种子不含 —— 同一道篱笆，四季是同几根竹子）。
+- 位置：门脸右侧沿墙，局部 `[3.175, OUTDOOR_Y, 0.24]`，宽 3.65 × 高 0.45。
+  🔴 **z = 0.24 是算出来的**：必须 > 门脸砖面的 **0.15**（否则被墙吞掉），
+  又 < 花箱前脸的 **0.65** ⇒ 与花箱 / 荷花缸重叠的那几段被不透明的容器挡住，
+  读成「竹篱沿墙一路铺过去、被容器打断」—— 真院子就是这样。平面**穿进**箱体内部
+  是无害的：两者都在不透明 pass，深度测试直接丢掉被挡住的片元。
+- 攀爬植物的叶色**复用 `SEASON_PLANT`**（花箱那丛的调色板），不另开一张表 ——
+  「同一张表写两遍，迟早在某个文件里漂移」是本项目最贵的一课。
+
 ### 6.4 季生道具（C 档）
 
 | 项 | 实现 | 新增 mesh |
@@ -576,6 +604,21 @@ uniform float uSnow;          // 0..1 积雪覆盖
 | 地面/墙头积雪 | `grassSurface` 的 `uSnow` + `SONG_WALL_FRAG` 压顶上方一条雪带 | **0** |
 | 雨幕 | 相机前 shader 平面（斜纹 + 湿地反光） | 1–2 |
 | 燕子 / 瓢虫 | **已有**，只改数量与显隐 | 0 |
+
+**✅ 已实现（2026-10-10 · WO-3）** —— `components/canvas/entrance/WeatherLayer.jsx`
+
+- **1 个 mesh**（一块 11×6 的平面），挂在**相机前方 2.6 单位**：每帧
+  `copy(camera.position)` + `copy(camera.quaternion)` + `translateZ(-2.6)`。
+  不用 `<primitive object={camera}>` 去改父子关系 —— 相机被 `useInfiniteCamera`
+  每帧驱动，动渲染图的风险远大于多写三行。
+- 春/夏 = 雨幕（`RAIN_FRAG`：uv 剪切 ⇒ 倾角，格子纵向拉长 2.6:1 ⇒ 细长雨丝）；
+  冬 = 落雪（`SNOW_FRAG`：三层不同 scale/speed ⇒ 读得出纵深）；
+  **秋 = 整层不挂载**（`return null`，0 mesh / 0 draw）。
+- 材质 `depthTest: false` + `renderOrder 999` + `depthWrite: false`：天象永远画在
+  所有东西**前面**（雨雪不会落在墙后面），且不污染深度缓冲。
+  `fog: false` 是必须的 —— 平面只在相机前 2.6 单位，混进雾（fogNear 18）会整片变白。
+- ⚠️ **暂未做**：§6.4 那句「**湿地反光**」。它要动 `grassSurface()` 的地面色板，
+  而地面刚验收过（§9.4j），贸然加"湿"有回归风险 —— 留作后续单独一轮。
 
 ---
 
@@ -640,7 +683,7 @@ uniform float uSnow;          // 0..1 积雪覆盖
 |---|---|---|---|
 | **P1** | L0 光照 + 树的四季 + 草的四季 + 雪的 uniform（**纯数据，零新增几何**） | 8 张定妆照一眼可辨；`?season=autumn` 与改动前逐位一致（**唯一例外见下**） | ✅ 2026-10-09 |
 | **P2** | L3 声音 + 燕子/瓢虫的季生开关 | 关掉画面只听声音也能分辨季节 | ✅ 2026-10-10（§9.3） |
-| **P3** | 常驻新道具（荷花缸 / 石桌石凳 / 竹篱）+ 季生天象（雨 / 雪）+ 藤蔓/花箱四季化 | 每季有自己的"物证"；mesh ≤ 760 | 🟡 石桌石凳已交付；荷花缸（位置已定：**与花箱并列**）/ 竹篱 / 雨雪 ⬜ |
+| **P3** | 常驻新道具（荷花缸 / 石桌石凳 / 竹篱）+ 季生天象（雨 / 雪）+ 藤蔓/花箱四季化 | 每季有自己的"物证"；mesh ≤ 760 | ✅ 2026-10-10（§9.4m；荷花缸位置**与花箱并列**） |
 | **P4** | 季节切换 UI（设置面板；**不做**双线性插值，换季改为吸附 —— 见 §4.2b） | 面板能切四季，且**同一次会话内**场景真的跟着变 | ✅ 2026-10-09 |
 
 **P1 是成败判据**：如果只做 L0+L1 就已经能一眼分辨四季，后面都是加分项；如果不能，说明轴选错了。
@@ -1274,6 +1317,36 @@ sRGB→Lab(D65)；草坪 = 同机位下 `lawnL + lawnR` 两块的像素池，
 
 ---
 
+**9.4m WO-3：荷花缸 / 竹篱 / 季生天象（2026-10-10）**
+
+P3 的最后三件。用户 2026-10-10 定「**三件全做，做完一起推**」。
+
+| 件 | 文件 | mesh | 备注 |
+| --- | --- | --- | --- |
+| 荷花缸 | `entrance/LotusVat.jsx` | ≤ **11**（夏） | 用户点名；位置「与花箱并列」 |
+| 竹篱 | `entrance/BambooFence.jsx` | **1** | 程序化贴图 + alphaTest 平面，无实体几何 |
+| 季生天象 | `entrance/WeatherLayer.jsx` | **0 / 1** | 春·夏 雨幕、冬 落雪、**秋 整层不挂载** |
+
+规格与实现细节见 **§6.1 / §6.3 / §6.4 各节末尾的 ✅ 块**（含为什么这么放、为什么这么做）。
+新增贴图：`makeVatWaterTexture(season)`、`makeBambooFenceTexture(season)`（都在 `utils/entranceArt.js`）。
+
+**两条这次才踩明白的**
+
+1. 🔴 **季生物不要"全挂上再 `visible` 关掉"**。`StoneTable` 那种写法（1 个季生网格）
+   没问题；但荷花缸四季内容物加起来约 20 个网格，而 `visible=false` 的网格
+   `scene.traverse` **照样数得到** —— 验收判据是 mesh ≤ 760。**条件挂载**
+   （`{isSummer && …}`）只留当前季那一组，几何又全走 `sharedGeometry`，
+   所以换季重挂就是一次 Map 查表，不 new 任何东西。
+2. 🔴 **入口的一切局部坐标都要 +22**。整个入口挂在 `Experience` 的
+   `ENTRANCE_POSITION`（z = 22）下。给新道具注入机位时按 JSX 里的局部值推
+   **会拍到走廊**（§9.4l 末尾那一轮就是这么白拍的）。
+   `harness/probe-planter-pos.mjs` 专门量这个（按几何签名找物件、打世界坐标）。
+
+**物证**：`.workbuddy-ai/wo3-2026-10-10/`（`after-<季>-props.png` 近景、
+`after-<季>-wide.png` 默认机位看天象；工具 `harness/shot-wo3.mjs`）。
+
+---
+
 ## 10. 设置面板（2026-10-09 · P4 的 UI 部分）
 
 需求原话：「将那个暗黑模式的图标按钮，改成设置按钮吧，弹设置面板，里面可以选暗黑
@@ -1344,9 +1417,12 @@ sRGB→Lab(D65)；草坪 = 同机位下 `lawnL + lawnR` 两块的像素池，
 | `src/components/canvas/audio/CourtyardAmbience.jsx` | 院子四季声床的挂载点（读 `useSeason` + `useAudio`，按季选预设） | ✅ P2 |
 | `.workbuddy-ai/harness/verify-wo2-seasons.mjs` | WO-2 验收：四声床 / 换季 / 互斥 / 燕子瓢虫季生 | ✅ P2 |
 | `.workbuddy-ai/harness/shot-wo2-nest.mjs` | 燕子窝四季特写（投影定框 + clip 截图，**不动相机**） | ✅ P2 |
-| `src/components/canvas/entrance/CourtyardProps.jsx` | 荷花缸 / 石桌石凳 / 竹篱 | ⬜ P3 |
-| `src/utils/courtyardArt.js` | 上述道具的程序化贴图 | ⬜ P3 |
-| `src/shaders/seasonFx.js` | 雨幕 / 落雪的 shader | ⬜ P3 |
+| `src/components/canvas/entrance/StoneTable.jsx` | 石条桌 + 2 石凳（树下）；冬雪盖 / 秋落叶 + 2 柿 | ✅ P3 · WO-3 |
+| `src/components/canvas/entrance/LotusVat.jsx` | 荷花缸：车削陶缸 + 水面 + **条件挂载**的四季内容物 | ✅ P3 · WO-3 |
+| `src/components/canvas/entrance/BambooFence.jsx` | 竹篱：1 块 alphaTest 平面，竹子与爬藤全在贴图里 | ✅ P3 · WO-3 |
+| `src/components/canvas/entrance/WeatherLayer.jsx` | 季生天象：挂在相机前的雨幕 / 落雪平面（秋不挂载） | ✅ P3 · WO-3 |
+| `.workbuddy-ai/harness/shot-wo3.mjs` | WO-3 定妆照：四季 × 两机位（props 近景 / wide 看天象） | ✅ WO-3 |
+| `.workbuddy-ai/harness/probe-planter-pos.mjs` | 按几何签名量物件的**世界**坐标（入口整体 +22，别按 JSX 推） | ✅ WO-3 |
 | `.workbuddy-ai/harness/shots-seasons.mjs` | 8 组合定妆照（每组合换 URL 重载，见文件头） | ✅ |
 | `.workbuddy-ai/harness/shot-page.mjs` | 截 **http URL** 页面（补 `shot-html.mjs` 只走 `file://` 的空） | ✅ |
 | `.workbuddy-ai/harness/settings-panel-check.mjs` | 设置面板证据脚本（面板 / 换季 / 明暗 / 互斥） | ✅ P4 |
@@ -1367,7 +1443,7 @@ sRGB→Lab(D65)；草坪 = 同机位下 `lawnL + lawnR` 两块的像素池，
 | `src/components/ui/SiteControls.jsx` | 第 3 个按钮：明暗 → **设置**（齿轮） | ✅ P4 |
 | `src/components/ui/NavigationUI.jsx` | 新增设置面板；四面板合并为单一 `openPanel`（互斥） | ✅ P4 |
 | `src/styles/NavigationUI.scss` | `$torn-paper-clip` 变量 + `.settings-panel` 全套 | ✅ P4 |
-| `src/utils/entranceArt.js` | `makeTreeTexture(season)`；`TREE_SEASON` 表；**树干 `closePath` 修复**；枝上积雪 | ✅ |
+| `src/utils/entranceArt.js` | `makeTreeTexture(season)`；`TREE_SEASON` 表；**树干 `closePath` 修复**；枝上积雪。**WO-3 加**：`makeVatWaterTexture(season)` / `makeBambooFenceTexture(season)` | ✅ |
 | `src/shaders/entranceTextures.js` | `grassSurface` 季节 palette + `uSnow`；`SONG_WALL_FRAG`/`STONE_FRAG` 积雪；`applyGroundSeason()` 就地更新 | ✅ |
 | `src/audio/ambience.js` | 4 条季节预设进 `PRESETS` | ⬜ P2 |
 

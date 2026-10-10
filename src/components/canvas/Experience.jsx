@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import InfiniteCorridorManager from './corridor/InfiniteCorridorManager';
 import EntranceDoors from './entrance/EntranceDoors';
 import EmptyCorridor from './entrance/EmptyCorridor';
+import WeatherLayer from './entrance/WeatherLayer';
 import TeleportRoom from './corridor/TeleportRoom';
 import HouseExit from './corridor/HouseExit';
 import RoomWarmup from './corridor/RoomWarmup';
@@ -136,6 +137,15 @@ const Experience = ({ onSceneReady, performanceTier }) => {
             {/* Separate SignSystem to avoid fragment nesting issues if any */}
             {!hasEntered && (
                 <SignSystem position={ENTRANCE_POSITION} />
+            )}
+
+            {/* === 季生天象（雨幕 / 落雪）=== §6.4，WO-3，C 档。
+                和上面几个共用同一个 `!hasEntered` 边界：它是**院子**的天象，
+                进了走廊 / 房间自然卸载 —— 在室内看到雨丝才是 bug。
+                挂在这里而不是 EntranceDoors 里：那一层带着 ENTRANCE_POSITION
+                的位移，而天象是**挂在相机上**的，坐标系必须干净。 */}
+            {!hasEntered && (
+                <WeatherLayer />
             )}
 
             {/* === INFINITE CORRIDOR (segment -1 SegmentDoors hidden during entrance) === */}

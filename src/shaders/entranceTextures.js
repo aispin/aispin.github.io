@@ -944,3 +944,105 @@ export function makeSurfaceUniforms(width, height, origin = [0, 0], season = 'au
         ...groundSeasonUniforms(season),
     };
 }
+
+/* ------------------------------------------------------------------ */
+/* WO-3 季生天象（C 档）：雨幕 / 落雪                                   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 天气层共用的顶点着色器。
+ *
+ * ⚠️ 这个平面**挂在相机前方**（`WeatherLayer` 每帧 copy 相机的 position +
+ * quaternion 再 `translateZ(-d)`），所以：
+ *   · 它必须自带 uv（不参与世界坐标投影，不吃任何 uOrigin/uSize）；
+ *   · 材质必须 `fog: false` —— 场景雾是 fogNear 18 / fogFar 60，而平面只在
+ *     相机前 ~2.6 单位，混进雾里会整片变白。
+ *
+ * ⚠️ GLSL 块是 JS **模板字面量**：注释里**不许出现反引号**（会截断字符串，
+ * 症状是 eslint 的 Parsing error）。这里一律用「」。
+ */
+export const WEATHER_VERT = /* glsl */ `
+varying vec2 vUv;
+void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+/** 二维 hash —— 不用纹理，纯算。确定性，和 mulberry32 那套精神一致。 */
+const WEATHER_HASH = /* glsl */ `
+float hash21(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+}
+`;
+
+/**
+ * 落雪：三层不同尺度/速度的雪花。
+ *
+ * 为什么是三层：单层要么密到糊成一片白噪声（把整个画面洗淡），要么稀到
+ * 只有几颗孤零零的点、读不出"下雪"。三层各自 scale / speed 不同，
+ * 近处大而快、远处小而慢，眼睛才读出**纵深**。
+ */
+export const SNOW_FRAG = /* glsl */ `
+varying vec2 vUv;
+uniform float uTime;
+uniform float uOpacity;
+${WEATHER_HASH}
+void main() {
+    float a = 0.0;
+    for (int i = 0; i < 3; i++) {
+        float fi = float(i);
+        float scale = 11.0 + fi * 7.0;
+        float speed = 0.055 + fi * 0.045;
+        vec2 p = vUv * vec2(scale * 1.9, scale);
+        // 下落 + 横向摆动（雪不是直着掉的）
+        p.y += uTime * speed * scale;
+        p.x += sin(uTime * (0.25 + fi * 0.18) + p.y * 0.55) * 0.4;
+        vec2 cell = floor(p);
+        vec2 f = fract(p);
+        float h = hash21(cell + fi * 37.0);
+        if (h > 0.80) {
+            vec2 c = vec2(0.22 + hash21(cell + 1.3) * 0.56, 0.22 + hash21(cell + 2.7) * 0.56);
+            float d = length(f - c);
+            float r = 0.05 + hash21(cell + 3.1) * 0.06;
+            a += smoothstep(r, 0.0, d) * (0.34 + fi * 0.22);
+        }
+    }
+    a = clamp(a, 0.0, 1.0) * uOpacity;
+    // 略偏冷白 —— 纯白在灰墙前会糊掉
+    gl_FragColor = vec4(vec3(0.94, 0.965, 1.0), a);
+}
+`;
+
+/**
+ * 雨幕：斜向的细长条纹。
+ *
+ * 做法 = 把 uv 沿 y 剪切（这就是"斜"），再在**纵向压扁**的格子里画一条细竖线
+ * ⇒ 细长、倾斜、带纵向速度。格子纵向拉长（2.6 : 1）是"雨丝"而不是"雨点"的关键。
+ */
+export const RAIN_FRAG = /* glsl */ `
+varying vec2 vUv;
+uniform float uTime;
+uniform float uOpacity;
+${WEATHER_HASH}
+void main() {
+    vec2 p = vUv * vec2(16.0, 3.0);
+    p.x += vUv.y * 2.2;            // 剪切 ⇒ 雨丝的倾角
+    p.y += uTime * 3.4;            // 下落
+    vec2 cell = floor(p);
+    vec2 f = fract(p);
+    float h = hash21(cell);
+    float a = 0.0;
+    if (h > 0.70) {
+        // 细竖线 + 纵向渐隐（头尾都淡，中段最亮）
+        float x = abs(f.x - 0.5);
+        float line = smoothstep(0.085, 0.0, x);
+        float head = smoothstep(0.0, 0.30, f.y) * smoothstep(1.0, 0.60, f.y);
+        a = line * head * (0.22 + h * 0.34);
+    }
+    a *= uOpacity;
+    gl_FragColor = vec4(vec3(0.78, 0.85, 0.93), a);
+}
+`;
