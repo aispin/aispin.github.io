@@ -984,6 +984,11 @@ float hash21(vec2 p) {
  * 为什么是三层：单层要么密到糊成一片白噪声（把整个画面洗淡），要么稀到
  * 只有几颗孤零零的点、读不出"下雪"。三层各自 scale / speed 不同，
  * 近处大而快、远处小而慢，眼睛才读出**纵深**。
+ *
+ * 🔴 **vUv 就是屏幕**：`WeatherLayer` 每帧把平面缩放到当前视锥的尺寸
+ * （`2·DIST·tan(fov/2)` × aspect），所以这里的格数是「屏幕上有几格」，
+ * **与视口宽窄无关**。之前平面写死 11×6，竖屏只看得见中间 ~15% 的宽度，
+ * 雨雪都稀到读不出来 —— 见 §9.4n。
  */
 export const SNOW_FRAG = /* glsl */ `
 varying vec2 vUv;
@@ -994,8 +999,12 @@ void main() {
     float a = 0.0;
     for (int i = 0; i < 3; i++) {
         float fi = float(i);
-        float scale = 11.0 + fi * 7.0;
-        float speed = 0.055 + fi * 0.045;
+        // 屏幕相对：竖屏/横屏的**每屏密度**一致。旧值 11/18/25 是按「11 单位宽的
+        // 固定平面」调的，换算成"每屏"要除以 ~1.9 ⇒ 6/10/14。
+        float scale = 6.0 + fi * 4.0;
+        // ⚠️ 换成屏幕相对之后，**速度的含义变了**：旧平面高 6 而可见高只有 3，
+        // 所以旧的 speed 在屏幕上要**乘 2**。这里直接把旧值翻倍，保持手感。
+        float speed = 0.11 + fi * 0.09;
         vec2 p = vUv * vec2(scale * 1.9, scale);
         // 下落 + 横向摆动（雪不是直着掉的）
         p.y += uTime * speed * scale;
@@ -1017,32 +1026,43 @@ void main() {
 `;
 
 /**
- * 雨幕：斜向的细长条纹。
+ * 雨幕：斜向的细长雨丝。
  *
- * 做法 = 把 uv 沿 y 剪切（这就是"斜"），再在**纵向压扁**的格子里画一条细竖线
- * ⇒ 细长、倾斜、带纵向速度。格子纵向拉长（2.6 : 1）是"雨丝"而不是"雨点"的关键。
+ * 做法 = 把 uv 沿 y 剪切（这就是"斜"），再在格子里画一条细线，
+ * 每格只画**一小段**（`len`），剩下的留空 ⇒ 雨丝之间有间隙。
+ *
+ * 🔴 **vUv 就是屏幕**（平面按视锥尺寸缩放，见 `WeatherLayer`）。
+ * 所以 `vec2(24, 7)` = 「屏幕上 24 列 × 7 行格子」。旧的 `vec2(16, 3)` 是按
+ * 11 单位宽的固定平面调的：竖屏只看得见 ~15% 的宽度 ⇒ 屏幕上只剩两三条，
+ * 且一条跨掉半个屏幕高 —— 看起来就是「右边几道光」，不是雨（§9.4n）。
+ *
+ * 🔴 **倾角要除以 uAspect**：`p.x` 加 `vUv.y * S` 时，屏幕上的斜率是
+ * `(S / NX) · uAspect`。不除就会「竖屏几乎垂直、横屏很斜」。
  */
 export const RAIN_FRAG = /* glsl */ `
 varying vec2 vUv;
 uniform float uTime;
 uniform float uOpacity;
+uniform float uAspect;
 ${WEATHER_HASH}
 void main() {
-    vec2 p = vUv * vec2(16.0, 3.0);
-    p.x += vUv.y * 2.2;            // 剪切 ⇒ 雨丝的倾角
-    p.y += uTime * 3.4;            // 下落
+    vec2 p = vUv * vec2(24.0, 7.0);
+    // 剪切 ⇒ 雨丝的倾角（屏幕空间恒定，与视口无关）
+    p.x += vUv.y * 4.2 / uAspect;
+    p.y += uTime * 9.0;            // 下落（≈1.3 屏高/秒 —— 雨要"落"得起来）
     vec2 cell = floor(p);
     vec2 f = fract(p);
     float h = hash21(cell);
     float a = 0.0;
-    if (h > 0.70) {
-        // 细竖线 + 纵向渐隐（头尾都淡，中段最亮）
+    if (h > 0.74) {
+        // 每格一条：长度不一（短丝/长丝混着才不像"光线"），头尾都渐隐
+        float len = 0.34 + hash21(cell + 5.7) * 0.36;
         float x = abs(f.x - 0.5);
-        float line = smoothstep(0.085, 0.0, x);
-        float head = smoothstep(0.0, 0.30, f.y) * smoothstep(1.0, 0.60, f.y);
-        a = line * head * (0.22 + h * 0.34);
+        float line = smoothstep(0.055, 0.0, x);
+        float head = smoothstep(0.0, 0.22 * len, f.y) * smoothstep(len, 0.55 * len, f.y);
+        a = line * head * (0.11 + h * 0.23);
     }
     a *= uOpacity;
-    gl_FragColor = vec4(vec3(0.78, 0.85, 0.93), a);
+    gl_FragColor = vec4(vec3(0.80, 0.87, 0.95), a);
 }
 `;
