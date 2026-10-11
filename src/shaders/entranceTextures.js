@@ -1026,6 +1026,85 @@ export function foxtailSeasonUniforms(season = 'autumn') {
     };
 }
 
+/* ------------------------------------------------------------------ */
+/* 柿子树的四季色板（3D 版，2026-10-12 WO-13）                          */
+/*                                                                     */
+/* 取值不是新拍的 —— 它是原来**画在 canvas 贴图里**那套调色板的原值，   */
+/* 搬进 sRGB 0..1：                                                     */
+/*   · `leafA`  ← TREE_SPRING / TREE_GREENS 的**亮**档（树冠受光面）     */
+/*   · `leafB`  ← 同一套的**暗**档（背光面 / 冠内）                     */
+/*   · `accent` ← TREE_AUTUMN（秋树的黄叶，按 `accentMix` 混进去）       */
+/*   · `bark*`  ← BARK / BARK_DARK / BARK_HI                            */
+/*                                                                     */
+/* 🔴 `autumn` 是**参照季**（原来那棵树就是秋天），所以换 3D 之后它的    */
+/*    **观感**要尽量接住旧版；其余三季按同一套关系推。                   */
+/* ⚠️ `winter` 的叶色是**占位**：那一季 `canopy: false`，叶 mesh 整个     */
+/*    `visible={false}`，色板根本不参与渲染。留值是为了"表是完整的"。     */
+/* ------------------------------------------------------------------ */
+
+export const SEASON_TREE = {
+    /* 春：返青的嫩芽 —— 比夏天亮一档、往黄绿偏（新叶本来就黄、就透）。 */
+    spring: {
+        leafA: [0.498, 0.635, 0.275],
+        leafB: [0.369, 0.490, 0.200],
+        accent: [0.498, 0.635, 0.275],
+        accentMix: 0,
+    },
+    /* 夏：最盛的一季，绿最沉。 */
+    summer: {
+        leafA: [0.337, 0.478, 0.220],
+        leafB: [0.243, 0.357, 0.165],
+        accent: [0.243, 0.357, 0.165],
+        accentMix: 0,
+    },
+    /* 秋 = 参照季：树还是绿的，只在三成叶子上泛黄 —— 挂着的红果才是主角。 */
+    autumn: {
+        leafA: [0.361, 0.494, 0.239],
+        leafB: [0.267, 0.376, 0.176],
+        accent: [0.749, 0.573, 0.224],
+        accentMix: 0.30,
+    },
+    /* 冬：秃枝。叶色是占位（见上）。 */
+    winter: {
+        leafA: [0.337, 0.478, 0.220],
+        leafB: [0.243, 0.357, 0.165],
+        accent: [0.243, 0.357, 0.165],
+        accentMix: 0,
+    },
+};
+
+/** 树皮（四季同一套 —— 树皮不随季节换色）。比 canvas 那套整体提亮一档：
+ *  3D 版的树皮走的是**光照相乘**，不是画好的明暗，直接沿用会偏黑。 */
+const TREE_BARK_3D = {
+    bark: [0.494, 0.365, 0.239],
+    barkDark: [0.290, 0.200, 0.129],
+    barkHi: [0.749, 0.612, 0.443],
+};
+
+/** 柿子（只有秋天挂果，所以不随季节换色）。 */
+const TREE_FRUIT_3D = {
+    fruit: [0.949, 0.451, 0.110],
+    fruitDark: [0.557, 0.196, 0.063],
+    calyx: [0.290, 0.420, 0.157],
+};
+
+/** 柿子树的四季色板 → three 的 uniform 对象。未知季节落到秋天。 */
+export function treeSeasonUniforms(season = 'autumn') {
+    const p = SEASON_TREE[season] || SEASON_TREE.autumn;
+    return {
+        uLeafA: { value: p.leafA },
+        uLeafB: { value: p.leafB },
+        uAccent: { value: p.accent },
+        uAccentMix: { value: p.accentMix },
+        uBark: { value: TREE_BARK_3D.bark },
+        uBarkDark: { value: TREE_BARK_3D.barkDark },
+        uBarkHi: { value: TREE_BARK_3D.barkHi },
+        uFruit: { value: TREE_FRUIT_3D.fruit },
+        uFruitDark: { value: TREE_FRUIT_3D.fruitDark },
+        uCalyx: { value: TREE_FRUIT_3D.calyx },
+    };
+}
+
 /** 某一季的地面色板 → three 的 uniform 对象。未知季节落到秋天。 */
 export function groundSeasonUniforms(season = 'autumn') {
     const p = SEASON_GROUND[season] || SEASON_GROUND.autumn;

@@ -12,10 +12,11 @@ import { isTouchDevice } from '../../../utils/deviceDetect';
 import { setGuitarCursor } from '../../../utils/guitarCursor';
 import { SURFACE_VERT, INK_OVERLAY_FRAG, STONE_FRAG, makeSurfaceUniforms, SEASON_INK_TINT } from '../../../shaders/entranceTextures';
 import GateBase from './GateBase';
-import { WindChime, WhiteDog, WoodenPlanter, WoodenWindowFrame, WindowCurtain, SwallowNest } from './EntranceProps';
+import { WhiteDog, WoodenPlanter, WoodenWindowFrame, WindowCurtain, SwallowNest } from './EntranceProps';
 import StoneTable from './StoneTable';
 import LotusVat from './LotusVat';
 import FoxtailGrass from './FoxtailGrass';
+import PersimmonTree from './PersimmonTree';
 import { SCENE_FONTS } from '../../../config/theme';
 // 季节：门联与院子共用同一张月份表（config/seasons.js），所以门口挂秋联时
 // 院子就是秋天 —— 这条一致性是免费的。
@@ -30,7 +31,6 @@ import {
     makeHandleTexture,
 } from '../../../utils/doorArt';
 import {
-    makeTreeTexture,
     makeWallInkTexture,
     makeLadybirdTexture,
     makeSpeechBubbleTexture,
@@ -188,6 +188,26 @@ const ENTRANCE_LANDING_INSET = 3.65;
  * in is still out on the path, and that is who the animals should be watching.
  */
 const DOG_YAW = 0.40;
+
+/**
+ * 柿子树的落点与朝向（WO-13，2026-10-12）。
+ *
+ * ⚠️ 这三个数是**和旧贴图对位出来的**，不是随手摆的：
+ *   · 旧版是一张 6×8 的**平面**停在局部 (−2.9, 0.95, 1)；3D 的冠有进深，
+ *     所以 z 从 1 挪到 2.85 —— 让冠的后缘留在**出檐之外**（出檐前端在
+ *     局部 0.9），否则冠会挑进屋檐 / 扎进前墙。
+ *   · x 从 −2.9 挪到 −3.55：冠在 x 方向比旧贴图的墨迹宽，往外让开一点，
+ *     **左侧那个窗**（`WINDOW_X_LEFT` = −5.0）才不会被树冠整个吃掉。
+ *   · `yaw` 把生成器那条"朝外长"的偏置方向转到镜头这一侧（生成器有确定性，
+ *     所以这个角度是稳定的）。
+ * 🔴 这三个数改任何一个都要重拍正 / 侧定妆照：冠与檐、冠与左窗都只差零点几。
+ */
+// 🔴 y **必须**是 GRASS_Y —— 树长在草坪上。第一版把 y 写成 0、以为 `rootY`
+//    会顺手把树放下去（它只喂给着色器做接地变暗），结果整棵树**浮空 2.09**：
+//    冠顶冲到 5.95（檐口才 4.25），树干比门高两倍多。判据见 harness 的
+//    `probe-tree-dump.mjs`（它量的是真实世界包围盒，一眼就能看出浮空）。
+const PERSIMMON_POS = [-3.20, GRASS_Y, 2.85];
+const PERSIMMON_YAW = 0.28;
 const RABBIT_YAW = -0.55;
 
 /* ---- the creeper ink layer ------------------------------------------- */
@@ -432,9 +452,6 @@ const EntranceDoors = ({
         (texture) => { texture.colorSpace = THREE.SRGBColorSpace; }
     );
 
-    // 四季：春新芽+花 / 夏浓荫 / 秋红果（= 现状）/ 冬秃枝。
-    // 缓存键含季节，种子不含（见 makeTreeTexture 的说明）。
-    const treeTexture = makeTreeTexture(season);
     const bugTexture = makeLadybirdTexture();
     const speechBubbleTexture = makeSpeechBubbleTexture();
 
@@ -1428,61 +1445,25 @@ const EntranceDoors = ({
 
 
 
-            {/* TREE & WIND CHIME (Left Side) */}
-            <group position={[-2.9, floorY + 2.7, 1]}>
-                {/* Tree.
+            {/* 柿子树（3D，WO-13，2026-10-12）。
+                这里原来是一张 768×1024 的**画布贴图**贴在 6×8 的平面上
+                （billboard）—— 画在 canvas 里、永远正对镜头。用户要求
+                「柿子树完全重构，3D 版」，参考 `public/demos/web3d/tree/`。
 
-                    ⚠️ renderOrder 8 — deliberately ABOVE the couplets (6) and
-                    the creeper ink layer (7).
+                现在它是程序化长出来的真几何：骨架（枝 + 关节）1 个 mesh、
+                叶 / 果各 1 个 InstancedMesh、地面投影 1 片 ⇒ **4 次 draw call**。
+                ⚠️ 风铃**由 PersimmonTree 自己挂**在一条真实的一级枝上（挂点
+                   由生成器挑出来，见 `utils/persimmonTree.js`），所以这里
+                   不再有单独的 WindChime —— 之前那个位置是按**贴图**里
+                   画的那根小臂反推的，3D 版的枝不在那儿了。
+                ⚠️ `rootY = GRASS_Y`：树长在**草坪**上（不是甬路、也不是
+                   室外地面）。旧版的贴图是从 y=0.95 那张 8 米高的平面底部
+                   长上来的，树根位置是画出来的；3D 版必须给真值。
+                ⚠️ `position` 的 z 比旧贴图（局部 1）更靠外：那是一个**没有
+                   厚度**的平面，可以贴着墙；3D 的冠有进深，要让它站在出檐
+                   之外（见 `utils/persimmonTree.js` 的 `FWD_BIAS` 注释）。 */}
+            <PersimmonTree position={PERSIMMON_POS} rootY={GRASS_Y} yaw={PERSIMMON_YAW} />
 
-                    The tree plane is a billboard parked at z = 1, i.e. a full
-                    0.85 units in FRONT of the 10x6 facade at z = 0.15, so it
-                    really is nearer the camera than the 春联 at z = 0.17. But
-                    both materials are `transparent` with `depthWrite: false`,
-                    and three sorts the transparent pass by renderOrder BEFORE
-                    it sorts by depth — so with the tree at the default 0 the
-                    couplets were painted on top of it and read as pasted over
-                    the trunk. Giving the tree 8 puts the ordering back the
-                    right way round. (2026-10-09 user note: 「对联：应该在树和藤
-                    的后面」.)
-
-                    Depth testing still applies inside the pass, so this cannot
-                    make the tree paint over the chime or the dog: those are
-                    opaque, drawn in the opaque pass, and they are nearer. */}
-                <mesh position={[0, 0, 0]} renderOrder={8}>
-                    <primitive object={sharedGeometry('plane', 6, 8)} attach="geometry" />
-                    <meshBasicMaterial color="#e0e0e0"
-                        map={treeTexture}
-                        transparent={true}
-                        alphaTest={0.01}
-                        depthWrite={false}
-                    />
-                </mesh>
-                {/* Wind chime hanging from the right scaffold (replaces the mouse picture).
-
-                    ⚠️ The string top is the group origin, so this position has
-                    to land ON a branch — it is not a "roughly around here".
-
-                    It used to be [0.45, 0.15], which is canvas (441.6, 492.8)
-                    on the 768x1024 tree texture. That looks like it is on the
-                    little arm authored for it (LIMBS[12], canvas 396,578 ->
-                    450,486), and it is within a few pixels of the arm's centre
-                    line — but the arm is *under the canopy*: probing the
-                    texture at the arm's vertices gives bark at 12.0 and 12.2 and
-                    leaf at 12.1 and 12.3. The chime was hanging from a branch
-                    nobody can see, so it read as floating in the gap between the
-                    trunk and the right scaffold.
-
-                    [0.75, -0.4375] is canvas (480, 568) = vertex 4.2 of the
-                    RIGHT SCAFFOLD (LIMBS[4]), which probes clean bark
-                    rgb(94,61,32) at the vertex and at all four ring samples.
-                    Its half-width there is 16.6 canvas px = 0.13 world units,
-                    just wider than the chime's 0.11 cap — so the cap reads as
-                    narrower than the branch it hangs from, which is the whole
-                    point. (2026-10-09 user note: 「风铃：调整下挂的位置，让它挂到
-                    树枝上」.) */}
-                <WindChime position={[0.75, -0.4375, 0.05]} />
-            </group>
 
             {/* STONE TABLE + TWO STOOLS —— 树下、树跟前（用户 2026-10-09 定）。
                 树干在 local x ≈ -2.82（见 entranceArt 的 trunk 骨架：canvas 394
@@ -1490,7 +1471,7 @@ const EntranceDoors = ({
                 平面停在 z = 1，所以摆在 z > 1 的一侧就是"树跟前"。
                 脚下是**草坪**不是甬路 —— 用 GRASS_Y（比 OUTDOOR_Y 低 4 cm，
                 见 entranceMetrics 的 GROUND_DROP）。 */}
-            <StoneTable position={[-2.78, GRASS_Y, 1.62]} />
+            <StoneTable position={[-2.30, GRASS_Y, 4.20]} />
 
             {/* WHITE DOG (Front Facing) — 3D procedural, blinking eyes, wagging tail.
                 On the lawn, clear of the 台明 (which is only APRON_W wide). */}
