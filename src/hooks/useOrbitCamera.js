@@ -13,7 +13,9 @@ import * as I from '../config/island';
  * 不需要地形高度场、不需要碰撞体（那正是"自由行走"最贵的两件事）。
  *
  * **B2 边界**：三个量全夹住（见 `config/island.js`）：
- *   · 半径 18~28 —— 下限防穿墙（屋身四角离轴心 16.28），上限防进雾；
+ *   · 半径 18~28 —— 下限防穿墙（屋身四角离轴心 16.28），上限防进雾。
+ *     ⚠️ 上限是**横屏的**上限；窄视口下按 `orbitMaxR(aspect)` 放大（最高 ×1.5
+ *     = 42），见 DR-I。**下限和默认机位都不跟着视口走** —— 那会破坏"接手不跳"。
  *   · 仰角 1°~50° —— 不许钻到地面以下，也不许变成航拍；
  *   · 算完再夹一次 y 的硬地板（双保险）。
  *
@@ -53,6 +55,10 @@ function urlNumber(key) {
 
 export function useOrbitCamera({ enabled }) {
     const { camera, gl } = useThree();
+    // 视口宽高比。DR-I 的 I1：**上限**跟着它走（窄视口允许拉更远），
+    // 下限和默认机位都不动 —— 理由写在 `config/island.js` 的 `orbitMaxR` 上面。
+    // 选择器返回的是**数字**（不是对象），所以不会每次渲染都触发更新。
+    const aspect = useThree((state) => state.size.width / state.size.height);
 
     // ⚠️ 项目约定：`useRef(...)` 的 `.current` **只在回调/effect 里碰**，
     //    绝不在 render body 里解引用（`react-hooks/refs` 会直接报错）。
@@ -67,6 +73,10 @@ export function useOrbitCamera({ enabled }) {
     });
 
     const enabledRef = useRef(enabled);
+    // 半径上限。用 ref 而不是闭包变量：`onWheel` / `adopt` 都注册在
+    // `[gl, adopt]` 的 effect 里，把 aspect 塞进依赖会让**每次转屏都重挂
+    // 一遍全部监听器**（转屏那一瞬间正好在拖拽的话，拖拽会断）。
+    const maxRRef = useRef(I.ORBIT_MAX_R);
 
     /** 从相机当前机位反算轨道参数 —— 接手时画面不动。 */
     const adopt = useCallback(() => {
@@ -74,7 +84,9 @@ export function useOrbitCamera({ enabled }) {
         const dx = camera.position.x - I.ORBIT_CENTER[0];
         const dy = camera.position.y - I.ORBIT_CENTER[1];
         const dz = camera.position.z - I.ORBIT_CENTER[2];
-        const r = clamp(Math.hypot(dx, dy, dz), I.ORBIT_MIN_R, I.ORBIT_MAX_R);
+        // ⚠️ 夹的是 `ORBIT_MIN_R`（18）而不是"接手距离"17.85 —— 这一点没变，
+        //    所以正面接手仍然落在 z = 28.15。上限跟着视口走。
+        const r = clamp(Math.hypot(dx, dy, dz), I.ORBIT_MIN_R, maxRRef.current);
         const yaw = Math.atan2(dx, dz);
         const elev = clamp(Math.asin(dy / Math.max(r, 1e-3)), I.ORBIT_MIN_ELEV, I.ORBIT_MAX_ELEV);
         st.yaw = st.targetYaw = yaw;
@@ -82,6 +94,16 @@ export function useOrbitCamera({ enabled }) {
         st.r = st.targetR = r;
         st.active = true;
     }, [camera]);
+
+    // 视口变化 ⇒ 重算上限。**变窄要放开、变宽要把已经拉出去的收回来**，
+    // 否则横屏切回竖屏再切回来时 `r` 会卡在 42（超过横屏上限）不回来。
+    useEffect(() => {
+        const m = I.orbitMaxR(aspect);
+        maxRRef.current = m;
+        const st = s.current;
+        if (st.targetR > m) st.targetR = m;
+        if (st.r > m) st.r = m;
+    }, [aspect]);
 
     // `enabled` 是给 DOM 事件回调读的，那些回调活在 React 的渲染之外，
     // 拿不到最新的 prop。写进 ref 必须在 effect 里 —— render body 里写 ref
@@ -149,7 +171,7 @@ export function useOrbitCamera({ enabled }) {
             st.targetR = clamp(
                 st.targetR * (1 + Math.sign(e.deltaY) * I.ORBIT_ZOOM_STEP),
                 I.ORBIT_MIN_R,
-                I.ORBIT_MAX_R
+                maxRRef.current
             );
         };
 
@@ -179,7 +201,7 @@ export function useOrbitCamera({ enabled }) {
         const st = s.current;
         st.yaw = st.targetYaw = yaw === null ? 0 : yaw;
         st.elev = st.targetElev = elev === null ? 0.12 : clamp(elev, I.ORBIT_MIN_ELEV, I.ORBIT_MAX_ELEV);
-        st.r = st.targetR = r === null ? I.ORBIT_MIN_R + 3 : clamp(r, I.ORBIT_MIN_R, I.ORBIT_MAX_R);
+        st.r = st.targetR = r === null ? I.ORBIT_MIN_R + 3 : clamp(r, I.ORBIT_MIN_R, maxRRef.current);
         st.active = true;
     }, []);
 
@@ -232,7 +254,7 @@ export function useOrbitCamera({ enabled }) {
         setPose: (yaw, elev, r, snap = true) => {
             const st = s.current;
             const e = clamp(elev, I.ORBIT_MIN_ELEV, I.ORBIT_MAX_ELEV);
-            const rr = clamp(r, I.ORBIT_MIN_R, I.ORBIT_MAX_R);
+            const rr = clamp(r, I.ORBIT_MIN_R, maxRRef.current);
             st.targetYaw = yaw;
             st.targetElev = e;
             st.targetR = rr;
