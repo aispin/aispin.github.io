@@ -5,22 +5,23 @@
  * 2026-10-11（WO-6）：门外那片竹篱笆小院（`ForecourtFence`）要的是同一种
  * 篱笆，只是更长。所以竹竿这一层整体抽出来共用，本文件是它的**唯一真源**：
  *
- *   · `CANE_STEP`     —— 立竹间距。两种篱笆必须同一把尺子
+ *   · `CANE_STEP`     —— 立竹间距
  *   · `caneCount()`   —— 给定长度该放几根
  *   · `buildFenceRun()` —— 一段**直**篱笆的实例清单（局部坐标）
  *   · `makeCaneGeometry()` —— 把清单变成带实例属性的几何体
  *
- * 🔴 「一把尺子」这件事是重点：疏密必须由 `CANE_STEP` 定，**不能各写各的**。
- *    两道篱笆的立竹间距差 5% 是会被一眼看出来的。所以下面连
- *    `FENCE_TILE_W / CANE_N_PER_TILE` 都只在这里除一次。
+ * ⚠️ 2026-10-11：墙脚那道矮竹篱**已经不存在了** —— 用户把它换成了狗尾巴草
+ *    （`FoxtailGrass`），篱笆、贴图、高度常量一起删。所以本文件现在只服务
+ *    `ForecourtFence` 一个调用方；"两种篱笆共用一把尺子"那句话也随之作废，
+ *    但 `CANE_STEP` 的**值**必须冻住（见它自己的注释）。
  *
  * 为什么拆成独立文件
  * ------------------
- * 原来这些都长在 `BambooFence.jsx` 里。一个组件文件同时导出 shader、尺子、
- * 构建函数和组件，会踩 `react-refresh/only-export-components`（dev 的 HMR
- * 粒度问题，见 `eslint.config.js` 的长注释）。那个规则留了 `allowExportNames`
- * 白名单，但它是给「Provider + useXxx 同文件」「房间 TWEAK HERE 参数」这类
- * **小而内聚**的例外用的；这里是一整个库 + 一个组件，拆开才是对的。
+ * 原来这些都长在一个组件文件里（`BambooFence.jsx`，已删）。一个组件文件同时
+ * 导出 shader、尺子、构建函数和组件，会踩 `react-refresh/only-export-components`
+ * （dev 的 HMR 粒度问题，见 `eslint.config.js` 的长注释）。那个规则留了
+ * `allowExportNames` 白名单，但它是给「Provider + useXxx 同文件」「房间
+ * TWEAK HERE 参数」这类**小而内聚**的例外用的；这里是一整个库 + 一个组件。
  * 拆法沿用项目既有分层：GLSL → `shaders/`（本文件的着色器在
  * `shaders/caneFence.js`），程序化美术/几何辅助 → `utils/`。
  */
@@ -28,29 +29,28 @@
 import * as THREE from 'three';
 
 import { randRange } from '../engine/art';
-import { BAMBOO_FENCE_ASPECT } from './entranceArt';
 
 /* ------------------------------------------------------------------ */
-/* 尺子（两种篱笆共用）                                                 */
+/* 尺子                                                                 */
 /* ------------------------------------------------------------------ */
 
 /**
- * 沿墙那道矮篱的高度。**它是这把尺子的原点** —— 藤贴图是照它出的
- * （`BAMBOO_FENCE_ASPECT = 3.65 / 0.45`），所以改它等于改贴图的宽高比。
+ * 立竹间距。**唯一真源** —— 不要再在别处除一遍。
+ *
+ * 🔴 这个数是**冻结**的：`3.65 / 26 ≈ 0.1404`。
+ *
+ * 3.65 原来是「沿墙那道矮竹篱」一格藤贴图的宽度（`0.45 × 8.111`）。
+ * 2026-10-11 用户把墙脚那道矮篱换成了**狗尾巴草**（`FoxtailGrass`），
+ * 于是那道篱笆、它的贴图、它的高度常量**一起删掉了**。
+ *
+ * 但这个间距**不能跟着动**：门外那片竹篱笆小院（`ForecourtFence`）已经
+ * 按它验收过 —— 改一个数就是换一片院子。所以这里把数**直接写死**并留下
+ * 出处，而不是继续挂在两个已经不存在的东西上。
+ *
+ * ⚠️ 真正的坑是"留着一个叫 `WALL_FENCE_H` 的常量指着一道没有的篱笆"：
+ *    下一个人会去找那道墙。所以宁可让 3.65 和 26 直接出现在这一行。
  */
-export const WALL_FENCE_H = 0.45;
-
-/**
- * 藤贴图**一格**的宽度（世界单位）= `BAMBOO_FENCE_ASPECT × WALL_FENCE_H`。
- * 立竹间距 = 这一格宽 / `CANE_N_PER_TILE`，两种篱笆都用它。
- */
-export const FENCE_TILE_W = WALL_FENCE_H * BAMBOO_FENCE_ASPECT; // 3.65
-
-/** 一格里的立竹根数（与旧贴图一致，换了几何不该顺手改疏密）。 */
-export const CANE_N_PER_TILE = 26;
-
-/** 🔴 立竹间距。**唯一真源** —— 不要再在别处除一遍。 */
-export const CANE_STEP = FENCE_TILE_W / CANE_N_PER_TILE; // ≈ 0.1404
+export const CANE_STEP = 3.65 / 26;
 
 /** 横档高度（占篱高的比例）。 */
 export const RAIL_Y = [0.30, 0.72];

@@ -984,6 +984,48 @@ export const SEASON_PLANT = {
     winter: { stem: '#6B5D33', leafA: '#B0A044', leafB: '#CBBB64' },  // 枯黄：干冷无绿味，H≈51°
 };
 
+/* ------------------------------------------------------------------ */
+/* 狗尾巴草（墙脚那条草带）的四季色板 —— 2026-10-11                     */
+/* ------------------------------------------------------------------ */
+/**
+ * 用户：「窗下的竹篱笆换成狗尾巴草看看效果，门口两边都要，和墙宽一样。」
+ *
+ * 和 `SEASON_PLANT`（窗下花箱的绿植）是同一套思路的第四组数：
+ * 春嫩 / 夏浓 / **秋转黄** / **冬枯**。但这一组是 **sRGB 0..1 的数组**，
+ * 因为它喂的是 `shaderMaterial` 的 uniform（`FOXTAIL_FRAG`），不是
+ * `material.color`。⚠️ 两组的写法不能混（见上面那段"三个消费者"）。
+ *
+ * 三个键：
+ *   · `bladeA` —— 叶**梢部**（受光那一截）
+ *   · `bladeB` —— 叶**根部**（晒不到，更暗更沉）
+ *   · `seed`   —— **穗**。狗尾巴草的穗本来就比叶淡、偏黄，四季都保持这个
+ *                 关系，只跟着整体变黄/变枯。
+ *
+ * 取值分寸：`summer` 是参照季（草最盛的三个月）。`winter` 按花箱那条
+ * 既定原则 —— **枯黄要"干、冷、不带绿味"**（用户 2026-10-10 对花箱的
+ * 原话是「冬天的太绿了，改为黄色的叶子」），所以 G 与 R 拉近、整体发灰。
+ *
+ * ⚠️ 「色板 = sRGB 0..1 ⇒ 色板中点 ≈ 屏幕色」：这些数乘 255 就是屏幕上的
+ *    rgb。`FOXTAIL_FRAG` 不写 tone mapping、不做色彩空间转换，所以是逐位的。
+ */
+export const SEASON_FOXTAIL = {
+    //          bladeA(梢)              bladeB(根)              seed(穗)
+    spring: { bladeA: [0.553, 0.678, 0.325], bladeB: [0.310, 0.435, 0.184], seed: [0.667, 0.729, 0.416] },
+    summer: { bladeA: [0.478, 0.600, 0.286], bladeB: [0.263, 0.365, 0.161], seed: [0.608, 0.675, 0.376] },
+    autumn: { bladeA: [0.612, 0.588, 0.271], bladeB: [0.388, 0.373, 0.169], seed: [0.769, 0.698, 0.392] },
+    winter: { bladeA: [0.663, 0.612, 0.412], bladeB: [0.435, 0.400, 0.263], seed: [0.796, 0.757, 0.576] },
+};
+
+/** 狗尾巴草的四季色板 → three 的 uniform 对象。未知季节落到秋天。 */
+export function foxtailSeasonUniforms(season = 'autumn') {
+    const p = SEASON_FOXTAIL[season] || SEASON_FOXTAIL.autumn;
+    return {
+        uBladeA: { value: p.bladeA },
+        uBladeB: { value: p.bladeB },
+        uSeed: { value: p.seed },
+    };
+}
+
 /** 某一季的地面色板 → three 的 uniform 对象。未知季节落到秋天。 */
 export function groundSeasonUniforms(season = 'autumn') {
     const p = SEASON_GROUND[season] || SEASON_GROUND.autumn;

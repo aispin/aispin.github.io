@@ -28,7 +28,10 @@ import { hashString, makeCanvas, mulberry32 } from '../engine/art';
 // 竹篱上的攀爬植物复用花箱那套四季叶色 —— 「同一张表写两遍，迟早在某个文件里漂移」
 // 是这个项目最贵的一课（见 config/seasons.js 开头）。依赖是**单向**的：
 // entranceTextures.js 只导出数据/shader，不 import 本文件，所以不会成环。
-import { SEASON_PLANT } from '../shaders/entranceTextures';
+//
+// ⚠️ 2026-10-11：这里原来还 import 了 `SEASON_PLANT`（给已删的
+//    `makeBambooFenceTexture` 用）。墙脚那道矮竹篱换成狗尾巴草之后，
+//    那个函数一起删了，这个 import 也就成了死引用 —— 一并去掉。
 
 const cache = new Map();
 
@@ -2620,111 +2623,3 @@ export function makeVatWaterTexture(season = 'summer') {
 
     return toTexture(canvas, key);
 }
-
-/**
- * 竹篱（§6.3）：程序化贴图 + alphaTest 平面，**不做实体几何**。
- *
- * 画布按落到 plane 上的**真实宽高比**出 —— 本项目吃过"原图常和 plane 不符"的亏
- * （宽高比契约，见 MEMORY）。调用方把 plane 做成 `BAMBOO_FENCE_ASPECT` 即可。
- *
- * ⚠️ 缓存键**含季节**：§6.3 说"季节只改**攀爬植物**的配色"，而叶色是烘进这张图的，
- * 所以必须一季一张。种子不含季节（同一道篱笆，四季是同几根竹子）。
- *
- * 叶色**直接复用 `SEASON_PLANT`**（花箱那丛的调色板）：同一个院子里两处绿植用两套绿
- * 是会被看出来的，而"同一张表写两遍，迟早在某个文件里漂移"是本项目最贵的一课。
- *
- * @param {'spring'|'summer'|'autumn'|'winter'} season
- */
-export const BAMBOO_FENCE_ASPECT = 3.65 / 0.45;
-
-/**
- * @param {'spring'|'summer'|'autumn'|'winter'} season
- * @param {{vineOnly?: boolean}} [opts]
- *   `vineOnly: true` 只画**攀爬植物**（藤 + 叶），跳过横档和立竹。
- *
- *   ⚠️ 2026-10-11 起竹篱的**竹竿和横档是实体几何**（`BambooFence.jsx` 的
- *   InstancedMesh）—— 一张 alphaTest 平面绕到侧面就成了一张纸。实体几何
- *   拿不到 canvas 上的季节色，所以"叶色随季"这件事只能留在**藤**这一层，
- *   而藤本来也真的是一张薄薄的东西。于是贴图只出藤，竹子由几何出。
- *   缓存键必须带上这个开关，否则两个变体会互相顶掉。
- */
-export function makeBambooFenceTexture(season = 'summer', { vineOnly = false } = {}) {
-    const key = vineOnly ? `bamboo-fence-vine-${season}` : `bamboo-fence-${season}`;
-    if (cache.has(key)) return cache.get(key);
-
-    const H = 128;
-    const W = Math.round(H * BAMBOO_FENCE_ASPECT);
-    const canvas = makeCanvas(W, H);
-    const ctx = canvas.getContext('2d');
-    const rand = mulberry32(hashString('bamboo-fence'));
-
-    const plant = SEASON_PLANT[season] || SEASON_PLANT.summer;
-    // 竹子的两档色：受光面偏黄、背光面偏褐。四季不变（竹子不随季）。
-    const BAMBOO = '#C4B070';
-    const BAMBOO_DARK = '#9C8A4E';
-
-    // ---- 1. 两道横档 ---------------------------------------------------
-    // ⚠️ 即使 `vineOnly`，这两道 `rand()` 也**必须照跑**：下面的立竹和藤
-    //    共用同一条随机序列，跳过去会让"只画藤"的版本长成另一根藤。
-    const rail = (yFrac) => {
-        const h = H * 0.085;
-        const y = H * yFrac - h / 2;
-        if (vineOnly) return;
-        ctx.fillStyle = BAMBOO;
-        ctx.fillRect(0, y, W, h);
-        ctx.fillStyle = BAMBOO_DARK;
-        ctx.fillRect(0, y + h * 0.62, W, h * 0.38);
-    };
-    rail(0.30);
-    rail(0.72);
-
-    // ---- 2. 立竹：等距 + 微抖（纯等距会读成"栅栏贴图"）------------------
-    const N = 26;
-    const step = W / N;
-    for (let i = 0; i < N; i++) {
-        const x = i * step + (rand() - 0.5) * step * 0.16;
-        const w = step * (0.20 + rand() * 0.07);
-        const top = H * (0.05 + rand() * 0.05);
-        const bot = H * (0.94 + rand() * 0.06);
-        // 竹节（`rand()` 同上：无论画不画都要消耗）
-        const nodes = 3 + Math.floor(rand() * 2);
-        if (vineOnly) continue;
-        ctx.fillStyle = BAMBOO;
-        ctx.fillRect(x - w / 2, top, w, bot - top);
-        // 背光侧
-        ctx.fillStyle = BAMBOO_DARK;
-        ctx.fillRect(x - w / 2 + w * 0.66, top, w * 0.34, bot - top);
-        for (let k = 1; k <= nodes; k++) {
-            const y = top + ((bot - top) * k) / (nodes + 1);
-            ctx.fillStyle = 'rgba(120,104,58,0.75)';
-            ctx.fillRect(x - w / 2, y, w, Math.max(1, H * 0.016));
-        }
-    }
-
-    // ---- 3. 攀爬植物：一条主藤 + 若干叶（**颜色随季**）------------------
-    ctx.strokeStyle = plant.stem;
-    ctx.lineWidth = Math.max(1.2, H * 0.018);
-    ctx.beginPath();
-    const y0 = H * 0.86;
-    ctx.moveTo(-2, y0);
-    for (let x = 0; x <= W; x += W / 22) {
-        ctx.lineTo(x, y0 - Math.sin((x / W) * Math.PI * 2.2) * H * 0.22 - (x / W) * H * 0.30);
-    }
-    ctx.stroke();
-
-    // 叶：沿主藤两侧铺，大小/角度都抖
-    for (let i = 0; i < 34; i++) {
-        const t = i / 33;
-        const x = t * W + (rand() - 0.5) * W * 0.03;
-        const y = y0 - Math.sin(t * Math.PI * 2.2) * H * 0.22 - t * H * 0.30;
-        const ang = (rand() - 0.5) * 2.2 + (i % 2 ? 0.5 : Math.PI - 0.5);
-        const len = H * (0.075 + rand() * 0.055);
-        const wid = len * (0.46 + rand() * 0.20);
-        drawLeaf(ctx, x, y, ang, len, wid,
-            i % 2 ? plant.leafA : plant.leafB, plant.stem, 0.92 + rand() * 0.08);
-    }
-
-    return toTexture(canvas, key);
-}
-
-
