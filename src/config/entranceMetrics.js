@@ -47,16 +47,25 @@ export const LINTEL_Y = FLOOR_Y + FRAME_H; // top edge of the architrave
  * 台基的 `PLINTH_*` 一起删掉）：留一个叫 "facade" 的常数指着一块藤蔓贴图，
  * 下一个人一定会以为那是墙的尺寸。
  *
- * 🔴 这两个数**不能跟着屋身宽度改**。藤蔓的位置是按 10 宽量出来的
- * （见 `makeWallInkTexture` 的 runners：全部落在 x ≥ 1.18，正好避开 2.5
- * 那个窗），改成 22 藤就爬到窗上了。也就是说藤只爬大门两侧这一片墙，
- * 而不是整面 22 宽的墙 —— 这是有意的，见 `EntranceDoors` 的 `inkCenterY`。
+ * 🔴 2026-10-11（WO-9）：用户要「让它长宽点，最好和右侧外墙一样宽」。
+ * 于是 overlay **从"跨大门两侧"改成"只铺右半面墙"**：
+ *   `WALL_INK_CENTER_X = 6.0`、宽仍是 10 ⇒ 覆盖 world x ∈ [1.0, 11.0]，
+ *   即「大门右边 → 前墙右边缘（`HOUSE_HALF_W` = 11）」。
+ *
+ * 宽度**故意仍是 10**（不是 22 铺满整面墙）：`makeWallInkTexture` 的画布
+ * 按 128 px/世界单位定尺寸，10×6 → 1280×768 ≈ 3.9 MB；铺满 22 会翻倍到
+ * ~8.6 MB，而藤只在右半边 —— 左半边是柿子树的位子，本来就不放藤。
+ *
+ * ⚠️ 右窗（`WINDOW_X` = 5.0）**落在这块 overlay 里面**（局部 x ∈ [−1.7, −0.3]），
+ * 所以 runners 在那一段**留空**，让藤绕开窗 —— 见 `makeWallInkTexture`。
  *
  * 高度 6 只是画布比例（`makeWallInkTexture` 按 `worldW / worldH` 定画布
  * 宽高），藤本身最长的一缕只到画布高的 0.29。
  */
 export const WALL_INK_W = 10;
 export const WALL_INK_H = 6;
+/** overlay 中心的世界 x。见上面：1.0 → 11.0，正好是"右半面墙"。 */
+export const WALL_INK_CENTER_X = 6.0;
 
 /* ---- the gate's opening in the house's front wall -------------------- */
 /**
@@ -86,12 +95,24 @@ export const GATE_HOLE = [0, DOOR_CENTER_Y, GATE_HOLE_HALF_W, GATE_HOLE_HALF_H];
  *
  * 以前它是 `EntranceDoors` 里的字面量 `[WINDOW_X, 0.02, 0.7, 0.73]`，
  * 门脸 uniforms 里还抄了一遍；门脸搬到屋身墙上之后就会变成三份拷贝。
+ *
+ * 🔴 2026-10-11（WO-10）：2.5 → **5.0**，用户要求「窗户距离门口太近，
+ * 调为现有距离的 2 倍」。同时**在另一侧加一个对称窗**（`WINDOW_X_LEFT`），
+ * 所以前墙现在开三个洞：门 + 右窗 + 左窗。
+ *
+ * ⚠️ 左窗的位置有代价：**柿子树挡在它前面**。树是一张 6×8 的 billboard，
+ * 挂在 x = −2.9，树冠横向覆盖约 world x ∈ [−5.24, −1.46]，正好压在
+ * 左窗（x ∈ [−5.7, −4.3]）上。树冠是有空隙的叶簇，所以窗会从缝里透出来，
+ * 但"对称"在视觉上会被这棵树打折 —— 这是用户明确要的，先做出来看。
  */
-export const WINDOW_X = 2.5;
+export const WINDOW_X = 5.0;
 export const WINDOW_CENTER_Y = 0.02;
 export const WINDOW_HALF_W = 0.7;
 export const WINDOW_HALF_H = 0.73;
 export const WINDOW_HOLE = [WINDOW_X, WINDOW_CENTER_Y, WINDOW_HALF_W, WINDOW_HALF_H];
+/** 左窗 —— 与右窗关于大门（x=0）镜像。见 `WINDOW_X` 上面那段代价说明。 */
+export const WINDOW_X_LEFT = -WINDOW_X;
+export const WINDOW_HOLE_LEFT = [WINDOW_X_LEFT, WINDOW_CENTER_Y, WINDOW_HALF_W, WINDOW_HALF_H];
 
 /* ---- the 横批 above the lintel --------------------------------------- */
 export const BANNER_W = 1.15;

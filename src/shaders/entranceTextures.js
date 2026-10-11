@@ -327,6 +327,10 @@ uniform vec2 uSize;      // plane size in world units
 uniform vec2 uOrigin;     // world XY of the plane's BOTTOM-LEFT corner
 uniform vec4 uHoleDoor;   // cx, cy, halfW, halfH (WORLD coords, centred on the facade)
 uniform vec4 uHoleWindow; // cx, cy, halfW, halfH (WORLD coords)
+// 左窗（WO-10）。前墙现在开**三个**洞：门 + 右窗 + 左窗。
+// ⚠️ 这个 uniform 是后加的 —— 不声明它的调用方（屋面）传进来会被 three 忽略，
+// 但**必须在下面取 max 之前声明**，否则 GLSL 编译不过。
+uniform vec4 uHoleWindow2; // cx, cy, halfW, halfH (WORLD coords)
 uniform sampler2D uInk;   // creeper ink wash, drawn in utils/entranceArt.js
 uniform float uInkStrength;
 // 压顶从墙高的哪个比例开始。0.905 = 一堵有黑瓦压顶的墙。
@@ -546,8 +550,84 @@ void main() {
      * ⚠️ 阈值保持 0.98（不是 0.5）：0.98 的弃置边界 = 洞外 0.005，与改前**逐位
      * 相同**，所以既有的洞口几何 / 定妆照全部仍然有效。
      */
-    float hole = max(rectHole(worldPos, uHoleDoor), rectHole(worldPos, uHoleWindow));
+    float hole = max(rectHole(worldPos, uHoleDoor),
+                     max(rectHole(worldPos, uHoleWindow), rectHole(worldPos, uHoleWindow2)));
     if (hole > 0.98) discard;
+
+    gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+/* ------------------------------------------------------------------ */
+/* 山墙抹灰面（黄白） — 2026-10-11 WO-8                                  */
+/*                                                                      */
+/* 用户：「侧面的三角形山墙改为黄白色。并且侧面应该也是有屋檐的。」        */
+/*                                                                      */
+/* 改之前那块三角**根本不是砖**：`GableWall` 把 `uSize = [1,1]` 和         */
+/* `uCapFrac = 1.5` 一起传给 `SONG_WALL_FRAG`，于是                        */
+/*     capBase = 1 * 1.5 = 1.5                                             */
+/*     capMask = smoothstep(1.45, 1.55, above)                             */
+/* 而三角的 `above` 全程在 5.34 以上 ⇒ capMask 恒为 1 ⇒ **整块三角都是黑瓦**。*/
+/* （所以侧视截图里那块三角和屋面是同一个颜色，两者分不开。）              */
+/*                                                                          */
+/* 为什么另起一个 shader 而不是给 SONG_WALL_FRAG 加开关：砖墙那一套里有砖缝、  */
+/* 勒脚、泛碱、压顶、瓦当滴水 —— 抹灰面一个都不要，硬塞进去只会让两边都变形。 */
+/* 但它**必须**和砖墙共用同一套语汇：同样的 `NOISE_GLSL` 颗粒、同样的          */
+/* 「按世界米算」的 uv 约定（`uOrigin` 是平面左下角的世界 XY），否则两块面    */
+/* 贴在一起会像来自两个场景。                                               */
+/*                                                                          */
+/* ⚠️ uv 约定：`GableWall` 用 `THREE.ShapeGeometry`，它的 uv **就是 shape 的   */
+/* 原始坐标**（世界米），不是 0..1 —— 所以 `uSize` 必须传 `[1, 1]`，           */
+/* `world = vUv * uSize` 才等于"世界米"，`above` 就等于「离草地多高」，        */
+/* 和砖墙完全同一把尺子。（砖墙走 `PlaneGeometry`，uv 是 0..1，才需要真 uSize。）*/
+/* 三角的下沿/顶点另外用 `uGableBase` / `uGableTop` 显式传进来做竖向渐变。     */
+/*                                                                          */
+/* ⚠️ 本段在 JS 模板字面量里：注释里不许出现反引号，引用标识符用「」。         */
+/* ------------------------------------------------------------------ */
+
+export const GABLE_FRAG = /* glsl */ `
+varying vec2 vUv;
+uniform vec2 uSize;       // 🔴 必须传 [1,1] —— ShapeGeometry 的 uv 已经是世界米
+uniform vec2 uOrigin;     // 平面左下角的世界 XY（= [0, GRASS_Y]）
+uniform float uGableBase; // 檐口世界 y —— 三角的下沿（= HOUSE_EAVE_Y）
+uniform float uGableTop;  // 屋脊世界 y —— 三角的顶点（= HOUSE_RIDGE_Y）
+
+${NOISE_GLSL}
+
+void main() {
+    vec2 world = vUv * uSize;
+    vec2 worldPos = uOrigin + world;
+    float above = worldPos.y - uOrigin.y;
+
+    // 0 在檐口、1 在屋脊。整块的竖向渐变都挂在这条线上。
+    float g = clamp((worldPos.y - uGableBase) / max(uGableTop - uGableBase, 0.001), 0.0, 1.0);
+
+    /* ---- 黄白抹灰 ------------------------------------------------------ */
+    // 下沿偏暖偏沉、上沿偏白偏亮。真实抹灰被雨水从上往下冲，所以是**上白下黄**，
+    // 不是反过来 —— 反过来会读成"被烟熏过"。
+    vec3 col = mix(vec3(0.858, 0.796, 0.633), vec3(0.965, 0.945, 0.874), g);
+
+    // 大块的花斑：抹灰从来不是一色，但频率要低，否则会和屋面的瓦垄打架。
+    float mottle = fbm(world * vec2(0.85, 1.25) + 12.0);
+    col = mix(col, col * vec3(0.945, 0.932, 0.900), smoothstep(0.42, 0.86, mottle) * 0.65);
+
+    /* ---- 雨痕 ---------------------------------------------------------- */
+    // 和砖墙同一套做法：x 方向压紧、y 方向拉长 —— 雨水是**往下**流的。
+    // 抹灰比砖吃水更深，所以这里允许比砖墙更明显一点，但上限压到 0.22：
+    // 这块三角只有 4.4 单位高，再重就糊成一道脏印子了。
+    float streak = fbm(vec2(world.x * 3.6, world.y * 0.40) + 3.7);
+    col = mix(col, vec3(0.780, 0.742, 0.618), smoothstep(0.54, 0.90, streak) * 0.22);
+
+    // 檐口一线最脏（溅起来的泥水 + 长期不干），越往上越干净。
+    col = mix(col, vec3(0.742, 0.700, 0.566), (1.0 - smoothstep(0.0, 1.05, worldPos.y - uGableBase)) * 0.18);
+
+    // 细裂纹。高频 + 强门限：低频的脊线会画出盘子大的轮廓线。
+    float crack = abs(noise2(world * vec2(5.2, 7.4) + 41.0) - 0.5);
+    col *= 1.0 - 0.13 * (1.0 - smoothstep(0.0, 0.011, crack)) * step(0.60, fbm(world * 1.6 + 7.0));
+
+    /* ---- 纸纹 ---------------------------------------------------------- */
+    // 与 SONG_WALL_FRAG 逐字同一条，让两块面在同一个颗粒体系里。
+    col *= 0.975 + 0.05 * noise2(vUv * uSize * 24.0);
 
     gl_FragColor = vec4(col, 1.0);
 }

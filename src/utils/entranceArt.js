@@ -1639,6 +1639,32 @@ export function makeWallInkTexture(worldW = 16, worldH = 8) {
     //    见 `EntranceDoors` 的 `INK_CENTER_Y`。
     const TOP = worldH * INK_TOP_FRAC;
 
+    /* ---- WO-9：藤横向铺开的范围，以及"绕开右窗"的那一段 ----------------
+     *
+     * 2026-10-11 用户：「重新做下常春藤，让它长宽点，最好和右侧外墙一样宽，
+     * 藤太粗要改小，打磨下细节」。
+     *
+     * overlay 中心在 world x = `WALL_INK_CENTER_X` = 6.0、宽 `worldW` = 10
+     * ⇒ 局部 x = world x − 6.0，覆盖 world x ∈ [1.0, 11.0]（大门右边 → 墙右缘）。
+     *
+     * 下面的数一律是**半宽的倍数**（沿用本函数原有的约定）：
+     *   SPAN_LO/HI  藤铺开的范围。不取 ±1 —— 叶子还会从枝上往外散 ±0.2 世界单位，
+     *               贴到画布边界会被切平。
+     *   WIN_F_LO/HI **右窗**占的那一段。右窗 world x ∈ [4.3, 5.7]
+     *               ⇒ 局部 ∈ [−1.7, −0.3] ⇒ 半宽倍数 ∈ [−0.34, −0.06]，
+     *               两侧各再留 0.08。runners 与"水渍"都跳过这一段。
+     *
+     * ⚠️ 藤**必须**绕开窗：这块 overlay 在墙**之前**（z = 0.18 > 墙 0.15），
+     * 所以落在窗洞上的笔画会直接糊在玻璃/窗帘上，而不是被墙挡住。
+     */
+    const SPAN_LO = -0.92;
+    const SPAN_HI = 0.94;
+    const WIN_F_LO = -0.42;
+    const WIN_F_HI = 0.02;
+    const inWindow = (f) => f > WIN_F_LO && f < WIN_F_HI;
+    /** u ∈ [0,1] → 半宽倍数（横向铺满 SPAN_LO…SPAN_HI）。 */
+    const fx = (u) => SPAN_LO + u * (SPAN_HI - SPAN_LO);
+
     // Runners. `x` is a fraction of the half-width (so the planting re-spaces
     // itself when the facade changes size instead of sliding off the edge),
     // `len` a fraction of the wall height, `drift` how far the tip wanders
@@ -1646,16 +1672,20 @@ export function makeWallInkTexture(worldW = 16, worldH = 8) {
     // come off one anchor. Unevenly spaced and unevenly long on purpose — an
     // even row reads as wallpaper, not as a creeper.
     //
-    // All five sit right of the gate (x/5 ≥ 0.236, i.e. world x ≥ 1.18) and
-    // clear the window at 2.5: the two nearest it drift AWAY from it, so the
-    // strand nearest the opening ends up at ≈ 1.25 while the opening starts
-    // at 1.8.
+    // WO-9：5 根 → **8 根**，从"大门右侧一缕"铺满右半面墙。
+    // ⚠️ 中间空出来的一段就是右窗（见 `inWindow`）—— 不是漏了，是绕开。
     const runners = [
-        { x: 0.236, len: 0.46, drift: 0.075, sway: 0.15, n: 1 },
-        { x: 0.320, len: 0.63, drift: -0.055, sway: 0.21, n: 2 },
-        { x: 0.700, len: 0.56, drift: -0.090, sway: 0.18, n: 2 },
-        { x: 0.810, len: 0.40, drift: 0.060, sway: 0.13, n: 1 },
-        { x: 0.924, len: 0.53, drift: -0.045, sway: 0.22, n: 1 },
+        // —— 窗左侧（world x ≈ 1.5 … 3.2）——
+        { x: -0.90, len: 0.48, drift: 0.070, sway: 0.15, n: 1 },
+        { x: -0.74, len: 0.64, drift: -0.050, sway: 0.21, n: 2 },
+        { x: -0.56, len: 0.45, drift: 0.080, sway: 0.17, n: 1 },
+        // ———— 右窗（局部 −0.34…−0.06）留空 ————
+        // —— 窗右侧（world x ≈ 6.4 … 10.6）——
+        { x: 0.08, len: 0.58, drift: -0.070, sway: 0.20, n: 2 },
+        { x: 0.30, len: 0.50, drift: 0.060, sway: 0.16, n: 1 },
+        { x: 0.52, len: 0.66, drift: -0.055, sway: 0.22, n: 2 },
+        { x: 0.74, len: 0.46, drift: 0.085, sway: 0.14, n: 1 },
+        { x: 0.92, len: 0.57, drift: -0.045, sway: 0.19, n: 1 },
     ].map((r) => ({
         ...r,
         x: r.x * (worldW / 2),
@@ -1668,10 +1698,13 @@ export function makeWallInkTexture(worldW = 16, worldH = 8) {
     // from the right edge of the frame, because a creeper this size did not
     // start on this wall — it walked in from the garden next door.
     const spinePts = [];
-    const spineSteps = 22;
+    const spineSteps = 30;
     for (let k = 0; k <= spineSteps; k++) {
         const t = k / spineSteps;
-        const wx = (worldW / 2) * (0.10 + t * 0.86);
+        // WO-9：铺满整块 overlay（原来只走 0.10…0.96，因为 overlay 只盖大门
+        // 右侧一缕）。主干贴着压顶走，所以**可以**跨过窗那一段 —— 它在窗顶
+        // 之上 2.5 个世界单位。
+        const wx = fx(t) * (worldW / 2);
         // a shallow sag between attachment points, plus a slight climb to the
         // right, so it reads as a stem and not as a ruled line
         const sag = Math.sin(t * 2.3) * 0.055 * worldH + t * 0.025 * worldH;
@@ -1680,11 +1713,15 @@ export function makeWallInkTexture(worldW = 16, worldH = 8) {
     ctx.save();
     // The runner is the vine's backbone: at the old 0.66 it was see-through and
     // the whole creeper read as a wash rather than as a plant with a stem.
+    //
+    // WO-9：13 → **9**。用户说「藤太粗要改小」。128 px/世界单位下 13 px =
+    // 0.102 世界单位，比真实藤蔓的木质部粗一倍；9 px = 0.070，配 0.62 的
+    // 收梢已经够读成"木质的枝"，又不再像一根水管。
     ctx.globalAlpha = 0.80;
-    limb(ctx, spinePts, 13, STEM, { taper: 0.62 });
+    limb(ctx, spinePts, 9, STEM, { taper: 0.62 });
     // the doubled line a brush leaves — without it the stem reads as a wire
     ctx.globalAlpha = 0.34;
-    limb(ctx, spinePts.map(([x, y]) => [x, y + 5]), 5, INK_RIB, { taper: 0.7 });
+    limb(ctx, spinePts.map(([x, y]) => [x, y + 5]), 3.4, INK_RIB, { taper: 0.7 });
     ctx.restore();
 
     /**
@@ -1706,12 +1743,19 @@ export function makeWallInkTexture(worldW = 16, worldH = 8) {
     // --- 2. foliage on the runner --------------------------------------
     // Lumpy, not a band: a few dense rosettes with gaps between them. An even
     // scatter along the coping reads as a painted stripe.
-    for (let c = 0; c < 26; c++) {
-        const wx = (worldW / 2) * (0.10 + rand() * 0.88);
+    //
+    // WO-9：26 → **52**，因为 overlay 从"一缕"变成"半面墙"（面积 ×2.5）。
+    // 竖向带宽也从 0.80 放到 **1.55** —— 原来所有叶团都挤在紧贴压顶的那 0.8
+    // 个单位里，藤一铺开就显得"顶上一条绿带、下面全是光杆"。
+    // ⚠️ 1.55 是**上限**：这一段最低只到 world y ≈ 2.1，而右窗顶在 0.75，
+    // 中间还留着 1.3 个世界单位的安全距离，所以叶团可以横跨窗的 x 位置。
+    // `rand() * rand()` 保持"越靠压顶越密"的偏置。
+    for (let c = 0; c < 52; c++) {
+        const wx = fx(rand()) * (worldW / 2);
         const cx = X(wx);
         // biased downward so the mass sits ON the wall under the tiles rather
         // than floating above the coping where it would be clipped flat
-        const cy = Y(TOP - rand() * rand() * 0.80);
+        const cy = Y(TOP - rand() * rand() * 1.55);
         const lump = 2 + Math.floor(rand() * 4);
         for (let j = 0; j < lump; j++) {
             const a = rand() * Math.PI * 2;
@@ -1755,11 +1799,14 @@ export function makeWallInkTexture(worldW = 16, worldH = 8) {
             // A strand, not a trunk: thin from the start and thinner at the
             // tip. Held at 0.80 alpha so the woody part stays darker than the
             // leaves it carries *without* going see-through (it was 0.66).
+            //
+            // WO-9：9 → **6**（用户「藤太粗要改小」）。6 px = 0.047 世界单位，
+            // 约是主干（9 px）的三分之二 —— 一枝比主干细，但还没细成丝线。
             ctx.save();
             ctx.globalAlpha = 0.80;
-            limb(ctx, pts, 9, STEM, { taper: 0.34 });
+            limb(ctx, pts, 6, STEM, { taper: 0.34 });
             ctx.globalAlpha = 0.32;
-            limb(ctx, pts.map(([x, y]) => [x + 5, y]), 3.4, INK_RIB, { taper: 0.5 });
+            limb(ctx, pts.map(([x, y]) => [x + 5, y]), 2.4, INK_RIB, { taper: 0.5 });
             ctx.restore();
 
             // Foliage is concentrated where the strand is young. A creeper
@@ -1773,7 +1820,11 @@ export function makeWallInkTexture(worldW = 16, worldH = 8) {
                 // bare. The old curve (×3.2 − 0.25) hit zero at t ≈ 0.9 and
                 // left a long naked strand, which is the other half of why it
                 // read as bamboo.
-                const count = Math.max(0, Math.round((1 - t) * 3.9 - 0.1 + rand() * 1.4));
+                //
+                // WO-9：系数 3.9 → **5.0**。枝干改细（9 → 6 px）之后，同样的
+                // 叶量在画面上看着更稀了 —— 枝越细，越要靠叶子把它"撑"起来，
+                // 否则整片藤就是一排光溜溜的线。
+                const count = Math.max(0, Math.round((1 - t) * 5.0 - 0.1 + rand() * 1.4));
                 // Young leaves near the top are the lit ones.
                 const tone = leafTone(t < 0.3);
                 for (let j = 0; j < count; j++) {
@@ -1819,8 +1870,13 @@ export function makeWallInkTexture(worldW = 16, worldH = 8) {
     // plaster. Purely atmospheric, and the thing that stops the strokes
     // floating on a blank field. Kept on the same half as the vine — a blotch
     // on the empty left wall would just look like damp.
-    for (let i = 0; i < 10; i++) {
-        const cx = X((0.12 + rand() * 0.84) * (worldW / 2));
+    //
+    // WO-9：10 → **16**（面积变大），并且**跳过右窗那一段** —— 这块 overlay
+    // 在墙之前（z = 0.18 > 0.15），水渍落在窗洞上会糊在玻璃上，像一块洗不掉的脏。
+    for (let i = 0; i < 16; i++) {
+        const f = fx(rand());
+        if (inWindow(f)) continue;
+        const cx = X(f * (worldW / 2));
         const cy = Y((0.06 + rand() * 0.72) * worldH);
         const rx = 40 + rand() * 120;
         const blob = (c) => wobblePath(c, cx, cy, rx, rx * (0.5 + rand() * 0.5), rand, { amp: 0.34, segments: 13 });

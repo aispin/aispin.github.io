@@ -3,9 +3,9 @@ import * as THREE from 'three';
 
 import { sharedGeometry, blankInk } from '../../../engine/resources';
 import { useSeasonUniforms } from '../../../hooks/useSeasonUniforms';
-import { SURFACE_VERT, SONG_WALL_FRAG, makeSurfaceUniforms } from '../../../shaders/entranceTextures';
+import { SURFACE_VERT, SONG_WALL_FRAG, GABLE_FRAG, makeSurfaceUniforms } from '../../../shaders/entranceTextures';
 import * as I from '../../../config/island';
-import { GRASS_Y, GATE_HOLE, WINDOW_HOLE } from '../../../config/entranceMetrics';
+import { GRASS_Y, GATE_HOLE, WINDOW_HOLE, WINDOW_HOLE_LEFT } from '../../../config/entranceMetrics';
 
 /**
  * HouseShell — 屋身（"老房子"本体）。
@@ -87,8 +87,19 @@ const ROOF_RISE = I.HOUSE_RIDGE_Y - I.HOUSE_EAVE_TIP_Y;
 const ROOF_SLOPE = Math.hypot(ROOF_RUN, ROOF_RISE);
 const ROOF_TILT = Math.atan2(ROOF_RISE, ROOF_RUN);
 const ROOF_CENTER_Y = (I.HOUSE_RIDGE_Y + I.HOUSE_EAVE_TIP_Y) / 2;
-/** 屋面在 x 方向拉满屋身宽度（硬山：屋面与山墙齐平，不悬出）。 */
-const ROOF_WIDTH = I.HOUSE_HALF_W * 2;
+/**
+ * 屋面在 x 方向的总宽。
+ *
+ * 🔴 2026-10-11（WO-8）：`HOUSE_HALF_W * 2` → **加上两侧出檐**。
+ * 原来屋面与山墙**齐平**（硬山），所以从侧面看是"墙顶直接切一刀、没有檐"。
+ * 用户要求「侧面应该也是有屋檐的」⇒ 屋面每侧多挑 `HOUSE_SIDE_OVERHANG`，
+ * 形制变成**悬山**。山墙三角本身的尺寸一点不动，只是屋面从它两侧挑出去。
+ *
+ * ⚠️ 这个常量一改，**椽头那排 x 坐标必须跟着重算**（见 `RafterEnds`）——
+ * 旧写法 `-HOUSE_HALF_W + ROOF_WIDTH * k/(n-1)` 在 `ROOF_WIDTH = 2·HALF_W`
+ * 时恰好对称，一加上侧檐就会往右偏 0.9。
+ */
+const ROOF_WIDTH = I.HOUSE_HALF_W * 2 + 2 * I.HOUSE_SIDE_OVERHANG;
 /** 两坡各自的中心 z（屋脊 → 出檐端的中点）。 */
 const ROOF_FRONT_CENTER_Z = (HOUSE_CENTER_Z + I.INTERIOR_FRONT_Z + I.HOUSE_OVERHANG) / 2;
 const ROOF_BACK_CENTER_Z = (HOUSE_CENTER_Z + I.HOUSE_BACK_Z - I.HOUSE_OVERHANG) / 2;
@@ -111,6 +122,8 @@ const ROOF_BACK_CENTER_Z = (HOUSE_CENTER_Z + I.HOUSE_BACK_Z - I.HOUSE_OVERHANG) 
  */
 const FRONT_DOOR_HOLE = GATE_HOLE;
 const FRONT_WINDOW_HOLE = WINDOW_HOLE;
+/** 左窗的洞（WO-10）—— 与右窗关于大门镜像。 */
+const FRONT_WINDOW_HOLE_LEFT = WINDOW_HOLE_LEFT;
 const NO_HOLE = [0, 9999, 0, 0];
 
 /* ---- 椽头 ----------------------------------------------------------- */
@@ -127,25 +140,46 @@ const RAFTER_D = 0.34;
  * `capFrac > 1` = 这面墙没有黑瓦压顶（墙顶直接接屋面，再压一道瓦会变成
  * "墙头又长出一条屋脊"）。
  */
-function wallUniformsFactory(width, height, originX, originY, capFrac, doorHole, windowHole) {
+function wallUniformsFactory(width, height, originX, originY, capFrac, doorHole, windowHole, windowHole2) {
     return (season) => ({
         ...makeSurfaceUniforms(width, height, [originX, originY], season),
         uHoleDoor: { value: doorHole },
         uHoleWindow: { value: windowHole },
+        uHoleWindow2: { value: windowHole2 },
         uInk: { value: blankInk() },
         uInkStrength: { value: 0 },
         uCapFrac: { value: capFrac },
     });
 }
 
+/**
+ * 山墙抹灰面的 uniform（WO-8）。
+ *
+ * ⚠️ `uSize` 必须 `[1, 1]` —— 山墙走 `ShapeGeometry`，uv 已经是**世界米**
+ * （见 `GABLE_FRAG` 顶上那段）。`uOrigin.y = GRASS_Y` 让 `above` 等于
+ * 「离草地多高」，和砖墙共用同一把尺子。
+ *
+ * ⚠️ 季节：`makeSurfaceUniforms` 顺带把地面色板（`uGrassA` 等）也带进来，
+ * 本 shader 一个都不声明 —— three 会忽略多余的 uniform，不会报错。
+ * 抹灰面**不跟季节变色**（它是一堵墙，不是地），但仍然要走 `useSeasonUniforms`
+ * 拿那份"对象身份锁死"的契约（见该 hook 顶上的大警告）。
+ */
+function gableUniformsFactory(originX) {
+    return (season) => ({
+        ...makeSurfaceUniforms(1, 1, [originX, GRASS_Y], season),
+        uGableBase: { value: I.HOUSE_EAVE_Y },
+        uGableTop: { value: I.HOUSE_RIDGE_Y },
+    });
+}
+
 /** 一面矩形墙。侧墙 / 前后墙只差宽、朝向、压顶和洞，所以共用一个组件。 */
 function ShellWall({
     width, height, position, rotationY, originX, originY, capFrac,
-    doorHole = NO_HOLE, windowHole = NO_HOLE,
+    doorHole = NO_HOLE, windowHole = NO_HOLE, windowHole2 = NO_HOLE,
 }) {
     const uniforms = useSeasonUniforms(
-        wallUniformsFactory(width, height, originX, originY, capFrac, doorHole, windowHole),
-        [width, height, originX, originY, capFrac, doorHole, windowHole]
+        wallUniformsFactory(width, height, originX, originY, capFrac, doorHole, windowHole, windowHole2),
+        [width, height, originX, originY, capFrac, doorHole, windowHole, windowHole2]
     );
     return (
         <mesh position={position} rotation={[0, rotationY, 0]}>
@@ -161,7 +195,10 @@ function ShellWall({
 }
 
 /**
- * 山墙（五边形：矩形 + 三角）。
+ * 山墙 —— **只有三角那一块**。
+ *
+ * ⚠️ 组件顶上旧注释写的是"矩形 + 三角"，那是**错的**：`shape` 只有三个点，
+ * 矩形那半截（草地 → 墙头）由两侧的 `ShellWall` 负责，两者不重叠。
  *
  * shape 的坐标就是 uv，所以直接按**世界米**画：x 沿墙的水平轴（这里 = 屋身
  * 进深方向）、y 是离草地的高度。配 `uSize = [1, 1]` 就等价于一个
@@ -171,6 +208,10 @@ function ShellWall({
  * （`eaveH = HOUSE_EAVE_Y - GRASS_Y`）、顶点在屋脊
  * （`ridgeH = HOUSE_RIDGE_Y - GRASS_Y`），而屋面在墙平面处的高度正好是
  * `HOUSE_EAVE_Y`。这就是 `HOUSE_RIDGE_Y` 不能把出檐算进去的原因。
+ *
+ * 🔴 WO-8：面材从 `SONG_WALL_FRAG`（青砖）换成 `GABLE_FRAG`（黄白抹灰）。
+ * 换之前这块三角**是黑瓦**，不是砖 —— `uSize=[1,1]` + `uCapFrac=1.5` 让
+ * `capMask` 恒为 1，整块被压顶色盖满。详见 `GABLE_FRAG` 顶上的推导。
  */
 function GableWall({ side }) {
     const geometry = useMemo(
@@ -185,12 +226,10 @@ function GableWall({ side }) {
         []
     );
 
-    // 两侧给不同的 uOrigin.x，砖缝噪声才不会左右一模一样（那会立刻被看成复制粘贴）。
+    // 两侧给不同的 uOrigin.x，抹灰的花斑/雨痕才不会左右一模一样
+    // （那会立刻被看成复制粘贴）。50 是随便取的、足够大又不在任何尺度上共振。
     const originX = side > 0 ? 0 : 50;
-    const uniforms = useSeasonUniforms(
-        wallUniformsFactory(1, 1, originX, GRASS_Y, 1.5, NO_HOLE, NO_HOLE),
-        [originX]
-    );
+    const uniforms = useSeasonUniforms(gableUniformsFactory(originX), [originX]);
 
     return (
         <mesh
@@ -200,7 +239,7 @@ function GableWall({ side }) {
         >
             <shaderMaterial
                 vertexShader={SURFACE_VERT}
-                fragmentShader={SONG_WALL_FRAG}
+                fragmentShader={GABLE_FRAG}
                 uniforms={uniforms}
                 side={THREE.DoubleSide}
             />
@@ -228,6 +267,10 @@ function RoofSlope({ side }) {
             ...makeSurfaceUniforms(ROOF_WIDTH, ROOF_SLOPE, [0, 0], season),
             uHoleDoor: { value: NO_HOLE },
             uHoleWindow: { value: NO_HOLE },
+            // ⚠️ 三个洞都要显式给 NO_HOLE。GLSL 里**声明了**的 uniform 若没传值
+            // 就是 0，而 hole = rectHole(vec4(0,0,0,0)) 在 worldPos≈(0,0) 处
+            // 会取到 1 ⇒ 屋面左上角会被挖掉一小块（亚像素，但没必要留）。
+            uHoleWindow2: { value: NO_HOLE },
             uInk: { value: blankInk() },
             uInkStrength: { value: 0 },
             // 0 ⇒ 整面都是黑瓦（压顶从 0 高度就开始）
@@ -293,7 +336,11 @@ function RafterEnds() {
         let i = 0;
         for (const eaveZ of [I.INTERIOR_FRONT_Z + I.HOUSE_OVERHANG, I.HOUSE_BACK_Z - I.HOUSE_OVERHANG]) {
             for (let k = 0; k < RAFTER_COUNT; k++) {
-                const x = -I.HOUSE_HALF_W + (ROOF_WIDTH / (RAFTER_COUNT - 1)) * k;
+                // 🔴 以**屋面中线**为基准铺，不是以墙半宽为起点。
+                // WO-8 加了侧檐之后 `ROOF_WIDTH ≠ 2·HOUSE_HALF_W`，
+                // 旧写法 `-HOUSE_HALF_W + ROOF_WIDTH * k/(n-1)` 会让整排
+                // 椽头往右偏 0.9（左边露出屋面、右边伸出去）。
+                const x = -ROOF_WIDTH / 2 + (ROOF_WIDTH / (RAFTER_COUNT - 1)) * k;
                 m.makeTranslation(x, I.HOUSE_EAVE_TIP_Y - RAFTER_H / 2 - 0.02, eaveZ - Math.sign(eaveZ - HOUSE_CENTER_Z) * RAFTER_D * 0.3);
                 mesh.setMatrixAt(i++, m);
             }
@@ -331,6 +378,7 @@ export function HouseShell({ corridorVisible = false }) {
                 capFrac={I.HOUSE_WALL_CAP_FRAC}
                 doorHole={FRONT_DOOR_HOLE}
                 windowHole={FRONT_WINDOW_HOLE}
+                windowHole2={FRONT_WINDOW_HOLE_LEFT}
             />
 
             {/* 后端封口。远在雾里，但少了它从 50° 俯角能看到屋身内部。

@@ -56,6 +56,7 @@ import {
     FRAME_ASPECT,
     WALL_INK_W,
     WALL_INK_H,
+    WALL_INK_CENTER_X,
     BANNER_W,
     BANNER_H,
     BANNER_Y,
@@ -64,6 +65,7 @@ import {
     GRASS_Y,
     STEP_FRONT_Z,
     WINDOW_X,
+    WINDOW_X_LEFT,
 } from '../../../config/entranceMetrics';
 import { sharedGeometry } from '../../../engine/resources';
 
@@ -315,7 +317,9 @@ const EntranceDoors = ({
     const [, setIsHovered] = useState(false);
     const [isAnimating, setIsAnimating] = useState(false);
     const [, setIsWindowHovered] = useState(false);
+    // 两个窗，各一个小人（WO-10：右窗是原有的，左窗是新增的对称窗）。
     const windowAvatarRef = useRef();
+    const windowAvatarRefL = useRef();
     const { camera } = useThree();
     const { unlockAchievement } = useAchievements();
     // 推门是音乐的**起播点**之一（另一个是音频面板）—— 见 handleClick。
@@ -798,67 +802,49 @@ const EntranceDoors = ({
      */
 
     // --- Window hover ---------------------------------------------------
-    // The opening is centred on x = 2.5 and is 1.4 wide, so its right edge is
-    // at 3.2. The avatar plane is 1.5 wide, so parking its CENTRE at 3.75 puts
-    // its LEFT edge at 3.0 — 0.2 *inside* the opening. That used to be safe
-    // because the old sprite's ink sat centred in its canvas, but the current
-    // one is a leaning pose with the waving hand pressed against the canvas's
-    // left edge (ink starts at 10.6% of the canvas = 0.16 world left of the
-    // plane centre). At 3.75 the fingertips poked through the panes even at
-    // rest. 3.90 clears the opening edge by 0.11 — enough for the pose, and
-    // still a short hop in from the left.
+    // 洞口 1.4 宽（`WINDOW_HOLE` 的半宽 0.7），小人平面 1.5 宽。
+    // 小人的墨迹不居中：它是一个**侧身招手**的姿势，手贴在画布左缘 ——
+    // 墨迹从画布 10.6% 处开始（= 平面中心往左 0.16 世界单位），宽 1.28。
+    // 于是「静止位」要满足：墨迹整体落在洞口**之外**（这样它被前墙挡住，
+    // 看不见）；「探头位」要满足：墨迹整体落在洞口**之内**。
     //
-    // AVATAR_SHOWN_X cannot simply be nudged right to centre the figure: the
-    // ink is 1.28 wide against a 1.4 opening, so 2.5 is already within 0.02 of
-    // the position that would clip the hand on the left jamb.
+    //   墨迹横向 = [中心 − 0.59, 中心 + 0.69]
+    //   静止位：中心 − 0.59 ≥ 洞口右缘 + 0.11  ⇒ 中心 = 窗心 + 1.40
+    //   探头位：中心 = 窗心（墨迹 [−0.59, +0.69] ⊂ 洞口 [−0.70, +0.70]）
+    //
+    // ⚠️ 探头位**不能**为了"把人摆正"而右移：墨迹 1.28 对洞口 1.40，
+    // 窗心已经是"再往左 0.02 就会切到左手"的位置。
     //
     // ⚠️ 2026-10-11：`WINDOW_X` 搬到 `config/entranceMetrics` 了 —— 窗看的那个
     // 洞是屋身前墙挖的（`WINDOW_HOLE`），"窗"和"洞"分在两个文件里，
     // 数字必须只有一个来源。
-    const AVATAR_REST_X = 3.90;
-    const AVATAR_SHOWN_X = WINDOW_X;
+    //
+    // 🔴 WO-10：现在有**两个**窗，所以上面这套数要按窗心参数化。
+    // 左窗沿用同一套（静止位在它**右边** 1.40 处、也躲在墙后），
+    // 于是两个窗的小人都是从右侧探头 —— 镜像一套反而要翻转贴图，不值得。
+    const AVATAR_REST_DX = 1.40;
+    const avatarRestX = (windowX) => windowX + AVATAR_REST_DX;
 
-    // Helper for window hover
-    const handleWindowEnter = (e) => {
+    /** 通用：把某个窗的小人推到 `toX`，并给一点倾斜。 */
+    const slideAvatar = (ref, toX, tilt, duration, ease) => {
+        const node = ref.current;
+        if (!node) return;
+        gsap.to(node.position, { x: toX, duration, ease, overwrite: true });
+        gsap.to(node.rotation, { z: tilt, duration, ease, overwrite: true });
+    };
+
+    const handleWindowEnter = (e, ref, windowX) => {
         e.stopPropagation();
         setIsWindowHovered(true);
         setGuitarCursor('pointer');
-
-        if (windowAvatarRef.current) {
-            gsap.to(windowAvatarRef.current.position, {
-                x: AVATAR_SHOWN_X,
-                duration: 0.5,
-                ease: 'back.out(1.7)',
-                overwrite: true
-            });
-            gsap.to(windowAvatarRef.current.rotation, {
-                z: 0.1,
-                duration: 0.5,
-                ease: 'power2.out',
-                overwrite: true
-            });
-        }
+        slideAvatar(ref, windowX, 0.1, 0.5, 'back.out(1.7)');
     };
 
-    const handleWindowLeave = (e) => {
+    const handleWindowLeave = (e, ref, windowX) => {
         e.stopPropagation();
         setIsWindowHovered(false);
         setGuitarCursor('auto');
-
-        if (windowAvatarRef.current) {
-            gsap.to(windowAvatarRef.current.position, {
-                x: AVATAR_REST_X,
-                duration: 0.4,
-                ease: 'power2.in',
-                overwrite: true
-            });
-            gsap.to(windowAvatarRef.current.rotation, {
-                z: 0,
-                duration: 0.4,
-                ease: 'power2.in',
-                overwrite: true
-            });
-        }
+        slideAvatar(ref, avatarRestX(windowX), 0, 0.4, 'power2.in');
     };
 
     // Frame center Y - aligned with doors
@@ -893,9 +879,13 @@ const EntranceDoors = ({
      * 的一缕也只到 0.29 × 画布高，下半张画布本来就是全透明的，而地面以下
      * 那一段被不透明的地面挡掉。
      *
-     * 宽度**故意保持 10**（= `WALL_INK_W`）：藤的位置是按 10 宽量出来的
-     * （runners 全落在 x ≥ 1.18，正好避开 2.5 那个窗），跟着屋身 22 宽改
-     * 就会爬到窗上。所以藤只爬大门两侧这一片墙，而不是整面 22 宽的墙。
+     * 🔴 WO-9（2026-10-11 用户：「让它长宽点，最好和右侧外墙一样宽」）：
+     * 这块 overlay 从"跨大门两侧、只有一缕藤"改成**只铺右半面墙** ——
+     * 横向中心从 x = 0 挪到 `WALL_INK_CENTER_X` = 6.0，宽仍是 `WALL_INK_W` = 10
+     * ⇒ 覆盖 world x ∈ [1.0, 11.0]（大门右边 → 前墙右边缘）。
+     * 左半边**不放藤**：那是柿子树的位子，本来就满了。
+     * ⚠️ 右窗（x = 5.0）落在这块 overlay 里，藤在贴图层**绕开**了它 ——
+     * 见 `makeWallInkTexture` 的 `inWindow`。
      */
     const inkCenterY = I.HOUSE_COPING_Y - WALL_INK_H * INK_TOP_FRAC + WALL_INK_H / 2;
 
@@ -964,7 +954,7 @@ const EntranceDoors = ({
 
                 renderOrder 7 让它压在对联（6）之上、柿子树（8）之下；因为它
                 不写深度，树在它不透明的地方仍然赢。见 INK_OVERLAY_FRAG。 */}
-            <mesh position={[0, inkCenterY, INK_OVERLAY_Z]} renderOrder={7}>
+            <mesh position={[WALL_INK_CENTER_X, inkCenterY, INK_OVERLAY_Z]} renderOrder={7}>
                 <primitive object={sharedGeometry('plane', WALL_INK_W, WALL_INK_H)} attach="geometry" />
                 <shaderMaterial
                     vertexShader={SURFACE_VERT}
@@ -1149,67 +1139,95 @@ const EntranceDoors = ({
                 color="#fff8e8"
                 distance={10}
             /> */}
-            {/* AVATAR - separate from the window group, parked behind the bricks.
-                `depthWrite={false}` stops its transparent margin from punching a
-                depth hole through the curtain behind it, and z = 0.06 puts the
-                figure in front of the curtain panels (-0.01) while staying
-                behind the brick facade (0.15) so the wall hides it at rest.
+            {/* ================= 两个窗（WO-10） =================
+                🔴 右窗（`WINDOW_X`）是原有的；**左窗（`WINDOW_X_LEFT` = −WINDOW_X）
+                是 2026-10-11 新加的对称窗**（用户：「窗户距离门口太近，调为现有
+                距离的 2 倍。然后再另外一边多加一个对称的窗户。」）。
 
-                ⚠️ y is NOT decorative. The illustration is a half-body pose that
-                is CROPPED AT ITS OWN BOTTOM EDGE — the ink runs to y=1023 of a
-                1024px canvas (see the note in the texture pipeline). At 0.04 the
-                ink bottom landed exactly on the window opening's bottom edge, so
-                a good 0.29 world units of trouser showed and read as a pair of
-                severed legs sitting on the sill. The user's report was exactly
-                that: "断腿露出来了". -0.16 pushes that hard cut behind the
-                frame's bottom rail and leaves only the hip, which reads as a
-                person standing at the window.
-                The head still clears the top rail comfortably at this height —
-                measured, not guessed: see .workbuddy-ai/round2-2026-10-08/
-                avatar-y-*.png. */}
-            <mesh
-                ref={windowAvatarRef}
-                position={[AVATAR_REST_X, -0.16, 0.06]}
-                rotation={[0, 0, 0]}
-            >
-                <primitive object={sharedGeometry('plane', 1.5, 1.5)} attach="geometry" />
-                <meshBasicMaterial color="#e0e0e0"
-                    map={avatarWindowTexture}
-                    transparent={true}
-                    depthWrite={false}
-                />
-            </mesh>
+                两个窗共用同一套构件 —— 木框 / 窗帘 / hover 热区 / 探头小人 ——
+                所以用一份循环生成，而不是把四块 JSX 复制两遍。
+                ⚠️ 小人的静止位与探头位都是**按窗心参数化**的（见上面
+                `avatarRestX` 那段推导），所以左窗不需要翻转贴图。
 
-            {/* WINDOW - rustic wooden frame, positioned to the right of doors */}
-            <WoodenWindowFrame position={[WINDOW_X, 0, 0.25]} />
+                ⚠️ 左窗会被柿子树挡掉一部分：树冠横向覆盖 world x ∈ [−5.24, −1.46]，
+                而左窗占 x ∈ [−5.7, −4.3]。树冠是有空隙的叶簇，窗会从缝里透出来，
+                但"对称"在视觉上会被这棵树打折 —— 这是用户明确要的，先做出来看。 */}
+            {[
+                { key: 'right', x: WINDOW_X, avatar: windowAvatarRef },
+                { key: 'left', x: WINDOW_X_LEFT, avatar: windowAvatarRefL },
+            ].map(({ key, x, avatar }) => (
+                <group key={key}>
+                    {/* AVATAR — parked behind the bricks.
+                        `depthWrite={false}` stops its transparent margin from
+                        punching a depth hole through the curtain behind it, and
+                        z = 0.06 puts the figure in front of the curtain panels
+                        (-0.01) while staying behind the brick facade (0.15) so
+                        the wall hides it at rest.
 
-            {/* Stable hover target for the window.
-                The enter/leave handlers used to live on WoodenWindowFrame's
-                group, whose raycast target is only the four planks plus the thin
-                cross mullions. Crossing one of the four open panes dropped the
-                hit, fired onPointerLeave and yanked the avatar straight back out
-                — the "peeks out for a split second then runs back" flicker.
-                One invisible plane covering the whole opening keeps the hover
-                state rock solid. */}
-            <mesh
-                position={[WINDOW_X, 0.06, 0.45]}
-                onPointerEnter={handleWindowEnter}
-                onPointerLeave={handleWindowLeave}
-            >
-                <primitive object={sharedGeometry('plane', 1.9, 1.9)} attach="geometry" />
-                <meshBasicMaterial color="#e0e0e0" transparent opacity={0} depthWrite={false} />
-            </mesh>
+                        ⚠️ y is NOT decorative. The illustration is a half-body
+                        pose that is CROPPED AT ITS OWN BOTTOM EDGE — the ink runs
+                        to y=1023 of a 1024px canvas (see the note in the texture
+                        pipeline). At 0.04 the ink bottom landed exactly on the
+                        window opening's bottom edge, so a good 0.29 world units of
+                        trouser showed and read as a pair of severed legs sitting
+                        on the sill. The user's report was exactly that:
+                        "断腿露出来了". -0.16 pushes that hard cut behind the
+                        frame's bottom rail and leaves only the hip, which reads as
+                        a person standing at the window.
+                        The head still clears the top rail comfortably at this
+                        height — measured, not guessed: see
+                        .workbuddy-ai/round2-2026-10-08/ avatar-y-*.png. */}
+                    <mesh
+                        ref={avatar}
+                        name={`window-avatar-${key}`}
+                        position={[avatarRestX(x), -0.16, 0.06]}
+                        rotation={[0, 0, 0]}
+                    >
+                        <primitive object={sharedGeometry('plane', 1.5, 1.5)} attach="geometry" />
+                        <meshBasicMaterial color="#e0e0e0"
+                            map={avatarWindowTexture}
+                            transparent={true}
+                            depthWrite={false}
+                        />
+                    </mesh>
 
-            {/* Curtain + interior, seen through the window opening (behind the
-                brick plane). Pulled back to z = -0.03 so the character can stand
-                in front of the fabric panels instead of being swallowed by them. */}
-            <WindowCurtain position={[WINDOW_X, 0, -0.03]} />
+                    {/* WINDOW - rustic wooden frame */}
+                    <WoodenWindowFrame position={[x, 0, 0.25]} />
+
+                    {/* Stable hover target for the window.
+                        The enter/leave handlers used to live on
+                        WoodenWindowFrame's group, whose raycast target is only the
+                        four planks plus the thin cross mullions. Crossing one of
+                        the four open panes dropped the hit, fired onPointerLeave
+                        and yanked the avatar straight back out — the "peeks out
+                        for a split second then runs back" flicker. One invisible
+                        plane covering the whole opening keeps the hover state rock
+                        solid. */}
+                    <mesh
+                        name={`window-hover-${key}`}
+                        position={[x, 0.06, 0.45]}
+                        onPointerEnter={(e) => handleWindowEnter(e, avatar, x)}
+                        onPointerLeave={(e) => handleWindowLeave(e, avatar, x)}
+                    >
+                        <primitive object={sharedGeometry('plane', 1.9, 1.9)} attach="geometry" />
+                        <meshBasicMaterial color="#e0e0e0" transparent opacity={0} depthWrite={false} />
+                    </mesh>
+
+                    {/* Curtain + interior, seen through the window opening (behind
+                        the brick plane). Pulled back to z = -0.03 so the character
+                        can stand in front of the fabric panels instead of being
+                        swallowed by them. */}
+                    <WindowCurtain position={[x, 0, -0.03]} />
+                </group>
+            ))}
 
             {/* DUCK PLANTER (Right Side - Under Window) — rustic wood, green plant, 3D duck.
                 Sits on the OUTDOOR grade (the lawn), not on the floor — the lawn
                 is 0.30 below the floor now, so anything standing on it has to
-                move with OUTDOOR_Y or it floats. */}
-            <group position={[2.5, OUTDOOR_Y, 0.4]}>
+                move with OUTDOOR_Y or it floats.
+                ⚠️ WO-10：右窗从 2.5 挪到 5.0，花箱跟着走 —— 它存在的理由就是
+                「窗下那丛绿植」，留在 2.5 就变成墙根下一盆没来由的花。 */}
+            <group position={[WINDOW_X, OUTDOOR_Y, 0.4]}>
                 <WoodenPlanter position={[0, 0, 0]} yaw={RABBIT_YAW} />
 
                 {/* Invisible hitbox just for the duck (right side of planter) */}
