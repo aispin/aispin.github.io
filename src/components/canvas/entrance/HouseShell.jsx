@@ -65,6 +65,10 @@ import { GRASS_Y, GATE_HOLE, WINDOW_HOLE } from '../../../config/entranceMetrics
  * 只在 `!hasEntered || houseExitRequested` 时挂。`houseExitRequested` 那一段
  * 必须留着：退出动画是**从走廊里滑到院门外**，那一瞬间 `hasEntered` 还是 true，
  * 卸掉屋身就会在滑出去的过程中看见走廊的白板。
+ *
+ * ⚠️ 但"挂上"不等于"每一面都画"：**后端封口**（`z = HOUSE_BACK_Z` 那堵 22 宽的墙）
+ * 必须跟着 `corridorVisible` 走 —— 走廊一画出来，它就横在 7 宽的走廊里，
+ * 而且屋身 shader 不吃雾，会是一块一清二楚的深色砖面。见组件内那段注释。
  */
 
 /* ---- 墙 ------------------------------------------------------------- */
@@ -308,7 +312,7 @@ function RafterEnds() {
     );
 }
 
-export function HouseShell() {
+export function HouseShell({ corridorVisible = false }) {
     return (
         // `name` 是给 harness 用的（与 `InfiniteCorridorManager` 的
         // `infinite-corridor` 同一套）：封口② 的验收要同时断言"走廊不可见"
@@ -329,16 +333,37 @@ export function HouseShell() {
                 windowHole={FRONT_WINDOW_HOLE}
             />
 
-            {/* 后端封口。远在雾里，但少了它从 50° 俯角能看到屋身内部。 */}
-            <ShellWall
-                width={I.HOUSE_HALF_W * 2}
-                height={WALL_H}
-                position={[0, WALL_CENTER_Y, I.HOUSE_BACK_Z]}
-                rotationY={Math.PI}
-                originX={I.HOUSE_HALF_W}
-                originY={GRASS_Y}
-                capFrac={1.5}
-            />
+            {/* 后端封口。远在雾里，但少了它从 50° 俯角能看到屋身内部。
+
+                🔴 但**人在屋里 / 正在进出时绝对不能画**（2026-10-11 用户报的
+                「进门时身后一堵黑墙，约 2 秒后消失；退出时同样出现」）。
+
+                为什么：它是一堵 **22 宽**的墙（`z = HOUSE_BACK_Z`），而走廊只有
+                **7 宽** —— 于是它**横在走廊里**，从门洞往里看就是走廊尽头那堵墙。
+                更糟的是屋身的 shader（`SONG_WALL_FRAG`）**不参与雾**（没有
+                fog chunk，`ShaderMaterial` 默认 `fog: false`），所以走廊两侧
+                已经化进雾里了，这堵墙还是**一清二楚的深色砖面**。
+
+                为什么是"2 秒后消失"：入场滑行 2.4 s，其间 `hasEntered` 仍是
+                false ⇒ `HouseShell` 整棵还挂着；`markEntered()` 那一帧它才卸载。
+                退出方向同理：`houseExitRequested` 让屋身留着，而
+                `corridorVisible = hasEntered || doorOpening` 已经是 true。
+
+                所以判据就是**走廊可不可见**，而不是"人在不在屋里" ——
+                入场滑行时相机还在门外（z ≈ 25），光看 `hasEntered` 判不出来。
+                ⚠️ 环绕预览（`?orbit`）下走廊不可见 ⇒ 这堵墙照常画，从 50°
+                俯角看屋身内部那个洞仍然被堵着（它存在的理由没变）。 */}
+            {!corridorVisible && (
+                <ShellWall
+                    width={I.HOUSE_HALF_W * 2}
+                    height={WALL_H}
+                    position={[0, WALL_CENTER_Y, I.HOUSE_BACK_Z]}
+                    rotationY={Math.PI}
+                    originX={I.HOUSE_HALF_W}
+                    originY={GRASS_Y}
+                    capFrac={1.5}
+                />
+            )}
 
             {/* 两侧长墙：沿 z 拉通，只砌到墙头 —— 上面那截三角由山墙补 */}
             <ShellWall

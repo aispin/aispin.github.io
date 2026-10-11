@@ -115,33 +115,6 @@
 - **判据**：两窗关于大门对称、各自离门 5.0；两个洞都透出窗帘；
   hover 时小人从对应那一侧探头。
 
-### WO-11 · BUG：门缝透白边
-
-- **现状**：用户图 2 —— 两扇门叶之间的门缝上有一条亮白竖边。
-  `makeDoorFrameTexture` 的注释里记着**同一类**问题（"the corridor's white wall
-  showed through as a bright band straight across the top of the doors"），
-  当年是靠 `headFrac` 让上槛跨满「叶顶 → 框顶」解决的 ——
-  **说明"框没盖住缝"这个模式在本组件里出现过一次**。
-- **改什么**：以复现结论为准（`probe-entrance-bugs.mjs` 的门缝近景 + 截图），
-  大概率是把 `#e0e0e0` 那层框/背板的覆盖范围补到门缝上，或给门缝加一道
-  压条；**不排除**是门叶贴图边缘 alpha 透出的框底。
-- **判据**：门缝近景里不再出现亮色像素（对门缝做一条竖向像素采样，
-  亮度不得高于两侧叶面）。
-
-### WO-12 · BUG：进门/出门时身后一堵黑墙，约 2 秒后消失
-
-- **现状**：入场滑行 **2.4 s**，其间 `hasEntered` 仍为 `false`
-  ⇒ `IslandGround / HouseShell / ForecourtFence / BambooGrove / EntranceDoors /
-  SignSystem / WeatherLayer` **全都还挂着**，而走廊已经可见
-  （`corridorVisible = hasEntered || doorOpening`）。
-  `HouseShell` 的**后端封口**是一堵 22 宽的墙（`z = −1.85`），
-  **横在 7 宽的走廊里** —— 进门后朝前看，它就是走廊尽头那堵墙。
-  2 秒后消失 = `markEntered()` 那一刻 `HouseShell` 整棵卸载。
-- **改什么**：把 `HouseShell` 的**后端封口**从"屋身外观"里摘出来，
-  改成只在"人真的在外面"时挂（而不是"没进门"时挂）——
-  或者干脆按 `camZ` 判：相机越过前墙后就不再画后端封口。
-- **判据**：入场滑行全程，走廊前方不再出现横墙；`probe-corridor-seal.mjs` 13/13 不变。
-
 ---
 
 # 🙋 待你拍板的 DR

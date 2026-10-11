@@ -211,9 +211,13 @@ const Experience = ({ onSceneReady, performanceTier }) => {
                    滑到院门外**，那一刻 hasEntered 还是 true，卸掉屋身就会在滑
                    出去的过程中看见白板。
                 ⚠️ 屋身的**前墙就是那座门楼**（门洞 + 窗洞都开在它上面），
-                   不再有独立的门脸，也没有四面院墙（`CourtyardWalls` 已删）。 */}
+                   不再有独立的门脸，也没有四面院墙（`CourtyardWalls` 已删）。
+                ⚠️ 还要把 `corridorVisible` 传下去：屋身的**后端封口**是一堵
+                   22 宽的墙，而走廊只有 7 宽 —— 只要走廊画出来，那堵墙就横在
+                   走廊里（用户报的「进门时身后一堵黑墙，2 秒后消失」）。
+                   见 `HouseShell` 里那段注释。 */}
             {(!hasEntered || houseExitRequested) && (
-                <HouseShell />
+                <HouseShell corridorVisible={corridorVisible} />
             )}
             {/* 门外竹篱笆围的开放小院（WO-6 第 ② 条）。只围外三面，
                 正前方留口给甬路 —— 详见 entrance/ForecourtFence.jsx。
