@@ -32,6 +32,13 @@ import * as I from '../../../config/island';
  * 这里自己写一个 20 行的 ShaderMaterial，风、竹节、季节、霾全在里面，
  * 反而更短也更可控。
  * ⚠️ 霾（`uHaze*`）每帧从 `scene.fog` 拷 —— 见 IslandGround 那条注释。
+ *
+ * 🔴 「贴脸就让开」（`uCamPos` / `uFade*`，DR-H 的 H1，2026-10-11）
+ * ---------------------------------------------------------------
+ * 环绕轨道和竹环**必然相交**，所以"转到背面 + 最低仰角"时相机会站在竹林
+ * 里面（定妆照 `spring-back-low-*.png`）。修法是在顶点着色器里按实例到
+ * 相机的距离把横截面半径缩到 0 —— 细节、三个"不要"、以及"正常游玩永远
+ * 不触发"的理由全写在 `config/island.js` 的 `BAMBOO_FADE_NEAR` 上面。
  */
 
 /* ------------------------------------------------------------------ */
@@ -44,6 +51,9 @@ attribute float aTint;
 uniform float uTime;
 uniform float uWind;
 uniform float uHeight;
+uniform vec3 uCamPos;
+uniform float uFadeNear;
+uniform float uFadeFar;
 varying float vTint;
 varying float vH;
 varying float vDepth;
@@ -52,13 +62,24 @@ void main() {
     vec3 p = position;
     float h = clamp(p.y / uHeight + 0.5, 0.0, 1.0);   // 0 根部 · 1 梢部
 
+    // ---- 贴脸就让开（DR-H 的 H1，见 config/island.js 的 BAMBOO_FADE_* ）----
+    // 按**实例原点**（竿的中点）到相机的距离算，整根一起细。按顶点算的话
+    // 一根竿会变成楔形 —— 近端细、远端粗，很怪。
+    vec4 o = vec4(0.0, 0.0, 0.0, 1.0);
+    #ifdef USE_INSTANCING
+        o = instanceMatrix * o;
+    #endif
+    vec3 ow = (modelMatrix * o).xyz;
+    float keep = smoothstep(uFadeNear, uFadeFar, distance(ow, uCamPos));
+    p.xz *= keep;                     // 只缩横截面：竿「细成线」，高度不变
+
     vec4 ip = vec4(p, 1.0);
     #ifdef USE_INSTANCING
         ip = instanceMatrix * ip;
     #endif
     vec3 wp = (modelMatrix * ip).xyz;
 
-    // 两列不同频率叠加：单频会看出"整片竹林齐步走"
+    // 两列不同频率叠加：单频会看出「整片竹林齐步走」
     float sway = sin(uTime * 1.05 + aPhase) * 0.7 + sin(uTime * 0.63 + aPhase * 1.7) * 0.3;
     float bend = h * h;                                // 根部不动
     wp.x += sway * uWind * bend;
@@ -99,13 +120,29 @@ attribute float aPhase;
 attribute float aTint;
 uniform float uTime;
 uniform float uWind;
+uniform vec3 uCamPos;
+uniform float uFadeNear;
+uniform float uFadeFar;
 varying vec2 vUvB;
 varying float vTint;
 varying float vDepth;
 
 void main() {
     vUvB = uv;
-    vec4 ip = vec4(position, 1.0);
+    vec3 p = position;
+
+    // 和竿同一套「贴脸就让开」：叶片缩到叶柄那个点（pivot 在底边中点）。
+    // 叶片挂在自己那根竿的梢上，原点 xz 和竿一样 ⇒ 两者同时消失，不会
+    // 出现「竿没了叶子还在」。
+    vec4 o = vec4(0.0, 0.0, 0.0, 1.0);
+    #ifdef USE_INSTANCING
+        o = instanceMatrix * o;
+    #endif
+    vec3 ow = (modelMatrix * o).xyz;
+    float keep = smoothstep(uFadeNear, uFadeFar, distance(ow, uCamPos));
+    p.xy *= keep;
+
+    vec4 ip = vec4(p, 1.0);
     #ifdef USE_INSTANCING
         ip = instanceMatrix * ip;
     #endif
@@ -275,6 +312,10 @@ export function BambooGrove({ lowTier = false }) {
             uHaze: { value: new THREE.Color(0.85, 0.87, 0.86) },
             uHazeNear: { value: 20 },
             uHazeFar: { value: 60 },
+            // DR-H 的 H1：贴脸就让开。每帧在 useFrame 里写 uCamPos。
+            uCamPos: { value: new THREE.Vector3() },
+            uFadeNear: { value: I.BAMBOO_FADE_NEAR },
+            uFadeFar: { value: I.BAMBOO_FADE_FAR },
         }),
         []
     );
@@ -286,6 +327,9 @@ export function BambooGrove({ lowTier = false }) {
             uHaze: { value: new THREE.Color(0.85, 0.87, 0.86) },
             uHazeNear: { value: 20 },
             uHazeFar: { value: 60 },
+            uCamPos: { value: new THREE.Vector3() },
+            uFadeNear: { value: I.BAMBOO_FADE_NEAR },
+            uFadeFar: { value: I.BAMBOO_FADE_FAR },
         }),
         []
     );
@@ -321,6 +365,8 @@ export function BambooGrove({ lowTier = false }) {
         const bm = bladeMatRef.current;
         if (!cm) return;
         cm.uniforms.uTime.value = t;
+        // DR-H 的 H1：每帧告诉着色器相机在哪，贴脸的竹子自己让开。
+        cm.uniforms.uCamPos.value.copy(state.camera.position);
         const fog = scene.fog;
         if (fog) {
             cm.uniforms.uHaze.value.copy(fog.color);
@@ -329,6 +375,7 @@ export function BambooGrove({ lowTier = false }) {
         }
         if (!bm) return;
         bm.uniforms.uTime.value = t;
+        bm.uniforms.uCamPos.value.copy(state.camera.position);
         if (fog) {
             bm.uniforms.uHaze.value.copy(fog.color);
             bm.uniforms.uHazeNear.value = fog.near;
