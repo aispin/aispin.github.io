@@ -7,7 +7,7 @@ import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useAchievements } from '../context/AchievementsContext';
 import { reducedMotion } from './useReducedMotion';
-import { settleLerp, SETTLE_ANGLE } from '../utils/settle';
+import { settleLerp, SETTLE_POS, SETTLE_ANGLE } from '../utils/settle';
 import { INTERIOR_FRONT_Z } from '../config/island';
 
 // Door positions for auto-glance
@@ -401,7 +401,10 @@ const useInfiniteCamera = ({
     }, [handleWheel, handleMouseMove, handleKeyDown, handleTouchStart, handleTouchMove, handleDeviceOrientation, requestGyroscopePermission]);
 
     // Main camera update loop
-    useFrame(() => {
+    // ⚠️ `delta` 一路传给 `settleLerp` 做 dt 补偿（WO-1，2026-10-11）：这里
+    //    那些 0.03 / 0.08 / `smoothing` 全是 **60 fps 下的每帧系数**，
+    //    低帧率机器上原来会"黏"成一条慢动作。
+    useFrame((_, delta) => {
         // If camera override is active, let external code control the camera
         if (cameraOverride.current) {
             return;
@@ -440,11 +443,11 @@ const useInfiniteCamera = ({
                 swipeGlance.current = 0;
             } else {
                 const parallaxSmoothing = justEnabled.current ? 0.02 : smoothing * 0.8;
-                parallax.current.x = settleLerp(parallax.current.x, targetParallax.current.x, parallaxSmoothing);
-                parallax.current.y = settleLerp(parallax.current.y, targetParallax.current.y, parallaxSmoothing);
+                parallax.current.x = settleLerp(parallax.current.x, targetParallax.current.x, parallaxSmoothing, SETTLE_POS, delta);
+                parallax.current.y = settleLerp(parallax.current.y, targetParallax.current.y, parallaxSmoothing, SETTLE_POS, delta);
 
                 // Smooth swipe glance (mobile horizontal swipe)
-                swipeGlance.current = settleLerp(swipeGlance.current, targetSwipeGlance.current, 0.08, SETTLE_ANGLE);
+                swipeGlance.current = settleLerp(swipeGlance.current, targetSwipeGlance.current, 0.08, SETTLE_ANGLE, delta);
             }
         }
 
@@ -459,7 +462,7 @@ const useInfiniteCamera = ({
             // 到不了 targetZ，相机停手之后位置还会以 1e-9/帧 的量爬下去，
             // 于是所有读相机位置的 useFrame 消费者（门的朝向、标题分裂）
             // 永远在写矩阵 —— 场景"从来没有静止过"。见 utils/settle.js。
-            currentZ.current = settleLerp(currentZ.current, targetZ.current, smoothing);
+            currentZ.current = settleLerp(currentZ.current, targetZ.current, smoothing, SETTLE_POS, delta);
 
             // 🔴 门前那道夹。**只在"相机起手就在门内"时才生效** ——
             // 相机起点在门外（`__aispin.enter()` / `?orbit` 交接，z = 28）是
@@ -497,7 +500,7 @@ const useInfiniteCamera = ({
                 const isReleasing = Math.abs(targetGlance.current) < Math.abs(glanceOffset.current);
                 const lerpSpeed = isReleasing ? 0.08 : 0.03;
 
-                glanceOffset.current = settleLerp(glanceOffset.current, targetGlance.current, lerpSpeed, SETTLE_ANGLE);
+                glanceOffset.current = settleLerp(glanceOffset.current, targetGlance.current, lerpSpeed, SETTLE_ANGLE, delta);
             }
 
             // Apply Z position to camera (only when scroll enabled).

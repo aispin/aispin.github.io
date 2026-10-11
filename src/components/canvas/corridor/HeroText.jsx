@@ -4,7 +4,7 @@ import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { SCENE_FONTS } from '../../../config/theme';
 import { reducedMotion } from '../../../hooks/useReducedMotion';
-import { settleLerp } from '../../../utils/settle';
+import { settleLerp, SETTLE_POS } from '../../../utils/settle';
 import { sharedGeometry } from '../../../engine/resources';
 
 // Local font for the wordmark. Maple is the only scene face left
@@ -61,7 +61,7 @@ const HeroText = ({ position = [0, 0.3, 0] }) => {
     ], []);
 
     // Animation loop
-    useFrame((state) => {
+    useFrame((state, delta) => {
         if (!groupRef.current) return;
 
         const time = state.clock.elapsedTime;
@@ -88,7 +88,7 @@ const HeroText = ({ position = [0, 0.3, 0] }) => {
         // settleLerp：裸 lerp 只会无限逼近 targetSplit，字母 X 位置于是永远
         // 在变 —— 相机的自动扫视（glance）本来就够小，这点残差没有任何人
         // 看得见，但它让"场景静止"在浮点上永不成立。见 utils/settle.js。
-        splitAmount.current = settleLerp(splitAmount.current, targetSplit.current, 0.08);
+        splitAmount.current = settleLerp(splitAmount.current, targetSplit.current, 0.08, SETTLE_POS, delta);
 
         // Apply split to each letter of ZEO
         // prefers-reduced-motion：字母的上下浮动与轻微摇摆停掉，但**分裂**

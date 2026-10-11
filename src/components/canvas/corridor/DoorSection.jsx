@@ -399,7 +399,7 @@ const DoorSection = ({
 
     // Force shader compilation: let the painted versions render for 2 frames during preloader, then hide
     const compileFramesRef = useRef(0);
-    useFrame(() => {
+    useFrame((_, delta) => {
         // === SHADER COMPILE (first 2 frames only) ===
         if (compileFramesRef.current < 2) {
             compileFramesRef.current++;
@@ -445,7 +445,7 @@ const DoorSection = ({
         // 的角度是相机距离的纯函数 —— 用户一停，它就停，没有任何尾巴。
         currentTilt.current = reducedMotion()
             ? targetTilt
-            : settleLerp(currentTilt.current, targetTilt, 0.06, SETTLE_ANGLE);
+            : settleLerp(currentTilt.current, targetTilt, 0.06, SETTLE_ANGLE, delta);
 
         // Apply rotation: BASE_ROTATION (90°) + dynamic tilt
         const baseDir = side === 'left' ? 1 : -1;

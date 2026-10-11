@@ -13,7 +13,7 @@ import * as I from '../config/island';
  * 不需要地形高度场、不需要碰撞体（那正是"自由行走"最贵的两件事）。
  *
  * **B2 边界**：三个量全夹住（见 `config/island.js`）：
- *   · 半径 15~26 —— 下限防穿墙（院子四角离岛心 14.2），上限防进雾；
+ *   · 半径 18~28 —— 下限防穿墙（屋身四角离轴心 16.28），上限防进雾；
  *   · 仰角 1°~50° —— 不许钻到地面以下，也不许变成航拍；
  *   · 算完再夹一次 y 的硬地板（双保险）。
  *
@@ -183,15 +183,17 @@ export function useOrbitCamera({ enabled }) {
         st.active = true;
     }, []);
 
-    useFrame(() => {
+    useFrame((_, delta) => {
         const st = s.current;
         if (!enabled || !st.active) return;
         // 1) GSAP 正在 tween 相机（入场 / 退出 / 传送）⇒ 一帧都不碰
         if (gsap.isTweening(camera.position) || gsap.isTweening(camera.rotation)) return;
 
-        st.yaw = settleLerp(st.yaw, st.targetYaw, 0.18, SETTLE_ANGLE);
-        st.elev = settleLerp(st.elev, st.targetElev, 0.18, SETTLE_ANGLE);
-        st.r = settleLerp(st.r, st.targetR, 0.18, SETTLE_ANGLE);
+        // `delta` 交给 settleLerp 做 dt 补偿（WO-1）—— 0.18 是 60 fps 下的
+        // 每帧系数，低帧率下会自动换算成更大的步长，手感不再挂在帧率上。
+        st.yaw = settleLerp(st.yaw, st.targetYaw, 0.18, SETTLE_ANGLE, delta);
+        st.elev = settleLerp(st.elev, st.targetElev, 0.18, SETTLE_ANGLE, delta);
+        st.r = settleLerp(st.r, st.targetR, 0.18, SETTLE_ANGLE, delta);
 
         const ce = Math.cos(st.elev);
         const se = Math.sin(st.elev);
@@ -211,14 +213,14 @@ export function useOrbitCamera({ enabled }) {
      *
      * 🔴 `snap` 默认 **true**，直接吸附到目标，不走那 0.18/帧的平滑。
      * ------------------------------------------------------------------
-     * 为什么：`settleLerp` 的插值系数是**每帧固定**的（不是 dt 补偿 ——
-     * 见 `utils/settle.js` 的设计意图：它要的是"真的会停"，不是"和帧率无关"）。
-     * 于是收敛速度**取决于帧率**：swiftshader 软件渲染下 1600×900 只有
-     * 个位数 fps，从 yaw = 1.5π 转到 0 需要 ~70 帧，而截图脚本只等 2200 ms
-     * —— 实测那一张停在半路，机位根本不是它要的那个（第一轮 `rest` 定妆照
-     * 拍成了"从左侧斜看院墙"，而不是正面）。
+     * 为什么：截图要的是**可复现的定机位**，不是动画。`settleLerp` 现在
+     * 做了 dt 补偿（WO-1，2026-10-11）—— 收敛**时长**不再挂在帧率上 ——
+     * 但**一帧**仍然走不完：0.18 的系数在 60 fps 下也要 ~25 帧才收敛，
+     * 而 swiftshader 下 1600×900 只有个位数 fps，脚本等 1200 ms 也只够
+     * 三四帧。不吸附的话那张图就停在半路，机位根本不是它要的那个
+     * （第一轮 `rest` 定妆照就是这么拍成"从左侧斜看院墙"的，而日志里
+     * 当时什么都没说 —— 现在 `shot-island.mjs` 有 `poseErr` 自检兜着）。
      *
-     * 截图要的是**可复现的定机位**，不是动画，所以这里吸附。
      * 用户拖拽那条路径不受影响（它走的是 `targetYaw` + 平滑）。
      *
      * @param {number} yaw
