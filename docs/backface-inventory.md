@@ -12,7 +12,8 @@
 |---|---|
 | `.workbuddy-ai/harness/probe-backfaces.mjs` | 遍历场景，列出**所有 `side: FrontSide` 的 `PlaneGeometry`**（世界坐标 / 尺寸 / 材质 / 祖先链），按世界 z 分桶 |
 | `.workbuddy-ai/harness/probe-island-slab.mjs` | 侧面机位打射线网格，报告每个像素命中的**完整从前到后列表** |
-| `.workbuddy-ai/harness/shot-island.mjs` | 四季 × 5 机位 × 横竖屏定妆照（走 `window.__orbit.setPose()`） |
+| `.workbuddy-ai/harness/probe-back-gate.mjs` | 同款，但采样点钉在**门楼背面**那块板上（`yaw = π`）。用来判"补的内面到底露没露脸" |
+| `.workbuddy-ai/harness/shot-island.mjs` | 四季 × 5 机位 × 横竖屏定妆照（走 `window.__orbit.setPose()`；第 4 个参数 `light`/`dark` 切昼夜） |
 
 判据只有两条，不需要逐个藏对象试：
 
@@ -71,9 +72,60 @@ Plane 总数 706 · 其中 FrontSide 177 · Box 78 · InstancedMesh 3
 |---|---|---|
 | 走廊外观是**一大片没细节的白板**（侧面/背面各一张，是画面里最大的破绽） | 给走廊穿一层壳：青砖墙（`SONG_WALL_FRAG`）+ 黑瓦顶，读成院子后面的廊屋 | `entrance/CorridorShell.jsx`（新） |
 | 四面院墙从里从外都要看得见 | 全部 `DoubleSide`（入场飞行是**穿过**院子的，单面会中途消失） | `entrance/CourtyardWalls.jsx`（新） |
-| 门楼 facade 从院子里看整片消失 | 补一层 `side={THREE.BackSide}` 的朝内面（z 退 0.02 防 z-fight；用 `BackSide` 而不是把几何转 180°，否则 vUv 镜像、砖缝跟正面错开） | `entrance/EntranceDoors.jsx` |
+| 门楼 facade 从院子里看整片消失 | 补一层 `side={THREE.BackSide}` 的朝内面（用 `BackSide` 而不是把几何转 180°，否则 vUv 镜像、砖缝跟正面错开）。⚠️ **第一版把 z 退到 0.13 是错的** —— 被门口三块 legacy 灰板挡住，等于没补，见 §4.1 | `entrance/EntranceDoors.jsx` |
+| 廊屋屋面从背面看是**占满下半屏的纯黑** | 屋面从 `meshStandardMaterial` 换成 `SONG_WALL_FRAG` + `uCapFrac = 0`（整面都是黑瓦）。见 §4.2 | `entrance/CorridorShell.jsx` |
 | 竹篱绕到侧面就是一张纸 | 竹竿 + 横档改 **1 个 InstancedMesh**（28 实例）；藤仍是 alphaTest 平面但改 `DoubleSide` | `entrance/BambooFence.jsx` |
 | 竹林长在廊屋屋面上 | 散布加"走廊带"拒绝采样（`\|x\| < 6.5 且 z < 6`） | `entrance/BambooGrove.jsx` |
+
+### 4.1 「补了背面」≠「背面被补上了」—— 门脸内面被灰板挡住
+
+`spring-back-land.png` 里门楼背面是**一整块没有任何纹理的灰板**（采样
+≈ (100,106,103)），而左右院墙是清清楚楚的青砖。
+
+**判据（不用看图猜）**：`SONG_WALL_FRAG` 的面一定带**勒脚**和**黑瓦压顶**
+（`uCapFrac = 0.905`）。灰板上两者都没有 ⇒ 它**不是**那个 shader 的面。
+
+**实测**（`probe-back-gate.mjs`，back 机位打射线）：
+
+```
+屏幕 (800,330)  d=29.85  BoxGeometry{1.8,3.45,0.07} local(0,2.52,-0.5)
+                         MeshBasicMaterial #585c5b           ← 第一命中 = 板子
+                d=30.52  PlaneGeometry{10,6} local(0,1.25,0.13)
+                         ShaderMaterial side=1(BackSide)      ← 内面，被挡死
+```
+
+**根因**：门口那三块 legacy "tunnel wall panel"（`meshBasicMaterial` +
+`WALL_REVEAL = '#585c5b'`，局部 z = −0.5 ± 0.035）**无光照、无纹理**，
+而内面在 z = 0.13 —— 从院子里看（z 越小越近）板子在**前面**，内面永远被挡。
+板子的存在理由是"透过正面门洞 0.06 的软边补上墙色"，从正面看它们确实等于
+不存在；**能绕到背面之后它们就是破绽**。
+
+**修法**：
+- 内面 z 改成派生式 `INNER_FACE_Z = WALL_PANEL_Z − wallThickness/2 − 0.06`
+  （≈ −0.6），**写在板子前面**，并且是派生而不是硬编码 —— 免得以后谁动了
+  板子的 z 又把它盖回去。
+- 内面改用**独立的 `innerFaceUniforms`**：门洞照旧通，**窗洞关掉**
+  （`uHoleWindow: [0, 9999, 0, 0]`）。窗背后同样只有那三块无纹理板子，
+  留着洞就是从院子里看到一块平整灰板。两批 uniform 各自被
+  `useSeasonUniforms` 锁身份、各自在换季时更新，不会冻在首季。
+- 砖缝按**世界坐标**算（`uOrigin + vUv*uSize`），所以挪 z **不会**让两面砖缝错位。
+
+**教训**：新加的遮挡面必须先确认它在**深度上真的在最前**。这类"补了但被挡"
+的失败**看图看不出来**（图里就是一块灰板，看着像"材质没生效"），
+只有打射线看命中顺序才能定位。
+
+### 4.2 标准材质在这个场景里发黑
+
+屋面第一版用 `meshStandardMaterial(#343a3d)`，结果从背面看是**占满下半屏的
+纯黑**：全站 `shadows={false}`、没有环境贴图、没有 toneMapping，标准材质吃不到
+足够的光；而墙用的是自带环境项的 `SONG_WALL_FRAG` —— 一块黑屋面挨着一面灰砖墙，
+立刻露馅。
+
+换成 `SONG_WALL_FRAG` + `uCapFrac = 0` 之后，屋面和院墙压顶是**同一套瓦、
+同一套光照**。前提是 UV 方向对上（否则瓦垄会画到屋脊上）：
+`uSize = [ROOF_LEN, ROOF_SLOPE]`，`u` 沿屋脊、`v` 沿坡度；shader 的瓦垄
+`fract(world.x / 0.285)` 沿坡度跑，檐口落在 `above ≈ 0` 那一侧。
+`CorridorShell.RoofSlope` 里那三层嵌套 group 的旋转顺序就是为这个约束服务的。
 
 ---
 
@@ -108,6 +160,30 @@ Plane 总数 706 · 其中 FrontSide 177 · Box 78 · InstancedMesh 3
   尽头之后那一小段走廊还隐约可见**。
 - 这是"要不要把岛做大 / 把外壳拉长"的设计决定，不是 bug，所以列成 DR。
 
+### WO-B4 · 院子中间那条**没有屋顶的走廊**（侧视图里的浅色大板）
+
+- **症状**：`spring-right-land.png` / `left` 里，院子中间是一整片**暖白色平面**
+  （采样 ≈ (246,242,234)，带一点墨色远山剪影），占了院子的很大一块。
+- **是什么**：走廊的**暖白顶**（`y = FLOOR_Y + 3.5 = 1.75`，`x ∈ ±3.5`，
+  `side: DoubleSide`）。走廊从门楼（z = 22.15）一路铺到 −70，**穿过整个院子**；
+  而 `CorridorShell` 只包住 `z ∈ [−14, 4.15]` —— 院子那一段（4.15 ~ 22.15）
+  **没有外壳**，于是从院子墙头（1.85）上方看过去，就是它的顶面。
+- **实测**：`probe-island-slab.mjs` 的 back 机位命中列表里有两个
+  `PlaneGeometry{7,10} local(0,1.75,7 / 17)`，`ShaderMaterial side=2`
+  —— 正是院子那一段的两块顶板。
+- **为什么单列出来**：这不是"背面"问题，是**要不要给院子中间那条廊加屋顶**的
+  构图问题。加 = 院子变成"廊院"（一条带瓦顶的廊从门楼贯到后罩墙，与
+  `CorridorShell` 的瓦顶连成一体）；不加 = 维持现状（从侧面看是一片浅色顶板）。
+  影响面大，所以**列成 DR 等拍板**，不擅自改。
+- **真要加的话**：`CorridorShell` 的 `HALL_LEN` 由 `COURT_BACK_Z − HALL_BACK_Z`
+  改成 `COURT_FRONT_Z − HALL_BACK_Z`（外壳从 −14 一直包到门楼）。
+  ⚠️ **不是一处参数就完事**：`ROOF_LEN = HALL_LEN + HALL_OVERHANG × 2` 在**两端
+  各**加 0.7 出檐，直接拉长会让屋面**伸到门楼前面**（z 到 22.85 > 门楼 22.15），
+  在门脸中段高度（y 2.2~2.85）横出一道 9.2 宽的檐口 —— 必须把**前端的出檐改成 0**
+  （即 z 方向改成非对称：后端留 0.7，前端齐门楼）。所以这是要动 `CorridorShell`
+  结构的改动，不是改个数。
+- ⚠️ 正面是否真的被门楼挡住（门楼 10 宽 / 外壳 9.2 宽）**必须实测**，别推。
+
 ---
 
 ## 6. 复现
@@ -122,9 +198,24 @@ node .workbuddy-ai/harness/probe-backfaces.mjs http://localhost:4173 spring 21 4
 # 3. 取证：某个机位下屏幕上一片白是什么
 node .workbuddy-ai/harness/probe-island-slab.mjs http://localhost:4173 1.5708 0.22 22
 
-# 4. 定妆照（四季 × 5 机位 × 横竖屏）
-node .workbuddy-ai/harness/shot-island.mjs http://localhost:4173 .workbuddy-ai/shots/island-v12
+# 3b. 取证：门楼背面那块灰板是什么（back 机位，采样点钉在板上）
+node .workbuddy-ai/harness/probe-back-gate.mjs http://localhost:4173
+
+# 4. 定妆照（四季 × 5 机位 × 横竖屏 × 昼夜）
+#    第 4 个参数 light|dark 只写 localStorage['aispin-theme']，
+#    ⚠️ 夜拍要另开一个 outDir（文件名里不含 theme，同目录会互相盖掉）
+node .workbuddy-ai/harness/shot-island.mjs http://localhost:4173 .workbuddy-ai/shots/island-v12      spring,summer,autumn,winter light
+node .workbuddy-ai/harness/shot-island.mjs http://localhost:4173 .workbuddy-ai/shots/island-v12-night spring,summer,autumn,winter dark
 ```
+
+🔴 **跑之前先 `pkill -f chrome-headless-shell`**：被 `TaskStop` 杀掉的 node
+**不会**连带杀掉它 spawn 的 chrome。孤儿 chrome 里还开着页面 ⇒ R3F 渲染循环
+满速跑 ⇒ swiftshader 是**纯 CPU** ⇒ 新的那一轮被饿死（实测孤儿堆到 58 个进程，
+截图 4 分钟一张没落盘）。跑起来后 `pgrep -f chrome-headless-shell | wc -l`
+应该是 **~6**。
+
+⚠️ **别用 `| tail -N` 包这个命令**：输出会被缓冲到进程结束才吐，
+"没输出"和"卡住"在日志上长得一模一样。要盯进度就 `> file 2>&1` 再 `cat`。
 
 🔴 **`setPose` 必须吸附**（第 4 个参数默认 `true`）。`settleLerp` 的插值系数
 是**每帧固定**的，软件渲染下只有个位数 fps，从 yaw = 1.5π 转到 0 需要 ~70 帧，
