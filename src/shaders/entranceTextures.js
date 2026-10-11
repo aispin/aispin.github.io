@@ -79,7 +79,7 @@ void main() {
 }
 `;
 
-const NOISE_GLSL = /* glsl */ `
+export const NOISE_GLSL = /* glsl */ `
 float hash21(vec2 p) {
     p = fract(p * vec2(234.34, 435.345));
     p += dot(p, p + 34.23);
@@ -128,7 +128,7 @@ float fbm(vec2 p) {
 /* mirrors every 40-unit ground tile either.                             */
 /* ------------------------------------------------------------------ */
 
-const GRASS_GLSL = /* glsl */ `
+export const GRASS_GLSL = /* glsl */ `
 // ---- 季节调色板 ------------------------------------------------------
 // **只在这里声明一次。** GRASS_FRAG（草地）与 STONE_FRAG（甬路的草边）都
 // include 本段，所以两边的季节色板天生相同 —— 石路矩形边上不可能裂出接缝。

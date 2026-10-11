@@ -360,7 +360,7 @@ const shadow = ctx.createRadialGradient(0, 0, 14, 0, 0, 300);
 | 藤蔓（常春藤） | `entranceTextures.SEASON_INK_TINT` → `INK_OVERLAY_FRAG` 的 `uInkTint` | ✅ 见 §5.1e |
 | 花箱植物 | `entranceTextures.SEASON_PLANT` → `EntranceProps.WoodenPlanter` | ✅ 见 §5.1e |
 | 荷花缸内容物 | `entrance/LotusVat.jsx`（**条件挂载**四季内容物） | ✅ 见 §6.1 / §6.3 / §6.4 |
-| 竹篱爬藤 | `entranceArt.makeBambooFenceTexture(season)`（复用 `SEASON_PLANT`） | ✅ 见 §6.1 / §6.3 / §6.4 |
+| 竹篱爬藤 | `entranceArt.makeBambooFenceTexture(season, { vineOnly: true })`（复用 `SEASON_PLANT`） | ✅ 见 §6.1 / §6.3 / §6.4 |
 | 季生天象 | `entrance/WeatherLayer.jsx` + `WEATHER_FRAG` | ✅ 见 §6.1 / §6.3 / §6.4 |
 
 > ⚠️ **签名注意**：这里原本写的是 `makeWallInkTexture(w, h, season)`（按季重烘贴图）。
@@ -448,8 +448,12 @@ P1 的写法是 `useMemo(() => makeSurfaceUniforms(w, h, origin, season), [..., 
 
 配套 hook `hooks/useSeasonUniforms(factory, deps)`：对象身份永远不变、`season` 不进 deps，
 季节变化走 `useLayoutEffect` 就地改值（layout effect 是为了在浏览器下一次绘制前写完，
-不闪一帧旧色）。三个调用点：`EmptyCorridor`（草）、`GateBase`（台明/踏跺顶面）、
-`EntranceDoors`（甬路 + 幕墙）。
+不闪一帧旧色）。调用点：`IslandGround`（草 / 沙滩 / 海，v1.2 起取代了原来的
+`EmptyCorridor`）、`GateBase`（台明/踏跺顶面）、`EntranceDoors`（甬路 + 幕墙）、
+`CourtyardWalls`（四面院墙）、`CorridorShell`（廊屋外壳的墙；**屋面刻意用素色
+标准材质** —— `SONG_WALL_FRAG` 的黑瓦压顶按 vUv.y 铺，而屋面的 v 方向是坡度
+方向，套上去会把瓦当画在屋脊上，见 `CorridorShell.jsx` 的注释）、
+`BambooGrove`（竹林）、`BambooFence`（竹篱的竹竿；藤色走贴图）。
 
 > 另一个**看起来**可行的方案是在 `<shaderMaterial>` 上加 `key={season}` —— 换季重建
 > 材质，新材质拿到全新的 `materialProperties`，`uniformsList` 自然会重建。但 R3F 卸载时
@@ -619,13 +623,27 @@ uniform float uSnow;          // 0..1 积雪覆盖
 
 ### 6.3 竹篱（P3，可选）
 
-沿墙矮竹篱。**用程序化贴图 + alphaTest 平面**（与树、藤蔓同款做法），
-**不做实体几何** —— 1–2 mesh 就够。季节只改攀爬植物的配色。
+沿墙矮竹篱。季节只改攀爬植物的配色。
 
-**✅ 已实现（2026-10-10 · WO-3）** —— `components/canvas/entrance/BambooFence.jsx`
+**✅ 已实现（2026-10-10 · WO-3）· 改版（2026-10-11 · v1.2 WO-2）**
+—— `components/canvas/entrance/BambooFence.jsx`
 
-- **1 个 mesh**：26 根立竹 + 2 道横档 + 34 片叶全在 `makeBambooFenceTexture(season)` 里
-  （贴图缓存键**含季节**，种子不含 —— 同一道篱笆，四季是同几根竹子）。
+🔴 **改版原因**：原版是"程序化贴图 + alphaTest 平面，不做实体几何"。
+正面看没问题，但院子能**绕着看**之后，绕到侧面它就是字面意义上的一张纸
+（厚度为零），而且单面材质从背后直接被剔除、整片消失 —— 这是 v1.2
+「背面清单」（L1）点名的一个洞。**"不做实体几何"这条只对"只能从正面看"
+的摆件成立，竹篱不再属于这一类。**
+
+- **2 个 mesh**：
+  - **竹竿 + 横档** = 1 个 `InstancedMesh`，**28 个实例**（26 根立竹 + 2 道横档）。
+    横档 = 转 90° 的竹竿，所以共用一个圆柱；真正的差别只有两点 ——
+    横档**不摆**、竹节沿**长度**排（立竹沿高度排）。这两件事做成实例属性
+    `aBend` / `aNodes`，于是不必为横档再开一个 mesh + 一份材质。
+  - **藤 + 叶** = 仍是一张 alphaTest 平面，贴图走
+    `makeBambooFenceTexture(season, { vineOnly: true })`（只画藤）。
+    藤本来就是薄东西，一张纸对它是对的；叶色也仍然烘在贴图里。
+    ⚠️ `vineOnly` 只跳过**绘制**，`rand()` 序列照跑 —— 否则"只画藤"的
+    版本会变成另一根藤。贴图缓存键带 `-vine-`，两个变体不会互相顶掉。
 - 位置：门脸右侧沿墙，局部 `[3.175, OUTDOOR_Y, 0.24]`，宽 3.65 × 高 0.45。
   🔴 **z = 0.24 是算出来的**：必须 > 门脸砖面的 **0.15**（否则被墙吞掉），
   又 < 花箱前脸的 **0.65** ⇒ 与花箱 / 荷花缸重叠的那几段被不透明的容器挡住，
@@ -762,8 +780,9 @@ uniform float uSnow;          // 0..1 积雪覆盖
 
 > 配套：`useSeasonUniforms(factory, deps)` 的对象身份永远不变、`season` **不进 deps**，
 > 季节变化走 `useLayoutEffect` 就地改值（layout effect 是为了在浏览器下一次绘制前写完，
-> 不闪一帧旧色）。三个调用点：`EmptyCorridor`（草）、`GateBase`（台明/踏跺顶面）、
-> `EntranceDoors`（甬路 + 幕墙）。
+> 不闪一帧旧色）。调用点：`IslandGround`（草 / 沙滩 / 海，v1.2 起取代了原来的
+> `EmptyCorridor`）、`GateBase`（台明/踏跺顶面）、`EntranceDoors`（甬路 + 幕墙）、
+> `CourtyardWalls`（四面院墙）、`BambooGrove`（竹林）。
 
 **⚠️ 最阴的一点：读 `material.uniforms` 会读出"已经更新了"的假象** —— 那里是新对象、
 值是 winter；GPU 用的却是旧对象。所以这个 bug **只能靠对象身份指纹查**
@@ -1376,7 +1395,7 @@ if (/\.(js|css|woff2?|png|jpe?g|webp|svg|ico|json)$/i.test(url.pathname) || …)
 | `.workbuddy-ai/harness/shot-wo2-nest.mjs` | 燕子窝四季特写（投影定框 + clip 截图，**不动相机**） | ✅ P2 |
 | `src/components/canvas/entrance/StoneTable.jsx` | 石条桌 + 2 石凳（树下）；冬雪盖 / 秋落叶 + 2 柿 | ✅ P3 · WO-3 |
 | `src/components/canvas/entrance/LotusVat.jsx` | 荷花缸：车削陶缸 + 水面 + **条件挂载**的四季内容物 | ✅ P3 · WO-3 |
-| `src/components/canvas/entrance/BambooFence.jsx` | 竹篱：1 块 alphaTest 平面，竹子与爬藤全在贴图里 | ✅ P3 · WO-3 |
+| `src/components/canvas/entrance/BambooFence.jsx` | 竹篱：竹竿/横档走 1 个 InstancedMesh（28 实例），藤走 alphaTest 平面（`vineOnly` 贴图） | ✅ P3 · WO-3，v1.2 WO-2 改版 |
 | `src/components/canvas/entrance/WeatherLayer.jsx` | 季生天象：挂在相机前、**按视锥缩放**的雨/雪平面（单 pass；两层都为 0 时整层不挂载） | ✅ P3 · P5 |
 | `src/config/weather.js` | 天气规则表**唯一真源**：`weatherLevels(season, weather)` + WMO 分组（**纯函数，可单测**） | ✅ P5 |
 | `src/hooks/useWeather.js` | 天气外部资源：模块级 store + `useSyncExternalStore`；IP 定位 → Open-Meteo；sessionStorage 30 min | ✅ P5 |
@@ -1396,10 +1415,16 @@ if (/\.(js|css|woff2?|png|jpe?g|webp|svg|ico|json)$/i.test(url.pathname) || …)
 | `src/config/couplets.js` | `seasonOf` 从 `seasons.js` 引入（**删掉本地月份表**）；`resolveCoupletSet/dailyCoupletFor` 收季节**偏好** | ✅ |
 | `src/context/SitePreferences.jsx` | 新增 `season` / `setSeason`（偏好）+ `html[data-season]`；新增 `setTheme`。**2026-10-10：季节偏好不再落盘**（删掉 `localStorage['aispin-season']` 读写，刷新即重判） | ✅ P4 |
 | `src/components/canvas/SceneLighting.jsx` | 端点季节化（`endpointsFor` 带缓存）；**换季吸附**（`lastSeason` ref） | ✅ |
-| `src/components/canvas/Experience.jsx` | 挂 `CourtyardAmbience`（与 `EntranceDoors` 同一个 `!hasEntered` 分支） | ✅ P2 |
+| `src/components/canvas/Experience.jsx` | 挂 `CourtyardAmbience`（与 `EntranceDoors` 同一个 `!hasEntered` 分支）。**v1.2 加**：`IslandGround` / `CourtyardWalls` / `CorridorShell` / `BambooGrove` / `DebugFlyCamera`，并挂 `useOrbitCamera`（相机模式状态机见 `config/cameraMode.js`） | ✅ P2 / v1.2 |
 | `src/components/canvas/entrance/EntranceDoors.jsx` | 树与甬路传季节；幕墙压顶积雪；`CoupletWall` 跟偏好重算；**瓢虫冬季不挂** | ✅ |
 | `src/components/canvas/entrance/EntranceProps.jsx` | `WindowCurtain` 乘 `seasonGlowFor`；**换季吸附**；**`SwallowNest` 按季 2/2/1/0 只** | ✅ |
-| `src/components/canvas/entrance/EmptyCorridor.jsx` | 草地传季节 uniform（改走 `useSeasonUniforms`） | ✅ |
+| `src/components/canvas/entrance/IslandGround.jsx` | 草地/沙滩/海传季节 uniform（v1.2 取代 `EmptyCorridor`） | ✅ |
+| `src/components/canvas/entrance/CourtyardWalls.jsx` | **v1.2 新**：四面院墙（`SONG_WALL_FRAG`，`DoubleSide`，洞推到 9999、`uInkStrength=0`） | ✅ |
+| `src/components/canvas/entrance/CorridorShell.jsx` | **v1.2 新**：走廊外壳（青砖墙接季节；屋面素色，理由见 §`useSeasonUniforms` 调用点） | ✅ |
+| `src/components/canvas/entrance/BambooGrove.jsx` | **v1.2 新**：竹林（2 个 InstancedMesh，风摆在顶点着色器，`BAMBOO_SEASON` 常绿规则） | ✅ |
+| `src/shaders/islandTextures.js` | **v1.2 新**：岸距场（湿沙 / 浪 / 泡沫 / 草缘）+ 岛 / 竹的季节色板；导出 `NOISE_GLSL`/`GRASS_GLSL` 供复用 | ✅ |
+| `src/config/island.js` | **v1.2 新**：孤岛 + 院墙 + 廊屋 + 环绕相机 + 竹林的全部尺寸（派生，不重打） | ✅ |
+| `src/hooks/useOrbitCamera.js` · `src/config/cameraMode.js` | **v1.2 新**：受限轨道相机 + 「谁拥有相机」的状态机 | ✅ |
 | `src/components/canvas/entrance/GateBase.jsx` | 台明/踏跺顶面传季节（落雪；改走 `useSeasonUniforms`） | ✅ |
 | `src/components/canvas/entrance/SignSystem.jsx` | 灯笼乘 `seasonGlowFor`（每帧都写，不需要吸附） | ✅ |
 | `src/components/ui/SiteControls.jsx` | 第 3 个按钮：明暗 → **设置**（齿轮） | ✅ P4 |

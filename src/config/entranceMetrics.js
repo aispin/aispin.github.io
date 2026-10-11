@@ -66,7 +66,8 @@ export const BANNER_TOP_Y = BANNER_Y + BANNER_H / 2;
  * tall enough to be unmistakable at the resting entrance camera.
  *
  * ⚠️ Anything standing on the OUTDOOR ground has to move with this:
- * the lawn (EmptyCorridor's GROUND_DROP), the 甬路, the planter and the dog.
+ * the lawn (IslandGround / the old EmptyCorridor's GROUND_DROP), the 甬路,
+ * the planter and the dog.
  * Anything mounted on the wall (window, curtain, bug, tree, 匾) does not.
  */
 export const OUTDOOR_DROP = 0.30;

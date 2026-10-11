@@ -2566,8 +2566,19 @@ export function makeVatWaterTexture(season = 'summer') {
  */
 export const BAMBOO_FENCE_ASPECT = 3.65 / 0.45;
 
-export function makeBambooFenceTexture(season = 'summer') {
-    const key = `bamboo-fence-${season}`;
+/**
+ * @param {'spring'|'summer'|'autumn'|'winter'} season
+ * @param {{vineOnly?: boolean}} [opts]
+ *   `vineOnly: true` 只画**攀爬植物**（藤 + 叶），跳过横档和立竹。
+ *
+ *   ⚠️ 2026-10-11 起竹篱的**竹竿和横档是实体几何**（`BambooFence.jsx` 的
+ *   InstancedMesh）—— 一张 alphaTest 平面绕到侧面就成了一张纸。实体几何
+ *   拿不到 canvas 上的季节色，所以"叶色随季"这件事只能留在**藤**这一层，
+ *   而藤本来也真的是一张薄薄的东西。于是贴图只出藤，竹子由几何出。
+ *   缓存键必须带上这个开关，否则两个变体会互相顶掉。
+ */
+export function makeBambooFenceTexture(season = 'summer', { vineOnly = false } = {}) {
+    const key = vineOnly ? `bamboo-fence-vine-${season}` : `bamboo-fence-${season}`;
     if (cache.has(key)) return cache.get(key);
 
     const H = 128;
@@ -2582,9 +2593,12 @@ export function makeBambooFenceTexture(season = 'summer') {
     const BAMBOO_DARK = '#9C8A4E';
 
     // ---- 1. 两道横档 ---------------------------------------------------
+    // ⚠️ 即使 `vineOnly`，这两道 `rand()` 也**必须照跑**：下面的立竹和藤
+    //    共用同一条随机序列，跳过去会让"只画藤"的版本长成另一根藤。
     const rail = (yFrac) => {
         const h = H * 0.085;
         const y = H * yFrac - h / 2;
+        if (vineOnly) return;
         ctx.fillStyle = BAMBOO;
         ctx.fillRect(0, y, W, h);
         ctx.fillStyle = BAMBOO_DARK;
@@ -2601,13 +2615,14 @@ export function makeBambooFenceTexture(season = 'summer') {
         const w = step * (0.20 + rand() * 0.07);
         const top = H * (0.05 + rand() * 0.05);
         const bot = H * (0.94 + rand() * 0.06);
+        // 竹节（`rand()` 同上：无论画不画都要消耗）
+        const nodes = 3 + Math.floor(rand() * 2);
+        if (vineOnly) continue;
         ctx.fillStyle = BAMBOO;
         ctx.fillRect(x - w / 2, top, w, bot - top);
         // 背光侧
         ctx.fillStyle = BAMBOO_DARK;
         ctx.fillRect(x - w / 2 + w * 0.66, top, w * 0.34, bot - top);
-        // 竹节
-        const nodes = 3 + Math.floor(rand() * 2);
         for (let k = 1; k <= nodes; k++) {
             const y = top + ((bot - top) * k) / (nodes + 1);
             ctx.fillStyle = 'rgba(120,104,58,0.75)';

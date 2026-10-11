@@ -13,7 +13,7 @@ import {
     PIVOT_W, PIVOT_H, PIVOT_D, PIVOT_X,
     PLINTH_W, PLINTH_H, PLINTH_Z,
 } from '../../../config/entranceMetrics';
-import { sharedGeometry } from '../../../engine/resources';
+import { sharedGeometry, blankInk } from '../../../engine/resources';
 // 台明 / 踏跺的顶面用 STONE_FRAG，冬天会落一层薄雪（见 shader 里的 uSnow），
 // 所以这两块也要跟着季节走 —— 否则雪后的院子里只有门前那块石头是干的。
 import { useSeasonUniforms } from '../../../hooks/useSeasonUniforms';
@@ -188,21 +188,5 @@ const STONE_RISER = '#8C7F6E';
 /* 青石：冷调，比甬路的暖调石板明显偏灰蓝，这样"墙脚"和"路面"不会混成一片。 */
 const PIVOT_SIDE = '#6A706C';
 const PIVOT_TOP = '#8A9088';
-
-/**
- * 1x1 全透明贴图，喂给台基那套 SONG_WALL_FRAG 的 uInk。
- * sampler2D 不能传 null，而台基根本不需要水墨（uInkStrength = 0），
- * 为它生成一张 3.9 MB 的墙绘贴图是纯浪费。
- */
-let _blankInk = null;
-function blankInk() {
-    if (_blankInk) return _blankInk;
-    const c = document.createElement('canvas');
-    c.width = 1;
-    c.height = 1;
-    _blankInk = new THREE.CanvasTexture(c);
-    _blankInk.colorSpace = THREE.SRGBColorSpace;
-    return _blankInk;
-}
 
 export default GateBase;

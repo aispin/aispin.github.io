@@ -262,6 +262,33 @@ export function cutoutMaterial(texture, {
 }
 
 /* ------------------------------------------------------------------ */
+/* 占位贴图                                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 1×1 全透明贴图，喂给 SONG_WALL_FRAG 这类「必须有 uInk 但本文不需要水墨」
+ * 的材质。
+ *
+ * `sampler2D` 不能传 null（传 null 的话 three 会绑一个默认白纹理，采样结果
+ * 是 1，于是 uInkStrength 就算设成 0 也可能被别的分支吃进去）。而台基、
+ * 院墙这种根本没有藤蔓的面，为它生成一张 3.9 MB 的墙绘贴图是纯浪费。
+ *
+ * ⚠️ 放在 `resources.js` 而不是 `GateBase.jsx`：组件文件里 export 非组件
+ *    的东西会触发 `react-refresh/only-export-components`（GateBase 就是这么
+ *    炸的）。这里是纯工具模块，没有组件，随便 export。
+ */
+let _blankInk = null;
+export function blankInk() {
+    if (_blankInk) return _blankInk;
+    const c = document.createElement('canvas');
+    c.width = 1;
+    c.height = 1;
+    _blankInk = new THREE.CanvasTexture(c);
+    _blankInk.colorSpace = THREE.SRGBColorSpace;
+    return _blankInk;
+}
+
+/* ------------------------------------------------------------------ */
 /* 释放                                                                */
 /* ------------------------------------------------------------------ */
 

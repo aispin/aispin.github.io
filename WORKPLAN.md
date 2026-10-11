@@ -7,8 +7,7 @@
 > 过程记录、实测数据、踩坑结论一律进 `.workbuddy-ai/memory/`（入口 `MEMORY.md`）。
 >
 > **新一轮迭代开始时，WO 和 DR 都应该是空的。**
-> **已交付的东西不留在这里** —— 技术结论在 `docs/seasons.md`
-> （§9 = 经验与陷阱，§10 = 天气驱动的天象），过程在 git 历史。
+> **已交付的东西不留在这里** —— 技术结论在 `docs/`、过程在 git 历史。
 
 ## 规范
 
@@ -28,57 +27,123 @@
 
 ---
 
-# 📊 滚动快照（2026-10-10 23:1x）
+# 📊 滚动快照（2026-10-11 13:2x）
 
-主题：**四季院子**。需求原文：「院子目前只有白天、晚上两种场景，想拓展多春夏秋冬四个季节场景。」
-技术方案唯一真源 = `docs/seasons.md`（本表只放指针，不复制结论）。
+主题：**孤岛院子（v1.2）** —— 把固定的正面院子改成真能绕一圈看的 3D 场景。
+分支 **`feat/v1.2.0-island-courtyard`**（不是 `main`，不影响线上）。
 
-| WO | 内容 | 状态 |
-| --- | --- | --- |
-| — | **本轮 WO 已全部交付，白板清空** | ✅ |
+需求原文：「我们目前院子是固定的，如果想改成真的3D（可以环绕四周的）成本有多大？孤岛竹林沙滩院子」
++ 执行顺序：「先提交 → push → 拉大版本分支 → 做 L0/L1/L2/L3a/L3b/L3c，DR-B 按 B1+B2 先做。我睡觉了，我明天整体验收。」
 
-> **已交付的不在这里。** P1 / P2 / P3 / P4 / P5 与 WO-3 ~ WO-11
-> （四季光照+树草雪 / 声床 / 切换 UI / 环境音配平 / dev SW / 地面层级重划 /
-> 石板太白 / 甬路冻首季 / 季节不落盘 / 四季草地 / 藤蔓+花箱随季 /
-> **荷花缸 + 竹篱 + 雨雪天象 / 花箱冬天改枯黄 / 荷花缸外移 / 天象平面按视锥缩放 /
-> 天象改由真实天气预报驱动（§10）**）
-> 均已于 2026-10-09 ~ 10-10 交付 —— 见 `docs/seasons.md` §9 / §10 与 git 历史。
->
-> **DR-1 ~ DR-5 全部关闭**（DR-4 = 选项 B：藤蔓与花箱都要随季变，见 §5.1e）。
+**L0~L3c + DR-B 全部已落地并提交**（见下「本轮已交付」）。
+**验收材料**：`.workbuddy-ai/shots/island-v12/`（四季 × 5 机位 × 横竖屏，共 40 张）
++ `docs/backface-inventory.md`（L1 的取证清单）。
 
-## 🔔 不用等你拍板、但别忘的事
+## 本轮已交付（代码已提交，故不留在 WO 表里）
 
-1. **推送策略**：你 2026-10-10 定「做完一起推」。**四季院子 P1~P5 整轮已发布** ——
-   `main` = **`ff5d147`**，并已打注释 tag **`v1.1.0`**（指向 `ff5d147`）。之后仍按"做完再推"。
-   ⚠️ 按本项目规则 **推 `main` = 上线**：本次 `Deploy to GitHub Pages (gh-pages branch)`
-   与随后的 `pages build and deployment` **均 success**，线上 `https://aispin.github.io/` **HTTP 200**。
-2. **推送通道**：本机代理对 `github.com:443` 会**间歇性 502**（`api.github.com` 正常）。
-   遇到 `CONNECT tunnel failed, response 502` 就改走 SSH：
-   `git push git@github.com:aispin/aispin.github.io.git main`
-   （remote 仍保持 HTTPS，没改）。**判据永远是** `gh api repos/<slug>/commits/main --jq .sha`。
-3. **`docs/seasons.md` §13 剩余开放问题**（春夏树冠是否太"满"、冬秃枝是否保留风铃挂点、
-   天气的精度/城市语义、雨天"湿反光"）**不阻塞开工**，你哪次看定妆照时顺手定即可。
-4. **截图工具**：用 `harness/shot-table-crop.mjs` / `shot-apron-seasons.mjs` /
-   **`shot-wo3.mjs`**（四季 × props 近景 / wide 看天象）/
-   **`shot-weather.mjs`**（天象，**横竖两种视口** —— 屏幕空间的效果必须两种都拍）/
-   **`shot-weather-forecast.mjs`**（天气驱动天象：预置 `sessionStorage` 推到指定天气，
-   断言 store 快照 **+ 场景里 mesh 的 `uSnow/uRain`**；含预热页，别删）。
-   ⚠️ **别再用 `shot-at.mjs`** —— 它走 rAF 每帧写 `camera.position`，会被控制器盖掉，
-   而**读回 `camera.position` 还是对的**（静默拍错）。
-   ⚠️ 注入机位前**先量世界坐标**（`harness/probe-planter-pos.mjs` 按几何签名量）——
-   入口整体有 `+22` 的 `ENTRANCE_POSITION`，按 JSX 的局部 z 推会拍进走廊。
-5. **构建快照**（`dist-old-*` / `dist-ab-*` / `dist-prev-*`，都是 `mv dist …` 的产物）：
-   已按你的要求清空 —— 2026-10-10 删 24 个 ≈ 159 MB，本轮又清 3 个 ≈ 20 MB（23:1x）。
-   ⚠️ 它**会随每次构建重新累积**，**需要定期清**。删用 `shutil.rmtree`（`rm -rf` 被沙箱拦）。
+| 项 | 落地内容 |
+| --- | --- |
+| **L0** | `config/cameraMode.js`（相机模式状态机）+ `hooks/useOrbitCamera.js`（B1 受限轨道 + B2 边界） |
+| **L1** | `entrance/DebugFlyCamera.jsx`（`?fly` 自由飞行）+ **`docs/backface-inventory.md`**（42 个单面平面的逐个判定） |
+| **L2** | `entrance/IslandGround.jsx`（地面唯一主人）+ `CourtyardWalls.jsx`（四面院墙）+ `CorridorShell.jsx`（走廊外壳）+ `BambooFence.jsx` 改实例化 |
+| **L3a** | `entrance/BambooGrove.jsx`（2 个 InstancedMesh，风摆在 shader 里） |
+| **L3b / L3c** | `shaders/islandTextures.js`（岸距场：湿沙带 / 浪 / 泡沫 / 草缘 / 竹林掩码，全在一张平面上） |
+| **DR-B** | 按 **B1 + B2** 落地（B3 自由飞行做成 `?fly` 后门） |
 
 ---
 
 # 📋 待办 WO
 
-**本轮没有待办 WO。** 下一个 WO 由你的下一条需求拆出。
+### WO-1 · 环绕手感验收（B1/B2 的参数）
+
+- **现状**：半径 15~26、仰角 1°~50°、拖拽 0.0045 rad/px、滚轮 6%/格、`settleLerp` 0.18/帧
+  —— 全是拍脑袋的初值，都在 `config/island.js` 里，改一个数就行。
+- **验收**：正面接手不跳（r=15 时相机到门楼 ≈7，和入场结束的 5.85 基本一致）；
+  转到侧面院子里不露馅；上限 26 时院子没被雾吃掉（冬夜 fogFar 只有 36）。
+- **已知**：`settleLerp` 的插值系数是**每帧固定**的（不是 dt 补偿）。低帧率机器上
+  拖拽会显得"黏"。要改的话是**全站**的事（走廊滚动也用它），所以先问你。
+
+### WO-2 · 竹林密度 / 环带是否挡住院子
+
+- **现状**：420 根（低画质 160），环带 r 16~25，竹高 4.2~7.6（院墙顶 1.85，竹梢会探出墙头）。
+- **风险**：从正/背面看竹林在相机身后，画面干净；**从侧面看竹林正好横在相机和院子中间**。
+- **验收**：四个角度 × 四季的定妆照上，院子主体没有被竹子糊住。
+
+### WO-3 · 背面清单的收尾（详见 `docs/backface-inventory.md` §5）
+
+- **WO-B1**：入口的**透明 billboard**（6×8 大树 / 灯笼 / 花丛）从背后消失。
+  🔴 **不能顺手开 `DoubleSide`** —— 透明材质双面会在同深度混两次，**前视图**
+  的树冠会变浓。文档里写了建议修法和必须先实测的两个前提。
+- **WO-B2**：仰角 50° + 半径 15 时相机越过后罩墙俯瞰，**门扇 / 门框 / 门墩**
+  （不透明单面）从背后消失。这几个是不透明材质，直接 `DoubleSide` 是安全的。
+- **WO-B3**：见下面 DR-E。
+
+### WO-4 · 四季 × 昼夜 × 横竖屏截图全套
+
+- 工具：`.workbuddy-ai/harness/shot-island.mjs`（走 `window.__orbit.setPose()`，
+  **必须吸附** —— 见 `docs/backface-inventory.md` §6）。
+- ⚠️ **横竖两种视口都要拍**。
+- 本轮已拍四季 × 5 机位 × 2 视口 = 40 张，**但只拍了白天**。昼夜 × 四季 = 8 组合
+  还没拍（需要按 `seasonLight` 的端点切夜）。
 
 ---
 
 # 🙋 待你拍板的 DR
 
-**本轮没有待决事项。** DR-1 ~ DR-5 均已答复并落地（见 git 历史与 `docs/seasons.md`）。
+### DR-A · 要不要拉远雾 + 加天空盒？（**想要"海平线"就必须答"要"**）
+
+- **现状**：`config/seasonLight.js` 的 fogFar 只有 **36（冬夜）~66（春）**。
+  雾就是世界边界 —— 正因为雾这么近，岛才做到 r=26 就够，**省掉了一整个天空盒 + 远景 LOD**。
+- **要**：能看到远处海平线、"孤岛"的孤立感成立。代价：`seasonLight.js:57` 写着
+  「季节的空气感一半靠雾」，拉远雾 = **8 个状态（4 季 × 昼夜）全量视觉回归**。
+- **不要**：保持现状 —— 岛边缘化进雾里，"岛"是靠岸线和竹林读出来的，不是靠看见边界。
+
+### DR-C · 远处竹林要不要做 impostor？
+
+- **现状**：420 根竹子全程真几何（2 个 InstancedMesh）。
+- **做**：省 draw call / 顶点。代价：tidewater 的 `LODFade.js:21-50` 用 Bayer 4×4 抖动做
+  交叉淡入淡出，**那个方案依赖 TAA 才能不闪** —— 我们**没有 TAA**，照抄会闪。
+  要上就得改用静态抖动图案或纯距离剔除。
+- **不做**：维持现状（先量一帧的实际开销再决定，`mesh-curve.mjs` 平台期判据）。
+
+### DR-D · 入场画面里，门楼两侧多了院墙（**这条是"我已按判断落地，请你复核"**）
+
+- **现状**：`CourtyardWalls` 在门楼 facade 两侧各补了一片院墙（宽 (22−10)/2 = 6），
+  门楼从此是"墙中间开的一个门"。**这是入口定妆画面的实质改动** —— 原来那个画面里
+  门楼两侧是空的（直接看得到草坪和走廊外壳）。
+- 你说"出现任何卡点，你先按你认为最佳的方案执行"，所以我**已经做了**：
+  建筑关系对（宅门本来就该在院墙上），绕一圈时正面不穿帮。
+- **要复核的是**：你喜不喜欢"门楼嵌在院墙里"这个构图。
+  不要的话，把 `CourtyardWalls` 的两片前墙删掉即可（院墙的其余三面不受影响）。
+
+### DR-E · 廊屋外壳拉到多长？
+
+- **现状**：外壳从后罩墙（z = 4.15）拉到 `z = −14`（`config/island.js` 的 `HALL_BACK_Z`），
+  再往 −z 的走廊段**靠雾收掉**。
+- **问题**：春雾 far = 66，理论上 z < −47 才完全入雾 —— 也就是说**春天侧看时，
+  外壳尽头之后那一小段走廊还隐约可见**（侧机位下它是 42 单位外的暗带）。
+- **要**：把外壳拉长到 z ≈ −48。代价：那时它在岛外（沙滩 r=26 之外）**立在水里**，
+  读成"一条架在水上的游廊" —— 未必难看，但那是新的构图决定。
+- **不要**：维持 −14，接受春天侧看有一小段淡淡的走廊暗带（冬夜完全看不见）。
+
+---
+
+## 🔔 不用等你拍板、但别忘的事
+
+1. **分支纪律**：本轮在 `feat/v1.2.0-island-courtyard`，**不推 `main`**
+   （本项目规则：推 `main` = 上线）。验收通过后再合。
+2. **推送通道**：本机代理对 `github.com:443` **间歇性 502**（`api.github.com` 正常）。
+   遇到 `CONNECT tunnel failed, response 502` 就改走 SSH：
+   `git push git@github.com:aispin/aispin.github.io.git <branch>`
+   （remote 仍保持 HTTPS）。**判据永远是** `gh api repos/<slug>/commits/<branch> --jq .sha`。
+3. **构建前必须挪走 `dist`**：vite 的 `prepareOutDir` 会被沙箱的安全删除拦下
+   （`SAFE_DELETE_BULK_CONFIRM_REQUIRED`）。先 `mv dist .workbuddy-ai/dist-prev-$(date +%s)`。
+   ⚠️ 这些快照会**随每次构建重新累积**，需要定期清；删用 `shutil.rmtree`（`rm -rf` 被沙箱拦）。
+4. **Bash 里的 `grep`/`rg` 会静默返回空** —— 一律用 Grep 工具或 Python。
+5. **lint 质量门**：`env -u NODE_OPTIONS npm run lint` → **0 error / 33 warning**（当前状态）。
+6. **preview 是 4173**（`npm run preview`，只听 `[::1]`，curl 要加 `--noproxy '*'`）。
+   ⚠️ dev server 端口**不固定**（本轮见过 5173 / 5174 / 5199），别写死。
+7. **新地面只有一个主人**：`IslandGround` 已取代 `EmptyCorridor`（后者已删）。
+   再挂第二块共面的地面会 z-fight —— 项目为这个付过学费（"走廊地板会闪绿"）。
+8. **给走廊/院子加东西之前先读 `docs/backface-inventory.md`**：那是一张"从背后
+   看会怎样"的账，不读就会重复踩同一类坑。

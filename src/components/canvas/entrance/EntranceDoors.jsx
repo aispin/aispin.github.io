@@ -1014,6 +1014,32 @@ const EntranceDoors = ({
                 />
             </mesh>
 
+            {/* === FACADE, INNER FACE (v1.2 · L1「背面清单」) ===
+                门脸原来只有朝外的一面（FrontSide，`transparent`）。院子能绕着看
+                之后，**从院子里面（−z 方向）看过去整片消失** —— 那面 10×6 的青砖
+                不见了，只剩门框和门扇，人从门洞直接看到走廊。
+
+                补一层**朝内**的同一面墙。做法说明：
+                · 用 `side={THREE.BackSide}` 而**不是**把几何绕 Y 转 180°：
+                  转过去 vUv 会左右镜像，砖缝/瓦当会跟正面错开；BackSide 的
+                  顶点属性一字不动，两面的砖缝严丝合缝。
+                · z 退 0.02（0.13）：与正面共面会 z-fight。
+                · 复用同一份 `brickUniforms`（含 uHoleDoor ⇒ 门洞照旧是通的）。
+                  两个材质共享同一个 uniform 对象，换季时 `.value` 一改两边都跟，
+                  不会出现"里面冻在上一季"。
+                · `transparent` 跟正面保持一致：门洞边缘是 0.06 单位的软过渡，
+                  写死不透明会变成一圈硬边。 */}
+            <mesh position={[0, facadeCenterY, 0.13]}>
+                <primitive object={sharedGeometry('plane', FACADE_W, FACADE_H)} attach="geometry" />
+                <shaderMaterial
+                    vertexShader={SURFACE_VERT}
+                    fragmentShader={SONG_WALL_FRAG}
+                    uniforms={brickUniforms}
+                    transparent={true}
+                    side={THREE.BackSide}
+                />
+            </mesh>
+
             {/* === CREEPER INK (its own layer, in front of the 春联) ===
                 Same quad as the facade, 0.03 in front of it, so the vine draws
                 over anything mounted flat on the wall — which is the whole
