@@ -110,6 +110,16 @@ const DOOR_LOOK_ANGLE = Math.PI * 0.334;
 // Higher value = further from door center horizontally
 const DOOR_ALIGN_X = 1.2;
 
+/**
+ * 门扇"迎向你"的距离区间：15 单位开始转，3 单位转到最大。
+ *
+ * 🔴 提到模块作用域（原来在组件体里）是因为 `handleClick` 现在要用它 ——
+ * 写在组件体里的 `const` 是**每次渲染的新值**，`useCallback` 的 deps 会
+ * 被 eslint 判为缺依赖。纯数字常量，本来也不该放在组件里。
+ */
+const TILT_START = 15;    // Start tilting when camera is 15 units away
+const TILT_PEAK = 3;      // Max tilt at 3 units
+
 // Room doors are procedural now (utils/doorArt.js). The per-room door bitmaps
 // (`drzwi*_painted.webp`) and their baked-in icon notes are gone; every door
 // shares the same code-drawn leaf plus the three taped notes below.
@@ -134,6 +144,15 @@ const DoorSection = ({
     segmentIndex,
     segmentLength = 80 // Passed down so this door can work out where the camera is
 }) => {
+    /**
+     * 这扇门的世界 z。
+     *
+     * ⚠️ 抽成**原始值**再用：`position` 是父组件内联的 `[door.x, 0, ...]`，
+     * 每次渲染都是新数组 —— 直接把它放进 `useCallback` 的 deps 就等于让
+     * 那个回调每帧重建（本项目为"内联数组进 deps"付过学费）。
+     */
+    const doorZ = position[2];
+
     const groupRef = useRef(); // Main group that tilts
     const doorRef = useRef();
     const handleRef = useRef();
@@ -304,8 +323,6 @@ const DoorSection = ({
     const BASE_ROTATION = Math.PI / 2; // 90 degrees - side wall orientation
     const BASE_TILT = 0.02;   // ~1 degree additional tilt towards camera
     const MAX_TILT = BASE_WALL_ANGLE + 0.1; // Sawtooth angle + extra (~27 degrees total tilt)
-    const TILT_START = 15;    // Start tilting when camera is 15 units away
-    const TILT_PEAK = 3;      // Max tilt at 3 units
 
     // Pivot offset - the group pivots from the OUTER edge
     const pivotX = side === 'left' ? -WALL_X_OUTER : WALL_X_OUTER;
@@ -404,7 +421,7 @@ const DoorSection = ({
             targetTilt = MAX_TILT;
         } else {
             // Normal proximity-based tilting
-            const distance = Math.abs(camera.position.z - position[2]);
+            const distance = Math.abs(camera.position.z - doorZ);
             isNearRef.current = distance < 8;
 
             if (distance < TILT_START && distance > TILT_PEAK) {
@@ -637,6 +654,27 @@ const DoorSection = ({
         // e might be null or synthetic from teleport
         e?.stopPropagation?.();
         const isTeleport = e?.isTeleport || false;
+
+        /**
+         * 🔴 只能点**你站在跟前**的那扇门（2026-10-11，WO-6）。
+         *
+         * R3F 的事件系统**不认遮挡、也不认 `visible`**：它把 `internal.interaction`
+         * 里每一个带 handler 的对象单独丢给 `raycaster.intersectObject()`，然后
+         * 按距离依次派发 —— 中间那堵**没有 handler 的墙根本不在列表里**，所以它
+         * 挡不住任何东西。判据在 three 源码：`Raycaster.intersectObject` 只查
+         * `object.layers`，`projectObject` 才查 `visible`。
+         *
+         * 后果：站在院子里（相机 z ≈ 28，门在 z ≈ 6）点一下屋子的前墙，
+         * 只要射线在几何上碰到了某扇门的隐形热区，就会当场传送进那个房间。
+         * 以前这条路径被"门被墙挡住、看不出来"掩盖着，但 WO-6 之后走廊在
+         * 外面是**不可见**的 —— 一个看不见却能点的门，比一个看得见的热区糟得多。
+         *
+         * 15 单位就是门扇开始"迎向你"的那个距离（`TILT_START`）：门没转向你，
+         * 就说明你不在它的交互范围里，点击不该生效。传送路径（`isTeleport`）
+         * 由 `pendingDoorClick` 在相机**已经被放到门前**之后触发，不受影响。
+         */
+        if (!isTeleport && Math.abs(camera.position.z - doorZ) > TILT_START) return;
+
         if (isAnimating) {
             // A real click landing mid-animation was silently swallowed, which
             // reads as a dead door. Only speak up for genuine user input — the
@@ -684,7 +722,7 @@ const DoorSection = ({
             savedCameraState.current = {
                 x: 0,
                 y: 0.2, // Correct height matching useInfiniteCamera
-                z: position[2] + 4, // 4 meters back from the door Z
+                z: doorZ + 4, // 4 meters back from the door Z
                 rotationX: 0,
                 rotationY: corridorGlanceY, // Natural corridor glance, not intense door stare
                 rotationZ: 0
@@ -792,7 +830,7 @@ const DoorSection = ({
                 }, 8000);
             }
         });
-    }, [camera, side, isOpen, isAnimating, setCameraOverride, isFastTeleport]);
+    }, [camera, side, doorZ, isOpen, isAnimating, setCameraOverride, isFastTeleport]);
 
     // Listen for pending door click (auto-click after teleport)
     useEffect(() => {

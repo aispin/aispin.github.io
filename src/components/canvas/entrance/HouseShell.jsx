@@ -5,7 +5,7 @@ import { sharedGeometry, blankInk } from '../../../engine/resources';
 import { useSeasonUniforms } from '../../../hooks/useSeasonUniforms';
 import { SURFACE_VERT, SONG_WALL_FRAG, makeSurfaceUniforms } from '../../../shaders/entranceTextures';
 import * as I from '../../../config/island';
-import { GRASS_Y, FLOOR_Y } from '../../../config/entranceMetrics';
+import { GRASS_Y, GATE_HOLE, WINDOW_HOLE } from '../../../config/entranceMetrics';
 
 /**
  * HouseShell — 屋身（"老房子"本体）。
@@ -24,11 +24,19 @@ import { GRASS_Y, FLOOR_Y } from '../../../config/entranceMetrics';
  *
  * 🔴 形制（照用户给的参考图，`参考屋形即可`）
  * -------------------------------------------
- * **双坡顶，屋脊与院子边界平行（沿 x）**，两坡分别朝院子（+z）和背院（−z）；
- * 檐口向院子出挑、压在院子上方，檐下露椽头（椽头是参考图里最认得出的细节）。
+ * **双坡顶，屋脊与屋身正面平行（沿 x）**，两坡分别朝前院（+z）和背院（−z）；
+ * 檐口向前院出挑、压在小院上方，檐下露椽头（椽头是参考图里最认得出的细节）。
  *
- * 为什么脊要沿 x 而不是沿走廊（z）：参考图的屋脊与「屋身 / 院子」那条分界线
- * **平行**，也就是屋面朝院子排水。沿 z 的话屋脊垂直于院子，山墙会正对门楼。
+ * 🔴 前墙 = 那座门楼（2026-10-11 用户定案「房子前门和门楼合二为一」）
+ * -------------------------------------------------------------------
+ * 门楼不再是一座独立的小楼。屋身的**前墙**就是那面开着大门、挂着对联的
+ * 青砖墙 —— 门洞（`GATE_HOLE`）和窗洞（`WINDOW_HOLE`）都开在这里，
+ * 门扇 / 门框 / 匾额 / 对联 / 柿子树由 `EntranceDoors` 挂在同一平面上。
+ * 于是"正面看到的那堵墙"和"从屋里看到的那堵墙"是**同一个几何**，不再有
+ * 两面共面的砖墙互相 z-fight（旧版的门脸 10×6 就压在院墙后罩墙前面）。
+ *
+ * 为什么脊要沿 x 而不是沿走廊（z）：参考图的屋脊与正面那条线**平行**，
+ * 也就是屋面朝前院排水。沿 z 的话屋脊垂直于正面，山墙会正对大门。
  *
  * 🔴 檐口高度 = **墙头**的高度，不是屋面外沿的高度
  * ------------------------------------------------
@@ -62,7 +70,7 @@ import { GRASS_Y, FLOOR_Y } from '../../../config/entranceMetrics';
 /* ---- 墙 ------------------------------------------------------------- */
 
 /** 墙高：从草地（GRASS_Y）到墙头（檐口）。 */
-const WALL_H = I.HOUSE_EAVE_Y - GRASS_Y;
+const WALL_H = I.HOUSE_WALL_H;
 const WALL_CENTER_Y = GRASS_Y + WALL_H / 2;
 /** 屋身中心 z。 */
 const HOUSE_CENTER_Z = (I.INTERIOR_FRONT_Z + I.HOUSE_BACK_Z) / 2;
@@ -81,21 +89,24 @@ const ROOF_WIDTH = I.HOUSE_HALF_W * 2;
 const ROOF_FRONT_CENTER_Z = (HOUSE_CENTER_Z + I.INTERIOR_FRONT_Z + I.HOUSE_OVERHANG) / 2;
 const ROOF_BACK_CENTER_Z = (HOUSE_CENTER_Z + I.HOUSE_BACK_Z - I.HOUSE_OVERHANG) / 2;
 
-/* ---- 门洞 ----------------------------------------------------------- */
+/* ---- 前墙上的两个洞（大门 + 窗）------------------------------------ */
 
 /**
- * 门洞 = 走廊的横截面（半宽 3.5 / 净高 3.5）。
+ * 🔴 前墙的洞 = **大门**，不是走廊的横截面。
  *
- * 高度取 **3.5（走廊净高）**是有意的：墙头比走廊顶高 0.4，而
- * `COURT_WALL_CAP_FRAC = 0.905` 的压顶正好从墙顶往下 9.5% 处开始
- * （0.4 / 4.28 ≈ 9.3%）—— 于是**黑瓦压顶的下沿正好落在门洞上沿**，
- * 门洞不会把压顶切开。
+ * 门楼合进屋身之后，这面墙同时是「屋身的前墙」和「那座门楼」—— 所以它开的
+ * 是大门的洞（1.8 × 2.55，见 `entranceMetrics` 的 `GATE_HOLE`），门后那条
+ * 7 × 3.5 的走廊被它切出一个切片。从前门往里看是"门里透出的一段廊"，而不是
+ * 一个 7 宽的方口。
+ *
+ * 洞的四周由门框压住（门框在墙前 0.12，从内洞口往外不透明），所以既不会
+ * 在门边露出砖，也不会从门框外看见走廊。余量 0.02 的来历见
+ * `entranceMetrics` 的 `GATE_HOLE` 注释。
+ *
+ * ⚠️ 这两条是**模块级常量**：内联数组每次渲染换引用（本项目为这个付过学费）。
  */
-const DOOR_HALF_W = 3.8;
-const DOOR_H = 3.5;
-const DOOR_CENTER_Y = FLOOR_Y + DOOR_H / 2;
-/** ⚠️ 模块级常量：内联数组会每次渲染换引用（本项目为这个付过学费）。 */
-const DOOR_HOLE = [0, DOOR_CENTER_Y, DOOR_HALF_W, DOOR_H / 2];
+const FRONT_DOOR_HOLE = GATE_HOLE;
+const FRONT_WINDOW_HOLE = WINDOW_HOLE;
 const NO_HOLE = [0, 9999, 0, 0];
 
 /* ---- 椽头 ----------------------------------------------------------- */
@@ -112,22 +123,25 @@ const RAFTER_D = 0.34;
  * `capFrac > 1` = 这面墙没有黑瓦压顶（墙顶直接接屋面，再压一道瓦会变成
  * "墙头又长出一条屋脊"）。
  */
-function wallUniformsFactory(width, height, originX, originY, capFrac, hole) {
+function wallUniformsFactory(width, height, originX, originY, capFrac, doorHole, windowHole) {
     return (season) => ({
         ...makeSurfaceUniforms(width, height, [originX, originY], season),
-        uHoleDoor: { value: hole },
-        uHoleWindow: { value: NO_HOLE },
+        uHoleDoor: { value: doorHole },
+        uHoleWindow: { value: windowHole },
         uInk: { value: blankInk() },
         uInkStrength: { value: 0 },
         uCapFrac: { value: capFrac },
     });
 }
 
-/** 一面矩形墙。侧墙 / 前后墙只差宽、朝向和压顶，所以共用一个组件。 */
-function ShellWall({ width, height, position, rotationY, originX, originY, capFrac, hole = NO_HOLE }) {
+/** 一面矩形墙。侧墙 / 前后墙只差宽、朝向、压顶和洞，所以共用一个组件。 */
+function ShellWall({
+    width, height, position, rotationY, originX, originY, capFrac,
+    doorHole = NO_HOLE, windowHole = NO_HOLE,
+}) {
     const uniforms = useSeasonUniforms(
-        wallUniformsFactory(width, height, originX, originY, capFrac, hole),
-        [width, height, originX, originY, capFrac]
+        wallUniformsFactory(width, height, originX, originY, capFrac, doorHole, windowHole),
+        [width, height, originX, originY, capFrac, doorHole, windowHole]
     );
     return (
         <mesh position={position} rotation={[0, rotationY, 0]}>
@@ -170,7 +184,7 @@ function GableWall({ side }) {
     // 两侧给不同的 uOrigin.x，砖缝噪声才不会左右一模一样（那会立刻被看成复制粘贴）。
     const originX = side > 0 ? 0 : 50;
     const uniforms = useSeasonUniforms(
-        wallUniformsFactory(1, 1, originX, GRASS_Y, 1.5, NO_HOLE),
+        wallUniformsFactory(1, 1, originX, GRASS_Y, 1.5, NO_HOLE, NO_HOLE),
         [originX]
     );
 
@@ -296,8 +310,13 @@ function RafterEnds() {
 
 export function HouseShell() {
     return (
-        <group>
-            {/* 前墙（= 院子的后罩墙），中间开走廊的门洞 */}
+        // `name` 是给 harness 用的（与 `InfiniteCorridorManager` 的
+        // `infinite-corridor` 同一套）：封口② 的验收要同时断言"走廊不可见"
+        // **且**"屋身还在"—— 只查前者的话，把整个场景卸载掉也能通过。
+        <group name="house-shell">
+            {/* 前墙 —— 它**就是**那座门楼：大门 + 窗都开在这面墙上。
+                ⚠️ 这里只开洞，门扇 / 门框 / 对联 / 匾额由 `EntranceDoors`
+                   挂在同一个平面上（它的局部 z = 0.06…0.18 都在这面墙之前）。 */}
             <ShellWall
                 width={I.HOUSE_HALF_W * 2}
                 height={WALL_H}
@@ -305,8 +324,9 @@ export function HouseShell() {
                 rotationY={0}
                 originX={-I.HOUSE_HALF_W}
                 originY={GRASS_Y}
-                capFrac={I.COURT_WALL_CAP_FRAC}
-                hole={DOOR_HOLE}
+                capFrac={I.HOUSE_WALL_CAP_FRAC}
+                doorHole={FRONT_DOOR_HOLE}
+                windowHole={FRONT_WINDOW_HOLE}
             />
 
             {/* 后端封口。远在雾里，但少了它从 50° 俯角能看到屋身内部。 */}

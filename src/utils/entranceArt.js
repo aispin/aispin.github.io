@@ -1554,6 +1554,17 @@ export function makeTreeTexture(season = 'autumn') {
  * would have scaled the vine along with it. Shrinking the facade from
  * 16 x 8 to 10 x 6 also takes this texture from 8.4 MB to 3.9 MB.
  */
+
+/**
+ * 藤蔓**锚点**在画布上的高度比例（从底边算起）。0.92 ⇒ 上面 8% 是空的，
+ * 藤是从那里"从瓦后面钻出来"的。
+ *
+ * ⚠️ 导出给 `EntranceDoors` 用：门脸没了之后，那块 overlay 的竖向位置必须
+ * 由"压顶下沿"反推（`INK_CENTER_Y = 压顶线 − INK_H × INK_TOP_FRAC + INK_H / 2`），
+ * 否则藤会挂在屋面以上、浮在屋顶外面。两边必须用**同一个**数。
+ */
+export const INK_TOP_FRAC = 0.92;
+
 export function makeWallInkTexture(worldW = 16, worldH = 8) {
     const key = `entrance:wall-ink:${worldW}x${worldH}`;
     if (cache.has(key)) return cache.get(key);
@@ -1622,7 +1633,11 @@ export function makeWallInkTexture(worldW = 16, worldH = 8) {
     // Where the mass sits. Everything above this is dissolved into the tile
     // coping by the fade at the end of this function, so the creeper appears
     // to come from behind the 黑瓦 rather than being pasted on at y = 0.
-    const TOP = worldH * 0.92;
+    //
+    // ⚠️ 这个比例被导出（`INK_TOP_FRAC`）—— 门脸没了之后，藤蔓 overlay 得
+    //    自己算出"该挂在哪一行"，好让 TOP 正好落在屋身前墙的压顶下沿上。
+    //    见 `EntranceDoors` 的 `INK_CENTER_Y`。
+    const TOP = worldH * INK_TOP_FRAC;
 
     // Runners. `x` is a fraction of the half-width (so the planting re-spaces
     // itself when the facade changes size instead of sliding off the edge),

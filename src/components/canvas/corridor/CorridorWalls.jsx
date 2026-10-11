@@ -20,10 +20,29 @@ const WALL_X_INNER = 1.7;
  * 
  * Renders the floor, ceiling, and the Sawtooth Walls.
  * 
+ * 🔴 `zClip` 已于 2026-10-11 删除（WO-6）—— 它是一个**陷阱**，不要再加回来。
+ * ---------------------------------------------------------------------------
+ * 它叫 "clip"，做的却是**几何截断**：
+ *
+ *     effectiveStart  = Math.min(zStart, zClip)
+ *     effectiveLength = effectiveStart - (zStart - length)
+ *     if (effectiveLength <= 0) return null;
+ *
+ * 段 −1 的 `zStart` 是 102.15（= 22.15 + 80），一旦有人传
+ * `zClip = CORRIDOR_FRONT_Z`（22.15，一个看起来完全合理的值），
+ * `effectiveLength` 就变成 **0 / 负数** ⇒ 这个组件**整段 `return null`**：
+ * 墙 / 地板 / 天花板全没了，而 `DoorSection` / `CorridorDecorations` /
+ * `SegmentDoors` / 英雄机位**都不认 zClip**，照样渲染 ⇒ 画面上只剩
+ * 「一堆门 / 画 / 花盆 / 通风口飘在雾色里」。用户 2026-10-11 报的
+ * 「进入房间后，往后退进入循环时，墙壁丢失了」就是这一条。
+ *
+ * 现在**不需要**任何裁剪：走廊的段相位钉在 `INTERIOR_FRONT_Z`（屋身前墙）上，
+ * 而 `InfiniteCorridorManager` 把段号 < 0 的段**整段**从渲染列表里摘掉 ——
+ * 截断是那个 filter 的职责，而且是整段粒度，不会出现"墙没了、门还在"。
+ *
  * @param {Array} doorPositions - Array of door objects with { relativeZ, side, ... }
- * @param {number} zClip - Optional Z value to clip geometry (hide anything with Z > zClip)
  */
-const CorridorWalls = ({ zStart = 10, length = 80, doorPositions = [], zClip = 100000 }) => {
+const CorridorWalls = ({ zStart = 10, length = 80, doorPositions = [] }) => {
     const corridorHeight = 3.5;
     const CORRIDOR_WIDTH = 7;
 
@@ -49,11 +68,11 @@ const CorridorWalls = ({ zStart = 10, length = 80, doorPositions = [], zClip = 1
     );
     const baseboardTexture = useMemo(() => trimTexture('corridor-baseboard'), []);
 
-    // Calculate effective geometry based on clipping
-    // We only render from Math.min(zStart, zClip) down to (zStart - length)
-    const effectiveStart = Math.min(zStart, zClip);
-    const effectiveLength = effectiveStart - (zStart - length);
-    const effectiveEndZ = effectiveStart - effectiveLength;
+    // 这一段的两个端点。段从 `zStart`（前沿，靠院子那一侧）往 −z 铺 `length`。
+    // ⚠️ 这里**没有** `effectiveStart` / `effectiveLength` 了 —— 那两个名字
+    //    是 `zClip` 时代的产物（见组件顶部的说明）。zClip 删掉之后它们恒等于
+    //    `zStart` / `length`，所以直接用，别再引入一层"看起来像被裁过"的别名。
+    const effectiveEndZ = zStart - length;
 
     // ---- FLOOR ----------------------------------------------------------
     // ONE plane per segment instead of a run of 10-unit tiles. The plank
@@ -70,13 +89,13 @@ const CorridorWalls = ({ zStart = 10, length = 80, doorPositions = [], zClip = 1
     // 想改回方砖只要把这个 `paving: true` 加回来。
     const floorMaterial = useMemo(() => makeFloorMaterial(), []);
     const floorGeometry = useMemo(() => {
-        const geo = new THREE.PlaneGeometry(effectiveLength, CORRIDOR_WIDTH);
+        const geo = new THREE.PlaneGeometry(length, CORRIDOR_WIDTH);
         // Mesh rotation is [-PI/2, 0, -PI/2]: local Y -> world X, local X -> world Z.
-        return bakeWorldUVs(geo, effectiveLength, CORRIDOR_WIDTH, (lx, ly) => [
+        return bakeWorldUVs(geo, length, CORRIDOR_WIDTH, (lx, ly) => [
             ly,                       // world X (across the corridor)
             effectiveEndZ + lx        // world Z (along the corridor)
         ]);
-    }, [effectiveLength, effectiveEndZ]);
+    }, [length, effectiveEndZ]);
 
     // =============================================
     // REGULACJA PRZYCIĘCIA LISTWY PRZY DRZWIACH
@@ -95,8 +114,8 @@ const CorridorWalls = ({ zStart = 10, length = 80, doorPositions = [], zClip = 1
 
         // We build the wall from Start (High Z) to End (Low Z).
         // Current 'cursor' for Z
-        let currentZ = effectiveStart;
-        const endZ = effectiveStart - effectiveLength;
+        let currentZ = zStart;
+        const endZ = zStart - length;
 
         // Sort doors by relativeZ descending (closest to start first) if needed
         // relativeZ is negative (-18, -32...). -18 > -32.
@@ -221,7 +240,7 @@ const CorridorWalls = ({ zStart = 10, length = 80, doorPositions = [], zClip = 1
                 width: segLength,
                 isLeft,
                 // Ten segment zaczyna się zaraz po drzwiach (od strony wyższego Z)
-                trimHighZ: currentZ !== effectiveStart
+                trimHighZ: currentZ !== zStart
             });
         }
 
@@ -261,15 +280,21 @@ const CorridorWalls = ({ zStart = 10, length = 80, doorPositions = [], zClip = 1
         // generateWallSegments() reads exactly these; it is recreated each
         // render, so it cannot itself be a dependency.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [effectiveStart, effectiveLength, zStart, doorPositions]
+        [zStart, length, doorPositions]
     );
 
-    // If fully clipped, render nothing. Kept AFTER every hook call so the hook
-    // order stays identical on each render.
-    if (effectiveLength <= 0) return null;
+    // 空段直接不画。保留这个守卫纯粹是防御性的（现在 `length` 恒为
+    // `SEGMENT_LENGTH` = 80），而且必须留在**每一个 hook 调用之后**，
+    // 否则 hook 顺序会随参数变化。
+    if (length <= 0) return null;
 
     return (
-        <group>
+        // `name` 是给 harness 用的（与 `infinite-corridor` / `house-shell` 同一套）：
+        // 用户 2026-10-11 报的「往后退时墙壁丢失」说的就是**这一组网格**，所以
+        // 验收探针要能直接数"墙还在不在"。数全场景网格数是**不行**的 —— 走廊的
+        // 挂载网格数会随时间和机位在 205~480 之间变（异步加载 / Suspense 之类的
+        // 非可见性因素，与墙无关），见 `probe-corridor-seal.mjs` 的注释。
+        <group name="corridor-walls">
             {/* =============================================
                 PODŁOGA - Kafelki (FLOOR TILES)
                 =============================================
@@ -292,7 +317,7 @@ const CorridorWalls = ({ zStart = 10, length = 80, doorPositions = [], zClip = 1
                 przez cały korytarz, bez sztucznych linii w poprzek.
             */}
             <mesh
-                position={[0, -corridorHeight / 2, effectiveEndZ + effectiveLength / 2]}
+                position={[0, -corridorHeight / 2, effectiveEndZ + length / 2]}
                 rotation={[-Math.PI / 2, 0, -Math.PI / 2]}
                 geometry={floorGeometry}
                 material={floorMaterial}
@@ -310,22 +335,22 @@ const CorridorWalls = ({ zStart = 10, length = 80, doorPositions = [], zClip = 1
                 const segmentEndZ = effectiveEndZ;
 
                 /**
-                 * 🔴 第一块瓦片的**前沿**必须正好落在 `effectiveStart` 上。
+                 * 🔴 第一块瓦片的**前沿**必须正好落在 `zStart` 上。
                  *
-                 * 旧写法是 `floor(effectiveStart / tileLength) * tileLength
+                 * 旧写法是 `floor(zStart / tileLength) * tileLength
                  * − tileLength / 2 + 2` —— 一个"全局对齐"的网格。问题是第一块
                  * 瓦片最多会比段前沿**多伸出 7 单位**。
                  *
                  * 段 0 前沿在 z = 10 时没人发现（多出来的那截正好被段 −1 的
-                 * 瓦片盖住）；前沿挪到后罩墙（`INTERIOR_FRONT_Z` ≈ 4.15）之后，
-                 * 多出来的那截就直接盖到**露天的院子**上了 —— 射线取证
+                 * 瓦片盖住）；前沿钉到屋身前墙（`INTERIOR_FRONT_Z` = 22.15）之后，
+                 * 多出来的那截就直接盖到**露天的前院**上了 —— 射线取证
                  * （`harness/probe-court-top.mjs`）在 z = 6 / 10 / 14 / 18 打到的
                  * 最上面一层全是 `PlaneGeometry{7,10}` @ `y = 1.75`。
                  *
-                 * 对齐到 `effectiveStart` 之后段与段仍然连续：`SEGMENT_LENGTH`
+                 * 对齐到 `zStart` 之后段与段仍然连续：`SEGMENT_LENGTH`
                  * 是 `tileLength` 的整数倍（80 / 10 = 8），所以相邻段的网格首尾相接。
                  */
-                let tileZ = effectiveStart - tileLength / 2;
+                let tileZ = zStart - tileLength / 2;
 
                 while (tileZ + tileLength / 2 > segmentEndZ) {
                     tiles.push(

@@ -80,20 +80,38 @@ const SegmentVisibilityWrapper = ({ children, segmentIndex }) => {
  * InfiniteCorridorManager Component
  * 
  * Manages dynamic generation/removal of corridor segments.
- * 
- * hideDoorsForSegments: Array of segment indices that should hide their SegmentDoors
- * (used during entrance to avoid duplicate doors while keeping content preloaded)
+ *
+ * ⚠️ 2026-10-11（WO-6）删掉了 `hideDoorsForSegments` / `clipSegmentNeg1`：
+ * 前者的唯一调用是 `[-1]`（入场前把段 −1 的门摘掉），而段号 < 0 的段现在
+ * **整段**不渲染，那个开关永远打不开；后者是 `zClip` 的入口，而 `zClip`
+ * 本身已经被删（它是几何截断，不是裁剪面 —— 见 `CorridorWalls` 顶部）。
+ *
+ * `visible`（2026-10-11，WO-6 的**封口②**）
+ * ----------------------------------------
+ * 整条走廊只在"人在里面"时渲染。院子 / 环绕视角下它**挂载但不可见**。
+ *
+ * 为什么是「挂载但不可见」而不是「卸载」：
+ *   ① 卸载会把上百个 shader 一起丢掉，再进来时第一帧要现场编译 —— 那正是
+ *      `RoomWarmup` 存在的理由，卸载等于把它的成果扔了；
+ *   ② `gl.compile()` 走的是 `scene.traverse`（**不是** `traverseVisible`，
+ *      见 three 的 WebGLRenderer.compile），所以 `visible = false` 的子树
+ *      照样会被预热 —— 挂载但不可见是唯一同时满足这两条的做法；
+ *   ③ R3F 的渲染走 three 的 `projectObject`，那一层**会**在
+ *      `object.visible === false` 时整棵子树 early-return。
+ *
+ * ⚠️ 但 R3F 的**事件系统不认 `visible`**（它只把带 handler 的对象逐个丢给
+ *    `raycaster.intersectObject`，而那个函数只查 `layers`）。所以"隐藏"不等于
+ *    "点不到" —— 门的可点范围由 `DoorSection` 自己的距离判据负责，见那边的注释。
  */
 const InfiniteCorridorManager = ({
     onDoorEnter,
-    hideDoorsForSegments = [], // Segments that should hide their SegmentDoors
-    clipSegmentNeg1 = false, // Whether to clip segment -1 at EntranceDoors
+    visible = true, // 封口②：院子 / 环绕时整条不画
     setCameraOverride // Function to take over camera control
 }) => {
     const { camera } = useThree();
-    // Pre-mount segments 0 and 1 so shaders compile during preloader.
-    // Segment -1 is NOT pre-mounted to avoid visual collision with entrance doors.
-    // It mounts dynamically when camera reaches entrance (behind camera = invisible stutter).
+    // 预热：先挂上段 0 和段 1，让它们的 shader 在 loader 期间编译完。
+    // 段 −1 不预热 —— 它**永远不会**被渲染（见下面 filter 的注释），
+    // 而预挂一段必然要被摘掉的几何只是白烧一次编译。
     const [activeSegments, setActiveSegments] = useState([0, 1]);
 
     // Calculate which segment the camera is in
@@ -127,40 +145,46 @@ const InfiniteCorridorManager = ({
     });
 
     /**
-     * 🔴 未入场时**整段摘掉段号 < 0 的段**。
+     * 🔴 段号 < 0 的段**永远不渲染**（2026-10-11，WO-6）。
      *
-     * 走廊的可见几何不能露到露天的院子里 —— 露出来从上面看就是院子正中间
-     * 一大片暖白顶（带墨色远山），而院子本该是露天的。段 0 的前沿正好钉在
-     * 后罩墙（`CORRIDOR_FRONT_Z` = `INTERIOR_FRONT_Z`）上，所以凡是段号 < 0
-     * 的段**整段**都落在院子那一侧 —— 摘掉即可。
+     * 走廊的可见几何不能露到露天的前院里 —— 露出来从上面看就是院子正中间
+     * 一大片暖白顶（带墨色远山），而前院本该是露天的。段 0 的前沿正好钉在
+     * 屋身前墙上（`CORRIDOR_FRONT_Z` = `INTERIOR_FRONT_Z` = 22.15），所以
+     * 凡是段号 < 0 的段**整段**都落在屋子那一侧之外 —— 摘掉即可。
+     *
+     * 为什么是"永远"而不是"未入场时"：门楼并进屋身、前墙挪到 22.15 之后，
+     * 相机落点（`INTERIOR_FRONT_Z − 3.65` = 18.5）**本身就在段 0 里**
+     * （`floor((22.15 − 18.5) / 80) = 0`），入场后也没有任何一刻需要段 −1。
+     * 只要往后退，`useInfiniteCamera` 会把相机夹在门前（见那里的注释），
+     * 所以"相机掉进段 −1"这件事已经不可能发生。
      *
      * 旧做法是 `zClip = 22` 硬裁段 −1 的几何，但那个做法有两个洞：
-     *   · 天花板瓦片按 10 单位网格对齐（`CorridorWalls` 的 `firstTileIndex`），
-     *     段 −1 的瓦片正好落在 z = 17（跨 12..22）—— 硬裁也铺满院子；
-     *   · 裁剪面（22）与段前沿（10）不重合 ⇒ `hasEntered` 翻转时墙和顶的
-     *     面板尺寸变化，画面上会跳一下。
-     * 整段摘掉两个洞都没有，而且连装饰 / 大锯齿门 / 涂鸦一起带走了
-     * （`CorridorDecorations` **不认** `zClip`，它只按 zOffset 摆东西）。
+     *   · 天花板瓦片按 10 单位网格对齐，段 −1 的瓦片正好落在 z = 17
+     *     （跨 12..22）—— 硬裁也铺满院子；
+     *   · 裁剪面（22）与段前沿不重合 ⇒ `hasEntered` 翻转时墙和顶的面板
+     *     尺寸变化，画面上会跳一下。
+     * 整段摘掉两个洞都没有，而且连装饰 / 大锯齿门 / 涂鸦一起带走了。
      *
-     * 入场后段 −1 / −2 照常挂回来：那时它们全在相机**背后**（相机落点 ≈ z 0.5，
-     * 段 −1 从 z = 84.15 到 4.15），所以挂载是隐形的。
+     * 🔴 **不要再引入任何形式的裁剪面**（`zClip` 已从 `CorridorWalls` /
+     * `CorridorSegment` / `CorridorDecorations` 全部删除）。它名字叫 clip，
+     * 做的却是几何截断，会把整段墙 / 地板 / 天花板 `return null` 掉而**门、
+     * 装饰、英雄机位照样渲染** —— 用户 2026-10-11 报的「进入房间后往后退，
+     * 墙壁丢失了」就是这一条。截断的职责**只在下面这一行 filter**。
      */
-    const visibleSegments = clipSegmentNeg1
-        ? activeSegments.filter((segmentIndex) => segmentIndex >= 0)
-        : activeSegments;
+    const visibleSegments = activeSegments.filter((segmentIndex) => segmentIndex >= 0);
 
     return (
-        <group>
+        // `name` 是给 harness 用的：封口② 的验收判据是「环绕任何角度都看不见
+        // 走廊的管子」，而"看不见"在截图上是**无法反证**的（管子可能只是被
+        // 屋身挡住了）。挂个名字，探针就能直接断言 `visible === false`。
+        // 见 `.workbuddy-ai/harness/probe-corridor-seal.mjs`。
+        <group name="infinite-corridor" visible={visible}>
             {visibleSegments.map((segmentIndex) => (
                 <SegmentVisibilityWrapper key={`seg-wrap-${segmentIndex}`} segmentIndex={segmentIndex}>
                     <CorridorSegment
                         key={`segment-${segmentIndex}`}
                         segmentIndex={segmentIndex}
                         onDoorEnter={onDoorEnter}
-                        hideSegmentDoors={hideDoorsForSegments.includes(segmentIndex)}
-                        // 硬保险：任何段都不许在室内前端面之前画东西。
-                        // 段 0 的前沿正好等于它 ⇒ 对所有段都是 no-op，纯粹是兜底。
-                        zClip={CORRIDOR_FRONT_Z}
                         setCameraOverride={setCameraOverride}
                     />
                 </SegmentVisibilityWrapper>

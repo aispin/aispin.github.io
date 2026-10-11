@@ -95,8 +95,6 @@ const LOOP_SPACES = [FIRST_RUN, SECOND_RUN];
 const CorridorSegment = ({
     segmentIndex = 0,
     onDoorEnter,
-    hideSegmentDoors = false,
-    zClip = 100000,
     setCameraOverride,
 }) => {
     const zOffset = CORRIDOR_FRONT_Z - (segmentIndex * SEGMENT_LENGTH);
@@ -110,14 +108,13 @@ const CorridorSegment = ({
     const loopIndex = ((segmentIndex % LOOP_SPACES.length) + LOOP_SPACES.length) % LOOP_SPACES.length;
 
     const doors = useMemo(() => {
-        // The segment directly behind the front doors is left blank while the
-        // user is still outside — it is the approach to the entrance and must
-        // not advertise rooms through the closed doors. This is the room-door
-        // counterpart of `hideDoorsForSegments`, which already suppresses that
-        // segment's big sawtooth doors. Once inside, the entrance is gone from
-        // the scene entirely and that segment becomes an ordinary ring space.
-        const definitions = hideSegmentDoors ? [] : LOOP_SPACES[loopIndex];
-        return definitions.map((def) => {
+        // ⚠️ 2026-10-11（WO-6）：这里原来有一个 `hideSegmentDoors` 分支，
+        //    用来"入场前把段 −1 的门摘掉，免得在院子里看见一排飘着的门"。
+        //    门楼并进屋身之后 `InfiniteCorridorManager` **整段**不渲染段号 < 0
+        //    的段，那个开关永远不会被打开 —— 所以连同它的调用方一起删了。
+        //    段 0 的门照常渲染：它在 z ≈ 6，离前门 16 单位，入场前看不见
+        //    （屋身前墙挡着），入场后就是走廊里的第一扇门。
+        return LOOP_SPACES[loopIndex].map((def) => {
             const xBase = (WALL_X_OUTER + WALL_X_INNER) / 2;
             const baseRotation = def.side === 'left' ? Math.PI / 2 : -Math.PI / 2;
             const rotationOffset = def.side === 'left' ? -WALL_ANGLE : WALL_ANGLE;
@@ -130,7 +127,7 @@ const CorridorSegment = ({
                 rotation: baseRotation + rotationOffset,
             };
         });
-    }, [segmentIndex, loopIndex, language, hideSegmentDoors]);
+    }, [segmentIndex, loopIndex, language]);
 
     return (
         <group position={[0, 0, 0]}>
@@ -138,7 +135,6 @@ const CorridorSegment = ({
                 zStart={zOffset}
                 length={SEGMENT_LENGTH}
                 doorPositions={doors}
-                zClip={zClip}
             />
 
             <group position={[0, 0, zOffset - HERO_INSET]}>
@@ -152,7 +148,7 @@ const CorridorSegment = ({
                 </Text>
             </group>
 
-            {!hideSegmentDoors && doors.map((door) => (
+            {doors.map((door) => (
                 <DoorSection
                     key={door.id}
                     position={[door.x, 0, zOffset + door.relativeZ + 2]}
@@ -173,16 +169,13 @@ const CorridorSegment = ({
                 zOffset={zOffset}
                 corridorWidth={WALL_X_OUTER * 2}
                 corridorHeight={3.5}
-                zClip={zClip}
                 setCameraOverride={setCameraOverride}
             />
 
-            {!hideSegmentDoors && (
-                <SegmentDoors
-                    position={[0, 0, zOffset - SEGMENT_LENGTH + 5]}
-                    corridorHeight={3.5}
-                />
-            )}
+            <SegmentDoors
+                position={[0, 0, zOffset - SEGMENT_LENGTH + 5]}
+                corridorHeight={3.5}
+            />
         </group>
     );
 };

@@ -37,13 +37,61 @@ export const FRAME_H = DOOR_HEIGHT + 0.30;
 export const FRAME_ASPECT = FRAME_W / FRAME_H;
 export const LINTEL_Y = FLOOR_Y + FRAME_H; // top edge of the architrave
 
-/* ---- the 青砖黑瓦 facade --------------------------------------------- */
-// Sized against the GATE, not against the corridor. The tunnel behind is
-// only 7 x 3.5 (see CorridorWalls), so these walls were never its walls.
-export const FACADE_W = 10;
-export const FACADE_H = 6;
-export const FACADE_CENTER_Y = FLOOR_Y + FACADE_H / 2;
-export const FACADE_TOP_Y = FLOOR_Y + FACADE_H;
+/* ---- 藤蔓 ink overlay 那块四边形 ------------------------------------- */
+/**
+ * ⚠️ 2026-10-11：这两个数**不再是"门脸"的尺寸** —— 独立的门脸没有了，
+ * 门楼并进了屋身前墙（`HouseShell` 的前墙就是那面砖墙）。它们现在只回答
+ * 一个问题：**藤蔓 overlay 那块透明四边形多大**。
+ *
+ * 所以名字也跟着改了（原来是 `FACADE_W/H`，`FACADE_CENTER_Y/TOP_Y` 连同
+ * 台基的 `PLINTH_*` 一起删掉）：留一个叫 "facade" 的常数指着一块藤蔓贴图，
+ * 下一个人一定会以为那是墙的尺寸。
+ *
+ * 🔴 这两个数**不能跟着屋身宽度改**。藤蔓的位置是按 10 宽量出来的
+ * （见 `makeWallInkTexture` 的 runners：全部落在 x ≥ 1.18，正好避开 2.5
+ * 那个窗），改成 22 藤就爬到窗上了。也就是说藤只爬大门两侧这一片墙，
+ * 而不是整面 22 宽的墙 —— 这是有意的，见 `EntranceDoors` 的 `inkCenterY`。
+ *
+ * 高度 6 只是画布比例（`makeWallInkTexture` 按 `worldW / worldH` 定画布
+ * 宽高），藤本身最长的一缕只到画布高的 0.29。
+ */
+export const WALL_INK_W = 10;
+export const WALL_INK_H = 6;
+
+/* ---- the gate's opening in the house's front wall -------------------- */
+/**
+ * 前墙上那个洞 —— 尺寸是**大门的**，不是走廊的。
+ *
+ * 门后是 7 × 3.5 的走廊，而这里开的是 1.8 × 2.55 的门洞：从大门往里看
+ * 看到的是走廊的一个切片，而不是整条管子。这正是"门楼与屋身合二为一"
+ * 之后想要的效果。
+ *
+ * 0.02 的余量（每边）**不是装饰**，是防止两件事：
+ *   · 洞与门扇边缘**逐位重合** —— 两个平行平面在同一条像素上谁赢是
+ *     深度缓冲说了算，会闪；
+ *   · 洞比门框外沿大 —— 那就从门框外面看进走廊了。
+ * 门框（`FRAME_W × FRAME_H`，在墙前 0.12）从**内洞口往外**是不透明的，
+ * 水平覆盖到 0.98、垂直覆盖到 1.10，所以 0.92 / 1.295 这个洞的四周
+ * 全被门框压住，既露不出砖、也露不出走廊。
+ */
+export const GATE_HOLE_HALF_W = DOOR_OPENING_W / 2 + 0.02;
+export const GATE_HOLE_HALF_H = DOOR_HEIGHT / 2 + 0.02;
+export const GATE_HOLE = [0, DOOR_CENTER_Y, GATE_HOLE_HALF_W, GATE_HOLE_HALF_H];
+
+/* ---- the window opening in the front wall ---------------------------- */
+/**
+ * 窗（以及从窗里探头的那个小人）挂在 `EntranceDoors` 上，但它看的那个洞
+ * 是 `HouseShell` 的前墙挖的 —— **一个洞、两个文件**，所以矩形写在这里，
+ * 和门洞一个待遇。
+ *
+ * 以前它是 `EntranceDoors` 里的字面量 `[WINDOW_X, 0.02, 0.7, 0.73]`，
+ * 门脸 uniforms 里还抄了一遍；门脸搬到屋身墙上之后就会变成三份拷贝。
+ */
+export const WINDOW_X = 2.5;
+export const WINDOW_CENTER_Y = 0.02;
+export const WINDOW_HALF_W = 0.7;
+export const WINDOW_HALF_H = 0.73;
+export const WINDOW_HOLE = [WINDOW_X, WINDOW_CENTER_Y, WINDOW_HALF_W, WINDOW_HALF_H];
 
 /* ---- the 横批 above the lintel --------------------------------------- */
 export const BANNER_W = 1.15;
@@ -109,15 +157,16 @@ export const PIVOT_H = 0.24;
 export const PIVOT_D = 0.36;
 export const PIVOT_X = THRESHOLD_W / 2 + PIVOT_W / 2;
 
-/* ---- 台基 (the plinth the whole facade stands on) -------------------- */
+/* ---- 台基：已删除（2026-10-11） --------------------------------------- */
 /**
- * The plinth is exactly the outdoor drop tall, so its top edge meets the
- * facade's bottom edge (FLOOR_Y) with nothing to reconcile. It carries its
- * own SONG_WALL_FRAG with `uCapFrac: 2`, i.e. "this wall has no 黑瓦 coping" —
- * without that the coping's smoothstep lands inside the stone and caps the
- * plinth with a band of roof tile.
+ * 这里原来有 `PLINTH_W / PLINTH_H / PLINTH_Z` —— 门脸脚下那块 10 宽、
+ * 0.30 高、停在砖面之前 0.05 的青石勒脚，用来填 `FLOOR_Y` 与 `OUTDOOR_Y`
+ * 之间那个空档。
+ *
+ * 门脸并进屋身前墙之后空档不存在了：屋身前墙自己从 `GRASS_Y` 起画，而
+ * `SONG_WALL_FRAG` 的勒脚段（`plinthTop = 0.62`，按**世界坐标**算石缝）
+ * 已经给了它一条横贯整面墙的青石墙脚。留着那块 10 宽的旧台基只会在
+ * 22 宽的墙上贴出一道宽度不对、石缝相位还差 0.04 的补丁。
+ *
+ * 详见 `components/canvas/entrance/GateBase.jsx` 顶部的说明。
  */
-export const PLINTH_W = FACADE_W;
-export const PLINTH_H = OUTDOOR_DROP;
-/** Facade plane sits at z=0.15; the plinth is a hair behind so the brick always wins. */
-export const PLINTH_Z = 0.10;

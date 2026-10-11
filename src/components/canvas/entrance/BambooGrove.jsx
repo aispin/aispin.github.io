@@ -154,13 +154,15 @@ void main() {
 const BASE_H = 1;
 
 function buildGrove(count) {
-    // ⚠️ 种子从 v1 升到 v2：v1 的竹林会**长在廊屋的屋面上**（走廊带 |x| < 6.5
-    //    且 z < 6）。散布序列变了，所以换种子名 —— 复用 v1 会让"改了什么"
-    //    这件事在 diff 里看不出来。
+    // ⚠️ 种子 v1 → v2 的来历：v1 的竹林会**长在廊屋的屋面上**（老几何下
+    //    走廊带 |x| < 6.5 且 z < 6）。散布序列变了，所以换种子名 —— 复用 v1
+    //    会让"改了什么"这件事在 diff 里看不出来。
+    // ⚠️ 2026-10-11 **没有**再升 v3：见下面排除带的注释 —— 那条判定现在
+    //    一次都不会命中，改成显式 z 窗口**不改动任何一根竹子的位置**，
+    //    所以沿用 v2，已验收的截图仍然有效。
     const rand = seededRand('bamboo-grove-v2');
     const culms = [];
-    // 拒绝采样：抽到的位置落在走廊带里就重抽。守卫上限防死循环
-    // （走廊带占环带的面积不到 15%，正常情况下两三轮就抽满）。
+    // 拒绝采样：抽到的位置落在建筑带里就重抽。守卫上限防死循环。
     let guard = 0;
     while (culms.length < count && guard++ < count * 8) {
         // 环带均匀采样：sqrt 让面积均匀，不然竹子全挤在内圈
@@ -175,9 +177,27 @@ function buildGrove(count) {
         const spin = rand() * Math.PI * 2;
         const phase = rand() * Math.PI * 2;
         const tint = rand();
-        // 让开屋身（HouseShell）：竹叶从屋面上长出来会一眼假。
-        // ⚠️ 屋身有 22 宽（= 院宽），带子窄了竹子会长在屋里。
-        if (Math.abs(x) < I.HOUSE_CLEAR_HALF_W && z < I.HOUSE_CLEAR_Z) continue;
+        // 让开"建筑带"：屋身 + 前院。竹叶从屋面 / 从院子里长出来会一眼假。
+        //
+        // ⚠️ 2026-10-11：这里原来写的是 `z < I.HOUSE_CLEAR_Z`。院子删掉之后
+        //    `HOUSE_CLEAR_Z` 从 `config/island.js` 里一起没了 ⇒ 这个比较变成
+        //    `z < undefined` = **恒为 false**，整条排除带静默失效。现在改成
+        //    一个**显式的 z 窗口**，两端都从 config 读，以后再改屋身进深 /
+        //    院深都不会再脱钩。
+        //
+        // 🔴 但请注意：**这条判定当前一次都不会命中**。带子 = `|x| < 12` 且
+        //    `z ∈ [−2.85, 39.15]`；环带 `r ≥ BAMBOO_R_MIN = 24`，而带子相对
+        //    岛心 (0, 18.15) 能取到的**最大**半径是角点 (±12, ±21) 的 24.19 ——
+        //    所以两者只在一个贴着角点的极薄月牙里重叠（实测拒绝率 0.000%）。
+        //    也就是说 `BAMBOO_R_MIN = 24` 这个数**本身**就是按这条带子定的
+        //    （见 `config/island.js` 的 `HOUSE_CLEAR_HALF_W` 注释）。
+        //    留它在这里是**不变量**，不是有效逻辑：谁要是把 `BAMBOO_R_MIN`
+        //    调小，这条判定立刻接手，竹子不会突然穿屋。
+        if (
+            Math.abs(x) < I.HOUSE_CLEAR_HALF_W
+            && z > I.HOUSE_BACK_Z - 1
+            && z < I.HOUSE_CLEAR_BACK_Z
+        ) continue;
         culms.push({ x, z, h, radius, lean, spin, phase, tint });
     }
     return culms;

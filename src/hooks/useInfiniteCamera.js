@@ -19,6 +19,41 @@ const DOOR_POSITIONS = [
 ];
 
 /**
+ * 🔴 后退的硬边界（2026-10-11，WO-6 的封口③）
+ * ==========================================
+ *
+ * 走廊的**前端就是屋子的前门**（`INTERIOR_FRONT_Z` = 屋身前墙 = 22.15）。
+ * 门外面是竹篱笆小院，所以往后退不能只是"停住"—— 那会停在门口，玩家看得见
+ * 院子却出不去，读成一个死头。按 DR-G 的定案，退到门前**自动退出**：
+ * 触发 `HouseExit`，相机滑出门、环绕视角重新挂上（语义是"退出去 = 回家"）。
+ *
+ * 为什么光有"触发"不够、还要一条硬夹：`HouseExit` 会等 `gsap` 的空档
+ * （`RETRY_MS = 250`，最长等 6 秒），这段时间里相机会继续往后走 ——
+ * 一直走到门外去，从门洞里**看得见院子**（那时走廊已经不算"人在里面"了）。
+ * 所以目标 z 必须同时被夹住：
+ *
+ *     BACK_OUT_LIMIT_Z = 22.15 − 0.6 = 21.55   ← 停在**门内** 0.6
+ *
+ * 0.6 是够的：段 0 的顶棚第一块瓦片前沿正好在 22.15（见 `CorridorWalls`），
+ * 覆盖 [12.15, 22.15]；地板是一整块 80 长的面，覆盖 [−57.85, 22.15]。
+ * 相机停在 21.55 时**仍在两者的覆盖范围内**，抬头低头都不会看见外面。
+ *
+ * 触发与重新武装分开，是为了让"退出被拒"（`SceneContext.requestHouseExit`
+ * 在门正忙时**拒绝**而不是排队）之后还能再试一次：走到 `BACK_OUT_REARM_Z`
+ * （19.65）以内重新武装，再退回来就再触发一次。没有这条，被拒一次就永久
+ * 卡在门口。
+ *
+ * ⚠️ 还有第三个数没出现在这里，因为它不是边界而是**闩**：
+ *    `everInsideRef`（"相机起手在门内吗"）—— 门外的相机是合法起点，
+ *    不能夹也不能触发退出。见 refs 声明处的长注释。
+ */
+const BACK_OUT_LIMIT_Z = INTERIOR_FRONT_Z - 0.6;
+/** 退到这里就算"想出去"，触发 `onBackOut`。 */
+const BACK_OUT_TRIGGER_Z = INTERIOR_FRONT_Z - 1.0;
+/** 往前走回这里就重新武装（见上）。 */
+const BACK_OUT_REARM_Z = INTERIOR_FRONT_Z - 2.5;
+
+/**
  * useInfiniteCamera Hook
  * 
  * When disabled: does NOT touch camera at all (GSAP can control it)
@@ -32,7 +67,8 @@ const useInfiniteCamera = ({
     smoothing = 0.035, // Lower = longer deceleration, smoother feel
     glanceIntensity = 0.15,
     scrollEnabled = true,
-    parallaxEnabled = true
+    parallaxEnabled = true,
+    onBackOut = null // 退到前门 ⇒ 请求退出（见 BACK_OUT_* 那段注释）
 } = {}) => {
     const { camera } = useThree();
 
@@ -68,6 +104,28 @@ const useInfiniteCamera = ({
 
     // Store last known mouse position (normalized -1 to 1)
     const lastMousePos = useRef({ x: 0, y: 0 });
+
+    /**
+     * 🔴 后退边界用**两个**闩，不是一个 —— 它们答的是不同的问题：
+     *
+     *   `everInsideRef` —— 「相机**起手**就在门内吗？」只有为 true 时，后退才受
+     *      门前那道夹的限制。相机起点在**门外**是**合法状态**：
+     *      · `window.__aispin.enter()`（12 个 harness 用它跳过推门动画）
+     *      · `?orbit` 与环绕相机的交接
+     *      两者都停在 z = 28（门前 5.85）。无条件 `min(currentZ, LIMIT)` 会把
+     *      这台相机一把拽到 21.55 —— **6.45 单位的瞬移**，而且下一帧就满足
+     *      `> BACK_OUT_TRIGGER_Z` ⇒ 误触发一次退出（相机又滑回 28 并 markExited）。
+     *      所以它**只**在 scroll 打开的那一帧按相机的实际位置初始化
+     *      （见下面的 layout effect），而不是写死 true。
+     *
+     *   `backOutAskedRef` —— 「这一次'想出去'已经喊过了吗？」喊过一次就不再喊，
+     *      直到玩家走回 `BACK_OUT_REARM_Z` 以内重新武装。见 BACK_OUT_* 注释。
+     *
+     * ⚠️ 两个闩**不能合并**：合并之后，退出被拒（`doorBusy`）时闩会一起复位，
+     *    玩家就能一路退出门外 —— 那正是「墙会消失」那一类 bug 的入口。
+     */
+    const everInsideRef = useRef(false);
+    const backOutAskedRef = useRef(false);
 
     /**
      * How far the camera should glance toward the nearest door at a given Z.
@@ -139,6 +197,15 @@ const useInfiniteCamera = ({
             targetZ.current = camera.position.z;
             currentZ.current = camera.position.z;
 
+            // 后退边界的两把闩跟着相机**实际位置**初始化 —— 见上面 refs 的注释。
+            // 走正常流程进来时相机落在 `INTERIOR_FRONT_Z − 3.65` = 18.5
+            // （`EntranceDoors.ENTRANCE_LANDING_INSET`），远在 19.65 以内 ⇒
+            // `everInside` 为 true，后退立刻受门前那道夹限制。
+            // 而 `__aispin.enter()` / `?orbit` 交接时相机在 28 ⇒ 为 false，
+            // 门外的相机不会被拽、也不会误触发退出。
+            everInsideRef.current = camera.position.z < BACK_OUT_REARM_Z;
+            backOutAskedRef.current = false;
+
             // Sync parallax with CURRENT camera position ONLY if we just enabled
             // To prevent snapping when achievements update the component
             if (!wasScrollEnabled) {
@@ -167,7 +234,8 @@ const useInfiniteCamera = ({
 
         e.preventDefault();
         const delta = e.deltaY * scrollSpeed;
-        targetZ.current -= delta;
+        // 往后退（+z）夹在门内 —— 见 BACK_OUT_LIMIT_Z 的注释。
+        targetZ.current = Math.min(targetZ.current - delta, BACK_OUT_LIMIT_Z);
         unlockAchievement('corridor_explore');
     }, [scrollSpeed, unlockAchievement]);
 
@@ -190,7 +258,8 @@ const useInfiniteCamera = ({
         const delta = keyScrollMap[e.key];
         if (delta !== undefined) {
             e.preventDefault();
-            targetZ.current -= delta * scrollSpeed;
+            // 往后退（+z）夹在门内 —— 见 BACK_OUT_LIMIT_Z 的注释。
+            targetZ.current = Math.min(targetZ.current - delta * scrollSpeed, BACK_OUT_LIMIT_Z);
             unlockAchievement('corridor_explore');
         }
 
@@ -236,7 +305,8 @@ const useInfiniteCamera = ({
         // Vertical scroll - only when scroll enabled
         if (scrollEnabledRef.current) {
             const deltaY = (touchStart.current.y - currentY) * scrollSpeed * 1.5;
-            targetZ.current -= deltaY;
+            // 往后退（+z）夹在门内 —— 见 BACK_OUT_LIMIT_Z 的注释。
+            targetZ.current = Math.min(targetZ.current - deltaY, BACK_OUT_LIMIT_Z);
             unlockAchievement('corridor_explore');
         }
 
@@ -390,6 +460,28 @@ const useInfiniteCamera = ({
             // 于是所有读相机位置的 useFrame 消费者（门的朝向、标题分裂）
             // 永远在写矩阵 —— 场景"从来没有静止过"。见 utils/settle.js。
             currentZ.current = settleLerp(currentZ.current, targetZ.current, smoothing);
+
+            // 🔴 门前那道夹。**只在"相机起手就在门内"时才生效** ——
+            // 相机起点在门外（`__aispin.enter()` / `?orbit` 交接，z = 28）是
+            // 合法状态，无条件夹会把它拽到 21.55（6.45 单位瞬移）并立刻误
+            // 触发退出。见上面 refs 的注释。
+            //
+            // 夹的是**两个**值：`currentZ` 是双保险（三条输入路径都夹过
+            // `targetZ`，但那是"约定"不是"事实"），`targetZ` 是真正的闸门 ——
+            // 没有它，被拒一次之后 `currentZ` 会继续朝门外的 target 爬。
+            if (everInsideRef.current) {
+                if (currentZ.current > BACK_OUT_LIMIT_Z) currentZ.current = BACK_OUT_LIMIT_Z;
+                if (targetZ.current > BACK_OUT_LIMIT_Z) targetZ.current = BACK_OUT_LIMIT_Z;
+
+                // 退到门前 ⇒ 请求退出（封口③）。喊一次就够，走回
+                // `BACK_OUT_REARM_Z` 以内重新武装 —— 见 BACK_OUT_* 注释。
+                if (currentZ.current < BACK_OUT_REARM_Z) {
+                    backOutAskedRef.current = false;
+                } else if (currentZ.current > BACK_OUT_TRIGGER_Z && !backOutAskedRef.current) {
+                    backOutAskedRef.current = true;
+                    onBackOut?.();
+                }
+            }
 
             if (reduced) {
                 // 关掉"自动回头看门"：走廊每经过一扇门，相机就会自己转过去

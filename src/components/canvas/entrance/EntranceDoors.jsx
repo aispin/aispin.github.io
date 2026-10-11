@@ -10,7 +10,7 @@ import { playInsectChirp, playRabbitSqueak } from '../../../audio/sfx';
 import { useAchievements } from '../../../context/AchievementsContext';
 import { isTouchDevice } from '../../../utils/deviceDetect';
 import { setGuitarCursor } from '../../../utils/guitarCursor';
-import { SURFACE_VERT, SONG_WALL_FRAG, INK_OVERLAY_FRAG, STONE_FRAG, makeSurfaceUniforms, SEASON_INK_TINT } from '../../../shaders/entranceTextures';
+import { SURFACE_VERT, INK_OVERLAY_FRAG, STONE_FRAG, makeSurfaceUniforms, SEASON_INK_TINT } from '../../../shaders/entranceTextures';
 import GateBase from './GateBase';
 import { WindChime, WhiteDog, WoodenPlanter, WoodenWindowFrame, WindowCurtain, SwallowNest } from './EntranceProps';
 import StoneTable from './StoneTable';
@@ -34,6 +34,7 @@ import {
     makeWallInkTexture,
     makeLadybirdTexture,
     makeSpeechBubbleTexture,
+    INK_TOP_FRAC,
 } from '../../../utils/entranceArt';
 import {
     makeDoorGodTexture,
@@ -44,18 +45,17 @@ import {
 } from '../../../utils/gateArt';
 // 门联文案（39 副）与「今天挂哪一副」的解析器。
 import { resolveCoupletSet, coupletOverride } from '../../../config/couplets';
+import * as I from '../../../config/island';
 import {
     FLOOR_Y,
     DOOR_WIDTH,
     DOOR_HEIGHT,
-    DOOR_OPENING_W,
     DOOR_CENTER_Y,
     FRAME_W,
     FRAME_H,
     FRAME_ASPECT,
-    FACADE_W,
-    FACADE_H,
-    FACADE_CENTER_Y,
+    WALL_INK_W,
+    WALL_INK_H,
     BANNER_W,
     BANNER_H,
     BANNER_Y,
@@ -63,6 +63,7 @@ import {
     PATH_Y,
     GRASS_Y,
     STEP_FRONT_Z,
+    WINDOW_X,
 } from '../../../config/entranceMetrics';
 import { sharedGeometry } from '../../../engine/resources';
 
@@ -136,6 +137,23 @@ const COUPLET_Y = DOOR_CENTER_Y;
 // not hardcode a lintel height of its own to do it.
 
 const COUPLET_Z = 0.17;
+
+/**
+ * 入场落点在屋里的深度（从屋身前墙往里算）。
+ *
+ * 🔴 落点必须**在屋里**（z < INTERIOR_FRONT_Z）。原来停在 z = 11，那是
+ *    院子正中间：入场动画一结束 `hasEntered` 翻转，地面 / 院墙 / 竹林 /
+ *    门楼一起卸载，而相机正站在它们中间 —— 地面会在脚下凭空消失。
+ *    落点挪进屋里之后，那次卸载全部发生在相机**背后**。
+ *
+ * ⚠️ 和 `CorridorSegment` 的 `HERO_INSET`（6.65）是一对：ZEO 落在
+ *    `INTERIOR_FRONT_Z − HERO_INSET − 0.3`，这里要比它靠前 ~3.3 单位。
+ *    改一个必须改另一个。
+ *
+ * ⚠️ x 也必须一起归零：入场之前用户可能已经拖到侧面看过（环绕相机），
+ *    只 tween z 的话相机会从墙上穿过去。
+ */
+const ENTRANCE_LANDING_INSET = 3.65;
 
 /* ---- the two yard animals' facing ------------------------------------ */
 /**
@@ -261,21 +279,27 @@ const FONT_URL = SCENE_FONTS.maple;
 
 /**
  * EntranceDoors Component - 3D Entrance to the Corridor
- * 
+ *
  * Doors that open and camera flies through.
- * EmptyCorridor provides the surrounding corridor context.
+ *
+ * 🔴 2026-10-11：**门脸（那面 10×6 的青砖墙）已经不在这里了** —— 它就是
+ * 屋身的**前墙**（见 `HouseShell`，门洞与窗洞都开在那面墙上）。这里只剩
+ * "挂在墙上的东西"：门扇 / 门框 / 门神 / 对联 / 匾额 / 窗 / 柿子树 /
+ * 花箱 / 缸 / 狗 / 石桌。所以本组件**自己不再是一堵墙**，它必须挂在
+ * `HOUSE_FRONT_Z` 那个平面上（`position.z = 22` ⇒ 局部 z = 0.15 就是墙）。
+ *
+ * 这条约束的判据：本文件里所有 mesh 的局部 z 都 ≥ 0.06（门扇），也就是
+ * 全部落在墙的**前面**；凡是需要"墙"的地方（洞口、砖缝、压顶、藤蔓底色）
+ * 一律由 `HouseShell` 提供。
  */
 const EntranceDoors = ({
     position = [0, 0, 22],
-    onComplete
+    onComplete,
+    onStart,
 }) => {
-    // The facade is sized against the GATE, not against the corridor — the
-    // tunnel behind it is only 7 x 3.5 (see CorridorWalls), so these walls
-    // were never the corridor's walls. All the vertical metrics come from
-    // config/entranceMetrics so the architrave, the 横批 and the hanging sign
-    // above them cannot drift apart again.
-    const corridorWidth = FACADE_W;
-    const corridorHeight = FACADE_H;
+    // 门脸的竖向尺寸（10 × 6）只剩一个用处：藤蔓 overlay 那块四边形
+    // （`WALL_INK_W/H`，见 config/entranceMetrics 里的说明）。
+    // 它的位置由屋身前墙的**压顶下沿**反推（见下面的 inkCenterY）。
     const leftDoorRef = useRef();
     const rightDoorRef = useRef();
     const leftHandleRef = useRef();
@@ -488,8 +512,6 @@ const EntranceDoors = ({
     // is a shop front, not a gate. This is 1:1.42.
     const doorWidth = DOOR_WIDTH;
     const doorHeight = DOOR_HEIGHT;
-    const doorOpeningWidth = DOOR_OPENING_W; // Both doors together
-    const wallThickness = 0.07;
 
     // Frame dimensions.
     //
@@ -519,10 +541,6 @@ const EntranceDoors = ({
     const floorY = FLOOR_Y;
     const doorBottomY = floorY;
     const doorCenterY = doorBottomY + doorHeight / 2;
-    const wallCenterY = floorY + corridorHeight / 2;
-    const topWallHeight = corridorHeight - doorHeight;
-    const topWallCenterY = doorBottomY + doorHeight + topWallHeight / 2;
-    const sideWallWidth = (corridorWidth - doorOpeningWidth) / 2;
 
     // The lever's rose sits at (0.8795, 0.5413) of the leaf — HANDLE_PIVOT in
     // utils/doorArt.js — so the handle group is parked that far off the leaf
@@ -547,6 +565,9 @@ const EntranceDoors = ({
 
         setIsOpen(true);
         setIsAnimating(true);
+        // 走廊只在这个时刻之后才需要被画出来（"门前那一眼"）—— 见
+        // `Experience` 的 `corridorVisible` 与 `InfiniteCorridorManager` 的封口②。
+        onStart?.();
 
         /* 推门起播 BGM。
          *
@@ -607,19 +628,12 @@ const EntranceDoors = ({
             ease: 'power2.out'
         }, 0.1);
 
-        // Camera flies through — across the open courtyard, through the house's
-        // doorway, and stops inside the corridor in front of ZEO.
-        //
-        // 🔴 落点必须**在屋里**（z < INTERIOR_FRONT_Z）。原来停在 z = 11，
-        //    那是院子的正中间：入场动画一结束 `hasEntered` 翻转，地面 / 院墙 /
-        //    竹林 / 门楼一起卸载，而相机正站在它们中间 —— 地面会在脚下凭空消失。
-        //    落点挪进屋里之后，那次卸载全部发生在相机**背后**。
-        //
-        // ⚠️ 和 `CorridorSegment` 的 `HERO_INSET` 是一对：ZEO 落在
-        //    `INTERIOR_FRONT_Z − HERO_INSET − 0.3`，这里要比它靠前 ~3.3 单位，
-        //    和原来（相机 11 / ZEO 7.7）的取景一致。改一个必须改另一个。
+        // Camera flies through — across the open forecourt, through the front
+        // door, and stops inside the corridor in front of ZEO.
+        // 落点深度与 x 归零的理由见 ENTRANCE_LANDING_INSET 的注释。
         tl.to(camera.position, {
-            z: 0.5,
+            x: 0,
+            z: I.INTERIOR_FRONT_Z - ENTRANCE_LANDING_INSET,
             y: 0.2, // Match hook's base Y position
             duration: 2.4,
             ease: 'power2.inOut'
@@ -771,40 +785,17 @@ const EntranceDoors = ({
 
 
 
-    // The three tunnel wall panels (see the JSX below) sit behind this, so
-    // they cannot occlude the window's interior or its curtains.
-    const WALL_PANEL_Z = -0.5;
-
-    /**
-     * 门脸**内面**所在的局部 z（v1.2 补的那一层，见下面 FACADE, INNER FACE）。
+    /* ---- 那三块"门洞周围的墙"（tunnel wall panels）已经不在了 ----------
      *
-     * 🔴 它必须落在那三块 tunnel wall panel 的**前面**（更小的局部 z）。
-     * 板子是 `meshBasicMaterial` + `WALL_REVEAL`（无光照、无纹理），一旦挡住内面，
-     * 从院子里看门楼背面就是**一块没有任何纹理的灰板** —— 而它左右两边的院墙
-     * 是清清楚楚的青砖，一眼就露馅。第一版把内面放在 0.13（贴着脸），正好被
-     * 板子（−0.5）挡死，等于没补。
+     * 它们原本是门脸的补丁：门脸的洞口是**柔边**（`SONG_WALL_FRAG` 的
+     * `rectHole` 有 0.06 的 smoothstep），洞口四周那圈半透明带子后面正是
+     * 这三块涂成 #e0e0e0 的板子 —— 用户 2026-10-08 报的「大门两边的白色
+     * 竖条」就是它们；后来涂成 `#585c5b`（青砖的实测值）才消掉。
      *
-     * 实测证据（`.workbuddy-ai/harness/probe-back-gate.mjs`，back 机位打射线）：
-     *   屏幕 (800,330) 第一命中 = `BoxGeometry{1.8,3.45,0.07}` local(0,2.52,−0.5)
-     *                            `MeshBasicMaterial #585c5b`   ← 板子
-     *                  第二命中 = `PlaneGeometry{10,6}` local(0,1.25,0.13)
-     *                            `ShaderMaterial side=1`        ← 内面（被挡）
-     *
-     * 0.06 是留给深度缓冲的余量：两者都是平行平面，0.06 世界单位在 30 单位
-     * 距离上仍有 ~80 个深度步，远不会 z-fight。
+     * 门楼合进屋身前墙之后，**洞是屋身墙上硬切的**（`GATE_HOLE`，不透明，
+     * 没有柔边），四周由门框从内洞口往外压住，所以既没有半透明带子、
+     * 也没有"板子"要补 —— 它们和门脸一起删了。
      */
-    const INNER_FACE_Z = WALL_PANEL_Z - wallThickness / 2 - 0.06;
-
-    /**
-     * Colour of those legacy panels.
-     *
-     * Sampled off the facade: the 青砖 around the opening reads (88, 92, 91)
-     * at the resting entrance camera. Painted #e0e0e0 they were the brightest
-     * thing in the frame (measured 205,205,205) and the facade's soft cut-out
-     * ramp turned them into a bright halo around the gate — see the long note
-     * on the panels below.
-     */
-    const WALL_REVEAL = '#585c5b';
 
     // --- Window hover ---------------------------------------------------
     // The opening is centred on x = 2.5 and is 1.4 wide, so its right edge is
@@ -820,7 +811,10 @@ const EntranceDoors = ({
     // AVATAR_SHOWN_X cannot simply be nudged right to centre the figure: the
     // ink is 1.28 wide against a 1.4 opening, so 2.5 is already within 0.02 of
     // the position that would clip the hand on the left jamb.
-    const WINDOW_X = 2.5;
+    //
+    // ⚠️ 2026-10-11：`WINDOW_X` 搬到 `config/entranceMetrics` 了 —— 窗看的那个
+    // 洞是屋身前墙挖的（`WINDOW_HOLE`），"窗"和"洞"分在两个文件里，
+    // 数字必须只有一个来源。
     const AVATAR_REST_X = 3.90;
     const AVATAR_SHOWN_X = WINDOW_X;
 
@@ -876,91 +870,34 @@ const EntranceDoors = ({
     // were only 1.46 wide, so the path was visibly narrower than the gate it
     // leads to. The extra width is grass, not stone, so nothing else moves.
     const pathWidth = frameWidth + 1.1;
-    // New texture is 1005x2317 (approx 1:2.3 ratio). 
-    // Width 3.06 * 2.3 = ~5.6 height.
-    const pathLength = 5.62;
+    // 甬路从踏跺前缘一直铺到**篱笆门口**（`FORECOURT_BACK_Z`），不再只铺
+    // 门口那一小段 —— 门前现在是一条 16 深的院子，铺装得走到底，否则路
+    // 在半路断在草地上，而篱笆正前方那个开口就通向一片草。
+    // 石板的纹理是**世界坐标程序化**的（STONE_FRAG 用 uOrigin/uSize 算板缝），
+    // 所以拉长只是多铺几块石板，不会被拉伸。
+    const pathLength = (I.FORECOURT_BACK_Z - position[2]) - STEP_FRONT_Z;
     // 甬路从踏跺前缘开始，不再从门平面开始 —— 门前那 1.7 米现在是抬高的
     // 台明和踏跺（见 GateBase），铺装接着它们往外走。
     const pathCenterZ = STEP_FRONT_Z + pathLength / 2;
 
-    // Procedural GPU textures (zero image assets — replaces AI-generated webp)
-    // The hole rects are authored in WORLD XY (same frame as the door group and
-    // the [2.5, 0] window prop), so the facade shader needs its bottom-left
-    // world corner to convert vUv -> world. Without it the openings never cut
-    // and the brick plane (z=0.15) hides the doors (z=0.06) completely.
-    // The facade's bottom edge sits ON the floor — that is the whole contract
-    // with the wall shader, which measures every band (plinth, brick courses,
-    // tile coping) upward from uOrigin.y. It used to be expressed as
-    // `wallCenterY + facadeYOffset + 1.65`, where the -1.65 and +1.65 cancelled
-    // and the result only equalled the floor because FACADE_H happened to be
-    // exactly corridorHeight. Say it directly instead.
-    const facadeCenterY = FACADE_CENTER_Y;
-    const wallInk = makeWallInkTexture(FACADE_W, FACADE_H);
-    // The cut-outs are the opening plus a small margin, so the doors and the
-    // frame show through without the brick clipping their edges.
-    const brickUniforms = useSeasonUniforms((season) => ({
-        ...makeSurfaceUniforms(
-            FACADE_W, FACADE_H,
-            [-FACADE_W / 2, facadeCenterY - FACADE_H / 2],
-            season
-        ),
-        uHoleDoor: { value: [0, doorCenterY, doorOpeningWidth / 2 + 0.07, doorHeight / 2 + 0.06] },
-        uHoleWindow: { value: [WINDOW_X, 0.02, 0.7, 0.73] },
-        uInk: { value: wallInk },
-        // ⚠️ This is one half of a pair — the other half is the palette in
-        // `makeWallInkTexture`. The effective mix is
-        // `leafAlpha × uInkStrength`, and the value that matters is whether
-        // the ink's G−R difference survives it. See the long note on the
-        // creeper's palette in utils/entranceArt.js: the old near-black green
-        // at 0.42 landed as 4/255 of chroma and read as a grey smudge. The
-        // palette is now mid-tone greens; this is the strength that lets them
-        // read. Lower it back towards 0.42 and the vine goes grey again.
-        //
-        // 0.86 → 0.96 on 2026-10-07 evening, together with the stroke alphas in
-        // `makeWallInkTexture` (leaf fill 0.36..0.74 → 0.58..0.94). The user's
-        // report was "有点半透明的模糊感": the ink layer is composited as
-        // `mix(brick, ink, ink.a × uInkStrength)`, so *both* factors leak the
-        // brick coursing through the foliage. Only the product matters, and it
-        // went 0.31..0.64 → 0.56..0.92. Do not raise this to 1.0: the ink is
-        // supposed to sit on plaster, and at full strength it competes with the
-        // coursing for attention (see the note in entranceTextures.js).
-        //
-        // 🔴 2026-10-09: the strength is now 0 HERE and WALL_INK_STRENGTH below
-        // lives on the ink overlay instead. The vine had to move in front of
-        // the 春联 (see INK_OVERLAY_FRAG). `mix(col, x, 0.0)` is exactly `col`,
-        // so the brick is bit-identical with the line left in place.
-        uInkStrength: { value: 0 }
-    }), [facadeCenterY, wallInk, doorCenterY, doorOpeningWidth, doorHeight]);
+    const wallInk = makeWallInkTexture(WALL_INK_W, WALL_INK_H);
 
-    /**
-     * 门脸**内面**的 uniform —— 与正面只差一处：**没有窗洞**。
+    /* 藤蔓 overlay 的竖向锚点。
      *
-     * 为什么不能直接复用 `brickUniforms`（那里面有 `uHoleWindow`）：
-     * 窗洞背后没有"窗内侧"可看，只有 legacy 的那三块 tunnel wall panel
-     * （`meshBasicMaterial` + `WALL_REVEAL`，无光照无纹理）。于是从院子里
-     * 看过去，窗的位置是**一块平整的灰板**贴在砖墙上 —— 比"没有窗"更像 bug。
-     * 见 `INNER_FACE_Z` 的注释与 `probe-back-gate.mjs`。
+     * 贴图里的藤是从「画布顶往下 8%」开始挂的（`makeWallInkTexture` 的
+     * `TOP = worldH * INK_TOP_FRAC`），而门脸没了之后这块 overlay 得自己
+     * 决定挂在哪一行 —— 判据只有一个：**让 TOP 落在屋身前墙的压顶下沿**，
+     * 藤才像是从黑瓦后面钻出来的。
      *
-     * `[0, 9999, 0, 0]` 是"这个洞不存在"的惯用写法（`HouseShell` 同款）：
-     * `rectHole` 的矩形被推到世界坐标 9999，整面都取不到洞。
+     * 反推出来的底边落在地面以下（≈ −2.78 < GRASS_Y），这是无害的：藤最长
+     * 的一缕也只到 0.29 × 画布高，下半张画布本来就是全透明的，而地面以下
+     * 那一段被不透明的地面挡掉。
      *
-     * ⚠️ 用**独立的一次** `useSeasonUniforms` 而不是 `useMemo` 包一层：
-     * 那个 hook 靠 `useRef` 锁对象身份、并且**每个调用点各自**在换季时把
-     * `.value` 写回自己那批对象。两次调用 = 两批身份，换季两边都跟得上；
-     * 而 `useMemo` 造出来的包装对象一旦重建，就会踩 `uniformsList` 那个坑
-     * （见 hooks/useSeasonUniforms.js 的文件头）。
+     * 宽度**故意保持 10**（= `WALL_INK_W`）：藤的位置是按 10 宽量出来的
+     * （runners 全落在 x ≥ 1.18，正好避开 2.5 那个窗），跟着屋身 22 宽改
+     * 就会爬到窗上。所以藤只爬大门两侧这一片墙，而不是整面 22 宽的墙。
      */
-    const innerFaceUniforms = useSeasonUniforms((season) => ({
-        ...makeSurfaceUniforms(
-            FACADE_W, FACADE_H,
-            [-FACADE_W / 2, facadeCenterY - FACADE_H / 2],
-            season
-        ),
-        uHoleDoor: { value: [0, doorCenterY, doorOpeningWidth / 2 + 0.07, doorHeight / 2 + 0.06] },
-        uHoleWindow: { value: [0, 9999, 0, 0] },
-        uInk: { value: wallInk },
-        uInkStrength: { value: 0 }
-    }), [facadeCenterY, wallInk, doorCenterY, doorOpeningWidth, doorHeight]);
+    const inkCenterY = I.HOUSE_COPING_Y - WALL_INK_H * INK_TOP_FRAC + WALL_INK_H / 2;
 
     /* The creeper, as its own layer in front of the couplets.
      *
@@ -1015,110 +952,20 @@ const EntranceDoors = ({
             <GateBase worldZ={position[2]} />
 
 
-            {/* === TUNNEL WALL PANELS (Z-BACKED) ===
-                这三块板是"门洞周围那圈墙"，从入口还是一条纯走廊的时候就留在这里。
-                现在 10×6 的青砖门脸（z = 0.15）把它们盖住 —— **但不是完全盖住**。
-
-                ⚠️ 2026-10-08：用户报「大门两边的白色竖条」就是它们。
-                门脸的洞口不是硬裁的：SONG_WALL_FRAG 里
-                    float hole = max(rectHole(uHoleDoor), rectHole(uHoleWindow));
-                    gl_FragColor = vec4(col, 1.0 - hole);
-                而 rectHole 是 `1.0 - smoothstep(0.0, 0.06, ...)`，所以洞口**四周
-                往外 0.06 世界单位**（在默认机位约 8 px）门脸是半透明的。那一条
-                半透明带子后面正是这块板：涂成 #e0e0e0（无光照 → 224）的板子从
-                青砖（实测 88,92,91）后面透出来，就是一道白边。
-
-                修法：板子代表的是"洞口周围那圈墙"，就按墙的颜色画。它们在视觉上
-                等于不存在了，而门脸那 0.06 的柔边无论透出多少都还是砖色。
-                别再改回 #e0e0e0 —— 那正是这条 bug 的成因。 */}
-
-            {/* LEFT WALL PANEL */}
-            <mesh position={[-(doorOpeningWidth / 2 + sideWallWidth / 2), wallCenterY, WALL_PANEL_Z]}>
-                <primitive object={sharedGeometry('box', sideWallWidth, corridorHeight, wallThickness)} attach="geometry" />
-                <meshBasicMaterial color={WALL_REVEAL} roughness={0.95} />
-            </mesh>
-
-            {/* RIGHT WALL PANEL */}
-            <mesh position={[(doorOpeningWidth / 2 + sideWallWidth / 2), wallCenterY, WALL_PANEL_Z]}>
-                <primitive object={sharedGeometry('box', sideWallWidth, corridorHeight, wallThickness)} attach="geometry" />
-                <meshBasicMaterial color={WALL_REVEAL} roughness={0.95} />
-            </mesh>
-
-            {/* TOP WALL PANEL */}
-            <mesh position={[0, topWallCenterY, WALL_PANEL_Z]}>
-                <primitive object={sharedGeometry('box', doorOpeningWidth, topWallHeight, wallThickness)} attach="geometry" />
-                <meshBasicMaterial color={WALL_REVEAL} roughness={0.95} />
-            </mesh>
-
-            {/* === SONG-DYNASTY WALL FACADE === */}
-            {/* 
-                DOSTOSOWANIE OBRAZKA (TEXTURE ADJUSTMENT):
-                1. args={[FACADE_W, FACADE_H]} - rozmiar elewacji; oba idą za
-                   corridorWidth / corridorHeight, więc zmieniaj je tam.
-                2. Pozycja pionowa NIE jest już osobna: `facadeCenterY` trzyma
-                   dolną krawędź elewacji na podłodze, bo shader mierzy od niej
-                   każdy pas (cokół, wątki cegły, gzyms). Przesunięcie jej w górę
-                   wsunęłoby cokół pod ziemię.
-                The surface itself (brick / plinth / tile coping / weathering)
-                is authored in shaders/entranceTextures.js; the ink creeper it
-                is overlaid with is drawn in utils/entranceArt.js.
-            */}
-            <mesh position={[0, facadeCenterY, 0.15]}>
-                {/* args={[Szerokość, Wysokość]} - Zmieniaj te liczby (np. 7, 8) */}
-                <primitive object={sharedGeometry('plane', FACADE_W, FACADE_H)} attach="geometry" />
-                <shaderMaterial
-                    vertexShader={SURFACE_VERT}
-                    fragmentShader={SONG_WALL_FRAG}
-                    uniforms={brickUniforms}
-                    transparent={true}
-                />
-            </mesh>
-
-            {/* === FACADE, INNER FACE (v1.2 · L1「背面清单」) ===
-                门脸原来只有朝外的一面（FrontSide，`transparent`）。院子能绕着看
-                之后，**从院子里面（−z 方向）看过去整片消失** —— 那面 10×6 的青砖
-                不见了，只剩门框和门扇，人从门洞直接看到走廊。
-
-                补一层**朝内**的同一面墙。做法说明：
-                · 用 `side={THREE.BackSide}` 而**不是**把几何绕 Y 转 180°：
-                  转过去 vUv 会左右镜像，砖缝/瓦当会跟正面错开；BackSide 的
-                  顶点属性一字不动，两面的砖缝严丝合缝。
-                · 🔴 z 取 `INNER_FACE_Z`（≈ −0.6），**必须落在门口那三块 tunnel
-                  wall panel（局部 z = −0.5）的前面** —— 第一版放在 0.13 被它们
-                  挡死，从院子里看到的还是那块无纹理的灰板。详见 INNER_FACE_Z
-                  的注释与 `probe-back-gate.mjs` 的实测。
-                · 砖缝按**世界坐标**算（`uOrigin + vUv*uSize`），所以把平面从
-                  0.13 挪到 −0.6 不会让两面的砖缝错位 —— 与 z 无关。
-                · 用自己的 `innerFaceUniforms`（**不是** `brickUniforms`）：门洞照旧
-                  是通的，但**窗洞被关掉** —— 窗背后只有那三块无纹理的板子，
-                  留着洞就是从院子里看到一块平整的灰板。见上面 innerFaceUniforms
-                  的注释。两批 uniform 各自被 `useSeasonUniforms` 锁着身份、各自
-                  在换季时更新，所以不会出现"里面冻在上一季"。
-                · `transparent` 跟正面保持一致：门洞边缘是 0.06 单位的软过渡，
-                  写死不透明会变成一圈硬边。 */}
-            <mesh position={[0, facadeCenterY, INNER_FACE_Z]}>
-                <primitive object={sharedGeometry('plane', FACADE_W, FACADE_H)} attach="geometry" />
-                <shaderMaterial
-                    vertexShader={SURFACE_VERT}
-                    fragmentShader={SONG_WALL_FRAG}
-                    uniforms={innerFaceUniforms}
-                    transparent={true}
-                    side={THREE.BackSide}
-                />
-            </mesh>
-
             {/* === CREEPER INK (its own layer, in front of the 春联) ===
-                Same quad as the facade, 0.03 in front of it, so the vine draws
-                over anything mounted flat on the wall — which is the whole
-                point: a real creeper stands proud of the plaster and a paper
-                couplet does not. renderOrder 7 puts it above the couplets (6)
-                and below the tree (8), and because it never writes depth the
-                tree still wins wherever it is opaque.
+                那块 10×6 的青砖门脸没了 —— 它就是屋身的前墙（见 `HouseShell`），
+                砖缝 / 压顶 / 洞口都由那边出。但**藤蔓留在这一层**：它必须画在
+                对联**前面**，而对联是本组件挂的。所以它现在是一块"只有藤"的
+                透明四边形，贴在屋身前墙之前 0.03（局部 0.18，墙在 0.15）。
 
-                The wall shader is handed uInkStrength 0, so the ink is drawn
-                exactly once — here. See INK_OVERLAY_FRAG for the reasoning. */}
-            <mesh position={[0, facadeCenterY, INK_OVERLAY_Z]} renderOrder={7}>
-                <primitive object={sharedGeometry('plane', FACADE_W, FACADE_H)} attach="geometry" />
+                ⚠️ 它的竖向位置由**压顶下沿**反推（见 `inkCenterY` 的注释）——
+                门脸还在的时候它跟门脸共用一个中心，现在得自己算，算错藤就挂到
+                屋面以上、浮在屋顶外面。
+
+                renderOrder 7 让它压在对联（6）之上、柿子树（8）之下；因为它
+                不写深度，树在它不透明的地方仍然赢。见 INK_OVERLAY_FRAG。 */}
+            <mesh position={[0, inkCenterY, INK_OVERLAY_Z]} renderOrder={7}>
+                <primitive object={sharedGeometry('plane', WALL_INK_W, WALL_INK_H)} attach="geometry" />
                 <shaderMaterial
                     vertexShader={SURFACE_VERT}
                     fragmentShader={INK_OVERLAY_FRAG}

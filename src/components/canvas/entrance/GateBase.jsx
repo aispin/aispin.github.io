@@ -1,8 +1,7 @@
 import { useMemo } from 'react';
-import * as THREE from 'three';
 
 import {
-    SURFACE_VERT, SONG_WALL_FRAG, STONE_FRAG, makeSurfaceUniforms,
+    SURFACE_VERT, STONE_FRAG, makeSurfaceUniforms,
 } from '../../../shaders/entranceTextures';
 import { makeThresholdTexture } from '../../../utils/gateArt';
 import {
@@ -11,26 +10,39 @@ import {
     STEP_W, STEP_DEPTH, STEP_TOP_Y,
     THRESHOLD_W, THRESHOLD_H, THRESHOLD_D, THRESHOLD_Z,
     PIVOT_W, PIVOT_H, PIVOT_D, PIVOT_X,
-    PLINTH_W, PLINTH_H, PLINTH_Z,
 } from '../../../config/entranceMetrics';
-import { sharedGeometry, blankInk } from '../../../engine/resources';
+import { sharedGeometry } from '../../../engine/resources';
 // 台明 / 踏跺的顶面用 STONE_FRAG，冬天会落一层薄雪（见 shader 里的 uSnow），
 // 所以这两块也要跟着季节走 —— 否则雪后的院子里只有门前那块石头是干的。
 import { useSeasonUniforms } from '../../../hooks/useSeasonUniforms';
 
 /**
- * GateBase — 门座：台基 / 台明 / 踏跺 / 门槛 / 门枕石
- * ==================================================
+ * GateBase — 门座：台明 / 踏跺 / 门槛 / 门枕石
+ * ============================================
  *
  * WHY THIS IS A SEPARATE COMPONENT
  * --------------------------------
- * 这五件东西是「一座宅子的门」和「一堵有门的墙」之间唯一的差别，而且它们
+ * 这几件东西是「一座宅子的门」和「一堵有门的墙」之间唯一的差别，而且它们
  * 互相咬合（台明的高度决定踏跺的踢面，门槛的宽度决定门枕石的位置），
  * 任何一件单独挪动都会让另外几件对不上。把它们放在一个文件里、尺寸全部
  * 从 config/entranceMetrics 派生，就不会再出现「改了门高忘了改横批」那类
  * drift —— EntranceDoors 已经 1200 行，它只需要说"这儿有座门座"。
  *
  * 换一个门、换一套尺寸，这个组件可以整体复用。
+ *
+ * ⚠️ 2026-10-11：**第五件「台基」删掉了**。它原来是 10 宽（`PLINTH_W =
+ * FACADE_W`）、0.30 高、停在门脸之前 0.05 的一块青石勒脚，存在的理由是
+ * 那面 10×6 的门脸**底下是空的** —— 门脸下沿在 FLOOR_Y，而室外地面在
+ * OUTDOOR_Y，中间那 0.30 得有人填。
+ *
+ * 门脸并进屋身前墙之后这个理由消失了：屋身前墙自己就从 `GRASS_Y` 起画，
+ * 而且 `SONG_WALL_FRAG` 的勒脚段（`plinthTop = 0.62`，用**世界坐标**
+ * 算石缝）已经给了它一条连续的青石墙脚。再叠一块 10 宽的同款青石，只会
+ * 在 22 宽的墙上留下一道**只有 10 宽的勒脚**，而且两块面的石缝相位差
+ * 0.04（`OUTDOOR_Y` vs `GRASS_Y`）⇒ 接缝处石头对不上。
+ *
+ * 判据：`SONG_WALL_FRAG` 里 `plinthTop` 是**墙自己**的常数，与调用方无关，
+ * 所以"墙有没有勒脚"不需要外部构件来回答。
  *
  * ---------------------------------------------------------------------------
  * 标高（这是这个组件存在的理由）
@@ -54,39 +66,13 @@ import { useSeasonUniforms } from '../../../hooks/useSeasonUniforms';
  * "这是一个可以踩上去的台子"。
  *
  * 台明/踏跺的顶面故意用和甬路同一套 STONE_FRAG（暖调石板），让"门前这一片
- * 铺装"是连续的；台基用 SONG_WALL_FRAG 的勒脚（冷调青石），因为它是墙脚
- * 而不是地面。冷暖分开是有意的：青石是墙，石板是路。
+ * 铺装"是连续的；墙脚那条青石勒脚则由屋身前墙自己出（见上）。冷暖分开是
+ * 有意的：青石是墙，石板是路。
  */
 const GateBase = ({ worldZ = 0 }) => {
     // 台明：从门平面稍后一点一直伸到踏跺前缘
     const apronCenterZ = APRON_FRONT_Z - APRON_DEPTH / 2;
     const stepCenterZ = APRON_FRONT_Z + STEP_DEPTH / 2;
-
-    // 台基用墙的 shader，但关掉压顶（uCapFrac > 1 = 这面"墙"没有瓦顶），
-    // 于是 0.30 高的整块面都落在勒脚那一段里，直接就是青石。
-    //
-    // 🔴 2026-10-10：这**也要走季节** —— 它原来是 `useMemo(() => ({...makeSurfaceUniforms(
-    //    PLINTH_W, PLINTH_H, [-PLINTH_W/2, OUTDOOR_Y])...}))`，**没传 season**，
-    //    于是吃到 `makeSurfaceUniforms` 的默认值 `autumn` ⇒ `uSnow` 恒为 0。
-    //    后果：台明/踏跺的顶面（下面两块，走了 useSeasonUniforms）冬天都落雪了，
-    //    唯独**它们脚下那圈台基还是干的** —— 正是本文件开头那句"雪后的院子里只有
-    //    门前那块石头是干的"又犯了一次，只是换了一层。
-    //
-    //    查法（可复现）：`harness/identify-stuck-ground.mjs` —— 它遍历整个场景，
-    //    打印所有 `uSnow === 0` 的贴地 mesh。修之前恰好命中这一块
-    //    （PlaneGeometry 10×0.3 @ world z=22.1，uGrassA 是秋天的 0.408,0.514,0.298）。
-    //    ⚠️ 这类 bug **不会报错、也不会崩**，只会让一块面停在旧季节 —— 所以
-    //    "给 makeSurfaceUniforms 传 season" 这条必须靠工具查，不能靠眼睛。
-    const plinthUniforms = useSeasonUniforms((season) => ({
-        ...makeSurfaceUniforms(PLINTH_W, PLINTH_H, [-PLINTH_W / 2, OUTDOOR_Y], season),
-        // 台基上没有门窗洞，把洞推到很远 —— 否则门洞的 discard 会在石台中间
-        // 挖掉一块。
-        uHoleDoor: { value: [0, 9999, 0, 0] },
-        uHoleWindow: { value: [0, 9999, 0, 0] },
-        uInk: { value: blankInk() },
-        uInkStrength: { value: 0 },
-        uCapFrac: { value: 2.0 },
-    }), []);
 
     // 顶面：uInLawn = 0 —— 这块石板不挨着草。抬高的石台不会长草边，
     // 石缝里也不会长苔；草边和石缝的苔都是"铺装与草坪相接"的解法，
@@ -119,16 +105,6 @@ const GateBase = ({ worldZ = 0 }) => {
 
     return (
         <group>
-            {/* === 台基 — 整面墙脚下的青石勒脚 === */}
-            <mesh position={[0, OUTDOOR_Y + PLINTH_H / 2, PLINTH_Z]}>
-                <primitive object={sharedGeometry('plane', PLINTH_W, PLINTH_H)} attach="geometry" />
-                <shaderMaterial
-                    vertexShader={SURFACE_VERT}
-                    fragmentShader={SONG_WALL_FRAG}
-                    uniforms={plinthUniforms}
-                />
-            </mesh>
-
             {/* === 台明 — 门前那块抬高的石台 === */}
             <mesh position={[0, OUTDOOR_Y + OUTDOOR_DROP / 2, apronCenterZ]}>
                 <primitive object={sharedGeometry('box', APRON_W, OUTDOOR_DROP, APRON_DEPTH)} attach="geometry" />

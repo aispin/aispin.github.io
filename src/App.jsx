@@ -142,6 +142,11 @@ function DebugBridge() {
         phase: scene.teleportPhase,
         isTeleporting: scene.isTeleporting,
         pending: scene.pendingDoorClick,
+        // WO-6 封口③ 的验收要用它：退到门前会先置 `houseExitRequested`，
+        // **然后** `HouseExit` 把相机滑到 z = 28，最后才 `markExited()`。
+        // 也就是说滑行全程 `hasEntered` 仍是 true —— 光看 `hasEntered` 分不清
+        // "玩家在往后退"和"退出动画在把相机拉出去"。见 probe-corridor-seal.mjs。
+        houseExitRequested: scene.houseExitRequested,
       }),
       // Force-snap into a room: bypass paper / door animation entirely.
       snap: (id) => {

@@ -311,7 +311,7 @@ const InspectableFrame = ({ frame, wallX, frameTexture, framePaintedTexture, fra
     );
 };
 
-const CorridorDecorations = ({ segmentLength, zOffset, corridorWidth = 4, corridorHeight = 3.5, zClip = 100000, setCameraOverride }) => {
+const CorridorDecorations = ({ segmentLength, zOffset, corridorWidth = 4, corridorHeight = 3.5, setCameraOverride }) => {
 
     const wallX = corridorWidth / 2 - 0.01;
     const floorY = -corridorHeight / 2;
@@ -464,7 +464,7 @@ const CorridorDecorations = ({ segmentLength, zOffset, corridorWidth = 4, corrid
     return (
         <group>
             {/* === LAMPY SUFITOWE === */}
-            {lights.filter(light => light.z <= zClip).map((light, i) => {
+            {lights.map((light, i) => {
                 return (
                     <group key={`light-${i}`} position={[0, ceilingY, light.z]}>
                         {/* Obudowa lampy - podłużny prostokąt 3D */}
