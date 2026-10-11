@@ -5,7 +5,7 @@
  * 为什么是一对自定义 shader 而不是 `meshStandardMaterial`
  * -------------------------------------------------------
  * ① **风摆**。竹篱是院子里唯一"活着"的硬质构件，全项目其它硬表面都是死的。
- *    摆幅由 uniform `uWind` 给（默认 0.05 —— 篱笆该比竹林（`BAMBOO_WIND`
+ *    摆幅由 uniform `uWind` 给（默认 0.05 —— 篱笆该比森林（`FOREST_WIND`
  *    0.34）安静一个量级，它是被绑住的）。
  * ② `meshStandardMaterial` 在这个场景里**接近全黑**：`SceneLighting` 没开
  *    阴影、没有 envMap、没上 toneMapping，标准材质拿不到可用的间接光。

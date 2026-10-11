@@ -15,6 +15,7 @@ import {
     PERSIMMON_H, buildPersimmonTree, makeLeafTuftGeometry, makeFruitGeometry,
 } from '../../../utils/persimmonTree';
 import { seasonLightFor } from '../../../config/seasonLight';
+import { toShaderColor } from '../../../config/theme';
 import { WindChime } from './EntranceProps';
 
 /**
@@ -156,7 +157,7 @@ export function PersimmonTree({ position = [0, 0, 0], yaw = 0, rootY = 0 }) {
         bm.uniforms.uTime.value = state.clock.elapsedTime;
         const fog = scene.fog;
         if (fog) {
-            bm.uniforms.uHaze.value.copy(fog.color);
+            toShaderColor(fog.color, bm.uniforms.uHaze.value);
             bm.uniforms.uHazeNear.value = fog.near;
             bm.uniforms.uHazeFar.value = fog.far;
         }

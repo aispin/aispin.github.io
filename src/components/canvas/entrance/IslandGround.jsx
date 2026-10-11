@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { sharedGeometry } from '../../../engine/resources';
 import { useSeasonUniforms } from '../../../hooks/useSeasonUniforms';
 import { makeSurfaceUniforms } from '../../../shaders/entranceTextures';
+import { toShaderColor } from '../../../config/theme';
 import { ISLAND_VERT, ISLAND_FRAG, islandSeasonUniforms } from '../../../shaders/islandTextures';
 import * as I from '../../../config/island';
 
@@ -61,7 +62,10 @@ export function IslandGround() {
         mat.uniforms.uTime.value = state.clock.elapsedTime;
         const fog = scene.fog;
         if (fog) {
-            mat.uniforms.uHaze.value.copy(fog.color);
+            // 🔴 自定义 shader 不过色彩空间编码 ⇒ 雾色必须转成屏幕值，
+            //    否则"完全化雾的远海"比真正的雾（内置材质那条）更暗更橙，
+            //    地平线上会留一道**看得出**的接缝。见 config/theme.js。
+            toShaderColor(fog.color, mat.uniforms.uHaze.value);
             mat.uniforms.uHazeNear.value = fog.near;
             mat.uniforms.uHazeFar.value = fog.far;
         }

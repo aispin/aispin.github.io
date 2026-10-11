@@ -28,12 +28,19 @@
  */
 import { SCENE, LIGHTS, NIGHT } from './theme';
 
-/** 秋天的白天 = 现状，逐字引用。 */
+/**
+ * 秋天的白天。
+ *
+ * ⚠️ 2026-10-12（WO-14，DR-A 答"要"）：**颜色仍然逐字引用** `theme.js`，
+ *    但雾距不再引用 —— 它跟着其余七态一起拉远（60 → 118）。理由见文件头
+ *    「雾就是世界边界」那段：拉远雾之后，`SCENE.fogNear/Far` 只是"拉到
+ *    什么程度"的起点，不再是任一态的真值。
+ */
 const AUTUMN_DAY = {
     sky: SCENE.background,
     haze: SCENE.fogColor,
-    fogNear: SCENE.fogNear,
-    fogFar: SCENE.fogFar,
+    fogNear: 24,
+    fogFar: 118,
     ambient: { ...LIGHTS.ambient },
     key: { ...LIGHTS.key },
     fill: { ...LIGHTS.fill },
@@ -44,8 +51,8 @@ const AUTUMN_NIGHT = {
     veil: { ...NIGHT.veil },
     sky: NIGHT.sky,
     haze: NIGHT.haze,
-    fogNear: NIGHT.fogNear,
-    fogFar: NIGHT.fogFar,
+    fogNear: 19,
+    fogFar: 88,
     ambient: { ...NIGHT.lights.ambient },
     key: { ...NIGHT.lights.key },
     fill: { ...NIGHT.lights.fill },
@@ -63,8 +70,8 @@ export const SEASON_LIGHT = {
         day: {
             sky: '#EAF3E6',
             haze: '#DCE9D9',
-            fogNear: 20,
-            fogFar: 66,
+            fogNear: 26,
+            fogFar: 118,
             ambient: { color: '#E9F0DE', intensity: 2.25 },
             key: { color: '#FFF4D6', intensity: 0.92, position: [5, 8.5, 5] },
             fill: { color: '#C8DEEA', intensity: 0.38, position: [-5, 8, -10] },
@@ -73,8 +80,8 @@ export const SEASON_LIGHT = {
             veil: { r: 0.42, g: 0.46, b: 0.62 },
             sky: '#2E3550',
             haze: '#252C42',
-            fogNear: 15,
-            fogFar: 48,
+            fogNear: 20,
+            fogFar: 92,
             ambient: { color: '#7E8EC6', intensity: 1.05 },
             key: { color: '#B2C8F5', intensity: 0.55, position: [5, 8.5, 5] },
             fill: { color: '#7084BA', intensity: 0.16, position: [-5, 8, -10] },
@@ -86,8 +93,8 @@ export const SEASON_LIGHT = {
         day: {
             sky: '#FFF6E0',
             haze: '#FFE8C2',
-            fogNear: 16,
-            fogFar: 58,
+            fogNear: 22,
+            fogFar: 128,
             ambient: { color: '#FFEAC0', intensity: 2.35 },
             key: { color: '#FFD684', intensity: 1.18, position: [4, 12.5, 4] },
             fill: { color: '#BADAF0', intensity: 0.30, position: [-5, 9, -10] },
@@ -96,8 +103,8 @@ export const SEASON_LIGHT = {
             veil: { r: 0.36, g: 0.42, b: 0.60 },
             sky: '#262C48',
             haze: '#1F2540',
-            fogNear: 15,
-            fogFar: 48,
+            fogNear: 20,
+            fogFar: 96,
             ambient: { color: '#7A88C0', intensity: 1.00 },
             key: { color: '#A8C0F2', intensity: 0.50, position: [4, 12.5, 4] },
             fill: { color: '#6C7FB4', intensity: 0.15, position: [-5, 9, -10] },
@@ -113,8 +120,8 @@ export const SEASON_LIGHT = {
         day: {
             sky: '#E9EEF3',
             haze: '#DEE5EB',
-            fogNear: 12,
-            fogFar: 42,
+            fogNear: 17,
+            fogFar: 96,
             ambient: { color: '#E0E8F0', intensity: 2.00 },
             key: { color: '#FFF1DE', intensity: 0.72, position: [6, 4.5, 5] },
             fill: { color: '#B4C6DA', intensity: 0.30, position: [-5, 6, -10] },
@@ -123,8 +130,8 @@ export const SEASON_LIGHT = {
             veil: { r: 0.54, g: 0.60, b: 0.76 },
             sky: '#3E4A66',
             haze: '#333D56',
-            fogNear: 10,
-            fogFar: 36,
+            fogNear: 14,
+            fogFar: 76,
             ambient: { color: '#8C9CCE', intensity: 1.15 },
             key: { color: '#C0D4F8', intensity: 0.58, position: [6, 4.5, 5] },
             fill: { color: '#7A8CC0', intensity: 0.18, position: [-5, 6, -10] },

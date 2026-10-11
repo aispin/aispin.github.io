@@ -166,6 +166,28 @@ export const NIGHT = {
  *
  * Returns the hex string three's Color constructor wants.
  */
+/**
+ * 把 three 的 `Color`（内部是**线性 sRGB**）转成"能直接写进 gl_FragColor 的屏幕值"。
+ *
+ * 🔴 为什么必须转
+ * --------------
+ * three 的 `Color` 从十六进制构造时会做 sRGB→线性 的转换（`ColorManagement` 默认开），
+ * 而**自定义 `ShaderMaterial` 的 fragment 输出不过色彩空间编码**（three 只在内置材质里
+ * 插那段 chunk，见仓库里其它几处同样的说明）。于是直接 `gl_FragColor = vec4(fog.color)`
+ * 等于把**线性值当屏幕值**用 —— 画面比应有的**更暗、更橙**（实测：夏季雾色
+ * `#FFE8C2` 的线性值是 `(1.0, 0.803, 0.559)`，屏幕上一眼就是橙的）。
+ *
+ * ⚠️ 什么时候**不需要**转：色板本来就是按「sRGB 0..1，色板中点 ≈ 屏幕色」手写的
+ * 常数数组（`SEASON_PLANT` / `SEASON_FOXTAIL` / `SEASON_TREE` / `SEASON_FOREST`）。
+ * 只有**从 `THREE.Color` 拷过来**的那几个（雾色 / 天空色）才要过这一道。
+ *
+ * @param {import('three').Color} src 线性色的来源（`scene.fog.color` / `EP.sky` …）
+ * @param {import('three').Color} dst 写进 uniform 的那个（**就地改写**）
+ */
+export function toShaderColor(src, dst) {
+    return dst.copy(src).convertLinearToSRGB()
+}
+
 export function unmultiplyVeil(skyHex, veil = NIGHT_VEIL) {
     const m = skyHex.replace('#', '')
     const ch = [0, 2, 4].map((i) => parseInt(m.slice(i, i + 2), 16) / 255)

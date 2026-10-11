@@ -27,7 +27,7 @@ import { useScene } from '../../context/SceneContext';
 import IslandGround from './entrance/IslandGround';
 import ForecourtFence from './entrance/ForecourtFence';
 import HouseShell from './entrance/HouseShell';
-import BambooGrove from './entrance/BambooGrove';
+import DreamForest from './entrance/DreamForest';
 import DebugFlyCamera from './entrance/DebugFlyCamera';
 import { resolveCameraMode, CAMERA_MODE, isFlyEnabled } from '../../config/cameraMode';
 
@@ -111,7 +111,7 @@ const Experience = ({ onSceneReady, performanceTier }) => {
      *   · `ForecourtFence` 同上                          ⇒ 在
      *   · **`EntranceDoors` 只写了 `!hasEntered`**       ⇒ **不在**
      *     ⇒ 前墙上留下一个没有门框、没有门扇的**洞**。
-     *   · `IslandGround` / `SignSystem` / `BambooGrove` / `WeatherLayer` 同理。
+     *   · `IslandGround` / `SignSystem` / `DreamForest` / `WeatherLayer` 同理。
      *
      * ⇒ 于是"一面墙 + 一个洞"就成了用户看到的东西。
      *
@@ -252,7 +252,7 @@ const Experience = ({ onSceneReady, performanceTier }) => {
                 <ForecourtFence />
             )}
             {outdoorVisible && (
-                <BambooGrove lowTier={isLowTier} />
+                <DreamForest lowTier={isLowTier} />
             )}
 
             {/* === 自由飞行调试相机（?fly 才开）===

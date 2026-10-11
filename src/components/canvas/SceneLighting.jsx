@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
-import { unmultiplyVeil } from '../../config/theme'
+import { unmultiplyVeil, toShaderColor } from '../../config/theme'
 import { seasonLightFor } from '../../config/seasonLight'
 import { useSitePreferences } from '../../context/SitePreferences'
 import { useSeason } from '../../hooks/useSeason'
@@ -136,6 +136,71 @@ const VEIL_FRAG = /* glsl */`
 
 const lerp = (a, b, t) => a + (b - a) * t
 
+/* ------------------------------------------------------------------ */
+/* 天空穹顶（2026-10-12，WO-14 / DR-A 答"要"）                          */
+/*                                                                     */
+/* 为什么需要一个真的穹顶，而不是只把 `scene.background` 换个颜色        */
+/* ------------------------------------------------------------------ */
+/* 雾拉远之后（`seasonLight.js`：fogFar 36~66 → 76~128），**地平线会露   */
+/* 出来** —— 而 `scene.background` 是一个**平色**，平色在"天"和"海"上    */
+/* 抹的是同一个颜色，地平线就无从谈起。                                   */
+/*                                                                     */
+/* 于是：地平线 = 雾色（和"远方全部化进霾里"的地面**逐位接上**），         */
+/* 天顶 = 那一季的天空色，中间一条渐变；再按主光方位加一点暖晕。          */
+/*                                                                     */
+/* 🔴 地平线以下**必须**是雾色，不能压暗、不能加别的渐变                  */
+/* ------------------------------------------------------------------ */
+/* 地面是一张有限大的平面，在 `camera.far` 处被裁掉；裁不掉的那一段早就  */
+/* 完全化进雾里了（`fogFar` ≤ 128 < 150）。所以"地面被裁掉之后露出来的    */
+/* 那一块"必须正好等于雾色，否则地平线上会出现一条**硬边**。             */
+/* 想要"海平线"的观感，靠的是"雾色 vs 天顶色"这个差 —— 而不是在地平线   */
+/* 下面再压一道暗色（那会立刻露馅）。                                    */
+/*                                                                     */
+/* 其余三条：半径必须 < `camera.far`（138 = 150 × 0.92）、每帧跟着相机   */
+/* 走（否则走两步天空就歪了）、`depthWrite: false` + `renderOrder -1000` */
+/* （永远最先画、且不写深度）。⚠️ 夜间的 veil 在 renderOrder 999，会把  */
+/* 它一起乘 —— 和以前 `scene.background` 的待遇一致，不用额外处理。     */
+/* ------------------------------------------------------------------ */
+
+const SKY_RADIUS_SCALE = 0.92;
+
+const SKY_VERT = /* glsl */`
+    varying vec3 vDir;
+    void main() {
+        // 局部坐标归一化就是方向（球心在原点，且整球跟着相机走）
+        vDir = normalize(position);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+`
+
+const SKY_FRAG = /* glsl */`
+    uniform vec3 uZenith;
+    uniform vec3 uHorizon;
+    uniform vec3 uGlow;
+    uniform vec3 uSunDir;
+    uniform float uGlowAmt;
+    varying vec3 vDir;
+
+    void main() {
+        float h = vDir.y;
+
+        // 天顶 → 地平线。「-0.06」而不是 0：让「就贴着地平线的那一圈」也已经
+        // 是雾色，和地面完全化雾的那一段对齐。
+        float t = smoothstep(-0.06, 0.55, h);
+        vec3 c = mix(uHorizon, uZenith, t);
+
+        // 太阳方位的地平线暖晕：一条很淡的横向亮带，只在太阳那一侧。
+        // ⚠️ 变量名**不能叫 flat** —— three 在 WebGL2 下按 GLSL ES 3.00 编译，
+        //    而「flat」在那里是**插值限定符关键字**，会报「'flat' : syntax error」
+        //    并且整个 fragment shader 都不编译（背景直接退回 scene.background）。
+        vec2 flatDir = normalize(vec2(uSunDir.x, uSunDir.z) + 1e-5);
+        float d = max(dot(normalize(vec2(vDir.x, vDir.z) + 1e-5), flatDir), 0.0);
+        c += uGlow * uGlowAmt * pow(d, 3.0) * smoothstep(0.42, -0.02, h);
+
+        gl_FragColor = vec4(c, 1.0);
+    }
+`
+
 const SceneLighting = ({ isLowTier = false }) => {
     const { theme } = useSitePreferences()
     const night = theme === 'dark'
@@ -151,8 +216,21 @@ const SceneLighting = ({ isLowTier = false }) => {
     const sky = useRef(new THREE.Color(EP.day.sky))
 
     const scene = useThree((state) => state.scene)
+    const camera = useThree((state) => state.camera)
 
     const veilUniforms = useRef({ uTint: { value: new THREE.Color(1, 1, 1) } })
+
+    // 天空穹顶：几何体只有一份，颜色每帧（其实是每次昼夜/换季过渡时）写一次。
+    const skyRef = useRef()
+    const skyUniforms = useRef({
+        uZenith: { value: new THREE.Color(EP.day.sky) },
+        uHorizon: { value: new THREE.Color(EP.day.haze) },
+        uGlow: { value: new THREE.Color(EP.day.key) },
+        uSunDir: { value: new THREE.Vector3(5, 8.5, 5).normalize() },
+        uGlowAmt: { value: 0.12 },
+    })
+    // 每帧复用的临时量（不分配）
+    const sunScratch = useRef(new THREE.Vector3())
 
     // 0 = full day, 1 = full night. -1 means "nothing written yet": the first
     // frame snaps straight to the current theme rather than fading in from
@@ -173,6 +251,11 @@ const SceneLighting = ({ isLowTier = false }) => {
     const lastSeason = useRef(season)
 
     useFrame((_, delta) => {
+        // 🔴 穹顶跟相机走这一步**必须在下面那个"已稳定就 return"之前** ——
+        //    否则每次昼夜过渡结束后天空就冻在最后一次的位置上，相机一走
+        //    它就歪。
+        if (skyRef.current) skyRef.current.position.copy(camera.position)
+
         if (lastSeason.current !== season) {
             lastSeason.current = season
             t.current = -1
@@ -216,6 +299,25 @@ const SceneLighting = ({ isLowTier = false }) => {
         }
         /* eslint-enable react-hooks/immutability */
 
+        // --- 天空穹顶 ---
+        // ⚠️ 三个都要过 `toShaderColor`：先在线性空间插值（那是物理上对的），
+        //    再转成屏幕值 —— 否则天会明显更暗更橙（见 `config/theme.js`）。
+        const S = skyUniforms.current
+        toShaderColor(S.uZenith.value.copy(D.sky).lerp(N.sky, k), S.uZenith.value)
+        toShaderColor(S.uHorizon.value.copy(D.haze).lerp(N.haze, k), S.uHorizon.value)
+        toShaderColor(S.uGlow.value.copy(D.key).lerp(N.key, k), S.uGlow.value)
+        // 太阳方位：把两端的灯位插值之后再归一化
+        sunScratch.current.set(D.keyPos[0], D.keyPos[1], D.keyPos[2]).normalize()
+        const nx = N.keyPos[0], ny = N.keyPos[1], nz = N.keyPos[2]
+        const nl = Math.hypot(nx, ny, nz) || 1
+        sunScratch.current.lerp(
+            new THREE.Vector3(nx / nl, ny / nl, nz / nl),
+            k
+        ).normalize()
+        skyUniforms.current.uSunDir.value.copy(sunScratch.current)
+        // 白天光晕强一点（太阳在那儿），夜里几乎只剩一点天光
+        skyUniforms.current.uGlowAmt.value = lerp(0.12, 0.045, k)
+
         // --- the veil ---
         veilUniforms.current.uTint.value.copy(D.veil).lerp(N.veil, k)
 
@@ -245,6 +347,19 @@ const SceneLighting = ({ isLowTier = false }) => {
                 <fog>, because this component resolves the theme on its first
                 render — so the very first painted frame is already right. */}
             <fog attach="fog" args={[EP.day.haze.getHex(), EP.day.fogNear, EP.day.fogFar]} />
+
+            {/* 天空穹顶。`frustumCulled={false}` 必需 —— 它每帧被搬到相机位置，
+                自动包围球会在搬之前把它剔掉。 */}
+            <mesh ref={skyRef} renderOrder={-1000} frustumCulled={false} raycast={() => null}>
+                <sphereGeometry args={[camera.far * SKY_RADIUS_SCALE, 32, 16]} />
+                <shaderMaterial
+                    vertexShader={SKY_VERT}
+                    fragmentShader={SKY_FRAG}
+                    uniforms={skyUniforms.current}
+                    side={THREE.BackSide}
+                    depthWrite={false}
+                />
+            </mesh>
 
             <ambientLight
                 ref={ambientRef}

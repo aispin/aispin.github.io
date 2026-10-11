@@ -1105,6 +1105,64 @@ export function treeSeasonUniforms(season = 'autumn') {
     };
 }
 
+/* ------------------------------------------------------------------ */
+/* 梦幻森林（WO-15，2026-10-12）                                        */
+/*                                                                     */
+/* 用户参考图三张：巨树 + **发光的绿球冠**、细杆顶着圆球、雾化的一层层球。 */
+/* 所以这一套色板只有四个量：树干 A/B、球受光/背光，外加一个**边缘透光色**。*/
+/*                                                                     */
+/* 🔴 `ballRim`（边缘透光）是这一套里**唯一不能省**的。参考图里那些球读起来 */
+/*    像"里面装着光"，靠的就是背光那一圈泛绿 —— 少了它整片森林会变成一堆 */
+/*    墨绿的塑料球，"梦幻"两个字就没有了。                              */
+/* ------------------------------------------------------------------ */
+
+export const SEASON_FOREST = {
+    /* 春：新叶的嫩绿，果球偏黄绿；边缘透光也最亮（春雾本来就透）。 */
+    spring: {
+        trunkA: [0.278, 0.247, 0.216],
+        trunkB: [0.361, 0.325, 0.286],
+        ballLit: [0.322, 0.545, 0.263],
+        ballDark: [0.098, 0.196, 0.098],
+        ballRim: [0.616, 0.867, 0.478],
+    },
+    /* 夏 = 参照季（参考图就是盛夏的浓绿）。 */
+    summer: {
+        trunkA: [0.263, 0.235, 0.204],
+        trunkB: [0.337, 0.302, 0.267],
+        ballLit: [0.216, 0.451, 0.208],
+        ballDark: [0.063, 0.149, 0.078],
+        ballRim: [0.541, 0.839, 0.400],
+    },
+    /* 秋：球冠转琥珀，但**不转成枯黄** —— 这是"幻想森林"，不是落叶林。 */
+    autumn: {
+        trunkA: [0.251, 0.216, 0.184],
+        trunkB: [0.318, 0.278, 0.231],
+        ballLit: [0.478, 0.435, 0.196],
+        ballDark: [0.176, 0.153, 0.063],
+        ballRim: [0.839, 0.702, 0.322],
+    },
+    /* 冬：冷、灰、几乎不发光（雪把天光反上来，所以 rim 偏冷白而不是绿）。 */
+    winter: {
+        trunkA: [0.235, 0.231, 0.231],
+        trunkB: [0.310, 0.306, 0.306],
+        ballLit: [0.353, 0.400, 0.373],
+        ballDark: [0.129, 0.157, 0.145],
+        ballRim: [0.706, 0.757, 0.741],
+    },
+};
+
+/** 梦幻森林的四季色板 → three 的 uniform 对象。未知季节落到夏天。 */
+export function forestSeasonUniforms(season = 'summer') {
+    const p = SEASON_FOREST[season] || SEASON_FOREST.summer;
+    return {
+        uTrunkA: { value: p.trunkA },
+        uTrunkB: { value: p.trunkB },
+        uBallLit: { value: p.ballLit },
+        uBallDark: { value: p.ballDark },
+        uBallRim: { value: p.ballRim },
+    };
+}
+
 /** 某一季的地面色板 → three 的 uniform 对象。未知季节落到秋天。 */
 export function groundSeasonUniforms(season = 'autumn') {
     const p = SEASON_GROUND[season] || SEASON_GROUND.autumn;
