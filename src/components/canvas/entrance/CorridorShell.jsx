@@ -31,13 +31,20 @@ import { GRASS_Y } from '../../../config/entranceMetrics';
  *   · 檐口必须 > FLOOR_Y + 3.5 = 1.75（走廊顶），否则天花板穿出屋面 —— 取 2.2；
  *   · 屋面必须**盖住**壳的墙顶，否则从 50° 仰角往下看会看见墙和屋顶的缝。
  *
- * ⚠️ 为什么屋面不用 `SONG_WALL_FRAG`
- * ----------------------------------
- * 那个 shader 的"黑瓦压顶"是按 **vUv.y**（平面的 v 方向）铺的。屋面的 v
- * 方向是**坡度方向**，不是竖直方向 —— 直接套会把"瓦当/滴水"画在屋脊上。
- * 所以屋面用一块深色的标准材质：相机最近也在 10 单位外，还隔着雾，
- * 一块素色屋面和一块带纹的屋面在这段距离上读起来是一样的。
- * 壳的**墙**照旧用 `SONG_WALL_FRAG`（青砖），和院墙同一套砖。
+ * ⚠️ 屋面也走 `SONG_WALL_FRAG`（`uCapFrac = 0` ⇒ 整面都是黑瓦）
+ * ------------------------------------------------------------
+ * 第一版屋面用的是一块深色 `meshStandardMaterial`，结果**从背面看是占满
+ * 下半屏的一大块纯黑**：标准材质在这个场景里吃不到足够的光（全站
+ * `shadows={false}`、没有环境贴图），而墙用的是自带环境项的 shader ——
+ * 一块黑屋面挨着一面灰砖墙，立刻露馅。
+ *
+ * 换成 `SONG_WALL_FRAG` 之后屋面和院墙的压顶是**同一套瓦、同一套光照**。
+ * 关键是 UV 要对上（这两条不成立就会把瓦当画到屋脊上）：
+ *   · `uSize = [ROOF_LEN, ROOF_SLOPE]`，`u` 沿**屋脊方向**、`v` 沿**坡度方向**；
+ *   · shader 的瓦垄 `fract(world.x / 0.285)` ⇒ 垄沿坡度跑 ✅（`world.x = u·ROOF_LEN`）；
+ *   · shader 的檐口在 `above ≈ 0`，而 `above = v·ROOF_SLOPE` ⇒ 檐口落在**檐口那一侧** ✅。
+ * 所以 `RoofSlope` 里那三层嵌套 group 的旋转顺序是**有约束的**，不是随便写的：
+ * 它保证 `u` 沿屋脊、`v` 沿坡度。改旋转之前先把上面两条推一遍。
  *
  * ⚠️ 什么时候挂
  * --------------
@@ -68,9 +75,9 @@ const ROOF_LEN = HALL_LEN + I.HALL_OVERHANG * 2;
  * 一面壳墙的 uniform。`uCapFrac > 1` = 这面墙没有黑瓦压顶 ——
  * 墙顶直接接屋面，再压一道瓦会变成"墙头又长出一条屋脊"。
  */
-function wallUniformsFactory(originX) {
+function wallUniformsFactory(width, originX) {
     return (season) => ({
-        ...makeSurfaceUniforms(HALL_LEN, WALL_H, [originX, GRASS_Y], season),
+        ...makeSurfaceUniforms(width, WALL_H, [originX, GRASS_Y], season),
         uHoleDoor: { value: [0, 9999, 0, 0] },
         uHoleWindow: { value: [0, 9999, 0, 0] },
         uInk: { value: blankInk() },
@@ -79,14 +86,15 @@ function wallUniformsFactory(originX) {
     });
 }
 
-function ShellWall({ x, originX }) {
-    const uniforms = useSeasonUniforms(wallUniformsFactory(originX), [originX]);
+/**
+ * 一面壳墙。侧墙（`rotationY = ±π/2`，沿 z 拉通）和后端封口墙
+ * （`rotationY = 0`，沿 x 拉通）只差宽和朝向，所以共用一个组件。
+ */
+function ShellWall({ width, position, rotationY, originX }) {
+    const uniforms = useSeasonUniforms(wallUniformsFactory(width, originX), [width, originX]);
     return (
-        <mesh
-            position={[x, WALL_CENTER_Y, HALL_CENTER_Z]}
-            rotation={[0, Math.PI / 2, 0]}
-        >
-            <primitive object={sharedGeometry('plane', HALL_LEN, WALL_H)} attach="geometry" />
+        <mesh position={position} rotation={[0, rotationY, 0]}>
+            <primitive object={sharedGeometry('plane', width, WALL_H)} attach="geometry" />
             <shaderMaterial
                 vertexShader={SURFACE_VERT}
                 fragmentShader={SONG_WALL_FRAG}
@@ -97,10 +105,30 @@ function ShellWall({ x, originX }) {
     );
 }
 
-/** 一片屋面。嵌套三层 group 是为了让"先铺平、再转 90°、最后倾斜"三步互不干扰 —— 三个欧拉角写在一个 rotation 里，顺序一错就翻面。 */
+/**
+ * 一片屋面。嵌套三层 group 是为了让"先铺平、再转 90°、最后倾斜"三步互不干扰
+ * —— 三个欧拉角写在一个 rotation 里，顺序一错就翻面。
+ *
+ * 🔴 旋转顺序同时决定了 UV 落在哪个方向（见文件头）：
+ *    `spin = ±π/2` + `Rx(−π/2)` 之后，平面的**宽**（= ROOF_LEN）跑到世界 −z
+ *    （屋脊方向）、**高**（= ROOF_SLOPE）跑到 ±x（坡度方向）。
+ *    左右两坡的 `spin` 相反，是为了让两边的 `v=0`（檐口）都落在**外侧**。
+ */
 function RoofSlope({ side }) {
     // side = +1 右坡（檐口在 +x）、−1 左坡
     const spin = side > 0 ? Math.PI / 2 : -Math.PI / 2;
+    const uniforms = useSeasonUniforms(
+        (season) => ({
+            ...makeSurfaceUniforms(ROOF_LEN, ROOF_SLOPE, [0, 0], season),
+            uHoleDoor: { value: [0, 9999, 0, 0] },
+            uHoleWindow: { value: [0, 9999, 0, 0] },
+            uInk: { value: blankInk() },
+            uInkStrength: { value: 0 },
+            // 0 ⇒ 整面都是黑瓦（压顶从墙的 0 高度就开始）
+            uCapFrac: { value: 0 },
+        }),
+        []
+    );
     return (
         <group
             position={[side * ROOF_CENTER_X, ROOF_CENTER_Y, HALL_CENTER_Z]}
@@ -110,10 +138,10 @@ function RoofSlope({ side }) {
                 <mesh rotation={[0, 0, spin]}>
                     {/* 宽 = 屋脊方向（z），高 = 坡度方向 */}
                     <primitive object={sharedGeometry('plane', ROOF_LEN, ROOF_SLOPE)} attach="geometry" />
-                    <meshStandardMaterial
-                        color="#343a3d"
-                        roughness={0.88}
-                        metalness={0}
+                    <shaderMaterial
+                        vertexShader={SURFACE_VERT}
+                        fragmentShader={SONG_WALL_FRAG}
+                        uniforms={uniforms}
                         side={THREE.DoubleSide}
                     />
                 </mesh>
@@ -125,14 +153,30 @@ function RoofSlope({ side }) {
 export function CorridorShell() {
     return (
         <group>
-            <ShellWall x={I.HALL_HALF_W} originX={I.COURT_BACK_Z} />
-            <ShellWall x={-I.HALL_HALF_W} originX={I.HALL_BACK_Z} />
+            {/* 两侧长墙：绕 Y 90°，沿 z 拉通 */}
+            <ShellWall
+                width={HALL_LEN}
+                position={[I.HALL_HALF_W, WALL_CENTER_Y, HALL_CENTER_Z]}
+                rotationY={Math.PI / 2}
+                originX={I.COURT_BACK_Z}
+            />
+            <ShellWall
+                width={HALL_LEN}
+                position={[-I.HALL_HALF_W, WALL_CENTER_Y, HALL_CENTER_Z]}
+                rotationY={Math.PI / 2}
+                originX={I.HALL_BACK_Z}
+            />
 
-            {/* 后端封口。远在雾里，但少了它从 50° 俯角能看到壳的内部。 */}
-            <mesh position={[0, WALL_CENTER_Y, I.HALL_BACK_Z]} rotation={[0, Math.PI, 0]}>
-                <primitive object={sharedGeometry('plane', I.HALL_HALF_W * 2, WALL_H)} attach="geometry" />
-                <meshStandardMaterial color="#4a5052" roughness={0.9} side={THREE.DoubleSide} />
-            </mesh>
+            {/* 后端封口。远在雾里，但少了它从 50° 俯角能看到壳的内部。
+                ⚠️ 它只砌到**檐口**（WALL_H），所以墙顶和屋脊之间会留一个三角形
+                缺口 —— 那个缺口由屋面自己盖住：屋面在 z 方向比墙身多出檐 0.7
+                （ROOF_LEN 那两份额外长度），缺口正好在出檐底下。 */}
+            <ShellWall
+                width={I.HALL_HALF_W * 2}
+                position={[0, WALL_CENTER_Y, I.HALL_BACK_Z]}
+                rotationY={0}
+                originX={-I.HALL_HALF_W}
+            />
 
             <RoofSlope side={1} />
             <RoofSlope side={-1} />
