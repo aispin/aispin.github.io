@@ -175,8 +175,9 @@ function buildGrove(count) {
         const spin = rand() * Math.PI * 2;
         const phase = rand() * Math.PI * 2;
         const tint = rand();
-        // 让开廊屋（CorridorShell）：竹叶从屋面上长出来会一眼假
-        if (Math.abs(x) < I.HALL_CLEAR_HALF_W && z < I.HALL_CLEAR_Z) continue;
+        // 让开屋身（HouseShell）：竹叶从屋面上长出来会一眼假。
+        // ⚠️ 屋身有 22 宽（= 院宽），带子窄了竹子会长在屋里。
+        if (Math.abs(x) < I.HOUSE_CLEAR_HALF_W && z < I.HOUSE_CLEAR_Z) continue;
         culms.push({ x, z, h, radius, lean, spin, phase, tint });
     }
     return culms;

@@ -309,10 +309,23 @@ const CorridorWalls = ({ zStart = 10, length = 80, doorPositions = [], zClip = 1
                 // Use same global Z alignment as floor
                 const segmentEndZ = effectiveEndZ;
 
-                // First tile position with fine-tuned offset (same as floor)
-                const CEILING_START_OFFSET = 2; // Match floor offset
-                const firstTileIndex = Math.floor(effectiveStart / tileLength);
-                let tileZ = firstTileIndex * tileLength - tileLength / 2 + CEILING_START_OFFSET;
+                /**
+                 * 🔴 第一块瓦片的**前沿**必须正好落在 `effectiveStart` 上。
+                 *
+                 * 旧写法是 `floor(effectiveStart / tileLength) * tileLength
+                 * − tileLength / 2 + 2` —— 一个"全局对齐"的网格。问题是第一块
+                 * 瓦片最多会比段前沿**多伸出 7 单位**。
+                 *
+                 * 段 0 前沿在 z = 10 时没人发现（多出来的那截正好被段 −1 的
+                 * 瓦片盖住）；前沿挪到后罩墙（`INTERIOR_FRONT_Z` ≈ 4.15）之后，
+                 * 多出来的那截就直接盖到**露天的院子**上了 —— 射线取证
+                 * （`harness/probe-court-top.mjs`）在 z = 6 / 10 / 14 / 18 打到的
+                 * 最上面一层全是 `PlaneGeometry{7,10}` @ `y = 1.75`。
+                 *
+                 * 对齐到 `effectiveStart` 之后段与段仍然连续：`SEGMENT_LENGTH`
+                 * 是 `tileLength` 的整数倍（80 / 10 = 8），所以相邻段的网格首尾相接。
+                 */
+                let tileZ = effectiveStart - tileLength / 2;
 
                 while (tileZ + tileLength / 2 > segmentEndZ) {
                     tiles.push(

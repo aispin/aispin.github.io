@@ -607,11 +607,21 @@ const EntranceDoors = ({
             ease: 'power2.out'
         }, 0.1);
 
-        // Camera flies through - STOP CLOSER to avatar/ZEO
+        // Camera flies through — across the open courtyard, through the house's
+        // doorway, and stops inside the corridor in front of ZEO.
+        //
+        // 🔴 落点必须**在屋里**（z < INTERIOR_FRONT_Z）。原来停在 z = 11，
+        //    那是院子的正中间：入场动画一结束 `hasEntered` 翻转，地面 / 院墙 /
+        //    竹林 / 门楼一起卸载，而相机正站在它们中间 —— 地面会在脚下凭空消失。
+        //    落点挪进屋里之后，那次卸载全部发生在相机**背后**。
+        //
+        // ⚠️ 和 `CorridorSegment` 的 `HERO_INSET` 是一对：ZEO 落在
+        //    `INTERIOR_FRONT_Z − HERO_INSET − 0.3`，这里要比它靠前 ~3.3 单位，
+        //    和原来（相机 11 / ZEO 7.7）的取景一致。改一个必须改另一个。
         tl.to(camera.position, {
-            z: 11,  // Closer stop point (was 11)
+            z: 0.5,
             y: 0.2, // Match hook's base Y position
-            duration: 1.8,
+            duration: 2.4,
             ease: 'power2.inOut'
         }, 0.3);
     };
@@ -931,7 +941,7 @@ const EntranceDoors = ({
      * 看过去，窗的位置是**一块平整的灰板**贴在砖墙上 —— 比"没有窗"更像 bug。
      * 见 `INNER_FACE_Z` 的注释与 `probe-back-gate.mjs`。
      *
-     * `[0, 9999, 0, 0]` 是"这个洞不存在"的惯用写法（`CorridorShell` 同款）：
+     * `[0, 9999, 0, 0]` 是"这个洞不存在"的惯用写法（`HouseShell` 同款）：
      * `rectHole` 的矩形被推到世界坐标 9999，整面都取不到洞。
      *
      * ⚠️ 用**独立的一次** `useSeasonUniforms` 而不是 `useMemo` 包一层：

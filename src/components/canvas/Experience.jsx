@@ -22,7 +22,7 @@ import { useScene } from '../../context/SceneContext';
 // 绕着看时草不会"跟着相机流"。
 import IslandGround from './entrance/IslandGround';
 import CourtyardWalls from './entrance/CourtyardWalls';
-import CorridorShell from './entrance/CorridorShell';
+import HouseShell from './entrance/HouseShell';
 import BambooGrove from './entrance/BambooGrove';
 import DebugFlyCamera from './entrance/DebugFlyCamera';
 import { resolveCameraMode, CAMERA_MODE, isFlyEnabled } from '../../config/cameraMode';
@@ -170,14 +170,16 @@ const Experience = ({ onSceneReady, performanceTier }) => {
             {!hasEntered && (
                 <CourtyardWalls />
             )}
-            {/* 走廊的外壳（青砖墙 + 黑瓦顶）。走廊自己每一面都是 DoubleSide，
-                从外面看是一大片没细节的白板 —— 这是 L1「背面清单」抓到的
-                头号洞。见 entrance/CorridorShell.jsx。
+            {/* 屋身（"老房子"本体：青砖墙 + 黑瓦双坡顶 + 檐下椽头）。
+                走廊自己每一面都是 DoubleSide，从外面看是一大片没细节的白板
+                —— 这是 L1「背面清单」抓到的头号洞。见 entrance/HouseShell.jsx。
                 ⚠️ 条件比邻居多一个 `houseExitRequested`：退出动画是**从走廊里
-                   滑到院门外**，那一刻 hasEntered 还是 true，卸掉壳就会在滑
-                   出去的过程中看见白板。 */}
+                   滑到院门外**，那一刻 hasEntered 还是 true，卸掉屋身就会在滑
+                   出去的过程中看见白板。
+                ⚠️ 它同时是院子的**后罩墙**（`CourtyardWalls` 不再砌那一片）——
+                   两面墙同平面会 z-fighting。 */}
             {(!hasEntered || houseExitRequested) && (
-                <CorridorShell />
+                <HouseShell />
             )}
             {!hasEntered && (
                 <BambooGrove lowTier={isLowTier} />

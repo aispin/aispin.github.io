@@ -13,7 +13,7 @@ import { FLOOR_Y, FACADE_W } from '../../../config/entranceMetrics';
  * 就什么都没有（背面剔除，整片消失）。现在补上四面院墙：
  *
  *     前（+z，门楼这一面）：左右两片，中间留给门楼（FACADE_W = 10）
- *     后（−z，后罩墙）    ：整片
+ *     后（−z，后罩墙）    ：**不在这里** —— 交给 `HouseShell` 的前墙（见下）
  *     左 / 右             ：沿 z 拉通
  *
  * 全部走现成的 `SONG_WALL_FRAG`（青砖 + 黑瓦压顶），**零新贴图**。
@@ -90,13 +90,12 @@ export function CourtyardWalls() {
                 originX={FACADE_W / 2}
             />
 
-            {/* 后罩墙：绕 Y 转 180°，让它朝 −z（院子外面） */}
-            <Wall
-                position={[0, wallCenterY, I.COURT_BACK_Z]}
-                rotationY={Math.PI}
-                width={I.COURT_HALF_W * 2}
-                originX={I.COURT_HALF_W}
-            />
+            {/* 后罩墙**不在这里** —— 它就是屋身（`HouseShell`）的前墙。
+                ⚠️ 两面墙落在同一个平面（z = INTERIOR_FRONT_Z）会 z-fighting，
+                所以所有权交给屋身：它还要在墙上开走廊的门洞，而且
+                `HouseShell` 的挂载条件（`!hasEntered || houseExitRequested`）
+                比这里宽一档 —— 退出动画那一段院子墙已经卸了，屋身还在，
+                正好补上院子这一面。 */}
 
             {/* 左墙（x = −11）：绕 Y −90° ⇒ 法线朝 −x */}
             <Wall

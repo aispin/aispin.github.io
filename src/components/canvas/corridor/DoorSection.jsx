@@ -9,6 +9,7 @@ import '../shaders/RevealMaterial'; // Registers alpha-discard reveal shader
 import { useScene } from '../../../context/SceneContext';
 import { useSitePreferences } from '../../../context/SitePreferences';
 import { SCENE_FONTS, TEXT } from '../../../config/theme';
+import { INTERIOR_FRONT_Z } from '../../../config/island';
 import { useAudio } from '../../../context/AudioManager';
 import { isTouchDevice } from '../../../utils/deviceDetect';
 import { setGuitarCursor } from '../../../utils/guitarCursor';
@@ -806,7 +807,7 @@ const DoorSection = ({
         // in. `camera.position.z` is read live here rather than tracked, which
         // is exactly right: this runs at the moment the teleport publishes its
         // pending click, after the camera has already been placed.
-        const cameraSegment = Math.floor((10 - camera.position.z) / segmentLength);
+        const cameraSegment = Math.floor((INTERIOR_FRONT_Z - camera.position.z) / segmentLength);
         const isTargetDoor = segmentIndex === cameraSegment;
 
         if (pendingDoorClick && pendingDoorClick === doorId && isTargetDoor && !isOpen && !isAnimating) {

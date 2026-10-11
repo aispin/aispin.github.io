@@ -11,12 +11,38 @@ import Doodles from './Doodles';
 import CorridorDecorations from './CorridorDecorations';
 import { useSitePreferences } from '../../../context/SitePreferences';
 import { ROOMS, SCENE_FONTS } from '../../../config/theme';
+import * as I from '../../../config/island';
 
 const SEGMENT_LENGTH = 80;
 const WALL_X_OUTER = 3.5;
 const WALL_X_INNER = 1.7;
 const DOOR_Z_SPAN = 4;
 const WALL_ANGLE = Math.atan2(WALL_X_OUTER - WALL_X_INNER, DOOR_Z_SPAN);
+
+/**
+ * 🔴 段 0 的**前沿** —— 也就是室内的起点，见 `config/island.js` 的
+ * `INTERIOR_FRONT_Z`（= 院子的后罩墙）。
+ *
+ * 为什么基准不是 0：走廊的可见几何（地板 / 墨墙 / 暖白顶）**不能露到露天的
+ * 院子里**，一露出来从上面看就是院子正中间一大片暖白顶。把段 0 的前沿钉在
+ * 后罩墙上，未入场时只要摘掉段号 < 0 的整段，走廊就一根线都不进院子 ——
+ * 而且**不需要 zClip**：裁剪面与段前沿重合，入场前后几何逐位一致。
+ *
+ * ⚠️ 这个值同时出现在 `InfiniteCorridorManager`（段索引反查）、
+ * `useInfiniteCamera`（自动回头看门的 zOffset）和 `DoorSection`（进屋时算段号）。
+ * 改这里必须一起改，判据是 `grep -rn 'INTERIOR_FRONT_Z' src/`。
+ */
+const CORRIDOR_FRONT_Z = I.INTERIOR_FRONT_Z;
+
+/**
+ * 英雄机位（ZEO + AISPIN 大字 + 地板贴花 + 涂鸦）在段内相对前沿的深度。
+ *
+ * 入场落点必须**在屋里**（见 `EntranceDoors` 的相机终点）：落点一进屋，
+ * `hasEntered` 翻转时院子那些道具（地面 / 院墙 / 竹林 / 门楼）卸载就发生在
+ * 相机**背后**，不会看见地面凭空消失。所以英雄机位要跟着往深里挪，
+ * 让 ZEO 仍然落在相机前 ~3.3 单位。
+ */
+const HERO_INSET = 6.65;
 
 const FIRST_RUN = [
     { roomId: 'about', relativeZ: -18, side: 'left', icon: '▤', color: '#f5efe6' },
@@ -73,7 +99,7 @@ const CorridorSegment = ({
     zClip = 100000,
     setCameraOverride,
 }) => {
-    const zOffset = 10 - (segmentIndex * SEGMENT_LENGTH);
+    const zOffset = CORRIDOR_FRONT_Z - (segmentIndex * SEGMENT_LENGTH);
     const { language } = useSitePreferences();
 
     // Wrapped index: segment -1 maps to the LAST space, segment 2 back to the
@@ -115,7 +141,7 @@ const CorridorSegment = ({
                 zClip={zClip}
             />
 
-            <group position={[0, 0, zOffset - 2]}>
+            <group position={[0, 0, zOffset - HERO_INSET]}>
                 {/* Tech stack decal on the floor behind ZEO — he is standing on it. */}
                 <AvatarFloorStack avatarLocalZ={-0.3} />
                 <HeroText position={[0, -0.1, -0.5]} />
@@ -163,5 +189,5 @@ const CorridorSegment = ({
 
 const MemoizedCorridorSegment = memo(CorridorSegment);
 
-export { SEGMENT_LENGTH, WALL_X_OUTER, WALL_X_INNER, DOOR_Z_SPAN };
+export { SEGMENT_LENGTH, CORRIDOR_FRONT_Z, WALL_X_OUTER, WALL_X_INNER, DOOR_Z_SPAN };
 export default MemoizedCorridorSegment;

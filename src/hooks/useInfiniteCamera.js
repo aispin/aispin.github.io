@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { useAchievements } from '../context/AchievementsContext';
 import { reducedMotion } from './useReducedMotion';
 import { settleLerp, SETTLE_ANGLE } from '../utils/settle';
+import { INTERIOR_FRONT_Z } from '../config/island';
 
 // Door positions for auto-glance
 const DOOR_POSITIONS = [
@@ -77,7 +78,7 @@ const useInfiniteCamera = ({
      * dead zone on the first render.
      */
     const calculateGlance = useCallback((z, segment) => {
-        const zOffset = 10 - (segment * segmentLength);
+        const zOffset = INTERIOR_FRONT_Z - (segment * segmentLength);
         let bestStrength = 0;
         let bestDir = 0;
 
@@ -147,7 +148,7 @@ const useInfiniteCamera = ({
 
             // Initialize glanceOffset with the CORRECT value for current position
             // This makes camera immediately look at the door (if near one) instead of looking forward first
-            const initialGlance = calculateGlance(currentZ.current, Math.floor((10 - currentZ.current) / segmentLength));
+            const initialGlance = calculateGlance(currentZ.current, Math.floor((INTERIOR_FRONT_Z - currentZ.current) / segmentLength));
             glanceOffset.current = initialGlance;
             targetGlance.current = initialGlance;
 
@@ -156,7 +157,7 @@ const useInfiniteCamera = ({
             targetSwipeGlance.current = 0;
 
             // Recalculate segment
-            currentSegment.current = Math.floor((10 - currentZ.current) / segmentLength);
+            currentSegment.current = Math.floor((INTERIOR_FRONT_Z - currentZ.current) / segmentLength);
         }
     }, [scrollEnabled, parallaxEnabled, camera, parallaxIntensity]);
 
@@ -446,7 +447,7 @@ const useInfiniteCamera = ({
             }
 
             // Update segment tracking
-            const segment = Math.floor((10 - currentZ.current) / segmentLength);
+            const segment = Math.floor((INTERIOR_FRONT_Z - currentZ.current) / segmentLength);
             if (segment !== currentSegment.current) {
                 currentSegment.current = segment;
             }
@@ -472,7 +473,7 @@ const useInfiniteCamera = ({
             currentZ.current = z;
 
             // Recalculate current segment immediately
-            const initSegment = Math.floor((10 - z) / segmentLength);
+            const initSegment = Math.floor((INTERIOR_FRONT_Z - z) / segmentLength);
             currentSegment.current = initSegment;
 
             // Sync parallax
