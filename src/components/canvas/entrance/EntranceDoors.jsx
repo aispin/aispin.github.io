@@ -766,6 +766,26 @@ const EntranceDoors = ({
     const WALL_PANEL_Z = -0.5;
 
     /**
+     * 门脸**内面**所在的局部 z（v1.2 补的那一层，见下面 FACADE, INNER FACE）。
+     *
+     * 🔴 它必须落在那三块 tunnel wall panel 的**前面**（更小的局部 z）。
+     * 板子是 `meshBasicMaterial` + `WALL_REVEAL`（无光照、无纹理），一旦挡住内面，
+     * 从院子里看门楼背面就是**一块没有任何纹理的灰板** —— 而它左右两边的院墙
+     * 是清清楚楚的青砖，一眼就露馅。第一版把内面放在 0.13（贴着脸），正好被
+     * 板子（−0.5）挡死，等于没补。
+     *
+     * 实测证据（`.workbuddy-ai/harness/probe-back-gate.mjs`，back 机位打射线）：
+     *   屏幕 (800,330) 第一命中 = `BoxGeometry{1.8,3.45,0.07}` local(0,2.52,−0.5)
+     *                            `MeshBasicMaterial #585c5b`   ← 板子
+     *                  第二命中 = `PlaneGeometry{10,6}` local(0,1.25,0.13)
+     *                            `ShaderMaterial side=1`        ← 内面（被挡）
+     *
+     * 0.06 是留给深度缓冲的余量：两者都是平行平面，0.06 世界单位在 30 单位
+     * 距离上仍有 ~80 个深度步，远不会 z-fight。
+     */
+    const INNER_FACE_Z = WALL_PANEL_Z - wallThickness / 2 - 0.06;
+
+    /**
      * Colour of those legacy panels.
      *
      * Sampled off the facade: the 青砖 around the opening reads (88, 92, 91)
@@ -902,6 +922,36 @@ const EntranceDoors = ({
         uInkStrength: { value: 0 }
     }), [facadeCenterY, wallInk, doorCenterY, doorOpeningWidth, doorHeight]);
 
+    /**
+     * 门脸**内面**的 uniform —— 与正面只差一处：**没有窗洞**。
+     *
+     * 为什么不能直接复用 `brickUniforms`（那里面有 `uHoleWindow`）：
+     * 窗洞背后没有"窗内侧"可看，只有 legacy 的那三块 tunnel wall panel
+     * （`meshBasicMaterial` + `WALL_REVEAL`，无光照无纹理）。于是从院子里
+     * 看过去，窗的位置是**一块平整的灰板**贴在砖墙上 —— 比"没有窗"更像 bug。
+     * 见 `INNER_FACE_Z` 的注释与 `probe-back-gate.mjs`。
+     *
+     * `[0, 9999, 0, 0]` 是"这个洞不存在"的惯用写法（`CorridorShell` 同款）：
+     * `rectHole` 的矩形被推到世界坐标 9999，整面都取不到洞。
+     *
+     * ⚠️ 用**独立的一次** `useSeasonUniforms` 而不是 `useMemo` 包一层：
+     * 那个 hook 靠 `useRef` 锁对象身份、并且**每个调用点各自**在换季时把
+     * `.value` 写回自己那批对象。两次调用 = 两批身份，换季两边都跟得上；
+     * 而 `useMemo` 造出来的包装对象一旦重建，就会踩 `uniformsList` 那个坑
+     * （见 hooks/useSeasonUniforms.js 的文件头）。
+     */
+    const innerFaceUniforms = useSeasonUniforms((season) => ({
+        ...makeSurfaceUniforms(
+            FACADE_W, FACADE_H,
+            [-FACADE_W / 2, facadeCenterY - FACADE_H / 2],
+            season
+        ),
+        uHoleDoor: { value: [0, doorCenterY, doorOpeningWidth / 2 + 0.07, doorHeight / 2 + 0.06] },
+        uHoleWindow: { value: [0, 9999, 0, 0] },
+        uInk: { value: wallInk },
+        uInkStrength: { value: 0 }
+    }), [facadeCenterY, wallInk, doorCenterY, doorOpeningWidth, doorHeight]);
+
     /* The creeper, as its own layer in front of the couplets.
      *
      * 🔴 走 `useSeasonUniforms` 而不是 `useMemo`（2026-10-10 · WO-10）：藤蔓现在
@@ -1023,18 +1073,25 @@ const EntranceDoors = ({
                 · 用 `side={THREE.BackSide}` 而**不是**把几何绕 Y 转 180°：
                   转过去 vUv 会左右镜像，砖缝/瓦当会跟正面错开；BackSide 的
                   顶点属性一字不动，两面的砖缝严丝合缝。
-                · z 退 0.02（0.13）：与正面共面会 z-fight。
-                · 复用同一份 `brickUniforms`（含 uHoleDoor ⇒ 门洞照旧是通的）。
-                  两个材质共享同一个 uniform 对象，换季时 `.value` 一改两边都跟，
-                  不会出现"里面冻在上一季"。
+                · 🔴 z 取 `INNER_FACE_Z`（≈ −0.6），**必须落在门口那三块 tunnel
+                  wall panel（局部 z = −0.5）的前面** —— 第一版放在 0.13 被它们
+                  挡死，从院子里看到的还是那块无纹理的灰板。详见 INNER_FACE_Z
+                  的注释与 `probe-back-gate.mjs` 的实测。
+                · 砖缝按**世界坐标**算（`uOrigin + vUv*uSize`），所以把平面从
+                  0.13 挪到 −0.6 不会让两面的砖缝错位 —— 与 z 无关。
+                · 用自己的 `innerFaceUniforms`（**不是** `brickUniforms`）：门洞照旧
+                  是通的，但**窗洞被关掉** —— 窗背后只有那三块无纹理的板子，
+                  留着洞就是从院子里看到一块平整的灰板。见上面 innerFaceUniforms
+                  的注释。两批 uniform 各自被 `useSeasonUniforms` 锁着身份、各自
+                  在换季时更新，所以不会出现"里面冻在上一季"。
                 · `transparent` 跟正面保持一致：门洞边缘是 0.06 单位的软过渡，
                   写死不透明会变成一圈硬边。 */}
-            <mesh position={[0, facadeCenterY, 0.13]}>
+            <mesh position={[0, facadeCenterY, INNER_FACE_Z]}>
                 <primitive object={sharedGeometry('plane', FACADE_W, FACADE_H)} attach="geometry" />
                 <shaderMaterial
                     vertexShader={SURFACE_VERT}
                     fragmentShader={SONG_WALL_FRAG}
-                    uniforms={brickUniforms}
+                    uniforms={innerFaceUniforms}
                     transparent={true}
                     side={THREE.BackSide}
                 />
