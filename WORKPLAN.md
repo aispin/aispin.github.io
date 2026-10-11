@@ -36,7 +36,7 @@
 
 ---
 
-# 📊 滚动快照（2026-10-11 22:20）
+# 📊 滚动快照（2026-10-11 23:05）
 
 主题：**孤岛院子（v1.2）** —— 把固定的正面院子改成真能绕一圈看的 3D 场景。
 分支 **`feat/v1.2.0-island-courtyard`**（不是 `main`，不影响线上）。
@@ -56,6 +56,15 @@
 四季色板 `SEASON_FOXTAIL`；避让是**按每片叶的扫掠包围盒**和实测障碍物
 （台明 / 白狗 / 荷花缸 / 花箱）做三维相交判掉，判据 `probe-grass-clearance.mjs`。
 被替换的 `BambooFence.jsx` 与 `makeBambooFenceTexture` 一并删除（死代码）。
+**用户第二轮两条报障也全部落地**：
+① 「退出门口时的 BUG」= 屋外那一整套的**边界不统一** —— 退场滑行 1.3 s 里
+`hasEntered` 还是 true，而 `EntranceDoors` / `IslandGround` / `SignSystem` /
+`BambooGrove` / `WeatherLayer` 只写了 `!hasEntered` ⇒ 前墙上只剩一个**光洞**。
+提成一个 `outdoorVisible` 谓词，全部走它；另加"门从开着往回关"（`swingShut`），
+否则相机会穿过**关着的门板**（整屏门神年画闪一下）。判据 `probe-transition-leak.mjs`。
+② 「进门后竹子出现了」= 竹林的排除带只有 z ∈ [−2.85, 39.15]，而**走廊往 −z 是无限的**
+⇒ 屋后那一段竹子长在走廊的管子里（实测 150 根 |x| ≤ 3.7，走廊一直画到 z = −57.85）。
+新增 `CORRIDOR_CLEAR_HALF_W`：按 |x| 一刀切、**不看 z**。判据 `probe-bamboo-corridor.mjs`。
 **验收材料 / 探针 / 结论全在 `.workbuddy-ai/memory/`**（当日日志 + `MEMORY.md`）。
 
 ---

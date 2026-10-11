@@ -235,6 +235,15 @@ function buildGrove(count) {
             && z > I.HOUSE_BACK_Z - 1
             && z < I.HOUSE_CLEAR_BACK_Z
         ) continue;
+
+        // 🔴 走廊的横截面：**任何 z 都不许有竹子**（2026-10-11，用户报的
+        //    「进门后……竹子出现了，和之前的墙一样的问题」）。
+        //
+        // 上面那条"建筑带"是按 **z 窗口**写的，而走廊往 −z 是**无限**的 ——
+        // 屋后（z < −2.85）那段竹子合法地落在管子里，从门口往里看就是
+        // "走廊地板上长了一排竹子"。这里按 |x| 一刀切、不看 z：
+        // 走廊在任何 z 上都是它自己那条管子。见 `CORRIDOR_CLEAR_HALF_W`。
+        if (Math.abs(x) < I.CORRIDOR_CLEAR_HALF_W) continue;
         culms.push({ x, z, h, radius, lean, spin, phase, tint });
     }
     return culms;
@@ -384,7 +393,10 @@ export function BambooGrove({ lowTier = false }) {
     });
 
     return (
-        <group>
+        // `name` 是给 harness 用的（与 `house-shell` / `infinite-corridor` 同一套）：
+        // 排查"进场/退场时画面上多出来什么"时，探针要能把屏幕上的每一格
+        // 归属到某个**顶层 group**。没有名字的话一整片竹子只能报成"Group"。
+        <group name="bamboo-grove">
             <instancedMesh
                 ref={culmRef}
                 args={[culmGeo, null, count]}

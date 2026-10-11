@@ -99,6 +99,31 @@ const Experience = ({ onSceneReady, performanceTier }) => {
     const [doorOpening, setDoorOpening] = useState(false);
     const corridorVisible = hasEntered || doorOpening;
 
+    /**
+     * 🔴 屋外那一整套东西的**唯一**边界（2026-10-11）。
+     *
+     * 用户报的：「退出门口时的 BUG」—— 退场滑行到一半，整屏是一堵青砖墙，
+     * 中间只有一个**光秃秃的门洞**（门框 / 门扇 / 对联 / 匾额全没了）。
+     *
+     * 根因：**边界不统一**。退场滑行的 1.3 s 里 `hasEntered` 还是 true
+     * （`markExited()` 要等相机到 z = 28 才调），所以：
+     *   · `HouseShell`    挂了 `|| houseExitRequested` ⇒ 在（对：不然是一片白板）
+     *   · `ForecourtFence` 同上                          ⇒ 在
+     *   · **`EntranceDoors` 只写了 `!hasEntered`**       ⇒ **不在**
+     *     ⇒ 前墙上留下一个没有门框、没有门扇的**洞**。
+     *   · `IslandGround` / `SignSystem` / `BambooGrove` / `WeatherLayer` 同理。
+     *
+     * ⇒ 于是"一面墙 + 一个洞"就成了用户看到的东西。
+     *
+     * 教训与 WO-6 的"三处封口"是同一条：**一套东西必须共用同一个开关**。
+     * 上一轮给 HouseShell 单独补条件，等于把这条规则又破坏了一次 ——
+     * 补一个就会漏一个。所以现在提成一个谓词，**全部**走它。
+     *
+     * ⚠️ 退场时走廊**同时**画着（`corridorVisible` 那一套），这是有意的：
+     *    相机在门口那一段两种几何都在画面里，门洞后面必须已经有一段廊。
+     */
+    const outdoorVisible = !hasEntered || houseExitRequested;
+
     // Camera control - both scroll and parallax only work after entering
     // Disable during teleporting to prevent scroll interference
     const { setCameraOverride } = useInfiniteCamera({
@@ -199,9 +224,11 @@ const Experience = ({ onSceneReady, performanceTier }) => {
                 frames would run unfogged with three's default lighting rig. */}
 
             {/* === 孤岛：地面 / 屋身 / 篱笆 / 竹林 ===
-                四样共用同一个 `!hasEntered` 边界，和下面的门楼、匾额、天象一致。
-                它们只在屋子外面存在 —— 走廊是室内的，从走廊里不该看见沙滩。 */}
-            {!hasEntered && (
+                这些东西共用**一个**边界 `outdoorVisible`（见它的注释）——
+                它们只在屋子外面存在，走廊是室内的，从走廊里不该看见沙滩。
+                ⚠️ 边界里那个 `|| houseExitRequested` 不是可选项：退场滑行的
+                   1.3 s 里 `hasEntered` 仍然是 true，少了它整段退场就没有地面。 */}
+            {outdoorVisible && (
                 <IslandGround />
             )}
             {/* 屋身（"老房子"本体：青砖墙 + 黑瓦双坡顶 + 檐下椽头）。
@@ -216,18 +243,15 @@ const Experience = ({ onSceneReady, performanceTier }) => {
                    22 宽的墙，而走廊只有 7 宽 —— 只要走廊画出来，那堵墙就横在
                    走廊里（用户报的「进门时身后一堵黑墙，2 秒后消失」）。
                    见 `HouseShell` 里那段注释。 */}
-            {(!hasEntered || houseExitRequested) && (
+            {outdoorVisible && (
                 <HouseShell corridorVisible={corridorVisible} />
             )}
             {/* 门外竹篱笆围的开放小院（WO-6 第 ② 条）。只围外三面，
-                正前方留口给甬路 —— 详见 entrance/ForecourtFence.jsx。
-                条件和屋身一样多带 `houseExitRequested`：退出滑行的最后一段
-                相机在院子里，虽然那时它朝屋里看、看不见篱笆，但让"院子里的
-                东西"共用同一个边界比省这一帧划算。 */}
-            {(!hasEntered || houseExitRequested) && (
+                正前方留口给甬路 —— 详见 entrance/ForecourtFence.jsx。 */}
+            {outdoorVisible && (
                 <ForecourtFence />
             )}
-            {!hasEntered && (
+            {outdoorVisible && (
                 <BambooGrove lowTier={isLowTier} />
             )}
 
@@ -236,8 +260,14 @@ const Experience = ({ onSceneReady, performanceTier }) => {
             <DebugFlyCamera />
 
             {/* === COURTYARD SEASON BED (四季声床) ===
-                与下面的 EntranceDoors 共用同一个 `!hasEntered` 边界 ——
-                进走廊 / 房间它自然卸载，不需要任何额外条件。
+                🔴 边界**故意**是 `!hasEntered`，**不是** `outdoorVisible` ——
+                视觉那一套可以（而且必须）在退场滑行时留着，声音不行：
+                退场那 1.3 s 里 `hasEntered` 仍是 true、走廊声床还在响，
+                这一层要是在此时挂上就变成**两个声床同时响**，而
+                「院子声床与走廊 / 房间互斥」是写在结构上的硬约束
+                （见 hard-rules 的音频一节 + `audio/CourtyardAmbience.jsx`）。
+                退场结束后 `markExited()` 把 `hasEntered` 置回 false，
+                这一层自然回来 —— 1.3 s 的静默换掉一次双声床，值。
                 详见 audio/CourtyardAmbience.jsx 的注释。 */}
             {!hasEntered && (
                 <CourtyardAmbience />
@@ -246,25 +276,38 @@ const Experience = ({ onSceneReady, performanceTier }) => {
             {/* === ENTRANCE DOORS (visible until entered) ===
                 `onStart` 在推门那一帧就开走廊（见 corridorVisible 的说明）：
                 门一开，门洞里必须已经有一段廊，否则就是一片空。 */}
-            {!hasEntered && (
+            {/* === ENTRANCE DOORS ===
+                `onStart` 在推门那一帧就开走廊（见 corridorVisible 的说明）：
+                门一开，门洞里必须已经有一段廊，否则就是一片空。
+                🔴 边界是 `outdoorVisible`（不是 `!hasEntered`）—— 这一条就是
+                   「退出门口时的 BUG」的根：退场滑行时 `hasEntered` 还是 true，
+                   用 `!hasEntered` 会让门框 / 门扇 / 对联 / 匾额**整组消失**，
+                   而屋身的前墙还画着 ⇒ 用户看到"一堵青砖墙 + 一个光洞"。 */}
+            {outdoorVisible && (
                 <EntranceDoors
                     position={ENTRANCE_POSITION}
                     onStart={handleEntranceStart}
                     onComplete={handleEntranceComplete}
+                    /* 退场：门从"开着"往回关（1.3 s，与滑行等长）。
+                       不传这个的话，退场那一刻 EntranceDoors 是**新挂上**的、
+                       门是关的，而相机要从门洞里退出去 ⇒ 穿过关着的门板，
+                       整屏门神年画闪 0.2~0.3 s。见 EntranceDoors 的 swingShut。 */
+                    swingShut={houseExitRequested}
                 />
             )}
 
             {/* Separate SignSystem to avoid fragment nesting issues if any */}
-            {!hasEntered && (
+            {outdoorVisible && (
                 <SignSystem position={ENTRANCE_POSITION} />
             )}
 
             {/* === 季生天象（雨幕 / 落雪）=== §6.4，WO-3，C 档。
-                和上面几个共用同一个 `!hasEntered` 边界：它是**院子**的天象，
-                进了走廊 / 房间自然卸载 —— 在室内看到雨丝才是 bug。
+                它是**院子**的天象，进了走廊 / 房间自然卸载 —— 在室内看到雨丝
+                才是 bug。边界跟 `outdoorVisible`（退场那 1.3 s 相机在院子里，
+                没有它就会"出了门却没有雨"）。
                 挂在这里而不是 EntranceDoors 里：那一层带着 ENTRANCE_POSITION
                 的位移，而天象是**挂在相机上**的，坐标系必须干净。 */}
-            {!hasEntered && (
+            {outdoorVisible && (
                 <WeatherLayer />
             )}
 

@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo } from 'react';
+import { useRef, useState, useEffect, useLayoutEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Text, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
@@ -133,6 +133,19 @@ const COUPLET_X = 1.28;
 const COUPLET_H = 2.15;
 const COUPLET_W = COUPLET_H * COUPLET_STRIP_ASPECT;
 const COUPLET_Y = DOOR_CENTER_Y;
+
+/* ---- 门扇的"开着"角度，与退场回关的时长 ---------------------------- */
+/**
+ * 两扇门**完全打开**时绕 y 的角度（左 −、右 +）。推门动画（`handleClick`
+ * 里那条 gsap timeline）用的就是这个值，退场回关也从它起步 ——
+ * 两处必须**同一个数**，否则退场的起点会和推门的终点差一点，看起来像卡了一下。
+ */
+const DOOR_OPEN_Y = Math.PI * 0.55;
+/**
+ * 退场时门**回关**用多久。抄 `corridor/HouseExit.jsx` 的 `GLIDE_SECONDS = 1.3`
+ * —— 相机滑到院门外的同时门正好关上，到站那一帧不会"啪"一下。
+ */
+const EXIT_SWING_SEC = 1.3;
 
 // BANNER_W / BANNER_H / BANNER_Y (the 横批 above the lintel) live in
 // config/entranceMetrics, because SignSystem has to clear the banner and must
@@ -298,6 +311,7 @@ const EntranceDoors = ({
     position = [0, 0, 22],
     onComplete,
     onStart,
+    swingShut = false,
 }) => {
     // 门脸的竖向尺寸（10 × 6）只剩一个用处：藤蔓 overlay 那块四边形
     // （`WALL_INK_W/H`，见 config/entranceMetrics 里的说明）。
@@ -320,6 +334,44 @@ const EntranceDoors = ({
     // 两个窗，各一个小人（WO-10：右窗是原有的，左窗是新增的对称窗）。
     const windowAvatarRef = useRef();
     const windowAvatarRefL = useRef();
+
+    /**
+     * 🔴 退场：门是**从这个"开着"的姿势往回关**的（2026-10-11）。
+     *
+     * 为什么需要这一条
+     * ----------------
+     * 退场滑行（`HouseExit`，1.3 s，z 21.55 → 28）是**从门洞里退出去**的 ——
+     * 相机一定会穿过门扇所在的平面。而 `EntranceDoors` 在退场那一刻是**新挂上**
+     * 的（见 `Experience` 的 `outdoorVisible`：退场前它被卸掉了），`isOpen`
+     * 从 false 起步 ⇒ 两扇门是**关着**的 ⇒ 相机穿过**关着的门板**，那 0.2~0.3 s
+     * 整屏都是门神年画。（这是把 `outdoorVisible` 修好之后才露出来的第二个
+     * 问题 —— 修之前门整组都不在，所以看不到它。）
+     *
+     * 做法：挂上时把两扇**立刻摆到"开着"的角度**（不补间 —— 用户看不到"开"
+     * 的过程，一秒前它本来就是开着的），然后用与滑行等长的时间**关回去**。
+     * 于是：① 相机穿过的是**门洞**，不是门板；② 滑行结束时门正好关上，
+     * 到站那一帧不会"啪"一下变。
+     *
+     * ⚠️ 门开后**不要**去置 `isOpen`：那个标志一旦置位，`handleClick` 第一行就
+     *    返回，退出之后就再也点不进来了 —— 而退出后是要能再进去的。
+     *    所以退场期间的"别再碰这扇门"由 `swingShut` 这个 prop 直接兜
+     *    （`handleClick` 与两个 hover 开场各加一条 `|| swingShut`），
+     *    而不是在这里 setState —— 在 effect 里同步 setState 会多出一条
+     *    `react-hooks/set-state-in-effect` 警告，而本项目的质量门是**零新增**。
+     */
+    useLayoutEffect(() => {
+        if (!swingShut) return;
+        const L = leftDoorRef.current;
+        const R = rightDoorRef.current;
+        if (!L || !R) return;
+        // 立刻摆到"开着"（不补间 —— 用户看不到"开"的过程，一秒前本来就在开着）
+        L.rotation.y = -DOOR_OPEN_Y;
+        R.rotation.y = DOOR_OPEN_Y;
+        const tl = gsap.timeline();
+        tl.to(L.rotation, { y: 0, duration: EXIT_SWING_SEC, ease: 'power2.inOut' }, 0);
+        tl.to(R.rotation, { y: 0, duration: EXIT_SWING_SEC, ease: 'power2.inOut' }, 0);
+        return () => tl.kill();
+    }, [swingShut]);
     const { camera } = useThree();
     const { unlockAchievement } = useAchievements();
     // 推门是音乐的**起播点**之一（另一个是音频面板）—— 见 handleClick。
@@ -562,7 +614,7 @@ const EntranceDoors = ({
     // Handle click
     const handleClick = (e) => {
         e.stopPropagation();
-        if (isOpen || isAnimating) return;
+        if (isOpen || isAnimating || swingShut) return;   // swingShut：退场回关期间别再推门
 
         // Reset cursor immediately on transition start
         setGuitarCursor('auto');
@@ -620,14 +672,16 @@ const EntranceDoors = ({
         }
 
         // Open doors - smoother angle (matches SegmentDoors)
+        // ⚠️ 角度用 `DOOR_OPEN_Y` —— 退场回关（`swingShut`）也从它起步，
+        //    两处写死两个数就会差一点，看起来像卡了一下。
         tl.to(leftDoorRef.current.rotation, {
-            y: -Math.PI * 0.55,
+            y: -DOOR_OPEN_Y,
             duration: 0.9,
             ease: 'power2.out'
         }, 0.1);
 
         tl.to(rightDoorRef.current.rotation, {
-            y: Math.PI * 0.55,
+            y: DOOR_OPEN_Y,
             duration: 0.9,
             ease: 'power2.out'
         }, 0.1);
@@ -646,7 +700,7 @@ const EntranceDoors = ({
 
     // Handle hover - doors slightly open to indicate interactivity
     const handlePointerEnter = () => {
-        if (isOpen || isAnimating || isMobile) return;
+        if (isOpen || isAnimating || isMobile || swingShut) return;   // swingShut：退场回关期间别再开场
         setIsHovered(true);
         setGuitarCursor('pointer');
 
@@ -722,7 +776,7 @@ const EntranceDoors = ({
     };
 
     const handlePointerLeave = () => {
-        if (isOpen || isAnimating || isMobile) return;
+        if (isOpen || isAnimating || isMobile || swingShut) return;   // swingShut：退场回关期间别再开场
         setIsHovered(false);
         setGuitarCursor('auto');
 
@@ -922,7 +976,12 @@ const EntranceDoors = ({
     );
 
     return (
-        <group ref={groupRef} position={[position[0], 0, position[2]]}>
+        // `name` 是给 harness 用的（与 `house-shell` / `bamboo-grove` 同一套）：
+        // 用户报的「退出门口时的 BUG」根因就是这一整组在退场时**被卸掉了**
+        // （`Experience` 的边界写成了 `!hasEntered`），而屋身的前墙还画着
+        // ⇒ 一面青砖墙 + 一个光洞。判据 `probe-transition-leak.mjs` 断言
+        // 「`houseExitRequested` 期间 `entrance-doors` 必须在场」。
+        <group ref={groupRef} name="entrance-doors" position={[position[0], 0, position[2]]}>
 
             {/* === STONE PATH FLOOR (甬路 — from the 踏跺 outwards) === */}
             <mesh
