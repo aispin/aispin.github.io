@@ -139,6 +139,37 @@ export const TUFT_EXTENT = Math.hypot(LEAF_LEN, LEAF_WID / 2) + 0.14;
 /** 果实：半径范围、挂在哪个高度带。 */
 const FRUIT_R = [0.120, 0.170];
 const FRUIT_COUNT = 46;
+/**
+ * 果沿"离冠心向外"推到**宿主叶团之外**多远 —— 以宿主叶团自己的探出量
+ * （`TUFT_EXTENT × 该团缩放`）为单位。
+ *
+ * 🔴 为什么要"挂在宿主叶团上"而不是"按冠壳半径采样"：
+ *   按半径采样时，果心与叶冠外表面是**两套独立的东西**，一旦半径写大一点，
+ *    果心就整体跑到叶外面去了 —— 这正是「果子飘离树冠」的成因（实测 46/46 颗
+ *    果心 rho 1.095~1.191，而叶团 rho 的 p99 只有 0.997）。
+ *   改小又会全部埋进叶里（实测 0.95~1.00 时可见比例中位数 = 0）。
+ *   ⇒ 把果**锚在一个真实存在的叶团上**，再沿径向外推一小段：
+ *     果心在叶壳内（挂着）、果身探出叶面（看得见）。两头都由构造保证。
+ * 判据：`harness/probe-fruit-attach.mjs`（C1 挂着 / C2 探出叶面）。
+ */
+const FRUIT_PUSH = 0.45;
+/**
+ * 宿主叶团的 rho 带。
+ * 🔴 **要靠外**：宿主在 0.85 那一档时，`FRUIT_PUSH` 推出去也仍在密叶里（被埋）；
+ *    只有挑 0.90 以上的"外圈团"，推出去才正好落在叶面上。
+ *    实测宿主编带 [0.80,0.95] 时探出率 80%，[0.90,0.99] 明显更好。
+ */
+const FRUIT_HOST_RHO = [0.90, 0.99];
+/**
+ * 果心的 rho **硬上限**。
+ *
+ * 🔴 这一条是"结构保证"，不是"调参调出来的"：`rho` 是 `(点−冠心)` 的归一化范数
+ *    ⇒ 把 `(点−冠心)` 整体乘 `RHO_MAX/rho`，新的 rho **正好**等于 `RHO_MAX`。
+ *    所以只要过一遍这个收缩，"果心跑到叶冠外面"就**不可能发生** ——
+ *    不再依赖 `FRUIT_PUSH` / 宿主带取什么值。
+ *    判据 `harness/probe-fruit-attach.mjs` 的 C1 就是量它。
+ */
+const FRUIT_RHO_MAX = 0.99;
 
 /* ------------------------------------------------------------------ */
 /* 骨架                                                                */
@@ -607,23 +638,54 @@ export function buildPersimmonTree() {
     const leafScale = new Float32Array(spotsRaw.length);
     for (let i = 0; i < spotsRaw.length; i++) leafScale[i] = randRange(rand, 0.78, 1.28);
 
-    // ---- 3. 果（只挂在外层：藏在冠心的果看不见、白花三角形）----------
+    // ---- 3. 果：**锚在外圈的真实叶团上**（见 `FRUIT_PUSH` 的说明）--------
+    //
+    // 历史（两条都踩过，别再回头）：
+    //   · 挑 rho > 0.74 的叶团再把果往下挪 ⇒ 果全在叶团**里面**，
+    //     被不透明的叶挡得一个都看不见（"柿子树没有柿子"）。
+    //   · 改成按冠壳半径采样、半径写 1.10~1.20（壳**外**）⇒ 果心整体跑到叶外，
+    //     就是用户报的「果子飘离树冠」（实测 46/46 违规）。
+    //   · 收回 0.95~1.00（壳**内**）⇒ 反过来全被埋（可见比例中位数 0）。
+    // ⇒ 正解是**锚宿主**：果跟着某一团叶走，两个方向都被构造保证。
+    const fruitHosts = [];
+    for (let i = 0; i < spotsRaw.length; i++) {
+        const rho = rhoOf(spotsRaw[i]);
+        if (rho < FRUIT_HOST_RHO[0] || rho > FRUIT_HOST_RHO[1]) continue;
+        // 柿子结在朝上的那面：把宿主限制在不下垂的方向（纯视觉，冠底挂果看不见）
+        if (spotsRaw[i].y < crownC.y - crownR.y * 0.15) continue;
+        fruitHosts.push({ p: spotsRaw[i], s: leafScale[i] });
+    }
+
     const fruitRaw = [];
     for (let i = 0; i < FRUIT_COUNT; i++) {
-        // 🔴 **按冠壳取点**，不是"从叶团里挑一个"。
-        //    第一版挑 rho > 0.74 的叶团再把果往下挪 —— 结果果全在叶团**里面**，
-        //    被不透明的叶挡得一个都看不见（"柿子树没有柿子"）。
-        //    现在直接按椭球面采样：`phi` 偏上半球（柿子结在冠的外缘、朝上的那面），
-        //    半径 0.97~1.02 ⇒ 果正好**卡在叶壳上**，一半露在外面。
-        const theta = randRange(rand, 0, Math.PI * 2);
-        const phi = Math.acos(randRange(rand, -0.55, 0.90));
-        const rad = randRange(rand, 1.10, 1.20);
+        const h = fruitHosts[Math.floor(rand() * fruitHosts.length)];
+        // 从冠心指向宿主的**径向**（椭球不是球，但方向够用）
+        const dx = h.p.x - crownC.x;
+        const dy = h.p.y - crownC.y;
+        const dz = h.p.z - crownC.z;
+        const inv = 1 / (Math.hypot(dx, dy, dz) || 1);
+        const push = TUFT_EXTENT * h.s * FRUIT_PUSH;
+
+        const p = new THREE.Vector3(
+            h.p.x + dx * inv * push,
+            h.p.y + dy * inv * push,
+            h.p.z + dz * inv * push
+        );
+
+        // 结构保证：把果心收进冠壳内（见 FRUIT_RHO_MAX 的说明）。
+        // rho 是"归一化范数" ⇒ 把 (p − crownC) 整体缩放，rho 同步等比缩放。
+        const rho = rhoOf(p);
+        if (rho > FRUIT_RHO_MAX) {
+            const k2 = FRUIT_RHO_MAX / rho;
+            p.set(
+                crownC.x + (p.x - crownC.x) * k2,
+                crownC.y + (p.y - crownC.y) * k2,
+                crownC.z + (p.z - crownC.z) * k2
+            );
+        }
+
         fruitRaw.push({
-            p: new THREE.Vector3(
-                crownC.x + crownR.x * rad * Math.sin(phi) * Math.cos(theta),
-                crownC.y + crownR.y * rad * Math.cos(phi) - crownR.y * 0.02,
-                crownC.z + crownR.z * rad * Math.sin(phi) * Math.sin(theta)
-            ),
+            p,
             // ⚠️ 半径是**世界单位**，不吃下面的归一化（柿子就是这么大）
             r: randRange(rand, FRUIT_R[0], FRUIT_R[1]),
         });
