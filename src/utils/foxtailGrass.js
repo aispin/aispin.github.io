@@ -100,6 +100,16 @@ const BLOCKERS = [
 /** 一组障碍物的名字（给判据打印用）。 */
 export const FOXTAIL_BLOCKER_NAMES = BLOCKERS.map((b) => b.name);
 
+/**
+ * 墙脚障碍物的**实测盒**（局部坐标，同上）。
+ *
+ * 🔴 导出它是因为**判据也要用同一张表**：`harness/probe-tree-fit.mjs` 要断言
+ *    "樱花树的冠 / 干不压花箱 / 荷花缸"。判据自己抄一份盒子的坐标就会漂移
+ *    —— 挪一下花箱，草带会跟着让，而判据还按旧位置说"没压上"。
+ *    本仓已经栽过 4 次"判据自带一份配置"的坑（见 memory 的 hard-rules）。
+ */
+export const FOXTAIL_BLOCKERS = BLOCKERS;
+
 /** 一个轴对齐盒和任一障碍物是否相交（带 `BLOCK_PAD` 呼吸余量）。 */
 function hitsBlocker(box) {
     for (const b of BLOCKERS) {

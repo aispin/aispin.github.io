@@ -17,6 +17,7 @@ import StoneTable from './StoneTable';
 import LotusVat from './LotusVat';
 import FoxtailGrass from './FoxtailGrass';
 import PersimmonTree from './PersimmonTree';
+import SakuraTree from './SakuraTree';
 import { SCENE_FONTS } from '../../../config/theme';
 // 季节：门联与院子共用同一张月份表（config/seasons.js），所以门口挂秋联时
 // 院子就是秋天 —— 这条一致性是免费的。
@@ -209,6 +210,36 @@ const DOG_YAW = 0.40;
 const PERSIMMON_POS = [-3.35, GRASS_Y, 2.85];
 const PERSIMMON_YAW = 0.28;
 const RABBIT_YAW = -0.55;
+
+/**
+ * 樱花树的落点（WO-17，2026-10-12）。
+ *
+ * 用户 2026-10-12 的决定：「放**花箱前面草地的中间**（做**一棵**看效果）」。
+ * 花箱在右窗下面 —— 局部 `[WINDOW_X, OUTDOOR_Y, 0.4]`，实测占
+ * x ∈ [4.425, 5.575]、z ∈ [0.10, 0.70]（见 `utils/foxtailGrass.js` 的避让表）。
+ *
+ * ⇒ **x = WINDOW_X**：正对花箱。"花箱前面"就是花箱往外的那一侧（+z）。
+ *
+ * z 的来历（**先夹出一个区间，再在里面挑**）：
+ *   · **后缘不进墙**（下界）：前墙在局部 z = 0.15。`probe-tree-fit.mjs` 量出
+ *     冠的进深 3.093，所以树干太靠后就会把冠捅进墙里。
+ *   · **前缘不顶镜头**（上界）：默认院子机位在局部 z ≈ 6.15（世界 28.15）。
+ *     冠前缘 = 树干 + 进深，所以树干要留出足够的余量。
+ *   · **"草地的中间"**：花箱前缘在 z = 0.70，往外的草地是那一段。
+ *
+ * 🔴 **这个值是"看出来的"，不是算出来的** —— 三档实拍对比过：
+ *     **3.20** 冠后缘离墙最宽裕，但树离默认机位只有 3.8 单位，
+ *     在静止机位下几乎看不出是一棵树（太远 ⇒ 屏幕占比太小）；
+ *     **2.20** 树大了，但冠后缘离墙只剩一点点；
+ *     **2.60** 取中间 —— 屏幕上站得住，后缘离墙 1.181（实测），
+ *     穿墙 0 / 顶进檐里 0 / 撞右窗框 0 / 压摆件 0。
+ *     ⇒ 改这个落点要**重拍同机位定妆照**并**重跑 `probe-tree-fit.mjs`**。
+ *
+ * ⚠️ **不给 yaw**：生成器的 `leanCrownForward()` 已经把"冠朝哪边"烤进几何
+ *    （冠朝 +z、背着前墙）。再转一次就把那一步白做了。
+ * ⚠️ y **必须**是 GRASS_Y（与柿子树同一条教训，见上面那段注释）。
+ */
+const SAKURA_POS = [WINDOW_X, GRASS_Y, 2.60];
 
 /* ---- the creeper ink layer ------------------------------------------- */
 /**
@@ -1463,6 +1494,21 @@ const EntranceDoors = ({
                    厚度**的平面，可以贴着墙；3D 的冠有进深，要让它站在出檐
                    之外（见 `utils/persimmonTree.js` 的 `FWD_BIAS` 注释）。 */}
             <PersimmonTree position={PERSIMMON_POS} rootY={GRASS_Y} yaw={PERSIMMON_YAW} />
+
+
+            {/* 樱花树（3D，WO-17，2026-10-12）。
+                用户：「参考 sakura-station-corner 在前院种两棵樱花树」
+                → 追加：「放**花箱前面草地的中间**（做**一棵**看效果，
+                  落樱参考真实樱花树的季节）」。
+
+                骨架机器与柿子树**共用一份**（`utils/treeSkeleton.js`），
+                樱花只提供自己那套形态参数 + 花 / 叶 / 落樱。
+                花簇与叶冠是**两个** InstancedMesh，共用同一批实例矩阵
+                （一次只显示一种）⇒ 加上骨架 / 影 / 落樱共 **5 个 mesh**，
+                任一时刻最多 4 个可见；落樱**只在春天挂载**。
+
+                ⚠️ 落点与"为什么不给 yaw"写在上面 `SAKURA_POS` 的注释里。 */}
+            <SakuraTree position={SAKURA_POS} rootY={GRASS_Y} />
 
 
             {/* STONE TABLE + TWO STOOLS —— 树下、树跟前（用户 2026-10-09 定）。
