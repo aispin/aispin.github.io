@@ -270,7 +270,10 @@ export function generateSeoHtml() {
          * /me 也是一条 entry —— 不拦一下，/me 的标题会被主站的覆盖掉，
          * 并且页面上会多出一段描述「八个房间」的结构化数据。
          *
-         * ctx.path 是 URL 形态（如 '/index.html'、'/me/index.html'）。
+         * ctx.path 是 URL 形态（如 '/index.html'、'/src/me/index.html'）。
+         * ⚠️ 判据用的是 ctx.filename（绝对路径）而不是 ctx.path ——
+         *    2026-10-12 把 /me 的源码从 me/ 挪到 src/me/ 之后，URL 形态变了，
+         *    但这条判据**不需要改**（它本来就认绝对路径）。照着 path 写就会静默失效。
          */
         async transformIndexHtml(html, ctx) {
             if (!isMainEntry(ctx)) return html;   // /me 自带完整 meta，原样放行

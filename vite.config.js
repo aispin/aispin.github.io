@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import viteCompression from 'vite-plugin-compression';
 import { generateSeoHtml } from './seo-plugin.js';
 import { buildDemosIndex } from './scripts/build-demos-index.mjs';
-import { copyFileSync, existsSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import process from 'node:process';
@@ -11,13 +11,29 @@ import process from 'node:process';
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
 /**
- * `/me` 是独立于 3D 主站的第二个 entry（见 me/index.html）。
+ * `/me` 是独立于 3D 主站的第二个 entry（见 `src/me/index.html`）。
  *
  * 它和主站**不共用** index.html —— 两个页面视觉、依赖、体积都不同，
  * 共用入口会让 /me 白白背上 three.js。Vite 的多页构建把两者分别打包，
- * 这里只负责把 `/me`（不带斜杠）改写到目录里的 index.html。
+ * 这里只负责把 `/me`（不带斜杠）改写过去。
+ *
+ * 🔴 2026-10-12：源码从 `me/` 挪进了 `src/me/`（让每个业务域自己内聚一个目录，
+ *    见 WORKPLAN 的 DR-N）。于是**源码路径不再等于产物路径**：
+ *
+ *      源码   `src/me/index.html`
+ *      产物   `dist/me/index.html`      ⇒ URL `/me/`
+ *
+ *    ⇒ 这两个中间件**必须分开写**，不能共用一个目标：
+ *      · dev     → 指到源码 `/src/me/index.html`（dev 从项目根服务）
+ *      · preview → 指到产物 `/me/index.html`（preview 从 dist/ 服务）
+ *    ⚠️ 这就是"源码与产物解耦"要付的代价：**路径不再是一份，两处都得对**。
+ *      以前两者碰巧相同，所以一个常量就够用。
  */
 const ME_PAGE_PATHS = new Set(['/me', '/me/']);
+/** 源码里的 entry 位置（dev 用）。 */
+const ME_ENTRY_SRC = resolve(rootDir, 'src/me/index.html');
+/** 产物里的位置 —— URL `/me/`、CI 的 sanity-check、`public/_redirects` 认的都是它。 */
+const ME_ENTRY_OUT = '/me/index.html';
 
 /**
  * 从模块 id 里取「包名」。
@@ -72,26 +88,78 @@ function rewritePublicDirIndex(req, _res, next) {
   next();
 }
 
-function rewriteMePage(req, _res, next) {
-  const [pathname, query = ''] = req.url.split('?');
+/** 造一个「把 `/me` 改写到 `target`」的中间件。dev 与 preview 的目标不同。 */
+function makeRewriteMePage(target) {
+  return (req, _res, next) => {
+    const [pathname, query = ''] = req.url.split('?');
 
-  if (ME_PAGE_PATHS.has(pathname)) {
-    req.url = `/me/index.html${query ? `?${query}` : ''}`;
-  }
+    if (ME_PAGE_PATHS.has(pathname)) {
+      req.url = `${target}${query ? `?${query}` : ''}`;
+    }
 
-  next();
+    next();
+  };
 }
 
 function serveExtraPages() {
-  const attach = (server) => {
-    server.middlewares.use(rewriteMePage);
-    server.middlewares.use(rewritePublicDirIndex);
-  };
-
   return {
     name: 'serve-extra-pages',
-    configureServer(server) { attach(server); },
-    configurePreviewServer(server) { attach(server); }
+    // dev：还没打包，指到**源码**路径
+    configureServer(server) {
+      server.middlewares.use(makeRewriteMePage('/src/me/index.html'));
+      server.middlewares.use(rewritePublicDirIndex);
+    },
+    // preview：服务的是 dist/，指到**产物**路径
+    configurePreviewServer(server) {
+      server.middlewares.use(makeRewriteMePage(ME_ENTRY_OUT));
+      server.middlewares.use(rewritePublicDirIndex);
+    }
+  };
+}
+
+/**
+ * 把 HTML entry 的**产物路径**与**源码路径**解耦。
+ *
+ *   源码 `src/me/index.html`（和它的模块住在一起）
+ *   产物 `dist/me/index.html`（URL `/me/`）
+ *
+ * 为什么需要它：Vite 让「产物路径 = 源码相对 root 的路径」⇒
+ * `src/me/index.html` 会落到 `dist/src/me/index.html`，URL 就变成 `/src/me/`。
+ *
+ * ⚠️ 必须用 `writeBundle`（文件已落盘）而不是 `generateBundle`：
+ *    Vite 是在**它自己的 post 阶段**才把 HTML 塞进 bundle 的，普通插件的
+ *    `generateBundle` 跑在那之前 —— 那时 `bundle['src/me/index.html']` 还**不存在**，
+ *    于是静默什么都不做（第一版就是这么写的，产物照样落在 dist/src/me/）。
+ *    而 `vite-compression` 用的是 `closeBundle`（扫盘再压），`writeBundle` 在它之前，
+ *    顺序刚好。
+ * ⚠️ 之所以可以安全改名：HTML 里的资源引用是**绝对路径**（`/assets/…`，
+ *    `base` 是默认的 `/`）。哪天 base 改成相对的，这个插件立刻失效。
+ */
+function flattenHtmlEntries(map) {
+  return {
+    name: 'flatten-html-entries',
+    writeBundle(options, _bundle) {
+      const outDir = options.dir || resolve(process.cwd(), 'dist');
+      for (const [from, to] of Object.entries(map)) {
+        const src = resolve(outDir, from);
+        if (!existsSync(src)) continue;
+        const dst = resolve(outDir, to);
+        mkdirSync(dirname(dst), { recursive: true });
+        renameSync(src, dst);
+        console.log(`[flatten] ${from} -> ${to}`);
+
+        // 顺手清掉改名后留下的**空**目录（否则 dist/src/ 会跟着上传）
+        // ⚠️ 只用非递归 rmdirSync + 先确认是空的 —— 不要在这里做任何递归删除。
+        for (let dir = dirname(src); dir !== outDir && dir.startsWith(outDir + '/'); dir = dirname(dir)) {
+          try {
+            if (readdirSync(dir).length) break;
+            rmdirSync(dir);
+          } catch {
+            break;
+          }
+        }
+      }
+    }
   };
 }
 
@@ -135,6 +203,8 @@ function emit404Fallback() {
 export default defineConfig({
   plugins: [
     serveExtraPages(),
+    // 源码 src/me/index.html → 产物 dist/me/index.html（见函数注释）
+    flattenHtmlEntries({ 'src/me/index.html': 'me/index.html' }),
     react(),
     viteCompression(),
     generateSeoHtml(),
@@ -147,8 +217,8 @@ export default defineConfig({
       input: {
         // 3D 主站
         main: resolve(rootDir, 'index.html'),
-        // 纯 DOM 的名片页，不引 three
-        me: resolve(rootDir, 'me/index.html'),
+        // 纯 DOM 的名片页，不引 three。源码与它的模块同住 src/me/（见 ME_ENTRY_SRC）
+        me: ME_ENTRY_SRC,
       },
       output: {
         // Without this, three / gsap / react-dom all landed in the one entry

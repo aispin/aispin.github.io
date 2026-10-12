@@ -46,7 +46,7 @@
 | 路径 | 入口 | 是什么 |
 |---|---|---|
 | `/` | `index.html` | 3D 房子（React + three.js） |
-| `/me` | `me/index.html` | 一张平铺的名片页（纯 DOM，**不引 three**） |
+| `/me` | `src/me/index.html` | 一张平铺的名片页（纯 DOM，**不引 three**） |
 
 `/me` 是「给 HR、合作方、搜索引擎看的那一面」：姓名、三种身份、代表作品、
 已发行曲目、联系方式，一屏一屏排下来，不需要鼠标在 3D 里走。
@@ -159,7 +159,7 @@ src/
   data/                站点内容（JSON）
   audio/               Web Audio：生成式 BGM 引擎、环境音、纸声音效
   me/                  /me 名片页（纯 DOM，无 React / 无 three）
-me/index.html          /me 的 HTML entry
+                       index.html = 该 entry 的 HTML（产物落到 dist/me/index.html）
 scripts/               构建期脚本（字体子集、demos 索引、AI 项目同步）
 public/                静态资源（字体、声音、贴图、demos）
 ```
@@ -272,9 +272,17 @@ python3 scripts/build-scene-fonts.py
 - `public/_headers` · `public/_redirects` —— Cloudflare Pages 用
 - 构建时会把 `index.html` 复制成 `404.html`，保证任意深链都能落到 SPA 入口
 
-两个 entry 的路径都能直接命中：`/me/` 命中 `me/index.html`，
-`/demos/` 命中 `demos/index.html`。只有不带尾斜杠的 `/me` 需要一条重写规则
+两个 entry 的路径都能直接命中：`/demos/` 命中 `demos/index.html`。
+只有不带尾斜杠的 `/me` 需要一条重写规则
 （`public/_redirects` 里一条，dev/preview 由 `vite.config.js` 的中间件兜住）。
+
+> ⚠️ **`/me` 的源码路径 ≠ 产物路径**（2026-10-12 起）。源码在
+> `src/me/index.html`（与它的模块同目录 —— 让每个业务域自己内聚一个目录），
+> 产物在 `dist/me/index.html`（URL `/me/`）。Vite 默认让「产物路径 = 源码
+> 相对 root 的路径」，所以 `vite.config.js` 里有个 `flattenHtmlEntries` 插件
+> 把它改回去；同时 dev 与 preview 的重写目标是**两个不同的路径**
+> （dev → `/src/me/index.html`，preview → `/me/index.html`）。
+> 以后再加这种「源码内聚、产物另置」的 entry，照这个套路来。
 
 > ⚠️ **dev 下目录 URL 需要显式重写**：Vite 用 sirv 提供 `public/`，
 > 而它配的是 `extensions: []`，**不会**把 `/demos/foo/` 解析成

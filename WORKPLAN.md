@@ -39,6 +39,32 @@
 已加 ⚠️；`ai-demo` 与 `threejs-architecture-effects` 是 MIT（做法可学）。
 ⚠️ 刻意没写"已参考它们做樱花树/飞行" —— 那两个当时还没做。
 
+## WO-20 · `me` 的源码内聚到 `src/me/` —— **已交付，待你验收**
+
+- **你的决定（2026-10-12）**：「根目录 `/me/index.html` 应该挪到 `src/me/` 目录下，
+  让源码内聚在各自业务域目录下」。
+- **改了什么**：`git mv me/index.html src/me/index.html`（与它的 5 个模块同目录）；
+  `vite.config.js` 的 entry 指向 `src/me/index.html`；新增 `flattenHtmlEntries`
+  插件把**产物**仍落在 `dist/me/index.html`；dev / preview 的重写目标**拆成两个**。
+- 🔴 **核心难点（也是这次唯一的真坑）**：Vite 让「产物路径 = 源码相对 root 的路径」⇒
+  挪完产物会落到 `dist/src/me/index.html`、URL 变成 `/src/me/`，
+  而 **CI 硬断言 `test -f dist/me/index.html`** ⇒ 构建直接失败。
+  所以必须把**源码路径**和**产物路径**解耦。
+- ⚠️ 插件**必须用 `writeBundle`**，不能用 `generateBundle`：Vite 是在**它自己的
+  post 阶段**才把 HTML 塞进 bundle 的，普通插件的 `generateBundle` 跑在那之前，
+  `bundle['src/me/index.html']` 还不存在 ⇒ **静默什么都不做**（第一版就这么写的，
+  产物照样落在 `dist/src/me/`，而且没有任何报错）。
+  而 `vite-compression` 用的是 `closeBundle`（扫盘再压），`writeBundle` 正好在它之前。
+- **验收判据（全部实测通过）**：
+  | 判据 | 结果 |
+  | --- | --- |
+  | 搬前 vs 搬后的 `dist/me/index.html` | **逐字节相同**（搬家对产物零影响）|
+  | CI 三条 sanity-check | `dist/index.html` · `dist/me/index.html` · `dist/404.html` 全在 |
+  | dev `/me` 与 `/me/` | 200，且标题是**名片页自己的**（不是 3D 主站的）|
+  | preview `/me` 与 `/me/` | 200，同上 |
+  | 残留 `dist/src/` | 无（插件顺手清空目录）|
+  | lint | 0 error / 33 warning |
+
 ## WO-17 · 前院一棵樱花树（DR-L 已定）· 参考 `sakura-station-corner`
 
 - **需求原文**：「参考 sakura-station-corner 在前院种两棵樱花树」
@@ -98,43 +124,11 @@
 
 # 🙋 待你拍板的 DR
 
-### DR-N · 类 `me` 这样的小模块，要不要统一挪到 `mods/` 或 `apps/`？
-
-- **你问的**：将来还可能有类似 `me` 的子模块，放根目录会很凌乱；是否统一放
-  `mods` 或 `apps`？需要我的建议。
-- **现状**：`me/` 是 **Vite 的第二个 entry**（`me/index.html` 里是
-  `<script type="module" src="/src/me/main.js">`）⇒ **必须被打包**，
-  由 `vite.config.js` 的 `rewriteMePage` 中间件把 `/me` 改写过去。
-- 🔴 **先把一条死路排掉**：**不能放进 `public/`。** `public/` 是逐字节拷贝、
-  Vite 不处理它，`src="/src/me/main.js"` 会 **404**。`public/demos/*` 能放那儿
-  是因为它们是**已构建产物**，不是源码。
-- **关键约束：URL 跟着源码相对 root 的路径走。**
-  `me/index.html` → `dist/me/index.html` → `/me/`；
-  挪成 `apps/me/index.html` → `dist/apps/me/index.html` → **`/apps/me/`**
-  （URL 变了）。要保住短 URL `/me` 就得加个改名插件或在输出后重排。
-- 🔴 **两条查证到的事实（2026-10-12 追问「两者什么联系」时查的）**：
-  1. **CI 里已经硬断言 `test -f dist/me/index.html`**（`deploy-gh-pages.yml`
-     的 "Sanity-check dist/" 步）。⇒ 只挪源码、不加改名插件，**构建会当场失败**。
-     这是**好事**：失败是响亮的。**它等于替我们规定了"产物必须落在
-     `dist/me/index.html`"** —— 那 (C) 就不只是"好看"，而是**和 CI 的现有契约一致**。
-  2. **`/me`（不带斜杠）由三处分别兜着**：dev/preview 走 `vite.config.js` 的
-     `rewriteMePage` 中间件；Cloudflare Pages 走 `public/_redirects` 的
-     `/me  /me/index.html  200`；GitHub Pages 靠它自己的目录重定向。
-     ⇒ 换路径时**这三处都要跟着动**，别只改一处。
-  3. `dist/` 被 `.gitignore` 忽略（`git ls-files dist` = **0 个文件**），
-     所以产物**不是**第二份真源 —— 这点和 `public/demos/*` 正相反
-     （那些是**提交进仓库**的预构建产物，会漂移）。
-- **三条路**：
-  - **(A) 保持现状**（entry 在根）：零成本、URL 最干净；只有 1~2 个模块时不叫凌乱。
-  - **(B) 源码挪进 `apps/<name>/`，URL 也变成 `/apps/<name>/`**：根目录干净、
-    结构诚实（name = URL），代价是 `/me` 这个短 URL 要改（页脚/外链要跟着改）。
-  - **(C) 源码挪进 `apps/<name>/`，再用一个 ~15 行的 `generateBundle` 插件
-    把产物改名回 `dist/<name>/index.html`**：根目录干净 **且** URL 仍是 `/me`。
-    代价是多一个小插件（但它是**通用的**，以后每个模块都白拿）。
-- **我的建议：(C)**。「`apps/` 是源码的家，URL 是产品的事」—— 两者不必同构。
-  如果嫌插件麻烦、且不介意 URL 变长，退 **(B)**。**不建议 `mods/`**：
-  mods 通常指"运行时可插拔的扩展"，而这些是各自独立的**前端应用**，`apps/` 名副其实。
-- **要不要我做**：(A) / (B) / (C) 三选一；选 B 或 C 我就顺手把 `me` 挪过去。
+> DR-N（类 `me` 的小模块放哪）你已答复：**源码内聚到 `src/<业务域>/`** ——
+> 已按这个做掉（见 WO-20），按白板规矩**出表**。
+> 你选的这条比我原来的 (C) 更干净：我提的是"源码进 `apps/`、产物改名回 `dist/`"，
+> 而你说的是**把 entry 和它的模块放一起** —— 那才是真正的内聚，
+> 连"源码的家"这个概念都不需要新增一层目录。
 
 ### DR-P · 「零位图」要留一个**有限放宽**的口子吗（备查，当前**不启用**）
 
