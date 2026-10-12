@@ -41,7 +41,7 @@
 主题：**孤岛院子（v1.2）** —— 把固定的正面院子改成真能绕一圈看的 3D 场景。
 分支 **`feat/v1.2.0-island-courtyard`**（不是 `main`，不影响线上）。
 
-已交付：环绕相机状态机 + 受限轨道、`IslandGround`、`BambooGrove`、竹篱笆小院、
+已交付：环绕相机状态机 + 受限轨道、`IslandGround`、竹篱笆小院、
 **WO-6 三处封口**（雾 / 只在人在走廊里时渲染 / 退到门前自动退出）、
 「外观与内部解绑」、`settleLerp` dt 补偿、竹子贴脸让开（DR-H）、
 窄视口放开环绕上限（DR-I）、`sw.js` 的 `respondWith` 兜底修复（`v6 → v7`）。
@@ -80,6 +80,25 @@
 ④ **DR-C 答"换成"**：竹林 → **超现实幻想梦幻森林**（`DreamForest`）：
    细杆 + **完美圆球冠** + 外缘透光 + 球面斑点 + 云雾化；170 棵 / 2 次 draw call。
    `BambooGrove.jsx` 删除，`BAMBOO_*` 一整套配置改名 `FOREST_*`。
+
+**2026-10-12 追加 · `sw.js` 预缓存的修复（用户贴控制台日志）**：
+用户贴的四条里其实有**两个病**。第一条（`Response.error()`）是**设计内**行为 ——
+服务器停了 + 该资源没进过缓存；`vite preview` 那条长寿命后台任务被回收了。
+但另外两条暴露了两个**真 bug**，都已修（`v7` → `v8`）：
+
+- `manifest.webmanifest: ERR_CONNECTION_REFUSED` —— 它在 `PRECACHE_URLS` 里，
+  但静态分支的正则**没有 `webmanifest`** ⇒ SW 根本不接管 ⇒ 走裸网络。
+  **"在预缓存清单里"≠"会被 fetch 处理器接管"。**
+- `assets/main-*.js` —— 静态分支只 `caches.open(RUNTIME)`，**从没读过 `PRECACHE`**
+  ⇒ install 期下的 favicon / maskable 图标 / 字体离线时**一个都取不出来**，
+  「精确预缓存核心外壳」实际只兑现了首页一张 HTML。
+  ⇒ 改成 RUNTIME 优先、落空再问 PRECACHE。
+
+判据 `probe-sw-fetch.mjs` 从 7 条扩到 **10 条**（新增三条"断网 + 只靠预缓存"），
+**先验过红**：拿 v7 跑 **7/10**（三条全 `Failed to fetch`）；v8 **10/10**，
+content-type 分别是 `application/manifest+json` / `image/svg+xml` / `font/woff2`。
+顺带修好 `check-sw-dev.mjs` —— 它**端口写死 5199** 而 dev 在 **5173**，长期跑不起来
+（"一条跑不起来的判据等于没有判据"），改成从 argv 取。
 
 ---
 

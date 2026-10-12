@@ -18,8 +18,28 @@
  *    真正的原因（服务器没起来 / 离线 + 该资源没进过缓存）。
  *    ⇒ 每个分支的兜底都要显式写 `Response.error()`，**不能靠"大概有缓存"**。
  *    2026-10-11 停掉 `vite preview` 后刷新，控制台一次刷出两条，就是这里漏的。
+ *
+ * 🔴 2026-10-12（用户又贴了一次控制台日志）——**同一个报错文本，两个不同的病**。
+ *    贴出来的四条里，两条是"服务器没起来"，另两条暴露了**预缓存形同虚设**：
+ *
+ *      · `manifest.webmanifest: ERR_CONNECTION_REFUSED`
+ *        ⇒ `PRECACHE_URLS` 里明明有它（第 28 行），但下面的静态分支正则
+ *          **没有 `webmanifest`** ⇒ SW 根本不接管 ⇒ 走裸网络 ⇒ 连接被拒。
+ *          **"在预缓存清单里"和"会被 fetch 处理器接管"是两件事。**
+ *      · `assets/main-*.js` → `Response.error()`
+ *        ⇒ 静态分支只 `caches.open(RUNTIME)`，**从来没读过 `PRECACHE`**。
+ *          于是 install 时辛辛苦苦下的 favicon / maskable 图标 / 字体，
+ *          离线时**一个都取不出来**（只有 `/` 因为导航分支读了 PRECACHE 才有效）。
+ *          整个"精确预缓存核心外壳"的策略，实际只兑现了首页一张 HTML。
+ *
+ *    ⚠️ 还有一个**不属于 SW** 的坑，一并记在这里，因为它和这套缓存纠缠在一起：
+ *       `vite preview` 是 SPA，**对不存在的哈希会回退 `index.html`（text/html）**。
+ *       于是"旧标签页 + 新构建"的表现是：哈希已经不在了，请求却拿到 200 + HTML
+ *       ⇒ 模块脚本 MIME 不对 ⇒ 同样报 `Failed to load resource`。
+ *       实测：`curl /assets/main-VgyU1IVL.js`（旧哈希）→ **200 + text/html**。
+ *       两者都靠**普通刷新**治：导航分支是 network-first，刷一下就拿到新 HTML。
  */
-const VERSION = 'aispin-v7';
+const VERSION = 'aispin-v8';
 const PRECACHE = `${VERSION}-precache`;
 const RUNTIME = `${VERSION}-runtime`;
 
@@ -92,15 +112,23 @@ self.addEventListener('fetch', (event) => {
   }
 
   // 同源静态资源：stale-while-revalidate
-  if (/\.(js|css|woff2?|png|jpe?g|webp|svg|ico|json)$/i.test(url.pathname) || url.pathname.startsWith('/textures/')) {
+  // ⚠️ 这个正则和 `PRECACHE_URLS` 是**两套独立的名单**，必须自己对齐：
+  //    清单里的东西如果这里不匹配，SW 就不接管它，预缓存白做。
+  //    `webmanifest` 就是这么漏掉的（见文件头的 2026-10-12 记录）。
+  if (/\.(js|css|woff2?|png|jpe?g|webp|svg|ico|json|webmanifest)$/i.test(url.pathname) || url.pathname.startsWith('/textures/')) {
     event.respondWith(
       (async () => {
-        const cache = await caches.open(RUNTIME);
-        const cached = await cache.match(request);
+        const runtime = await caches.open(RUNTIME);
+        const precache = await caches.open(PRECACHE);
+        // 🔴 **两个缓存都要看**。原来只查 `RUNTIME`，而 `RUNTIME` 是"被请求过
+        //    且成功过"才写入的 ⇒ install 期的预缓存（favicon / maskable 图标 /
+        //    字体）离线时一个都取不出来，等于预缓存只兑现了首页一张 HTML。
+        //    顺序：RUNTIME 优先（它是较新的那份），落空再问 PRECACHE。
+        const cached = (await runtime.match(request)) || (await precache.match(request));
         const network = fetch(request)
           .then((response) => {
             if (response && response.status === 200) {
-              cache.put(request, response.clone()).catch(() => {});
+              runtime.put(request, response.clone()).catch(() => {});
             }
             return response;
           })
