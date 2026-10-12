@@ -4,13 +4,14 @@
  *
  * 为什么需要它
  * ----------------------------------------------------------
- * 院子能绕着看之后，能写 `camera` 的东西变成了五个：
+ * 院子能绕着看之后，能写 `camera` 的东西变成了六个：
  *
  *   1. GSAP 入场 timeline（`EntranceDoors`）
- *   2. 环绕相机（用户拖拽，本版新增）
- *   3. `?fly` 自由飞行调试相机（本版新增）
+ *   2. 环绕相机（用户拖拽）
+ *   3. `?fly` 自由飞行调试相机
  *   4. `useInfiniteCamera`（走廊滚动 / 视差）
  *   5. `DoorSection` 的 `cameraOverride`（进房间 / 传送 / `HouseExit` 退出）
+ *   6. `FlightCamera`（点前院小飞机 / `?flight`，WO-18 新增）
  *
  * 控制器本身只有十几行，**贵的是"谁现在说了算"**。以前这条规矩是隐式的
  * （"进走廊才开滚动"），加一个环绕相机就立刻打架：两边都在 `useFrame`
@@ -39,6 +40,8 @@
 export const CAMERA_MODE = {
     /** `?fly` —— 自由飞行调试相机。优先级最高，压过一切。 */
     FLY: 'FLY',
+    /** 飞行模式（点小飞机 / `?flight`）—— 见 `config/flightMode.js`。 */
+    FLIGHT: 'FLIGHT',
     /** 传送中 / 房间内 —— `DoorSection` 通过 `cameraOverride` 直接控制。 */
     ROOM: 'ROOM',
     /** `HouseExit` 从前门滑出去的那一段。 */
@@ -59,10 +62,25 @@ export const CAMERA_MODE = {
  * @param {boolean} s.isInRoom            是否在房间里
  * @param {boolean} s.houseExitRequested  是否正在播"走出大门"
  * @param {boolean} s.flyEnabled          URL 上有没有 `?fly`
+ * @param {boolean} s.flightActive        飞行模式是否开着（点飞机 / `?flight`）
  */
-export function resolveCameraMode({ hasEntered, isTeleporting, isInRoom, houseExitRequested, flyEnabled }) {
+export function resolveCameraMode({
+    hasEntered, isTeleporting, isInRoom, houseExitRequested, flyEnabled, flightActive,
+}) {
     // `?fly` 压过一切：它是 debug 后门，必要时得能从房间内部飞出去看。
     if (flyEnabled) return CAMERA_MODE.FLY;
+    /**
+     * 飞行模式排在第二。
+     *
+     * 为什么敢压在 ROOM / EXIT 上面：这两个状态在**实践上**不可能与飞行
+     * 同时成立 —— 小飞机只在前院、`outdoorVisible` 为假时它整个卸载，
+     * 而进房间 / 传送 / 退场都发生在那之后；`?flight` 又是页面加载即生效，
+     * 那时人还在院子里。
+     *
+     * 那为什么还要把它放在前面？因为万一真撞上了，**用户显式要求的那个**
+     * 应该赢。"点开飞机"是一次明确的意图，比"恰好还留在房间里"更该被尊重。
+     */
+    if (flightActive) return CAMERA_MODE.FLIGHT;
     // 传送 / 房间 / 退出：全都是 DoorSection 在 tween 相机。
     if (isTeleporting || isInRoom) return CAMERA_MODE.ROOM;
     if (houseExitRequested) return CAMERA_MODE.EXIT;

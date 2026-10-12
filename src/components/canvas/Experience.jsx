@@ -29,7 +29,10 @@ import ForecourtFence from './entrance/ForecourtFence';
 import HouseShell from './entrance/HouseShell';
 import DreamForest from './entrance/DreamForest';
 import DebugFlyCamera from './entrance/DebugFlyCamera';
+import Airplane from './entrance/Airplane';
+import FlightCamera from './entrance/FlightCamera';
 import { resolveCameraMode, CAMERA_MODE, isFlyEnabled } from '../../config/cameraMode';
+import { useFlightMode } from '../../config/flightMode';
 
 // Positioning:
 // - Segment -1's SegmentDoors are at Z=15
@@ -55,7 +58,7 @@ const Experience = ({ onSceneReady, performanceTier }) => {
     // Use SceneContext for room state
     const { hasEntered, markEntered, enterRoom, isTeleporting, isInRoom, houseExitRequested, requestHouseExit } = useScene();
 
-    const { camera } = useThree();
+    const { camera, gl } = useThree();
 
     // Debug hook: allows tests/screenshots to reposition the camera (window.__cam)
     const scene = useThree((state) => state.scene);
@@ -73,7 +76,13 @@ const Experience = ({ onSceneReady, performanceTier }) => {
         // *what* a stray 5 px bright line on screen actually is degenerates
         // into hiding objects one at a time and guessing from the diff.
         window.__THREE = THREE;
-    }, [camera, scene]);
+        // 🔴 `window.__renderer` —— WO-18 的 DR-M 要求一份"**绘制开销**增量报告"
+        //    （mesh / draw call / 体积）。`renderer.info` 只有 renderer 上有，
+        //    而 `draw calls` 是**每帧实际发生的事**，从 scene 图里推不出来
+        //    （可见性、视锥剔除、实例化都参与）。
+        //    与 `__cam` / `__scene` 同一套 DEV 钩子，生产构建里被摇掉。
+        window.__renderer = gl;
+    }, [camera, scene, gl]);
 
     /**
      * 🔴 WO-6 的**封口②**：走廊只在"人在里面"时渲染。
@@ -168,12 +177,16 @@ const Experience = ({ onSceneReady, performanceTier }) => {
     // 先算出"这一帧谁拥有相机"，再把结论分发给各个控制器。控制器自己
     // 不判断场景状态 —— 否则同一个条件要写五遍，且改一处就漏四处。
     const flyEnabled = useMemo(() => isFlyEnabled(), []);
+    // 飞行模式（点小飞机 / `?flight`）。状态在 `config/flightMode.js` ——
+    // 模块级 store，因为飞机 / 相机 / 这个状态机三处都要读它（见那个文件）。
+    const flight = useFlightMode();
     const cameraMode = resolveCameraMode({
         hasEntered,
         isTeleporting,
         isInRoom,
         houseExitRequested,
         flyEnabled,
+        flightActive: flight.active,
     });
 
     // 环绕相机只在 COURTYARD 模式下接管。
@@ -255,9 +268,25 @@ const Experience = ({ onSceneReady, performanceTier }) => {
                 <DreamForest lowTier={isLowTier} />
             )}
 
+            {/* === 前院的小飞机（WO-18）===
+                停机位在左院草地中心（`utils/flightPath.js` 的 `PARKED`），
+                点它进飞行模式。边界是 `outdoorVisible || flight.active`：
+                飞行中它必须**一直画着**（相机在它身上），哪怕场景状态
+                因为别的原因翻成了"屋里"。 */}
+            {(outdoorVisible || flight.active) && (
+                <Airplane />
+            )}
+
             {/* === 自由飞行调试相机（?fly 才开）===
                 挂在最后：它只在 URL 带 ?fly 时写相机，其余时候整个 hook 空转。 */}
             <DebugFlyCamera />
+
+            {/* === 飞行模式的相机所有者（点飞机 / ?flight）===
+                它在 `cameraMode === FLIGHT` 时每帧写相机，其余时候空转。
+                退出时只把 `position` / `quaternion` 写回 —— **`fov` 根本不用
+                存**，因为这套镜头把"长焦"换算成了推拉距离，投影矩阵从头到尾
+                没被碰过（⇒ 残留结构上不存在）。见 FlightCamera 的文件头。 */}
+            <FlightCamera enabled={cameraMode === CAMERA_MODE.FLIGHT} />
 
             {/* === COURTYARD SEASON BED (四季声床) ===
                 🔴 边界**故意**是 `!hasEntered`，**不是** `outdoorVisible` ——
