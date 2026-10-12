@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Agent 全景图 · 星球与星系</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; overflow:hidden; background:#04050c;
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+    -webkit-font-smoothing:antialiased; }
+  
+  #scene3d { position:fixed; inset:0; display:block; z-index:1; }
+  #container2d { position:fixed; inset:0; display:none; z-index:1; overflow:hidden; background:#04050c; }
+  #container2d.active { display:block; }
+  #scene3d.hidden { display:none; }
+  
+  #header { position:fixed; top:0; left:0; right:0; padding:24px 32px 60px; z-index:10;
+    pointer-events:none; background:linear-gradient(180deg, rgba(4,5,12,0.94) 0%, rgba(4,5,12,0.5) 55%, transparent 100%); }
+  #header h1 { font-size:19px; font-weight:700; letter-spacing:0.5px;
+    background:linear-gradient(90deg, #c4b5fd 0%, #60a5fa 45%, #22d3ee 100%);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  #header p { font-size:11.5px; color:rgba(255,255,255,0.42); margin-top:7px; letter-spacing:0.3px; line-height:1.7; }
+  #header .quote { color:rgba(196,181,253,0.8); font-style:italic; }
+  
+  #toggle { position:fixed; top:26px; right:32px; z-index:50; padding:9px 20px; border-radius:22px;
+    background:linear-gradient(135deg, rgba(167,139,250,0.16), rgba(96,165,250,0.16));
+    border:1px solid rgba(167,139,250,0.4); color:#e0e7ff; font-size:12px; font-weight:600;
+    letter-spacing:0.5px; cursor:pointer; font-family:inherit; backdrop-filter:blur(12px);
+    transition:all 0.25s; box-shadow:0 4px 20px rgba(167,139,250,0.2); }
+  #toggle:hover { background:linear-gradient(135deg, rgba(167,139,250,0.3), rgba(96,165,250,0.3));
+    border-color:rgba(167,139,250,0.7); transform:translateY(-1px); box-shadow:0 6px 24px rgba(167,139,250,0.35); }
+  
+  #legend { position:fixed; bottom:24px; left:32px; z-index:10; display:flex; flex-direction:column;
+    gap:7px; pointer-events:none; }
+  .legend-item { display:flex; align-items:center; gap:10px; font-size:11px;
+    color:rgba(255,255,255,0.5); letter-spacing:0.3px; }
+  .legend-dot { width:7px; height:7px; border-radius:50%; box-shadow:0 0 10px currentColor, 0 0 20px currentColor; flex-shrink:0; }
+  .legend-dot.square { border-radius:2px; width:8px; height:8px; box-shadow:none;
+    background:transparent !important; border:1px dashed currentColor; }
+  .legend-dot.ring { border-radius:50%; width:9px; height:9px; box-shadow:none;
+    background:transparent !important; border:1.5px solid currentColor; }
+  
+  #hint { position:fixed; bottom:24px; right:32px; z-index:10; font-size:10.5px;
+    color:rgba(255,255,255,0.3); text-align:right; line-height:1.9; letter-spacing:0.3px; pointer-events:none; }
+  #hint kbd { display:inline-block; padding:1px 6px; border-radius:4px;
+    background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08);
+    color:rgba(255,255,255,0.55); font-size:10px; font-family:inherit; }
+  
+  .node-label { text-align:center; white-space:nowrap; pointer-events:none; user-select:none;
+    transform:translateY(-6px); transition:opacity 0.3s; }
+  .nl-zh { display:block; font-size:12.5px; font-weight:600; color:#fff;
+    text-shadow:0 0 10px currentColor, 0 0 26px currentColor, 0 2px 8px rgba(0,0,0,0.95);
+    letter-spacing:0.4px; }
+  .nl-en { display:block; font-size:8.5px; color:rgba(255,255,255,0.35);
+    letter-spacing:1.2px; text-transform:uppercase; margin-top:3px;
+    text-shadow:0 1px 4px rgba(0,0,0,0.9); }
+  .nl-ns { display:block; font-size:8px; letter-spacing:1.5px; color:rgba(255,255,255,0.32);
+    margin-top:1px; font-weight:500; }
+  
+  #card { position:fixed; top:50%; right:28px; width:330px; max-height:76vh; z-index:100;
+    padding:26px 24px 24px; border-radius:22px;
+    background:linear-gradient(160deg, rgba(26,28,48,0.94), rgba(10,12,24,0.97));
+    border:1px solid rgba(255,255,255,0.08);
+    box-shadow:0 24px 70px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.04) inset,
+      0 0 80px -30px var(--accent, #a78bfa);
+    backdrop-filter:blur(24px) saturate(1.5); -webkit-backdrop-filter:blur(24px) saturate(1.5);
+    transform:translateY(-50%) translateX(calc(100% + 50px)); opacity:0;
+    transition:transform 0.55s cubic-bezier(0.16,1,0.3,1), opacity 0.35s ease;
+    overflow-y:auto; overflow-x:hidden; }
+  #card.visible { transform:translateY(-50%) translateX(0); opacity:1; }
+  #card::-webkit-scrollbar { width:4px; }
+  #card::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.12); border-radius:2px; }
+  .card-accent-bar { position:absolute; top:0; left:24px; right:24px; height:2px;
+    border-radius:0 0 2px 2px;
+    background:linear-gradient(90deg, transparent, var(--accent, #a78bfa), transparent); opacity:0.9; }
+  .card-close { position:absolute; top:16px; right:16px; width:28px; height:28px; border:none;
+    border-radius:50%; background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.5);
+    font-size:17px; line-height:1; cursor:pointer; transition:all 0.2s;
+    display:flex; align-items:center; justify-content:center; font-family:inherit; }
+  .card-close:hover { background:rgba(255,255,255,0.12); color:#fff; transform:rotate(90deg); }
+  .card-tag { display:inline-block; font-size:9.5px; letter-spacing:1.5px; text-transform:uppercase;
+    color:var(--accent, #a78bfa);
+    background:color-mix(in srgb, var(--accent, #a78bfa) 12%, transparent);
+    border:1px solid color-mix(in srgb, var(--accent, #a78bfa) 28%, transparent);
+    padding:3px 9px; border-radius:20px; margin-bottom:14px; font-weight:600; }
+  .card-title { font-size:19px; font-weight:700; color:#fff; letter-spacing:0.3px;
+    line-height:1.3; margin-bottom:4px; }
+  .card-subtitle { font-size:11px; color:var(--accent, #a78bfa); letter-spacing:1.5px;
+    text-transform:uppercase; margin-bottom:18px; opacity:0.85; font-weight:500; }
+  .card-desc { font-size:12.5px; line-height:1.75; color:rgba(255,255,255,0.62);
+    margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid rgba(255,255,255,0.06); }
+  .card-rows { display:flex; flex-direction:column; gap:13px; }
+  .card-row { display:flex; flex-direction:column; gap:4px; }
+  .cr-key { font-size:10px; letter-spacing:1.2px; text-transform:uppercase;
+    color:rgba(255,255,255,0.3); font-weight:600; }
+  .cr-val { font-size:12.5px; color:rgba(255,255,255,0.85); line-height:1.55; font-weight:500; }
+  
+  #loader { position:fixed; inset:0; z-index:999; background:#04050c; display:flex;
+    align-items:center; justify-content:center; flex-direction:column; gap:20px;
+    transition:opacity 0.8s ease, visibility 0.8s; }
+  #loader.hidden { opacity:0; visibility:hidden; }
+  .loader-ring { width:42px; height:42px; border:2px solid rgba(167,139,250,0.15);
+    border-top-color:#a78bfa; border-radius:50%; animation:spin 0.9s linear infinite; }
+  .loader-text { font-size:11px; letter-spacing:3px; text-transform:uppercase;
+    color:rgba(255,255,255,0.3); }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  
+  .flow-line { animation: dashFlow 1.6s linear infinite; }
+  @keyframes dashFlow { to { stroke-dashoffset: -32; } }
+  .star-glow { animation: starPulse 3s ease-in-out infinite; }
+  @keyframes starPulse { 0%,100% { opacity: 0.55; } 50% { opacity: 0.95; } }
+  
+  @media (max-width:768px) {
+    #header { padding:18px 18px 44px; }
+    #header h1 { font-size:14px; }
+    #header p { font-size:9.5px; }
+    #toggle { top:16px; right:16px; padding:7px 14px; font-size:11px; }
+    #legend { left:16px; bottom:16px; gap:5px; }
+    .legend-item { font-size:9.5px; }
+    #hint { display:none; }
+    #card { right:12px; width:calc(100vw - 24px); max-width:340px;
+      top:auto; bottom:12px; transform:translateY(calc(100% + 30px)) translateX(0); }
+    #card.visible { transform:translateY(0) translateX(0); }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="scene3d"></canvas>
+<div id="container2d"></div>
+
+<div id="header">
+  <h1>AI Agent 概念全景图 · 星球与星系</h1>
+  <p><span class="quote">「概念即星球，边界即星系 —— Agent 是 Harness 与 Model 组成的恒星系统，一次提示词的旅程，就是从用户星系出发，穿过 Agent 系统，带着工具的回声返回。」</span></p>
+</div>
+
+<button id="toggle">切换到 2D 星图</button>
+
+<div id="legend">
+  <div class="legend-item"><span class="legend-dot" style="color:#ffb74d;background:#ffb74d"></span>用户星系</div>
+  <div class="legend-item"><span class="legend-dot" style="color:#ab47bc;background:#ab47bc"></span>Harness 星系</div>
+  <div class="legend-item"><span class="legend-dot" style="color:#66bb6a;background:#66bb6a"></span>推理星系</div>
+  <div class="legend-item"><span class="legend-dot" style="color:#ffd54f;background:#ffd54f"></span>能力星系</div>
+  <div class="legend-item"><span class="legend-dot" style="color:#26c6da;background:#26c6da"></span>连接星系</div>
+  <div class="legend-item"><span class="legend-dot" style="color:#7986cb;background:#7986cb"></span>生态星系</div>
+  <div class="legend-item"><span class="legend-dot ring" style="color:#b0bec5"></span>Agent 边界（= Harness + Model）</div>
+  <div class="legend-item"><span class="legend-dot square" style="color:#9e9e9e"></span>WorkBuddy 概念（非标准）</div>
+</div>
+
+<div id="hint">
+  拖拽旋转 · 滚轮缩放 · <kbd>点击</kbd> 查看详情
+</div>
+
+<div id="card">
+  <div class="card-accent-bar"></div>
+  <button class="card-close">×</button>
+  <span class="card-tag"></span>
+  <h2 class="card-title"></h2>
+  <p class="card-subtitle"></p>
+  <p class="card-desc"></p>
+  <div class="card-rows"></div>
+</div>
+
+<div id="loader">
+  <div class="loader-ring"></div>
+  <div class="loader-text">Initializing Cosmos</div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+/* =====================================================
+   1. 数据源
+   ===================================================== */
+const GALAXIES = {
+  user:       { name:'用户星系',      en:'User Galaxy',       color:'#ffb74d', hex:0xffb74d, center3d:[0,20,0],      scale3d:[3.6,4,3.6],  rect2d:[500,50,400,220,40] },
+  harness:    { name:'Harness 星系',  en:'Harness Galaxy',    color:'#ab47bc', hex:0xab47bc, center3d:[0,0,0],       scale3d:[8,8,8],      rect2d:[400,300,600,380,60] },
+  reasoning:  { name:'推理星系',      en:'Reasoning Galaxy',  color:'#66bb6a', hex:0x66bb6a, center3d:[0,-13,0],     scale3d:[3,3,3],      rect2d:[580,730,240,180,40] },
+  capability: { name:'能力星系',      en:'Capability Galaxy', color:'#ffd54f', hex:0xffd54f, center3d:[-14,5,4],     scale3d:[5.2,5.2,5.2],rect2d:[40,300,380,400,50] },
+  connection: { name:'连接星系',      en:'Connection Galaxy', color:'#26c6da', hex:0x26c6da, center3d:[15.5,5,-4],   scale3d:[5.2,5.2,5.2],rect2d:[980,300,380,400,50] },
+  ecosystem:  { name:'生态星系',      en:'Ecosystem Galaxy',  color:'#7986cb', hex:0x7986cb, center3d:[-14,-10.5,7], scale3d:[4,4,4],      rect2d:[40,720,340,290,50] },
+  agent:      { name:'Agent 边界',    en:'Agent Boundary',    color:'#b0bec5', hex:0xb0bec5, center3d:[0,-6.5,0],    scale3d:[11,12,11],   rect2d:[370,270,660,670,70], silent:true },
+};
+
+/* 颜色延伸参数（同一星系内，主星为本色，其他星球在色相/明度/饱和度上做小幅延伸，保持色系一致） */
+const NODES = {
+  // —— 用户星系（橙色系，主星=用户）——
+  user:   { label:'用户', en:'User', g:'user', pos3d:[0,22,0], r3d:0.85, svg:[700,100,24], shift:{h:0, l:0, s:0},
+    card:{ tag:'INPUT', title:'用户 (User)', sub:'交互入口 · Entry Point',
+      desc:'人类用户是 Agent 系统服务的对象，也是任务的最初发起者。每一次交互，都始于一次自然语言的输入。',
+      rows:[['典型示例','开发者 / 终端用户 / 业务人员'],['输入形式','自然语言提示词 (Prompt)'],['期望输出','任务完成结果 / 答案 / 可执行产物']] } },
+  client: { label:'客户端', en:'Client', g:'user', pos3d:[0,19.5,0], r3d:1.0, svg:[700,160,28], shift:{h:-0.018, l:-0.06, s:-0.04},
+    card:{ tag:'UI LAYER', title:'客户端 (Client)', sub:'用户界面层 · UI Layer',
+      desc:'负责接收用户输入、展示输出、收集审批。用户直接与客户端交互，客户端负责创建并管理会话，然后把任务交给背后的 Harness 引擎。',
+      rows:[['典型示例','Codex App / WorkBuddy / ChatGPT 网页版 / Cursor'],['核心职责','输入输出、流式渲染、审批收集'],['与会话关系','客户端创建会话，会话承载上下文'],['不负责','循环控制、工具执行、模型调用']] } },
+  session:{ label:'会话', en:'Session', g:'user', pos3d:[0,16.5,0], r3d:0.75, svg:[700,220,22], shift:{h:0.03, l:0.08, s:-0.08},
+    card:{ tag:'CONTEXT · SESSION', title:'会话 (Session)', sub:'对话容器 · Conversation',
+      desc:'由客户端创建并管理的对话容器，承载本次对话的完整上下文与状态。一次会话可以包含 1 次或多次「数据流」（即多轮对话），是客户端与 Harness 之间状态传递的基本单位。',
+      rows:[['创建者','客户端（用户每次开启聊天）'],['与数据流关系','1 个会话 = 1 次或多次数据流'],['包含内容','消息历史 / 会话 ID / 临时状态'],['传递方向','客户端 → Harness（每轮携带）']] } },
+  
+  // —— Harness 星系（紫色系，主星=Harness）——
+  harness:{ label:'Harness', en:'驾驭系统', g:'harness', pos3d:[0,0,0], r3d:1.7, svg:[700,490,48], shift:{h:0, l:0, s:0},
+    card:{ tag:'CORE RUNTIME', title:'Harness (驾驭系统)', sub:'核心运行时 · Core Runtime',
+      desc:'包裹在语言模型外围、驱动其完成实际任务的整套运行时软件基础设施。它和 Model 组合起来，才构成大家口中的 Agent。',
+      rows:[['典型示例','OpenAI Codex Harness / DeepSeek Harness'],['包含组件','Agent Loop · Context · Policy · Tool Executor'],['与 Agent 关系','Agent = Harness + Model'],['关键作用','把模型的推理能力转化为可靠的实际产出']] } },
+  loop:   { label:'Agent Loop', en:'代理循环', g:'harness', pos3d:[5.5,0,0], r3d:0.5, svg:[840,490,16], shift:{h:0.045, l:0.06, s:-0.06},
+    card:{ tag:'HARNESS INNER', title:'Agent Loop (代理循环)', sub:'Harness 内部 · Core Loop',
+      desc:'驱动 "感知 → 思考 → 行动 → 观察" 的核心循环。它是 Harness 的心跳，决定了 Agent 能否持续推进任务。',
+      rows:[['典型模式','ReAct / Plan-and-Execute'],['单次周期','组装上下文 → 调用模型 → 解析输出 → 执行工具'],['终止条件','任务完成 / 达到最大轮次 / 触发策略']] } },
+  context:{ label:'Context', en:'上下文管理', g:'harness', pos3d:[0,0,5.5], r3d:0.5, svg:[700,610,16], shift:{h:-0.04, l:-0.02, s:0.05},
+    card:{ tag:'HARNESS INNER', title:'Context (上下文管理)', sub:'Harness 内部 · Memory',
+      desc:'管理系统提示词、对话历史、检索增强内容与长期记忆。目标是让模型在每一轮都能看到"正确且刚好"的信息。',
+      rows:[['典型示例','RAG 检索 / 短期对话记忆 / 向量数据库'],['关键挑战','上下文窗口压缩、信息优先级排序'],['目标','让模型看到正确的信息']] } },
+  policy: { label:'Policy', en:'策略与安全', g:'harness', pos3d:[-5.5,0,0], r3d:0.5, svg:[560,490,16], shift:{h:0.055, l:0.05, s:-0.05},
+    card:{ tag:'HARNESS INNER', title:'Policy (策略与安全)', sub:'Harness 内部 · Guardrails',
+      desc:'控制 Agent 的权限边界，在关键操作前触发人工审批。它决定了 Agent "能做什么、不能做什么、需要问谁"。',
+      rows:[['典型示例','人工审批节点 / 沙箱隔离 / 速率限制'],['核心目标','安全、可控、可审计'],['常见策略','危险操作拦截、成本上限、数据脱敏']] } },
+  tools:  { label:'Tool Executor', en:'工具执行', g:'harness', pos3d:[0,0,-5.5], r3d:0.5, svg:[700,360,16], shift:{h:-0.05, l:-0.05, s:0.06},
+    card:{ tag:'HARNESS INNER', title:'Tool Executor (工具执行)', sub:'Harness 内部 · Execution',
+      desc:'解析模型输出的工具调用请求，在受控环境中执行，并把结果安全地返回给循环。执行时可以选择走 MCP 协议，也可以走进程调用。',
+      rows:[['典型示例','文件读写 / 网络请求 / 代码沙箱执行'],['两条路径','MCP 协议（标准化）/ 进程调用（原生）'],['关键保障','超时控制、错误重试、结果截断']] } },
+  
+  // —— 推理星系（绿色系，只有模型）——
+  model:  { label:'模型', en:'Model', g:'reasoning', pos3d:[0,-13,0], r3d:1.3, svg:[700,820,36], shift:{h:0, l:0, s:0},
+    card:{ tag:'REASONING', title:'模型 (Model)', sub:'推理引擎 · Reasoning Engine',
+      desc:'大语言模型是系统的 "大脑"，负责理解上下文并决定下一步行动。它只负责推理，不直接接触外部世界。与 Harness 组合，就构成完整的 Agent。',
+      rows:[['典型示例','GPT-4o / Claude 3.5 Sonnet / DeepSeek-V3'],['核心职责','理解上下文、生成决策、输出工具调用'],['输入','Harness 组装好的上下文 (Context)'],['与 Agent 关系','Agent = Harness + Model']] } },
+  
+  // —— Agent 节点 ——
+  agent:  { label:'Agent', en:'代理系统', g:'agent', pos3d:[13,-6.5,0], r3d:0.85, svg:[1030,620,24], shift:{h:0, l:0, s:0},
+    card:{ tag:'META CONCEPT', title:'Agent (代理系统)', sub:'运行中的完整系统 · Running System',
+      desc:'Agent 是大家平时挂在嘴边的"智能体"，它不是一个单独的组件，而是 Model + Harness 组合运行后的整体。当人们说"我在做一个 Agent"时，指的就是这个能自主感知、决策、行动的完整系统。',
+      rows:[['核心公式','Agent = Model + Harness'],['在图中对应','Harness 星系 + 推理星系 一起构成的系统'],['与 Harness 区别','Harness 是运行时组件，Agent 是运行后的整体'],['典型示例','编码 Agent / 客服 Agent / 研究 Agent'],['一句话','Harness 是引擎，Model 是大脑，Agent 是那辆车']] } },
+  
+  // —— 能力星系（黄色系，主星=Skill）——
+  skill:  { label:'Skill', en:'技能模块', g:'capability', pos3d:[-11,2,6], r3d:0.6, svg:[230,380,20], shift:{h:0, l:0, s:0},
+    card:{ tag:'CAPABILITY', title:'Skill (技能模块)', sub:'能力封装 · Capability',
+      desc:'可复用的能力模块，是给 Agent 的 "操作手册"，告诉它在特定场景下应该怎么做。技能是能力星系的核心，专家团和专家都建立在技能之上。',
+      rows:[['典型示例','代码生成 / 数据分析 / 网页浏览 / PPT 制作'],['常见形式','提示词 + 工具组合 + 示例'],['复用价值','把专业流程封装成可调用的能力单元'],['关联关系','专家团 / 专家 都关联多个技能']] } },
+  expertTeam:{ label:'专家团', en:'Expert Team', g:'capability', pos3d:[-16,5,4], r3d:0.7, svg:[160,500,18], shift:{h:-0.02, l:-0.04, s:-0.04}, nonStandard:true,
+    card:{ tag:'NON-STANDARD · WORKBUDDY', title:'专家团 (Expert Team)', sub:'WorkBuddy 概念 · 非行业标准',
+      desc:'WorkBuddy 中的组织概念，指一组协同工作的专家 Agent。它不是行业通用标准，而是一种特定的产品设计模式。专家团可以关联多个技能。',
+      rows:[['所属产品','WorkBuddy'],['概念性质','非行业标准，产品特有'],['关联技能','多个（如 代码 + 调试 + 测试）'],['行业近似','Multi-Agent System / Agent Team']] } },
+  expert: { label:'专家', en:'Expert', g:'capability', pos3d:[-17,8,2], r3d:0.6, svg:[120,610,16], shift:{h:0.03, l:0.07, s:-0.08}, nonStandard:true,
+    card:{ tag:'NON-STANDARD · WORKBUDDY', title:'专家 (Expert)', sub:'WorkBuddy 概念 · 非行业标准',
+      desc:'WorkBuddy 中的单个专家 Agent，拥有特定领域的能力和角色设定。它不是行业通用标准，而是产品中的角色化 Agent。专家可以关联多个技能。',
+      rows:[['所属产品','WorkBuddy'],['概念性质','非行业标准，产品特有'],['关联技能','多个（如"前端专家" → React + CSS + 调试）'],['行业近似','Specialized Agent / Persona']] } },
+  
+  // —— 连接星系（青色系，主星=MCP；新增进程调用作为兄弟节点）——
+  mcp:    { label:'MCP', en:'模型上下文协议', g:'connection', pos3d:[11,1,-7], r3d:0.65, svg:[1065,400,22], shift:{h:0, l:0, s:0},
+    card:{ tag:'CONNECTION', title:'MCP (Model Context Protocol)', sub:'标准协议 · Protocol',
+      desc:'像 USB 接口一样的标准协议，让 Harness 能够方便地连接外部工具与数据源。MCP 既可以连接本机软件（如实现了 MCP 的 Figma、Blender），也可以连接外部服务（如 GitHub、Notion）。',
+      rows:[['生动类比','AI 世界的 USB-C 接口'],['覆盖范围','本机软件 + 外部服务'],['外部服务示例','GitHub / Notion / Slack / 云服务 API'],['提出者','Anthropic (2024)']] } },
+  processInvocation: { label:'进程调用', en:'Process Invocation', g:'connection', pos3d:[20,1,-7], r3d:0.65, svg:[1235,400,22], shift:{h:0.03, l:-0.04, s:0.03},
+    card:{ tag:'CONNECTION', title:'进程调用 (Process Invocation)', sub:'原生机制 · Native Process',
+      desc:'Agent 通过操作系统直接创建子进程、执行命令行或触发本地 API 来操控软件，无需该软件实现 MCP 协议。这是连接本机软件的另一条主要路径，与 MCP 并列。',
+      rows:[['典型场景','Figma / Blender / Photoshop 等未实现 MCP 的本地软件'],['典型机制','Shell 执行 / 子进程创建 / GUI 自动化 / 本地 SDK'],['与 MCP 区别','MCP 走标准协议，进程调用走操作系统原生机制'],['用户授权','多数情况下需要用户显式授权后才能执行']] } },
+  localSoftware:{ label:'本机软件', en:'Local App', g:'connection', pos3d:[15.5,5.5,-4], r3d:0.6, svg:[1150,540,20], shift:{h:0.04, l:0.03, s:-0.04},
+    card:{ tag:'CONNECTION', title:'本机软件 (Local App)', sub:'本地工具 · Local Tools',
+      desc:'运行在用户电脑上的本地应用。Harness 可以经由 MCP 协议操控它，也可以经由进程调用直接操控——选择哪条路径，取决于软件本身是否实现了 MCP。',
+      rows:[['典型示例','Figma / Blender / VSCode / Photoshop'],['路径一','MCP 协议（若软件实现了 MCP server）'],['路径二','进程调用（原生机制，无需 MCP）'],['特点','低延迟、数据不出本机、能力专业']] } },
+  externalService: { label:'外部服务', en:'External Service', g:'connection', pos3d:[19,9,-1], r3d:0.6, svg:[1285,650,20], shift:{h:-0.04, l:-0.03, s:0.04},
+    card:{ tag:'CONNECTION', title:'外部服务 (External Service)', sub:'云服务与 API · Cloud Services',
+      desc:'运行在云端的第三方服务。通过 MCP 或原生 API，Harness 可以让 Agent 读写云端数据、触发外部工作流。这里的"外部"是相对于本机软件而言的。',
+      rows:[['典型示例','GitHub / Notion / Slack / Stripe / 天气 API'],['连接方式','MCP 协议 / REST API / OAuth'],['特点','能力丰富、需网络、需鉴权'],['与本机软件对比','本机软件在本地运行，外部服务在云端运行']] } },
+  
+  // —— 生态星系（蓝紫色系，主星=Framework）——
+  framework:{ label:'Framework', en:'开发框架', g:'ecosystem', pos3d:[-12,-9,8], r3d:0.55, svg:[200,790,18], shift:{h:0, l:0, s:0},
+    card:{ tag:'ECOSYSTEM', title:'Framework (开发框架)', sub:'构建工具库 · Toolkit',
+      desc:'提供抽象与组件，让开发者自己搭建 Agent 循环。它是一盒乐高积木，而不是一栋现成的房子。',
+      rows:[['典型示例','LangChain / LlamaIndex / CrewAI'],['定位','构建工具，非开箱即用的运行时'],['对比 Harness','Framework 让你组装，Harness 已经组装好']] } },
+  runtime:{ label:'Runtime', en:'运行时', g:'ecosystem', pos3d:[-16,-12,6], r3d:0.55, svg:[120,900,18], shift:{h:-0.03, l:-0.04, s:0.05},
+    card:{ tag:'ECOSYSTEM', title:'Runtime (运行时)', sub:'执行保障 · Infrastructure',
+      desc:'提供持久化、流式、断点续跑等生产级能力，侧重于执行环境的可靠性保障。',
+      rows:[['典型示例','LangGraph / Temporal / Ray'],['核心价值','让 Agent 在生产环境中稳定运行'],['关键能力','状态持久化、故障恢复、可观测性']] } },
+};
+
+/* =====================================================
+   ★ 颜色计算：星系本色 + 小幅偏移 → 同色系内区分
+   ===================================================== */
+function getNodeColor(id) {
+  const data = NODES[id];
+  const base = new THREE.Color(GALAXIES[data.g].hex);
+  const sh = data.shift;
+  if (!sh || (sh.h === 0 && sh.l === 0 && sh.s === 0)) return base;
+  
+  const hsl = {};
+  base.getHSL(hsl);
+  
+  let h = hsl.h + sh.h;
+  if (h < 0) h += 1;
+  if (h > 1) h -= 1;
+  const s = Math.max(0.25, Math.min(1.0, hsl.s + sh.s));
+  const l = Math.max(0.20, Math.min(0.85, hsl.l + sh.l));
+  
+  const c = new THREE.Color();
+  c.setHSL(h, s, l);
+  return c;
+}
+
+function getNodeColorHex(id) {
+  return '#' + getNodeColor(id).getHexString();
+}
+
+// 边定义
+const EDGES = [
+  { from:'user', to:'client', color:0xffb74d, flow:true, count:5, speed:0.30 },
+  { from:'client', to:'session', color:0xffb74d, flow:true, count:4, speed:0.30 },
+  { from:'session', to:'harness', color:0xec407a, flow:true, count:6, speed:0.26 },
+  { from:'harness', to:'model', color:0xab47bc, flow:true, count:9, speed:0.22 },
+  { from:'harness', to:'loop', color:0xce93d8, flow:true, count:4, speed:0.5, straight:true },
+  { from:'harness', to:'context', color:0xce93d8, flow:true, count:4, speed:0.5, straight:true },
+  { from:'harness', to:'policy', color:0xce93d8, flow:true, count:4, speed:0.5, straight:true },
+  { from:'harness', to:'tools', color:0xce93d8, flow:true, count:4, speed:0.5, straight:true },
+  /* Tool Executor 分出两条连接路径 */
+  { from:'tools', to:'mcp', color:0x26c6da, flow:true, count:6, speed:0.24 },
+  { from:'tools', to:'processInvocation', color:0x26c6da, flow:true, count:5, speed:0.24 },
+  /* MCP 通往下游（本机软件 + 外部服务） */
+  { from:'mcp', to:'localSoftware', color:0x26c6da, flow:true, count:4, speed:0.28 },
+  { from:'mcp', to:'externalService', color:0x26c6da, flow:true, count:4, speed:0.28 },
+  /* 进程调用只通往下游（本机软件） */
+  { from:'processInvocation', to:'localSoftware', color:0x26c6da, flow:true, count:4, speed:0.28 },
+  /* 能力星系内部关系 */
+  { from:'expertTeam', to:'skill', color:0xffd54f, flow:true, count:3, speed:0.35 },
+  { from:'expert', to:'skill', color:0xffd54f, flow:true, count:3, speed:0.35 },
+  { from:'expertTeam', to:'expert', color:0x9e9e9e, dashed:true, straight:true, lineOpacity:0.15 },
+  /* 生态虚线 */
+  { from:'harness', to:'skill', color:0xffd54f, dashed:true },
+  { from:'harness', to:'framework', color:0x7986cb, dashed:true },
+  { from:'harness', to:'runtime', color:0x7986cb, dashed:true },
+  /* Agent 边界 */
+  { from:'agent', to:'harness', color:0xb0bec5, dashed:true, straight:true, lineOpacity:0.22 },
+  { from:'agent', to:'model', color:0xb0bec5, dashed:true, straight:true, lineOpacity:0.22 },
+];
+
+/* =====================================================
+   2. 卡片
+   ===================================================== */
+const cardEl = document.getElementById('card');
+const closeBtn = cardEl.querySelector('.card-close');
+
+function showCard(data, colorHex) {
+  const c = data.card;
+  cardEl.style.setProperty('--accent', colorHex);
+  cardEl.querySelector('.card-tag').textContent = c.tag;
+  cardEl.querySelector('.card-title').textContent = c.title;
+  cardEl.querySelector('.card-subtitle').textContent = c.sub;
+  cardEl.querySelector('.card-desc').textContent = c.desc;
+  cardEl.querySelector('.card-rows').innerHTML = c.rows
+    .map(([k,v]) => `<div class="card-row"><span class="cr-key">${k}</span><span class="cr-val">${v}</span></div>`).join('');
+  cardEl.classList.add('visible');
+}
+function hideCard() { cardEl.classList.remove('visible'); }
+closeBtn.addEventListener('click', hideCard);
+
+/* =====================================================
+   3. 3D 场景
+   ===================================================== */
+const canvas3d = document.getElementById('scene3d');
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 500);
+camera.position.set(38, 10, 40);
+
+const renderer = new THREE.WebGLRenderer({ canvas:canvas3d, antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(innerWidth, innerHeight);
+Object.assign(labelRenderer.domElement.style, {
+  position:'fixed', top:'0', left:'0', pointerEvents:'none', zIndex:'2'
+});
+document.body.appendChild(labelRenderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.28;
+controls.minDistance = 20;
+controls.maxDistance = 120;
+controls.target.set(0, 1, 0);
+controls.enablePan = false;
+
+const bgMat = new THREE.ShaderMaterial({
+  uniforms:{ uTime:{value:0}, uRes:{value:new THREE.Vector2(innerWidth, innerHeight)} },
+  vertexShader:`void main(){ gl_Position = vec4(position.xy, 0.9999, 1.0); }`,
+  fragmentShader:`
+    precision highp float;
+    uniform float uTime; uniform vec2 uRes;
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453123); }
+    float noise(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f);
+      float a=hash(i),b=hash(i+vec2(1,0)),c=hash(i+vec2(0,1)),d=hash(i+vec2(1,1));
+      return mix(mix(a,b,f.x),mix(c,d,f.x),f.y); }
+    void main(){
+      vec2 p = (gl_FragCoord.xy*2.0 - uRes)/min(uRes.x,uRes.y);
+      float t = uTime*0.045;
+      float n1 = noise(p*1.4 + vec2(t, t*0.6));
+      float n2 = noise(p*2.4 - vec2(t*0.7, t*0.9));
+      float n3 = noise(p*4.2 + vec2(t*0.4, -t*0.5));
+      float n4 = noise(p*0.7 + vec2(-t*0.3, t*0.2));
+      vec3 col1 = vec3(0.030,0.020,0.090);
+      vec3 col2 = vec3(0.015,0.045,0.110);
+      vec3 col3 = vec3(0.050,0.018,0.085);
+      vec3 col = mix(col1,col2,n1);
+      col = mix(col,col3,n2*0.55);
+      col += vec3(0.18,0.09,0.35)*pow(n3,3.5)*0.9;
+      col += vec3(0.02,0.14,0.24)*pow(n1*n2,2.0)*0.6;
+      col += vec3(0.10,0.04,0.20)*pow(n4,4.0)*0.5;
+      float vig = 1.0 - smoothstep(0.25, 1.35, length(p));
+      col *= vig*0.75 + 0.25;
+      col += (hash(gl_FragCoord.xy + fract(uTime)*100.0)-0.5)*0.012;
+      gl_FragColor = vec4(col,1.0);
+    }`,
+  depthTest:false, depthWrite:false,
+});
+const bgMesh = new THREE.Mesh(new THREE.PlaneGeometry(2,2), bgMat);
+bgMesh.frustumCulled = false; bgMesh.renderOrder = -1;
+scene.add(bgMesh);
+
+function radialTexture(hex, softness=1.0) {
+  const s = 256, cv = document.createElement('canvas');
+  cv.width = cv.height = s;
+  const ctx = cv.getContext('2d');
+  const c = new THREE.Color(hex);
+  const r = Math.round(c.r*255), g = Math.round(c.g*255), b = Math.round(c.b*255);
+  const grad = ctx.createRadialGradient(s/2,s/2,0, s/2,s/2,s/2);
+  grad.addColorStop(0.0,'rgba(255,255,255,1)');
+  grad.addColorStop(0.12*softness, `rgba(${r},${g},${b},0.95)`);
+  grad.addColorStop(0.35*softness, `rgba(${r},${g},${b},0.32)`);
+  grad.addColorStop(0.65*softness, `rgba(${r},${g},${b},0.08)`);
+  grad.addColorStop(1.0, `rgba(${r},${g},${b},0)`);
+  ctx.fillStyle = grad; ctx.fillRect(0,0,s,s);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace; tex.needsUpdate = true;
+  return tex;
+}
+
+const galaxyBoundaries = [];
+const galaxyBoundaryMats = [];
+
+function createGalaxyBoundary(g) {
+  const geo = new THREE.IcosahedronGeometry(1, 2);
+  const isAgent = g.silent;
+  const mat = new THREE.MeshBasicMaterial({
+    color: g.hex, wireframe: true, transparent: true,
+    opacity: isAgent ? 0.07 : 0.11,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(...g.center3d);
+  mesh.scale.set(...g.scale3d);
+  mesh.userData.baseScale = [...g.scale3d];
+  mesh.userData.phase = Math.random()*Math.PI*2;
+  mesh.userData.isAgent = isAgent;
+  scene.add(mesh);
+  galaxyBoundaries.push(mesh);
+  galaxyBoundaryMats.push(mat);
+  
+  if (!isAgent) {
+    const div = document.createElement('div');
+    div.className = 'node-label';
+    div.style.color = g.color;
+    div.innerHTML = `<span style="font-size:9px;letter-spacing:2.5px;opacity:0.6;font-weight:500;">${g.name}</span>`;
+    const lbl = new CSS2DObject(div);
+    lbl.position.set(...g.center3d);
+    lbl.position.y += g.scale3d[1] + 0.5;
+    scene.add(lbl);
+  } else {
+    const div = document.createElement('div');
+    div.className = 'node-label';
+    div.style.color = '#b0bec5';
+    div.innerHTML = `<span style="font-size:10px;letter-spacing:3px;opacity:0.75;font-weight:500;">— AGENT 边界 —</span>`;
+    const lbl = new CSS2DObject(div);
+    lbl.position.set(g.center3d[0], g.center3d[1] + g.scale3d[1] + 0.5, g.center3d[2]);
+    scene.add(lbl);
+  }
+}
+
+Object.values(GALAXIES).forEach(createGalaxyBoundary);
+
+const nodeObjects = {};
+const clickables3d = [];
+
+function createNode(id, data) {
+  const nodeColor = getNodeColor(id);
+  const nodeColorHex = getNodeColorHex(id);
+  const group = new THREE.Group();
+  group.position.set(...data.pos3d);
+  
+  const geo = new THREE.SphereGeometry(data.r3d, 48, 48);
+  const mat = new THREE.ShaderMaterial({
+    uniforms:{
+      uColor:{ value:nodeColor.clone() },
+      uTime:{ value:0 },
+      uSelected:{ value:0 },
+      uHover:{ value:0 },
+    },
+    vertexShader:`
+      varying vec3 vNormal; varying vec3 vViewDir; varying vec3 vPos;
+      void main(){
+        vNormal = normalize(normalMatrix * normal);
+        vec4 mv = modelViewMatrix * vec4(position,1.0);
+        vViewDir = normalize(-mv.xyz);
+        vPos = position;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader:`
+      uniform vec3 uColor; uniform float uTime;
+      uniform float uSelected; uniform float uHover;
+      varying vec3 vNormal; varying vec3 vViewDir; varying vec3 vPos;
+      void main(){
+        vec3 N = normalize(vNormal); vec3 V = normalize(vViewDir);
+        float fres = pow(1.0 - max(dot(N,V),0.0), 2.2);
+        vec3 L = normalize(vec3(0.55,1.0,0.75));
+        float diff = max(dot(N,L),0.0);
+        float backLight = max(dot(N,-L),0.0)*0.3;
+        vec3 base = uColor * (0.20 + diff*0.55 + backLight);
+        vec3 rim = uColor * 2.4 * fres;
+        float pulse = 0.92 + 0.08*sin(uTime*1.6 + vPos.y*2.5);
+        vec3 col = (base + rim) * pulse;
+        col += vec3(1.0) * (uSelected*0.4 + uHover*0.18) * fres;
+        col += uColor * uSelected * 0.25;
+        gl_FragColor = vec4(col,1.0);
+      }`,
+  });
+  
+  const sphere = new THREE.Mesh(geo, mat);
+  sphere.userData.nodeId = id;
+  group.add(sphere);
+  clickables3d.push(sphere);
+  
+  const glowTex = radialTexture(nodeColorHex, 0.9);
+  const glowMat = new THREE.SpriteMaterial({
+    map: glowTex, color: nodeColor.clone(), transparent: true,
+    opacity: data.nonStandard ? 0.28 : 0.55,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  const glow = new THREE.Sprite(glowMat);
+  glow.scale.setScalar(data.r3d * (data.nonStandard ? 5.5 : 6.5));
+  group.add(glow);
+  
+  const div = document.createElement('div');
+  div.className = 'node-label';
+  div.style.color = nodeColorHex;
+  const nsMark = data.nonStandard ? '<span class="nl-ns">◇ 非标准</span>' : '';
+  div.innerHTML = `<span class="nl-zh">${data.label}</span><span class="nl-en">${data.en}</span>${nsMark}`;
+  const lbl = new CSS2DObject(div);
+  lbl.position.set(0, data.r3d + 1.15, 0);
+  group.add(lbl);
+  
+  scene.add(group);
+  nodeObjects[id] = { group, sphere, glow, mat, data, id, nodeColor };
+}
+
+Object.entries(NODES).forEach(([id,data]) => createNode(id, data));
+
+const edgeObjects3d = [];
+
+function createEdge3d(e) {
+  const a = new THREE.Vector3(...NODES[e.from].pos3d);
+  const b = new THREE.Vector3(...NODES[e.to].pos3d);
+  const color = e.color;
+  
+  let curve;
+  if (e.straight) {
+    curve = new THREE.LineCurve3(a, b);
+  } else {
+    const mid = a.clone().lerp(b, 0.5);
+    let perp = new THREE.Vector3().subVectors(b,a).cross(new THREE.Vector3(0,1,0));
+    if (perp.lengthSq() < 0.0001) perp.set(1,0,0);
+    perp.normalize();
+    const bend = 0.06 * a.distanceTo(b);
+    mid.add(perp.multiplyScalar(bend));
+    curve = new THREE.QuadraticBezierCurve3(a, mid, b);
+  }
+  
+  const pts = curve.getPoints(64);
+  const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
+  const lineMat = new THREE.LineBasicMaterial({
+    color, transparent: true,
+    opacity: e.dashed ? (e.lineOpacity ?? 0.10) : 0.16,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  scene.add(new THREE.Line(lineGeo, lineMat));
+  
+  if (e.flow) {
+    const count = e.count ?? 6;
+    const pGeo = new THREE.BufferGeometry();
+    const positions = new Float32Array(count*3);
+    pGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const pMat = new THREE.PointsMaterial({
+      size: 0.5, map: radialTexture(color, 0.8), color,
+      transparent: true, blending: THREE.AdditiveBlending,
+      depthWrite: false, sizeAttenuation: true, opacity: 0.92,
+    });
+    const points = new THREE.Points(pGeo, pMat);
+    points.frustumCulled = false;
+    scene.add(points);
+    edgeObjects3d.push({
+      curve, positions, count, pGeo,
+      speed: e.speed ?? 0.22,
+      offsets: Array.from({length:count}, (_,i)=>i/count),
+    });
+  }
+}
+
+EDGES.forEach(createEdge3d);
+
+const pulsePath = new THREE.LineCurve3(
+  new THREE.Vector3(0, 22, 0),
+  new THREE.Vector3(0, -13, 0)
+);
+const pulseGeo = new THREE.BufferGeometry();
+pulseGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3));
+const pulseMat = new THREE.PointsMaterial({
+  size: 1.5, map: radialTexture(0xffffff, 0.7), color: 0x88ccff,
+  transparent: true, blending: THREE.AdditiveBlending,
+  depthWrite: false, sizeAttenuation: true, opacity: 1,
+});
+const pulse = new THREE.Points(pulseGeo, pulseMat);
+pulse.frustumCulled = false;
+scene.add(pulse);
+
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let hovered3d = null;
+let selected3d = null;
+
+function updatePointer(e) {
+  pointer.x = (e.clientX/innerWidth)*2 - 1;
+  pointer.y = -(e.clientY/innerHeight)*2 + 1;
+}
+function pick3d(e) {
+  updatePointer(e);
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(clickables3d, false);
+  return hits.length ? hits[0].object : null;
+}
+
+renderer.domElement.addEventListener('pointermove', (e) => {
+  const hit = pick3d(e);
+  if (hit !== hovered3d) {
+    hovered3d = hit;
+    renderer.domElement.style.cursor = hit ? 'pointer' : 'grab';
+  }
+});
+
+let downX=0, downY=0, downT=0;
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  downX = e.clientX; downY = e.clientY; downT = performance.now();
+});
+renderer.domElement.addEventListener('pointerup', (e) => {
+  const dx = e.clientX - downX, dy = e.clientY - downY;
+  const d2 = dx*dx + dy*dy;
+  const dt = performance.now() - downT;
+  if (d2 > 36 || dt > 450) return;
+  const hit = pick3d(e);
+  if (hit) {
+    const id = hit.userData.nodeId;
+    selected3d = id;
+    showCard(NODES[id], getNodeColorHex(id));
+  } else {
+    selected3d = null;
+    hideCard();
+  }
+});
+
+const clock = new THREE.Clock();
+let paused = false;
+
+function animate3d() {
+  if (paused) return;
+  requestAnimationFrame(animate3d);
+  
+  const dt = clock.getDelta();
+  const t = clock.getElapsedTime();
+  
+  bgMat.uniforms.uTime.value = t;
+  
+  for (let i = 0; i < galaxyBoundaries.length; i++) {
+    const m = galaxyBoundaries[i];
+    const s = m.userData.baseScale;
+    const ph = m.userData.phase;
+    const breath = 1 + Math.sin(t*0.5 + ph)*0.015;
+    m.scale.set(s[0]*breath, s[1]*breath, s[2]*breath);
+    m.rotation.y += dt*0.03;
+    const baseOp = m.userData.isAgent ? 0.055 : 0.09;
+    galaxyBoundaryMats[i].opacity = baseOp + Math.sin(t*0.8 + ph)*0.02;
+  }
+  
+  for (const id in nodeObjects) {
+    const n = nodeObjects[id];
+    n.mat.uniforms.uTime.value = t;
+    const selT = id === selected3d ? 1 : 0;
+    const hovT = n.sphere === hovered3d ? 1 : 0;
+    n.mat.uniforms.uSelected.value += (selT - n.mat.uniforms.uSelected.value)*0.12;
+    n.mat.uniforms.uHover.value += (hovT - n.mat.uniforms.uHover.value)*0.18;
+    const baseOp = id === selected3d ? 1.0 : (n.data.nonStandard ? 0.35 : 0.5);
+    n.glow.material.opacity = baseOp + Math.sin(t*1.4 + n.data.pos3d[1]*0.35)*0.08;
+  }
+  
+  for (const e of edgeObjects3d) {
+    const p = e.positions;
+    for (let i = 0; i < e.count; i++) {
+      let u = (e.offsets[i] + t*e.speed) % 1;
+      if (u < 0) u += 1;
+      const pt = e.curve.getPointAt(u);
+      p[i*3] = pt.x; p[i*3+1] = pt.y; p[i*3+2] = pt.z;
+    }
+    e.pGeo.attributes.position.needsUpdate = true;
+  }
+  
+  const CYCLE = 8;
+  const phase = (t % (CYCLE*2)) / CYCLE;
+  let u, colHex;
+  if (phase < 1) { u = phase; colHex = 0x60a5fa; }
+  else { u = 2 - phase; colHex = 0x4ade80; }
+  u = Math.max(0, Math.min(1, u));
+  const pt = pulsePath.getPointAt(u);
+  pulse.position.copy(pt);
+  pulseMat.color.setHex(colHex);
+  pulseMat.opacity = Math.min(1, Math.min(u, 1-u)*7);
+  pulseMat.size = 1.3 + Math.sin(t*6)*0.25;
+  
+  controls.update();
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+}
+
+/* =====================================================
+   4. 2D SVG 渲染
+   ===================================================== */
+let svgBuilt = false;
+
+function buildSVG() {
+  if (svgBuilt) return;
+  svgBuilt = true;
+  
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 1400 1100');
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  svg.style.width = '100%';
+  svg.style.height = '100%';
+  svg.style.display = 'block';
+  
+  const defs = document.createElementNS(NS, 'defs');
+  
+  // 星系渐变
+  Object.entries(GALAXIES).forEach(([key, g]) => {
+    const grad = document.createElementNS(NS, 'radialGradient');
+    grad.setAttribute('id', `galaxy-${key}`);
+    const c = new THREE.Color(g.hex);
+    const r = Math.round(c.r*255), gg = Math.round(c.g*255), b = Math.round(c.b*255);
+    grad.innerHTML = `
+      <stop offset="0%" stop-color="rgba(${r},${gg},${b},0.10)"/>
+      <stop offset="100%" stop-color="rgba(${r},${gg},${b},0.02)"/>
+    `;
+    defs.appendChild(grad);
+  });
+  
+  // 每个节点一个独立渐变
+  Object.keys(NODES).forEach((id) => {
+    const hexStr = getNodeColorHex(id);
+    const ng = document.createElementNS(NS, 'radialGradient');
+    ng.setAttribute('id', `node-${id}`);
+    ng.innerHTML = `
+      <stop offset="0%" stop-color="rgba(255,255,255,0.95)"/>
+      <stop offset="30%" stop-color="${hexStr}"/>
+      <stop offset="100%" stop-color="${hexStr}" stop-opacity="0.7"/>
+    `;
+    defs.appendChild(ng);
+  });
+  
+  svg.appendChild(defs);
+  
+  // Agent 边界矩形（背景层）
+  const agentG = GALAXIES.agent;
+  const [ax,ay,aw,ah,arx] = agentG.rect2d;
+  const agentRect = document.createElementNS(NS, 'rect');
+  agentRect.setAttribute('x', ax); agentRect.setAttribute('y', ay);
+  agentRect.setAttribute('width', aw); agentRect.setAttribute('height', ah);
+  agentRect.setAttribute('rx', arx);
+  agentRect.setAttribute('fill', 'none');
+  agentRect.setAttribute('stroke', agentG.color);
+  agentRect.setAttribute('stroke-width', 1.5);
+  agentRect.setAttribute('stroke-dasharray', '10 12');
+  agentRect.setAttribute('opacity', 0.32);
+  svg.appendChild(agentRect);
+  
+  const agentLabel = document.createElementNS(NS, 'text');
+  agentLabel.setAttribute('x', ax + 22);
+  agentLabel.setAttribute('y', ay + 24);
+  agentLabel.setAttribute('fill', agentG.color);
+  agentLabel.setAttribute('font-size', '11');
+  agentLabel.setAttribute('font-family', 'inherit');
+  agentLabel.setAttribute('letter-spacing', '2.5');
+  agentLabel.setAttribute('font-weight', '600');
+  agentLabel.setAttribute('opacity', '0.8');
+  agentLabel.textContent = '— AGENT 边界（= Harness + Model）—';
+  svg.appendChild(agentLabel);
+  
+  // 其他星系矩形
+  Object.entries(GALAXIES).forEach(([key, g]) => {
+    if (key === 'agent') return;
+    const [x,y,w,h,rx] = g.rect2d;
+    const rect = document.createElementNS(NS, 'rect');
+    rect.setAttribute('x', x); rect.setAttribute('y', y);
+    rect.setAttribute('width', w); rect.setAttribute('height', h);
+    rect.setAttribute('rx', rx);
+    rect.setAttribute('fill', `url(#galaxy-${key})`);
+    rect.setAttribute('stroke', g.color);
+    rect.setAttribute('stroke-width', 1);
+    rect.setAttribute('stroke-dasharray', '4 6');
+    rect.setAttribute('opacity', 0.6);
+    svg.appendChild(rect);
+    
+    const label = document.createElementNS(NS, 'text');
+    label.setAttribute('x', x + 20);
+    label.setAttribute('y', y + 26);
+    label.setAttribute('fill', g.color);
+    label.setAttribute('font-size', '11');
+    label.setAttribute('font-family', 'inherit');
+    label.setAttribute('letter-spacing', '2');
+    label.setAttribute('font-weight', '600');
+    label.setAttribute('opacity', '0.85');
+    label.textContent = g.name;
+    svg.appendChild(label);
+  });
+  
+  // 边
+  EDGES.forEach(e => {
+    const a = NODES[e.from].svg;
+    const b = NODES[e.to].svg;
+    const color = new THREE.Color(e.color);
+    const col = `#${color.getHexString()}`;
+    
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    const len = Math.sqrt(dx*dx + dy*dy);
+    if (len < 5) return;
+    
+    let d;
+    if (Math.abs(dx) < 5 || Math.abs(dy) < 5) {
+      d = `M ${a[0]} ${a[1]} L ${b[0]} ${b[1]}`;
+    } else {
+      const midX = (a[0] + b[0])/2;
+      const midY = (a[1] + b[1])/2;
+      const perpX = -dy/len, perpY = dx/len;
+      const bend = len * 0.08;
+      d = `M ${a[0]} ${a[1]} Q ${midX + perpX*bend} ${midY + perpY*bend} ${b[0]} ${b[1]}`;
+    }
+    const path = document.createElementNS(NS, 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', col);
+    path.setAttribute('stroke-width', e.dashed ? 1 : 1.5);
+    path.setAttribute('opacity', e.dashed ? 0.2 : 0.35);
+    if (e.dashed) {
+      path.setAttribute('stroke-dasharray', '4 6');
+    } else if (e.flow) {
+      path.setAttribute('stroke-dasharray', '6 10');
+      path.classList.add('flow-line');
+    }
+    svg.appendChild(path);
+  });
+  
+  // 节点
+  Object.entries(NODES).forEach(([id, data]) => {
+    const nodeColorHex = getNodeColorHex(id);
+    const [cx, cy, r] = data.svg;
+    const nodeG = document.createElementNS(NS, 'g');
+    nodeG.style.cursor = 'pointer';
+    nodeG.dataset.nodeId = id;
+    
+    const glow = document.createElementNS(NS, 'circle');
+    glow.setAttribute('cx', cx); glow.setAttribute('cy', cy);
+    glow.setAttribute('r', r*1.8);
+    glow.setAttribute('fill', nodeColorHex);
+    glow.setAttribute('opacity', data.nonStandard ? 0.06 : 0.12);
+    glow.classList.add('star-glow');
+    nodeG.appendChild(glow);
+    
+    const circle = document.createElementNS(NS, 'circle');
+    circle.setAttribute('cx', cx); circle.setAttribute('cy', cy);
+    circle.setAttribute('r', r);
+    circle.setAttribute('fill', `url(#node-${id})`);
+    circle.setAttribute('stroke', nodeColorHex);
+    circle.setAttribute('stroke-width', 1.5);
+    circle.setAttribute('opacity', data.nonStandard ? 0.7 : 1);
+    if (data.nonStandard) circle.setAttribute('stroke-dasharray', '3 3');
+    nodeG.appendChild(circle);
+    
+    const labelZh = document.createElementNS(NS, 'text');
+    labelZh.setAttribute('x', cx);
+    labelZh.setAttribute('y', cy + r + 16);
+    labelZh.setAttribute('text-anchor', 'middle');
+    labelZh.setAttribute('fill', '#fff');
+    labelZh.setAttribute('font-size', '12');
+    labelZh.setAttribute('font-weight', '600');
+    labelZh.setAttribute('font-family', 'inherit');
+    labelZh.setAttribute('letter-spacing', '0.4');
+    labelZh.textContent = data.label;
+    nodeG.appendChild(labelZh);
+    
+    const labelEn = document.createElementNS(NS, 'text');
+    labelEn.setAttribute('x', cx);
+    labelEn.setAttribute('y', cy + r + 30);
+    labelEn.setAttribute('text-anchor', 'middle');
+    labelEn.setAttribute('fill', 'rgba(255,255,255,0.4)');
+    labelEn.setAttribute('font-size', '9');
+    labelEn.setAttribute('font-family', 'inherit');
+    labelEn.setAttribute('letter-spacing', '1');
+    labelEn.textContent = data.en;
+    nodeG.appendChild(labelEn);
+    
+    nodeG.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      selected3d = id;
+      showCard(data, nodeColorHex);
+    });
+    
+    svg.appendChild(nodeG);
+  });
+  
+  svg.addEventListener('click', () => {
+    selected3d = null;
+    hideCard();
+  });
+  
+  document.getElementById('container2d').appendChild(svg);
+}
+
+/* =====================================================
+   5. 视图切换
+   ===================================================== */
+const toggleBtn = document.getElementById('toggle');
+let viewMode = '3d';
+
+toggleBtn.addEventListener('click', () => {
+  if (viewMode === '3d') {
+    viewMode = '2d';
+    paused = true;
+    canvas3d.classList.add('hidden');
+    labelRenderer.domElement.style.display = 'none';
+    buildSVG();
+    document.getElementById('container2d').classList.add('active');
+    toggleBtn.textContent = '切换到 3D 星球';
+  } else {
+    viewMode = '3d';
+    canvas3d.classList.remove('hidden');
+    labelRenderer.domElement.style.display = 'block';
+    document.getElementById('container2d').classList.remove('active');
+    toggleBtn.textContent = '切换到 2D 星图';
+    paused = false;
+    clock.getDelta();
+    animate3d();
+  }
+  hideCard();
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  labelRenderer.setSize(innerWidth, innerHeight);
+  bgMat.uniforms.uRes.value.set(innerWidth, innerHeight);
+});
+
+animate3d();
+
+setTimeout(() => document.getElementById('loader').classList.add('hidden'), 500);
+</script>
+
+</body>
+</html>

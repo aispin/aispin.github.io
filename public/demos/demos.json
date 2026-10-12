@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-10T02:59:53.679Z",
-  "count": 7,
+  "generatedAt": "2026-10-12T10:05:07.754Z",
+  "count": 10,
   "demos": [
     {
       "id": "door",
@@ -10,6 +10,16 @@
       "dir": "public/demos",
       "entry": "door.html",
       "readme": false,
+      "variants": []
+    },
+    {
+      "id": "creature-kit",
+      "title": "CreatureKit 2.1 - 关节过渡与物种配色",
+      "description": "- 入口：index.html",
+      "url": "/demos/creature-kit/",
+      "dir": "public/demos/creature-kit",
+      "entry": "index.html",
+      "readme": true,
       "variants": []
     },
     {
@@ -64,6 +74,16 @@
       "variants": []
     },
     {
+      "id": "web3d/ai-concepts",
+      "title": "AI Agent 全景图 · 星球与星系",
+      "description": " 「概念即星球，边界即星系 —— Agent 是 Harness 与 Model 组成的恒星系统，一次提示词的旅程，就是从用户星系出发，穿过 Agent 系统，带着工具的回声返回。」 ",
+      "url": "/demos/web3d/ai-concepts/",
+      "dir": "public/demos/web3d/ai-concepts",
+      "entry": "index.html",
+      "readme": true,
+      "variants": []
+    },
+    {
       "id": "web3d/life-meaning",
       "title": "人生的意义 · v0.0.1 · AI Matrix",
       "description": "- 入口：index.html",
@@ -105,6 +125,21 @@
       "entry": "index.html",
       "readme": true,
       "variants": []
+    },
+    {
+      "id": "web3d/tree",
+      "title": "3D 柿子树 · Three.js",
+      "description": "- 入口：index.html",
+      "url": "/demos/web3d/tree/",
+      "dir": "public/demos/web3d/tree",
+      "entry": "index.html",
+      "readme": true,
+      "variants": [
+        {
+          "name": "index01",
+          "url": "/demos/web3d/tree/index01.html"
+        }
+      ]
     }
   ]
 }

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>3D 柿子树 · Three.js</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #cfe3f2; }
+  canvas { display: block; }
+  #hint {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+    font: 13px/1.6 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #3a2a18; background: rgba(255,255,255,.65); backdrop-filter: blur(6px);
+    padding: 7px 15px; border-radius: 999px; user-select: none; pointer-events: none;
+    box-shadow: 0 2px 10px rgba(0,0,0,.08);
+  }
+</style>
+</head>
+<body>
+<div id="hint">拖动旋转 · 滚轮缩放 · 右键平移</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* =========================================================
+   0. 可调参数
+   ========================================================= */
+const MAX_DEPTH     = 5;      // 递归层级
+const TRUNK_LEN     = 1.20;   // 主干长度
+const TRUNK_R0      = 0.15;   // 根部半径
+const TRUNK_R1      = 0.10;   // 主干顶端半径
+const LEN_FALLOFF   = 0.78;   // 每层长度衰减
+const RAD_FALLOFF   = 0.62;   // 每层半径衰减
+const FRUIT_CHANCE  = 0.5;    // 每条末梢挂果概率
+
+// —— 叶量参数 ——
+const LEAF_MIN      = 18;     // 末梢最少叶片数
+const LEAF_MAX      = 30;     // 末梢最多叶片数
+const LEAF_SPREAD   = 0.30;   // 叶片散布半径
+
+// —— 关节参数 ——
+const JOINT_SCALE   = 1.06;   // 关节椭球基准半径 = r1 * JOINT_SCALE
+const JOINT_ELONG   = 1.30;   // 沿枝条方向的拉长系数
+const JOINT_SQUASH  = 0.98;   // 垂直枝条方向的压扁系数（需 ≥ 1/JOINT_SCALE 才能盖住父枝口）
+const JOINT_INSET   = 0.25;   // 关节向父枝内部偏移的比例
+const CHILD_INSET   = 0.55;   // 子枝起点回退比例（埋进关节内部）
+const CHILD_DIR_BIAS = 0.30;  // 子枝起始方向偏向父枝方向的比例
+
+/* =========================================================
+   0.5 随机小工具
+   ========================================================= */
+const rnd = (a, b) => a + Math.random() * (b - a);
+const _axis = new THREE.Vector3();
+
+function jitterDir(dir, angle) {
+  _axis.set(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1));
+  if (_axis.lengthSq() < 1e-6) _axis.set(0, 1, 0);
+  _axis.normalize();
+  return dir.clone().applyAxisAngle(_axis, angle).normalize();
+}
+
+/* =========================================================
+   1. 渲染器 / 场景 / 相机
+   ========================================================= */
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.02;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = makeSkyTexture();
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(4.8, 3.3, 5.8);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 2.0, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.minDistance = 2;
+controls.maxDistance = 22;
+controls.maxPolarAngle = Math.PI * 0.49;
+controls.update();
+
+/* =========================================================
+   2. 灯光
+   ========================================================= */
+scene.add(new THREE.HemisphereLight(0xbcd9ff, 0x6b5a3e, 1.15));
+
+const sun = new THREE.DirectionalLight(0xfff2d8, 2.5);
+sun.position.set(6, 9, 5);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 30;
+sun.shadow.camera.left = -7;
+sun.shadow.camera.right = 7;
+sun.shadow.camera.top = 7;
+sun.shadow.camera.bottom = -7;
+sun.shadow.bias = -0.0012;
+sun.shadow.normalBias = 0.02;
+scene.add(sun);
+
+const fill = new THREE.DirectionalLight(0xa8c8ff, 0.55);
+fill.position.set(-6, 4, -5);
+scene.add(fill);
+
+/* =========================================================
+   3. 地面
+   ========================================================= */
+const ground = new THREE.Mesh(
+  new THREE.CircleGeometry(18, 64),
+  new THREE.MeshStandardMaterial({ color: 0x707b4c, roughness: 1, metalness: 0 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+/* =========================================================
+   4. 材质与共享几何体
+   ========================================================= */
+const barkMat = new THREE.MeshStandardMaterial({
+  color: 0x6b5140, roughness: 0.96, metalness: 0
+});
+
+const leafMats = [0x4f8a2e, 0x5f9c34, 0x3f7a28, 0x71ad3d, 0x568f2f, 0x467f26].map(c =>
+  new THREE.MeshStandardMaterial({
+    color: c, roughness: 0.82, metalness: 0,
+    side: THREE.DoubleSide, flatShading: true
+  })
+);
+
+const persimmonMat = new THREE.MeshStandardMaterial({
+  color: 0xf2731c, roughness: 0.42, metalness: 0.02,
+  emissive: 0x3d0f00, emissiveIntensity: 1.0
+});
+
+const calyxMat = new THREE.MeshStandardMaterial({ color: 0x4a6b28, roughness: 0.9 });
+
+const leafGeo      = makeLeafGeometry();
+const persimmonGeo = new THREE.SphereGeometry(1, 16, 12);
+const calyxGeo     = new THREE.ConeGeometry(1, 1, 5);
+// 关节几何：用球体做基础，通过缩放变成“沿枝条方向拉长的椭球”
+const jointGeo     = new THREE.SphereGeometry(1, 14, 12);
+
+/* =========================================================
+   5. 种树
+   ========================================================= */
+const tree = new THREE.Group();
+scene.add(tree);
+
+grow(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1, 0),
+     TRUNK_LEN, TRUNK_R0, TRUNK_R1, 0);
+
+/* ---------------------------------------------------------
+   递归生长
+   --------------------------------------------------------- */
+function grow(start, dir, length, r0, r1, depth) {
+  const SEGS = 3;
+  const pts = [start.clone()];
+  let p = start.clone();
+  let d = dir.clone().normalize();
+
+  const jit = depth === 0 ? 0.13 : 0.19;
+  for (let i = 1; i <= SEGS; i++) {
+    d = jitterDir(d, jit);
+    d.y += 0.09;
+    d.normalize();
+    p.addScaledVector(d, length / SEGS);
+    pts.push(p.clone());
+  }
+
+  const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.5);
+  // 纵向细分多一些，弯管更顺滑
+  const geo = taperedTube(curve, r0, r1, SEGS * 7, 8);
+  const mesh = new THREE.Mesh(geo, barkMat);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  tree.add(mesh);
+
+  const tip    = p.clone();
+  const tipDir = d.clone();
+
+  // 末梢：长叶子 + 挂柿子
+  if (depth >= MAX_DEPTH) {
+    growFoliage(tip);
+    return;
+  }
+
+  // —— 规划子枝 ——
+  const n = depth === 0 ? 3 : (Math.random() < 0.35 ? 3 : 2);
+  const children = [];
+  for (let i = 0; i < n; i++) {
+    const spread = depth === 0 ? rnd(0.55, 0.95) : rnd(0.45, 1.05);
+    const nd = jitterDir(tipDir, spread);
+    nd.y += depth === 0 ? rnd(0.25, 0.45) : rnd(0.03, 0.24);
+    nd.normalize();
+
+    // 子枝起始半径提高到父枝末端的 0.82~0.98，粗细过渡更自然
+    const nr0  = r1 * rnd(0.82, 0.98);
+    const nlen = length * rnd(0.72, 0.86);
+    children.push({ nd, nr0, nlen });
+  }
+
+  // —— 关节椭球：沿父枝方向拉长，垂直方向略微压扁 ——
+  // 关键：垂直方向的半径必须 ≥ r1，才能把父枝末端的开口完全包住
+  const jointR = r1 * JOINT_SCALE;
+  const joint = new THREE.Mesh(jointGeo, barkMat);
+
+  // 让椭球的长轴对齐父枝方向（SphereGeometry 极轴是 Y）
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), tipDir);
+  joint.quaternion.copy(q);
+
+  // 位置稍微往父枝内部偏移，视觉上像枝干自身的膨大
+  joint.position.copy(tip).addScaledVector(tipDir, -jointR * JOINT_INSET);
+
+  // 缩放：沿父枝方向拉长，垂直方向压扁
+  joint.scale.set(
+    jointR * JOINT_SQUASH,
+    jointR * JOINT_ELONG,
+    jointR * JOINT_SQUASH
+  );
+
+  joint.castShadow = true;
+  joint.receiveShadow = true;
+  tree.add(joint);
+
+  // —— 递归：子枝起点埋进关节内部，起始方向略微偏向父枝方向 ——
+  const inset = tipDir.clone().multiplyScalar(-jointR * CHILD_INSET);
+  for (const c of children) {
+    const childStart = tip.clone().add(inset);
+    // 让子枝在根部稍微“顺”着父枝方向长出来，再逐渐分开
+    const biasedDir = c.nd.clone().lerp(tipDir, CHILD_DIR_BIAS).normalize();
+    grow(childStart, biasedDir, c.nlen, c.nr0, c.nr0 * RAD_FALLOFF, depth + 1);
+  }
+}
+
+/* ---------------------------------------------------------
+   末梢：叶子 + 柿子
+   --------------------------------------------------------- */
+function growFoliage(pos) {
+  // —— 叶子 ——
+  const leafCount = LEAF_MIN + ((Math.random() * (LEAF_MAX - LEAF_MIN + 1)) | 0);
+  for (let i = 0; i < leafCount; i++) {
+    const leaf = new THREE.Mesh(leafGeo, leafMats[(Math.random() * leafMats.length) | 0]);
+
+    // 球面均匀分布（cbrt 让内外密度一致），树冠更蓬松
+    const theta = rnd(0, Math.PI * 2);
+    const phi   = Math.acos(rnd(-1, 1));
+    const rad   = LEAF_SPREAD * Math.cbrt(Math.random());
+    leaf.position.set(
+      pos.x + rad * Math.sin(phi) * Math.cos(theta),
+      pos.y + rad * Math.cos(phi) * 0.75,
+      pos.z + rad * Math.sin(phi) * Math.sin(theta)
+    );
+
+    leaf.scale.setScalar(rnd(0.08, 0.13));
+    leaf.rotation.set(rnd(0, 6.28), rnd(0, 6.28), rnd(0, 6.28));
+    leaf.castShadow = true;
+    tree.add(leaf);
+  }
+
+  // —— 柿子 ——
+  if (Math.random() > FRUIT_CHANCE) return;
+
+  const r = rnd(0.085, 0.115);
+  const fpos = new THREE.Vector3(
+    pos.x + rnd(-0.07, 0.07),
+    pos.y - r * 0.85,
+    pos.z + rnd(-0.07, 0.07)
+  );
+
+  const fruit = new THREE.Mesh(persimmonGeo, persimmonMat);
+  fruit.position.copy(fpos);
+  fruit.scale.set(r, r * 0.88, r);
+  fruit.castShadow = true;
+  tree.add(fruit);
+
+  const calyx = new THREE.Mesh(calyxGeo, calyxMat);
+  calyx.position.set(fpos.x, fpos.y + r * 0.85, fpos.z);
+  calyx.scale.set(r * 0.55, r * 0.4, r * 0.55);
+  calyx.rotation.x = Math.PI;
+  calyx.rotation.z = rnd(0, 3);
+  calyx.castShadow = true;
+  tree.add(calyx);
+}
+
+/* =========================================================
+   6. 几何工具
+   ========================================================= */
+
+/** 把 TubeGeometry 改造成两端半径不同的锥形管 */
+function taperedTube(curve, r0, r1, tubularSegments, radialSegments) {
+  const geo = new THREE.TubeGeometry(curve, tubularSegments, 1, radialSegments, false);
+  const pos = geo.attributes.position;
+  const radial = radialSegments + 1;
+  const center = new THREE.Vector3();
+  const v = new THREE.Vector3();
+
+  for (let i = 0; i <= tubularSegments; i++) {
+    const t = i / tubularSegments;
+    const r = r0 + (r1 - r0) * t;
+    curve.getPointAt(t, center);
+    for (let j = 0; j < radial; j++) {
+      const idx = i * radial + j;
+      v.fromBufferAttribute(pos, idx).sub(center);
+      const len = v.length() || 1e-6;
+      v.multiplyScalar(r / len).add(center);
+      pos.setXYZ(idx, v.x, v.y, v.z);
+    }
+  }
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+/** 一片叶子的形状 */
+function makeLeafGeometry() {
+  const s = new THREE.Shape();
+  s.moveTo(0, 0);
+  s.bezierCurveTo(0.42, 0.18, 0.50, 0.75, 0, 1.0);
+  s.bezierCurveTo(-0.50, 0.75, -0.42, 0.18, 0, 0);
+  const g = new THREE.ShapeGeometry(s, 8);
+  g.translate(0, -0.5, 0);
+  return g;
+}
+
+/** 天空渐变 */
+function makeSkyTexture() {
+  const c = document.createElement('canvas');
+  c.width = 2; c.height = 256;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0.00, '#6ea8de');
+  g.addColorStop(0.45, '#b8d6ee');
+  g.addColorStop(0.78, '#e6e2cf');
+  g.addColorStop(1.00, '#d8c9a6');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 2, 256);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/* =========================================================
+   7. 主循环
+   ========================================================= */
+const clock = new THREE.Clock();
+function animate() {
+  const t = clock.getElapsedTime();
+  tree.rotation.z = Math.sin(t * 0.6) * 0.006;
+  tree.rotation.x = Math.cos(t * 0.45) * 0.005;
+
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+animate();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

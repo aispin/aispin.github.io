@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>3D 松针树林 · Three.js</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #a8e5dc; }
+  canvas { display: block; }
+  #hint {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+    font: 13px/1.6 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #234d3e; background: rgba(255,255,255,.55); backdrop-filter: blur(6px);
+    padding: 7px 15px; border-radius: 999px; user-select: none; pointer-events: none;
+    box-shadow: 0 2px 10px rgba(0,0,0,.08);
+  }
+</style>
+</head>
+<body>
+<div id="hint">拖动旋转 · 滚轮缩放 · 右键平移</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* =========================================================
+   0. 参数
+   ========================================================= */
+const NEEDLE_MIN    = 3200;  // 每棵大树最少针叶数
+const NEEDLE_MAX    = 4800;  // 每棵大树最多针叶数
+const FRUIT_MIN     = 28;
+const FRUIT_MAX     = 60;
+const CANOPY_R      = 0.75;
+
+// 针的尺寸
+const NEEDLE_W      = 0.013;  // 根部宽度（很细）
+const NEEDLE_H      = 0.105;  // 针长
+
+const rnd = (a, b) => a + Math.random() * (b - a);
+
+/* =========================================================
+   1. 渲染器 / 场景 / 相机
+   ========================================================= */
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.08;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = makeSkyTexture();
+scene.fog = new THREE.Fog(0xbdeae0, 7, 32);
+
+const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(0, 1.7, 9.5);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.7, -2);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.minDistance = 2;
+controls.maxDistance = 22;
+controls.maxPolarAngle = Math.PI * 0.49;
+controls.update();
+
+/* =========================================================
+   2. 灯光
+   ========================================================= */
+scene.add(new THREE.HemisphereLight(0xd6f0e8, 0x4a6b3a, 1.25));
+
+const sun = new THREE.DirectionalLight(0xfff3d6, 2.2);
+sun.position.set(-7, 12, 8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 45;
+sun.shadow.camera.left = -16;
+sun.shadow.camera.right = 16;
+sun.shadow.camera.top = 16;
+sun.shadow.camera.bottom = -16;
+sun.shadow.bias = -0.0009;
+sun.shadow.normalBias = 0.02;
+scene.add(sun);
+scene.add(sun.target);
+sun.target.position.set(0, 0, -3);
+
+const fill = new THREE.DirectionalLight(0xa8d8ff, 0.5);
+fill.position.set(6, 5, -6);
+scene.add(fill);
+
+/* =========================================================
+   3. 地面
+   ========================================================= */
+const ground = new THREE.Mesh(
+  new THREE.CircleGeometry(40, 64),
+  new THREE.MeshStandardMaterial({
+    map: makeGrassTexture(),
+    roughness: 1,
+    metalness: 0,
+  })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+/* =========================================================
+   4. 共享材质与几何
+   ========================================================= */
+const trunkMat = new THREE.MeshStandardMaterial({
+  color: 0x5a3f2c, roughness: 0.95, metalness: 0,
+});
+
+const canopyBaseMat = new THREE.MeshStandardMaterial({
+  color: 0x1f3a10, roughness: 1, metalness: 0,
+  flatShading: true,
+});
+
+// 针叶：用 flatShading 让每根针有硬边高光，看起来更"硬"
+const needleMat = new THREE.MeshStandardMaterial({
+  color: 0xffffff, roughness: 0.85, metalness: 0,
+  side: THREE.DoubleSide,
+  flatShading: true,
+});
+
+const fruitMat = new THREE.MeshStandardMaterial({
+  color: 0xffd12e, roughness: 0.35, metalness: 0.02,
+  emissive: 0x6b4a00, emissiveIntensity: 0.55,
+});
+
+const needleGeo = makeNeedleGeometry();
+const fruitGeo  = new THREE.SphereGeometry(1, 8, 6);
+const canopyGeo = new THREE.SphereGeometry(1, 24, 18);
+
+/* =========================================================
+   5. 生成一棵树
+   ========================================================= */
+function createTree(scale = 1) {
+  const group = new THREE.Group();
+
+  const canopyR = CANOPY_R;
+  const canopyCenterY = 1.85;
+
+  /* —— 树干 —— */
+  const trunkH = 1.55;
+  const pts = [new THREE.Vector3(0, 0, 0)];
+  const p = new THREE.Vector3(0, 0, 0);
+  const d = new THREE.Vector3(rnd(-0.02, 0.02), 1, rnd(-0.02, 0.02)).normalize();
+  const SEG = 6;
+  for (let i = 1; i <= SEG; i++) {
+    d.x += rnd(-0.03, 0.03);
+    d.z += rnd(-0.03, 0.03);
+    d.y = 1;
+    d.normalize();
+    p.addScaledVector(d, trunkH / SEG);
+    pts.push(p.clone());
+  }
+  const trunkCurve = new THREE.CatmullRomCurve3(pts);
+  const trunkGeo = taperedTube(trunkCurve, 0.10, 0.05, 24, 8);
+  const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+  trunk.castShadow = true;
+  trunk.receiveShadow = true;
+  group.add(trunk);
+
+  /* —— 树冠基底球：颜色更深，藏在针叶下面 —— */
+  const base = new THREE.Mesh(canopyGeo, canopyBaseMat);
+  base.position.y = canopyCenterY;
+  base.scale.set(canopyR * 0.80, canopyR * 0.72, canopyR * 0.80);
+  base.castShadow = true;
+  base.receiveShadow = true;
+  group.add(base);
+
+  /* —— 针叶：InstancedMesh —— */
+  const densityMul = THREE.MathUtils.clamp(scale * 0.9, 0.35, 1);
+  const needleCount = Math.floor(
+    (NEEDLE_MIN + Math.random() * (NEEDLE_MAX - NEEDLE_MIN)) * densityMul
+  );
+
+  const needleMesh = new THREE.InstancedMesh(needleGeo, needleMat, needleCount);
+  const dummy = new THREE.Object3D();
+  const up    = new THREE.Vector3(0, 1, 0);
+  const color = new THREE.Color();
+  const nrm   = new THREE.Vector3();
+
+  for (let i = 0; i < needleCount; i++) {
+    /* 球面均匀采样 */
+    const theta = Math.random() * Math.PI * 2;
+    const phi   = Math.acos(2 * Math.random() - 1);
+
+    const nx = Math.sin(phi) * Math.cos(theta);
+    const ny = Math.cos(phi);
+    const nz = Math.sin(phi) * Math.sin(theta);
+
+    // 关键：针的起点在球面**内侧**，让针从球里往外扎出去
+    // 深度分层，形成参差感
+    let rScale = rnd(0.86, 0.96);
+    if (Math.random() < 0.20) rScale = rnd(0.78, 0.88);  // 更深的针，只露尖
+    const r = canopyR * rScale;
+
+    dummy.position.set(
+      nx * r,
+      ny * r * 0.9 + canopyCenterY,
+      nz * r
+    );
+
+    /* 朝向：以球面法线为主，加较大的随机扰动 */
+    nrm.set(nx, ny, nz).normalize();
+
+    // 20% 的针往外偏得更厉害，形成"炸毛"
+    const wobble = Math.random() < 0.20 ? 0.55 : 0.35;
+    nrm.x += rnd(-wobble, wobble);
+    nrm.y += rnd(-wobble, wobble);
+    nrm.z += rnd(-wobble, wobble);
+    nrm.normalize();
+
+    // 关键：几何底部在原点，用 setFromUnitVectors 让针的+Y方向指向 nrm
+    const quat = new THREE.Quaternion().setFromUnitVectors(up, nrm);
+    // 绕针自身轴转，让针的"扁平面"朝向随机
+    const spin = new THREE.Quaternion().setFromAxisAngle(nrm, Math.random() * Math.PI * 2);
+    quat.premultiply(spin);
+    dummy.quaternion.copy(quat);
+
+    // 长短参差
+    dummy.scale.set(
+      rnd(0.75, 1.15),             // 宽
+      rnd(0.65, 1.35),             // 长（更有"尖刺"感）
+      rnd(0.75, 1.15)
+    );
+    dummy.updateMatrix();
+    needleMesh.setMatrixAt(i, dummy.matrix);
+
+    /* 颜色：深绿到亮黄绿，顶部更亮 */
+    const hue   = 0.235 + rnd(-0.02, 0.045);
+    const sat   = rnd(0.60, 0.92);
+    const light = 0.22 + (ny + 1) * 0.11 + rnd(-0.05, 0.10);
+    color.setHSL(hue, sat, THREE.MathUtils.clamp(light, 0.10, 0.62));
+    needleMesh.setColorAt(i, color);
+  }
+  needleMesh.castShadow = true;
+  needleMesh.receiveShadow = true;
+  needleMesh.instanceMatrix.needsUpdate = true;
+  if (needleMesh.instanceColor) needleMesh.instanceColor.needsUpdate = true;
+  group.add(needleMesh);
+
+  /* —— 果实 —— */
+  const fruitCount = FRUIT_MIN + ((Math.random() * (FRUIT_MAX - FRUIT_MIN + 1)) | 0);
+  const fruitMesh = new THREE.InstancedMesh(fruitGeo, fruitMat, fruitCount);
+  for (let i = 0; i < fruitCount; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi   = Math.acos(2 * Math.random() - 1);
+
+    const nx = Math.sin(phi) * Math.cos(theta);
+    const ny = Math.cos(phi);
+    const nz = Math.sin(phi) * Math.sin(theta);
+    // 果实露在针叶外面
+    const r = canopyR * rnd(1.02, 1.14);
+
+    dummy.position.set(nx * r, ny * r * 0.9 + canopyCenterY, nz * r);
+    dummy.quaternion.identity();
+    dummy.scale.setScalar(rnd(0.05, 0.078));
+    dummy.updateMatrix();
+    fruitMesh.setMatrixAt(i, dummy.matrix);
+  }
+  fruitMesh.castShadow = true;
+  fruitMesh.instanceMatrix.needsUpdate = true;
+  group.add(fruitMesh);
+
+  return group;
+}
+
+/* =========================================================
+   6. 排布树林
+   ========================================================= */
+const trees = [];
+
+// 前景两棵大树
+trees.push({ pos: [-4.2, 0, 3.0], scale: 2.0 });
+trees.push({ pos: [ 4.4, 0, 3.2], scale: 1.9 });
+
+// 中景
+for (let i = 0; i < 10; i++) {
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const x = side * rnd(1.6, 4.8);
+  const z = rnd(-2.5, 1.8);
+  trees.push({ pos: [x, 0, z], scale: rnd(0.85, 1.2) });
+}
+
+// 远景
+for (let i = 0; i < 24; i++) {
+  const x = rnd(-11, 11);
+  const z = rnd(-22, -3.5);
+  trees.push({ pos: [x, 0, z], scale: rnd(0.55, 0.9) });
+}
+
+for (const t of trees) {
+  const tree = createTree(t.scale);
+  tree.position.set(t.pos[0], t.pos[1], t.pos[2]);
+  tree.scale.setScalar(t.scale);
+  tree.rotation.y = Math.random() * Math.PI * 2;
+  scene.add(tree);
+}
+
+/* =========================================================
+   7. 几何工具
+   ========================================================= */
+
+/** 针状叶：底部对齐原点，向上收窄成针尖，沿长度带微弯 */
+function makeNeedleGeometry() {
+  const W = NEEDLE_W;
+  const H = NEEDLE_H;
+  const SEG = 4;
+
+  // 用平面做基础，1 段宽 × 4 段长
+  const g = new THREE.PlaneGeometry(W, H, 1, SEG);
+  const pos = g.attributes.position;
+
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i) / W;      // -0.5 ~ 0.5
+    const y = pos.getY(i) / H + 0.5; // 0 ~ 1（0 为底部，1 为尖端）
+
+    // 宽度收敛：底部略微收窄，越往上越细，顶部几乎为 0
+    let wf;
+    if (y < 0.12) {
+      // 根部稍微收一点，防止和球面接缝太硬
+      wf = 0.35 + (y / 0.12) * 0.65;
+    } else {
+      // 从 1 平滑收敛到 0（针尖）
+      const t = (y - 0.12) / 0.88;
+      wf = Math.pow(1 - t, 1.35);
+    }
+    wf = Math.max(wf, 0.015);
+
+    pos.setX(i, x * W * wf);
+
+    // 沿长度方向微微弯曲，让针看起来不僵硬
+    const bend = Math.sin(y * Math.PI * 0.9) * 0.012;
+    pos.setZ(i, bend);
+  }
+
+  pos.needsUpdate = true;
+  g.computeVertexNormals();
+
+  // 把底部对齐到原点：现在几何中心在 y=0，需要上移 H/2
+  g.translate(0, H / 2, 0);
+
+  return g;
+}
+
+/** 把 TubeGeometry 改造成两端半径不同的锥形管 */
+function taperedTube(curve, r0, r1, tubularSegments, radialSegments) {
+  const geo = new THREE.TubeGeometry(curve, tubularSegments, 1, radialSegments, false);
+  const pos = geo.attributes.position;
+  const radial = radialSegments + 1;
+  const center = new THREE.Vector3();
+  const v = new THREE.Vector3();
+  for (let i = 0; i <= tubularSegments; i++) {
+    const t = i / tubularSegments;
+    const r = r0 + (r1 - r0) * t;
+    curve.getPointAt(t, center);
+    for (let j = 0; j < radial; j++) {
+      const idx = i * radial + j;
+      v.fromBufferAttribute(pos, idx).sub(center);
+      const len = v.length() || 1e-6;
+      v.multiplyScalar(r / len).add(center);
+      pos.setXYZ(idx, v.x, v.y, v.z);
+    }
+  }
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+/** 天空渐变 */
+function makeSkyTexture() {
+  const c = document.createElement('canvas');
+  c.width = 2; c.height = 512;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, 512);
+  g.addColorStop(0.00, '#7fd6d6');
+  g.addColorStop(0.35, '#a4e5dd');
+  g.addColorStop(0.65, '#cdf0e6');
+  g.addColorStop(1.00, '#e8f7ef');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 2, 512);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/** 草地纹理 */
+function makeGrassTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 512;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#6dbb48';
+  ctx.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 260; i++) {
+    const x = Math.random() * 512;
+    const y = Math.random() * 512;
+    const r = Math.random() * 40 + 10;
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+    const dark = Math.random() < 0.6;
+    grad.addColorStop(0, dark ? 'rgba(70,150,55,0.45)' : 'rgba(150,210,110,0.4)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(10, 10);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/* =========================================================
+   8. 主循环
+   ========================================================= */
+function animate() {
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+animate();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

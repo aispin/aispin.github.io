@@ -1,0 +1,1497 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CreatureKit 2.1 - 关节过渡与物种配色</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg-dark: #0f172a;
+            --bg-card: #ffffff;
+            --bg-panel: #f8fafc;
+            --border: #e2e8f0;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .app-container {
+            display: flex;
+            background: var(--bg-card);
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: var(--shadow-xl);
+            max-width: 1200px;
+            width: 100%;
+            height: 85vh;
+            max-height: 880px;
+        }
+        .preview-panel {
+            width: 40%;
+            background-color: var(--bg-panel);
+            background-image: 
+                linear-gradient(45deg, #E2E8F0 25%, transparent 25%), 
+                linear-gradient(-45deg, #E2E8F0 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #E2E8F0 75%), 
+                linear-gradient(-45deg, transparent 75%, #E2E8F0 75%);
+            background-size: 16px 16px;
+            background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 30px;
+            position: relative;
+            border-right: 1px solid var(--border);
+        }
+        #avatar-preview {
+            width: 280px;
+            height: 500px;
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: center;
+            filter: drop-shadow(0 10px 15px rgba(0,0,0,0.05));
+        }
+        .controls-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-card);
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            padding: 0 20px;
+            background: var(--bg-card);
+        }
+        .tab {
+            padding: 16px 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .tab:hover:not(.active) { color: var(--text-main); }
+        .tab-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: none;
+        }
+        .tab-content.active { display: block; }
+        .section-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin: 0 0 12px 0;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .section-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+        .control-group { display: flex; flex-direction: column; gap: 6px; }
+        .control-group label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+        select {
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            background: var(--bg-card);
+            outline: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-main);
+            font-family: inherit;
+        }
+        select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); }
+        input[type="color"] {
+            width: 100%;
+            height: 38px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            padding: 2px;
+            background: var(--bg-card);
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+        input[type="color"]::-webkit-color-swatch { border: none; border-radius: 6px; }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-panel);
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            user-select: none;
+        }
+        .checkbox-group input { accent-color: var(--primary); cursor: pointer; }
+        .actions-panel {
+            padding: 20px;
+            background: var(--bg-panel);
+            border-top: 1px solid var(--border);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            font-family: inherit;
+        }
+        .btn:hover { background-color: var(--primary-hover); transform: translateY(-1px); }
+        .btn-secondary { background-color: white; color: var(--text-main); border: 1px solid var(--border); }
+        .btn-secondary:hover { background-color: var(--bg-panel); border-color: #CBD5E1; }
+        .btn-random { grid-column: span 2; background-color: #10B981; }
+        .btn-random:hover { background-color: #059669; }
+        .tab-content::-webkit-scrollbar { width: 6px; }
+        .tab-content::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
+        
+        .species-switcher {
+            padding: 16px 24px;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 10px;
+            position: relative;
+        }
+        .species-btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid transparent;
+            background: white;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            color: var(--text-muted);
+            font-family: inherit;
+        }
+        .species-btn:hover { border-color: var(--border); }
+        .species-btn.active {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: white;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+        }
+        .species-icon { font-size: 1.2rem; }
+        .species-hint {
+            position: absolute;
+            top: -8px;
+            right: 24px;
+            background: var(--primary);
+            color: white;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 10px;
+            letter-spacing: 0.05em;
+        }
+        .hidden { display: none !important; }
+        
+        .pose-selector {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+        .pose-btn {
+            flex: 1;
+            padding: 14px 8px;
+            border: 2px solid var(--border);
+            background: white;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-muted);
+            font-family: inherit;
+        }
+        .pose-btn:hover { border-color: #CBD5E1; }
+        .pose-btn.active {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
+        }
+        .pose-icon {
+            font-size: 1.4rem;
+            line-height: 1;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="preview-panel">
+        <div id="avatar-preview"></div>
+    </div>
+
+    <div class="controls-panel">
+        <div class="species-switcher">
+            <span class="species-hint">物种由你决定</span>
+            <button class="species-btn active" data-species="humanoid">
+                <span class="species-icon">🧑</span> 人形
+            </button>
+            <button class="species-btn" data-species="monster">
+                <span class="species-icon">👾</span> 积木怪物
+            </button>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" data-tab="tab-base">基础特征</div>
+            <div class="tab" data-tab="tab-accessories">配饰</div>
+            <div class="tab" data-tab="tab-settings">比例与配色</div>
+        </div>
+
+        <div class="tab-content active" id="tab-base">
+            <div class="species-humanoid-only">
+                <div class="section-title">人形面部</div>
+                <div class="grid-3">
+                    <div class="control-group"><label>脸型</label><select id="select-face"><option value="round">圆润</option><option value="sharp">瓜子</option><option value="square">方正</option></select></div>
+                    <div class="control-group"><label>发型</label><select id="select-hair"><option value="short">短发</option><option value="long">长发</option><option value="bald">光头</option></select></div>
+                    <div class="control-group"><label>眼罩</label><select id="select-eyepatch"><option value="none">无</option><option value="left">左眼罩</option><option value="right">右眼罩</option><option value="both">左+右</option></select></div>
+                    <div class="control-group"><label>鼻子</label><select id="select-nose"><option value="normal">正常</option><option value="tiny">小巧</option><option value="none">无</option></select></div>
+                </div>
+            </div>
+
+            <div class="species-monster-only hidden">
+                <div class="section-title">怪物体态</div>
+                <div class="grid-2">
+                    <div class="control-group">
+                        <label>体型</label>
+                        <select id="select-monster-body">
+                            <option value="classic">经典方正</option>
+                            <option value="round">圆润可爱</option>
+                            <option value="slim">瘦长高挑</option>
+                            <option value="chubby">胖乎乎</option>
+                            <option value="alien">外星触手</option>
+                            <option value="mech">机械战甲</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>眼睛数量</label>
+                        <select id="select-monster-eyes">
+                            <option value="1">独眼 (1)</option>
+                            <option value="2" selected>双眼 (2)</option>
+                            <option value="3">三眼 (3)</option>
+                            <option value="4">四眼 (4)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-title">手臂动作</div>
+            <div class="pose-selector">
+                <button class="pose-btn active" data-pose="default">
+                    <span class="pose-icon">🧍</span>
+                    <span>默认</span>
+                </button>
+                <button class="pose-btn" data-pose="left_wave">
+                    <span class="pose-icon">👋</span>
+                    <span>左手招手</span>
+                </button>
+                <button class="pose-btn" data-pose="right_wave">
+                    <span class="pose-icon">🙋</span>
+                    <span>右手招手</span>
+                </button>
+            </div>
+
+            <div class="section-title">表情</div>
+            <div class="grid-3">
+                <div class="control-group">
+                    <label>眼睛表情</label>
+                    <select id="select-eyes">
+                        <option value="normal">正常</option>
+                        <option value="wink_left">左眨眼</option>
+                        <option value="wink_right">右眨眼</option>
+                        <option value="happy">笑眼 (^ ^)</option>
+                        <option value="squint">微眯 (怀疑)</option>
+                        <option value="closed">闭眼</option>
+                    </select>
+                </div>
+                <div class="control-group"><label>嘴巴</label><select id="select-mouth"><option value="smile">微笑</option><option value="grin">大笑</option><option value="neutral">平静</option><option value="surprised">惊讶</option></select></div>
+            </div>
+
+            <div class="section-title">动画</div>
+            <div class="grid-2">
+                <div class="checkbox-group"><input type="checkbox" id="anim-eye" checked><label for="anim-eye">👁️ 眨眼动画</label></div>
+                <div class="checkbox-group"><input type="checkbox" id="anim-mouth" checked><label for="anim-mouth">👄 嘴部动画</label></div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tab-accessories">
+            <div class="section-title">头部配饰</div>
+            <div class="grid-3">
+                <div class="control-group"><label>眼镜</label><select id="select-glasses"><option value="none">无</option><option value="round">圆框</option><option value="square">方框</option></select></div>
+                <div class="control-group">
+                    <label>帽子</label>
+                    <select id="select-hat">
+                        <option value="none">无</option>
+                        <option value="beanie">毛线帽</option>
+                        <option value="cap">棒球帽</option>
+                        <option value="fedora">爵士礼帽</option>
+                        <option value="top_hat">高筒帽</option>
+                        <option value="bunny">兔耳帽</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>围脖</label>
+                    <select id="select-scarf">
+                        <option value="none">无</option>
+                        <option value="basic">基础围脖</option>
+                        <option value="chunky">厚实围脖</option>
+                    </select>
+                </div>
+                <div class="control-group"><label>耳饰</label><select id="select-earring"><option value="none">无</option><option value="stud">耳钉</option><option value="hoop">耳环</option></select></div>
+                <div class="control-group"><label>项链</label><select id="select-necklace"><option value="none">无</option><option value="choker">颈圈</option><option value="pearl">珍珠</option></select></div>
+            </div>
+
+            <div class="section-title">衣服穿搭 (仅人形)</div>
+            <div class="grid-3 species-humanoid-only">
+                <div class="control-group"><label>外套</label><select id="select-jacket"><option value="blazer">西装</option><option value="hoodie">卫衣</option><option value="sweater">毛衣</option></select></div>
+                <div class="control-group"><label>下装</label><select id="select-pants"><option value="long">长裤</option><option value="shorts">短裤</option><option value="skirt">短裙</option></select></div>
+                <div class="control-group"><label>鞋子</label><select id="select-shoes"><option value="sneakers">运动鞋</option><option value="dress">皮鞋</option><option value="boots">靴子</option></select></div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tab-settings">
+            <div class="section-title">画布与配色</div>
+            <div class="grid-2">
+                <div class="control-group"><label>显示模式</label><select id="select-ratio"><option value="portrait">全身像</option><option value="square">方形头像</option></select></div>
+                <div class="control-group">
+                    <label>配色方案</label>
+                    <select id="select-color-scheme">
+                        <option value="default">默认配色</option>
+                        <option value="random">随机配色</option>
+                        <option value="smart">智能设计</option>
+                        <option value="monochrome">黑白配色</option>
+                    </select>
+                </div>
+            </div>
+            <div class="section-title">颜色定制</div>
+            <div class="grid-3">
+                <div class="control-group"><label>肤色 / 头手体</label><input type="color" id="color-skin" value="#c26142"></div>
+                <div class="control-group"><label>怪物躯干</label><input type="color" id="color-torso" value="#2a9d8f"></div>
+                <div class="control-group"><label>发色</label><input type="color" id="color-hair" value="#2d2f33"></div>
+                <div class="control-group"><label>眼罩颜色</label><input type="color" id="color-eyepatch" value="#1a1a1a"></div>
+                <div class="control-group"><label>帽子颜色</label><input type="color" id="color-hat" value="#e74c3c"></div>
+                <div class="control-group"><label>围脖颜色</label><input type="color" id="color-scarf" value="#f39c12"></div>
+                <div class="control-group"><label>镜框颜色</label><input type="color" id="color-glasses-frame" value="#333333"></div>
+                <div class="control-group"><label>镜片颜色</label><input type="color" id="color-glasses-lens" value="#ffffff"></div>
+                <div class="control-group"><label>外套 / 饰色</label><input type="color" id="color-jacket" value="#3d444b"></div>
+                <div class="control-group"><label>内衬颜色</label><input type="color" id="color-shirt" value="#ffffff"></div>
+                <div class="control-group"><label>内衬阴影</label><input type="color" id="color-shirt-shadow" value="#e2e8f0"></div>
+                <div class="control-group"><label>下装颜色</label><input type="color" id="color-pants" value="#c2542f"></div>
+                <div class="control-group"><label>鞋子颜色</label><input type="color" id="color-shoes" value="#ffffff"></div>
+                <div class="control-group"><label>配饰颜色</label><input type="color" id="color-accessories" value="#ebd234"></div>
+            </div>
+        </div>
+
+        <div class="actions-panel">
+            <button class="btn btn-secondary" id="btn-export-json">📄 导出配置</button>
+            <button class="btn btn-secondary" id="btn-export-png">🖼️ 下载 PNG</button>
+            <button class="btn" id="btn-export-svg" style="grid-column: span 2;">⬇️ 下载矢量图 (SVG)</button>
+            <button class="btn btn-random" id="btn-random">🎲 随机生成 (保持当前物种)</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ==========================================
+// 工具函数
+// ==========================================
+function hslToHex(h, s, l) {
+    l /= 100;
+    const a = s * Math.min(l, 1 - l) / 100;
+    const f = n => {
+        const k = (n + h / 30) % 12;
+        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+        return Math.round(255 * color).toString(16).padStart(2, '0');
+    };
+    return `#${f(0)}${f(8)}${f(4)}`;
+}
+const rc = () => '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+const rand = arr => arr[Math.floor(Math.random() * arr.length)];
+
+// ==========================================
+// CreatureKit 核心引擎
+// ==========================================
+class CreatureKit {
+    constructor(options = {}) {
+        this.config = Object.assign({
+            species: 'humanoid',
+            faceType: 'round', hairType: 'short', eyePatchType: 'none', noseType: 'normal',
+            monsterBodyType: 'classic', monsterEyeCount: '2',
+            eyeType: 'normal', mouthType: 'smile',
+            armPose: 'default',
+            glassesType: 'none', hatType: 'none', scarfType: 'none',
+            earringType: 'none', necklaceType: 'none',
+            jacketType: 'blazer', pantsType: 'long', shoesType: 'sneakers',
+            // 颜色 (初始 = 人形默认配色)
+            skinColor: '#c26142', torsoColor: '#2a9d8f', hairColor: '#2d2f33', eyePatchColor: '#1a1a1a',
+            hatColor: '#e74c3c', scarfColor: '#f39c12', jacketColor: '#3d444b',
+            pantsColor: '#c2542f', shoesColor: '#ffffff',
+            glassesColor: '#333333', glassesLensColor: '#ffffff',
+            accessoryColor: '#ebd234',
+            shirtColor: '#ffffff', shirtShadowColor: '#e2e8f0',
+            eyeColor: '#1b717b', mouthColor: '#e84a6c',
+            aspectRatio: 'portrait',
+            enableEyeAnimation: true, enableMouthAnimation: true
+        }, options);
+
+        // ⭐ 每个物种独立记住自己的配色
+        this.speciesColorCache = {
+            humanoid: {
+                skinColor: '#c26142', torsoColor: '#2a9d8f', hairColor: '#2d2f33', eyePatchColor: '#1a1a1a',
+                hatColor: '#e74c3c', scarfColor: '#f39c12', jacketColor: '#3d444b',
+                pantsColor: '#c2542f', shoesColor: '#ffffff',
+                glassesColor: '#333333', glassesLensColor: '#ffffff',
+                accessoryColor: '#ebd234',
+                shirtColor: '#ffffff', shirtShadowColor: '#e2e8f0'
+            },
+            monster: {
+                // ⭐ 精心设计的怪物配色: 墨绿 + 深青 + 暖黄
+                skinColor: '#2a9d8f', torsoColor: '#1f7a6f', hairColor: '#2d2f33', eyePatchColor: '#1a1a1a',
+                hatColor: '#e9c46a', scarfColor: '#f4a261', jacketColor: '#264653',
+                pantsColor: '#c2542f', shoesColor: '#ffffff',
+                glassesColor: '#264653', glassesLensColor: '#ffffff',
+                accessoryColor: '#e9c46a',
+                shirtColor: '#ffffff', shirtShadowColor: '#e2e8f0'
+            }
+        };
+    }
+
+    update(opts) { Object.assign(this.config, opts); }
+    getShadow(opacity = 0.15) { return `rgba(0, 0, 0, ${opacity})`; }
+
+    // ⭐ 切换物种, 附带配色记忆
+    switchSpecies(newSpecies) {
+        if (newSpecies === this.config.species) return;
+        // 1. 保存当前物种的颜色
+        const c = this.config;
+        this.speciesColorCache[c.species] = {
+            skinColor: c.skinColor, torsoColor: c.torsoColor, hairColor: c.hairColor, eyePatchColor: c.eyePatchColor,
+            hatColor: c.hatColor, scarfColor: c.scarfColor, jacketColor: c.jacketColor,
+            pantsColor: c.pantsColor, shoesColor: c.shoesColor,
+            glassesColor: c.glassesColor, glassesLensColor: c.glassesLensColor,
+            accessoryColor: c.accessoryColor,
+            shirtColor: c.shirtColor, shirtShadowColor: c.shirtShadowColor
+        };
+        // 2. 加载目标物种的颜色
+        Object.assign(this.config, this.speciesColorCache[newSpecies]);
+        // 3. 切换物种
+        this.config.species = newSpecies;
+    }
+
+    getAnchors() {
+        const c = this.config;
+        if (c.species === 'humanoid') {
+            const yOff = c.faceType === 'sharp' ? 5 : 0;
+            return {
+                eyePositions: [{ x: 80, y: 75 + yOff }, { x: 120, y: 75 + yOff }],
+                eyeY: 75 + yOff,
+                headTop: 40, headBottom: 130,
+                neckY: 110, chestY: 145, waistY: 320,
+                earY: 85 + yOff, mouthY: 105 + yOff, hatBaseY: 55
+            };
+        }
+        const eyeCount = parseInt(c.monsterEyeCount);
+        let eyePositions;
+        if (eyeCount === 1) eyePositions = [{ x: 100, y: 85 }];
+        else if (eyeCount === 2) eyePositions = [{ x: 80, y: 85 }, { x: 120, y: 85 }];
+        else if (eyeCount === 3) eyePositions = [{ x: 75, y: 75 }, { x: 100, y: 75 }, { x: 125, y: 75 }];
+        else eyePositions = [{ x: 80, y: 75 }, { x: 120, y: 75 }, { x: 80, y: 100 }, { x: 120, y: 100 }];
+        
+        return {
+            eyePositions, eyeY: 85,
+            headTop: 35, headBottom: 135,
+            neckY: 130, chestY: 140, waistY: 230,
+            earY: 85, mouthY: 110, hatBaseY: 50
+        };
+    }
+
+    renderAnimations(anchors) {
+        const c = this.config;
+        if (!c.enableEyeAnimation || c.eyeType !== 'normal' || c.eyePatchType !== 'none') return '';
+        const rules = anchors.eyePositions.map((p, i) => 
+            `.eye-${i} { transform-origin: ${p.x}px ${p.y}px; animation: blink 4s infinite; }`
+        ).join('\n');
+        return `
+            <style>
+                @keyframes blink {
+                    0%, 90%, 100% { transform: scaleY(1); }
+                    95% { transform: scaleY(0.1); }
+                }
+                ${rules}
+            </style>
+        `;
+    }
+
+    renderEyes(anchors) {
+        const c = this.config;
+        const canAnimate = c.enableEyeAnimation && c.eyeType === 'normal' && c.eyePatchType === 'none';
+        const covered = new Set();
+        if (c.eyePatchType === 'left') covered.add(0);
+        if (c.eyePatchType === 'right') covered.add(anchors.eyePositions.length - 1);
+        if (c.eyePatchType === 'both') anchors.eyePositions.forEach((_, i) => covered.add(i));
+
+        return anchors.eyePositions.map((p, i) => {
+            if (covered.has(i)) return '';
+            const className = canAnimate ? `eye-${i}` : '';
+            const r = anchors.eyePositions.length === 1 ? 18 : 10;
+            const pupilR = anchors.eyePositions.length === 1 ? 8 : 5;
+            
+            switch (c.eyeType) {
+                case 'normal':
+                    return `<g class="${className}"><circle cx="${p.x}" cy="${p.y}" r="${r}" fill="#ffffff" /><circle cx="${p.x}" cy="${p.y}" r="${pupilR}" fill="${c.eyeColor}" /></g>`;
+                case 'wink_left':
+                    return i === 0 
+                        ? `<path d="M ${p.x - 10} ${p.y} Q ${p.x} ${p.y + 7} ${p.x + 10} ${p.y}" stroke="${c.eyeColor}" stroke-width="3" fill="none" stroke-linecap="round"/>`
+                        : `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="#ffffff" /><circle cx="${p.x}" cy="${p.y}" r="${pupilR}" fill="${c.eyeColor}" />`;
+                case 'wink_right':
+                    return i === anchors.eyePositions.length - 1
+                        ? `<path d="M ${p.x - 10} ${p.y} Q ${p.x} ${p.y + 7} ${p.x + 10} ${p.y}" stroke="${c.eyeColor}" stroke-width="3" fill="none" stroke-linecap="round"/>`
+                        : `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="#ffffff" /><circle cx="${p.x}" cy="${p.y}" r="${pupilR}" fill="${c.eyeColor}" />`;
+                case 'happy':
+                    return `<path d="M ${p.x - 10} ${p.y + 2} Q ${p.x} ${p.y - 6} ${p.x + 10} ${p.y + 2}" stroke="${c.eyeColor}" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+                case 'squint':
+                    return `<ellipse cx="${p.x}" cy="${p.y}" rx="${r}" ry="4" fill="#ffffff" stroke="${c.eyeColor}" stroke-width="1.5" /><circle cx="${p.x}" cy="${p.y}" r="3" fill="${c.eyeColor}" />`;
+                case 'closed':
+                    return `<path d="M ${p.x - 10} ${p.y} Q ${p.x} ${p.y + 7} ${p.x + 10} ${p.y}" stroke="${c.eyeColor}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+                default:
+                    return `<g class="${className}"><circle cx="${p.x}" cy="${p.y}" r="${r}" fill="#ffffff" /><circle cx="${p.x}" cy="${p.y}" r="${pupilR}" fill="${c.eyeColor}" /></g>`;
+            }
+        }).join('');
+    }
+
+    renderEyePatch(anchors) {
+        const c = this.config;
+        if (c.species !== 'humanoid' || c.eyePatchType === 'none') return '';
+        const yL = anchors.eyePositions[0].y;
+        let svg = '';
+        if (c.eyePatchType === 'left' || c.eyePatchType === 'both') {
+            svg += `<path d="M 60 ${yL - 16} Q 80 ${yL - 22} 100 ${yL - 16} L 100 ${yL + 16} Q 80 ${yL + 22} 60 ${yL + 16} Z" fill="${c.eyePatchColor}" />`;
+        }
+        if (c.eyePatchType === 'right' || c.eyePatchType === 'both') {
+            svg += `<path d="M 100 ${yL - 16} Q 120 ${yL - 22} 140 ${yL - 16} L 140 ${yL + 16} Q 120 ${yL + 22} 100 ${yL + 16} Z" fill="${c.eyePatchColor}" />`;
+        }
+        return svg;
+    }
+
+    renderMouth(anchors) {
+        const c = this.config;
+        const y = anchors.mouthY;
+        const animateTag = (dur, vals) => c.enableMouthAnimation ? `<animate attributeName="d" dur="${dur}s" repeatCount="indefinite" values="${vals}" />` : '';
+        
+        if (c.mouthType === 'smile') {
+            const d1 = `M 85 ${y} Q 100 ${y + 10} 115 ${y}`;
+            const d2 = `M 85 ${y} Q 100 ${y + 6} 115 ${y}`;
+            return `<path stroke="${c.mouthColor}" stroke-width="4" fill="none" stroke-linecap="round" d="${d1}">${animateTag(3, `${d1}; ${d2}; ${d1}`)}</path>`;
+        } else if (c.mouthType === 'grin') {
+            const d1 = `M 85 ${y} Q 100 ${y + 20} 115 ${y}`;
+            const d2 = `M 85 ${y} Q 100 ${y + 30} 115 ${y}`;
+            return `<path stroke="${c.mouthColor}" stroke-width="4" fill="none" stroke-linecap="round" d="${d1}">${animateTag(2, `${d1}; ${d2}; ${d1}`)}</path>`;
+        } else if (c.mouthType === 'neutral') {
+            const d1 = `M 85 ${y} L 115 ${y}`;
+            const d2 = `M 85 ${y} Q 100 ${y + 5} 115 ${y}`;
+            return `<path stroke="${c.mouthColor}" stroke-width="4" fill="none" stroke-linecap="round" d="${d1}">${animateTag(3, `${d1}; ${d2}; ${d1}`)}</path>`;
+        } else if (c.mouthType === 'surprised') {
+            return `<ellipse cx="100" cy="${y + 5}" rx="8" ry="10" fill="${c.mouthColor}" />`;
+        }
+        return '';
+    }
+
+    // ==========================================
+    // 人形手臂
+    // ==========================================
+    renderHumanoidArms(pose) {
+        const c = this.config;
+        const jacket = c.jacketColor;
+        const skin = c.skinColor;
+        
+        const lShoulder = { x: 60, y: 160 };
+        const rShoulder = { x: 140, y: 160 };
+        
+        let lElbow, lWrist, rElbow, rWrist;
+        
+        switch(pose) {
+            case 'left_wave':
+                lElbow = { x: 35, y: 215 };
+                lWrist = { x: 22, y: 120 };
+                rElbow = { x: 158, y: 240 };
+                rWrist = { x: 156, y: 315 };
+                break;
+            case 'right_wave':
+                lElbow = { x: 42, y: 240 };
+                lWrist = { x: 44, y: 315 };
+                rElbow = { x: 165, y: 215 };
+                rWrist = { x: 178, y: 120 };
+                break;
+            default:
+                lElbow = { x: 42, y: 240 };
+                lWrist = { x: 44, y: 315 };
+                rElbow = { x: 158, y: 240 };
+                rWrist = { x: 156, y: 315 };
+        }
+        
+        const drawSleeve = (from, to, wFrom, wTo) => {
+            const dx = to.x - from.x;
+            const dy = to.y - from.y;
+            const len = Math.sqrt(dx*dx + dy*dy) || 1;
+            const nx = -dy / len;
+            const ny = dx / len;
+            const p1 = { x: from.x + nx * wFrom/2, y: from.y + ny * wFrom/2 };
+            const p2 = { x: to.x + nx * wTo/2, y: to.y + ny * wTo/2 };
+            const p3 = { x: to.x - nx * wTo/2, y: to.y - ny * wTo/2 };
+            const p4 = { x: from.x - nx * wFrom/2, y: from.y - ny * wFrom/2 };
+            return `<path d="M ${p1.x.toFixed(1)} ${p1.y.toFixed(1)} L ${p2.x.toFixed(1)} ${p2.y.toFixed(1)} L ${p3.x.toFixed(1)} ${p3.y.toFixed(1)} L ${p4.x.toFixed(1)} ${p4.y.toFixed(1)} Z" fill="${jacket}" />`;
+        };
+        
+        const drawFist = (wrist, elbow) => {
+            const angleRad = Math.atan2(wrist.y - elbow.y, wrist.x - elbow.x);
+            const handRotation = angleRad * 180 / Math.PI + 90;
+            return `
+                <g transform="translate(${wrist.x}, ${wrist.y}) rotate(${handRotation.toFixed(1)})">
+                    <ellipse cx="0" cy="-4" rx="6.5" ry="10" fill="${skin}" />
+                </g>
+            `;
+        };
+        
+        const drawOpenHand = (wrist, elbow, isLeft) => {
+            const angleRad = Math.atan2(wrist.y - elbow.y, wrist.x - elbow.x);
+            const handRotation = angleRad * 180 / Math.PI + 90;
+            const thumbSign = isLeft ? 1 : -1;
+            return `
+                <g transform="translate(${wrist.x}, ${wrist.y}) rotate(${handRotation.toFixed(1)})">
+                    <rect x="-7" y="-16" width="3.4" height="14" rx="1.7" fill="${skin}" />
+                    <rect x="-3.5" y="-19" width="3.4" height="17" rx="1.7" fill="${skin}" />
+                    <rect x="0" y="-18" width="3.4" height="16" rx="1.7" fill="${skin}" />
+                    <rect x="3.5" y="-16" width="3.4" height="14" rx="1.7" fill="${skin}" />
+                    <ellipse cx="0" cy="2" rx="8" ry="11.5" fill="${skin}" />
+                    <ellipse cx="${thumbSign * 9}" cy="0" rx="3.5" ry="6.5" 
+                             transform="rotate(${thumbSign * 35} ${thumbSign * 9} 0)" 
+                             fill="${skin}" />
+                </g>
+            `;
+        };
+        
+        const drawArm = (shoulder, elbow, wrist, isWaving, isLeft) => {
+            const handFn = isWaving ? drawOpenHand : drawFist;
+            return `
+                ${drawSleeve(shoulder, elbow, 24, 22)}
+                <circle cx="${elbow.x}" cy="${elbow.y}" r="11" fill="${jacket}" />
+                ${drawSleeve(elbow, wrist, 22, 16)}
+                ${handFn(wrist, elbow, isLeft)}
+            `;
+        };
+        
+        return `
+            ${drawArm(lShoulder, lElbow, lWrist, pose === 'left_wave', true)}
+            ${drawArm(rShoulder, rElbow, rWrist, pose === 'right_wave', false)}
+        `;
+    }
+
+    // ==========================================
+    // 怪物手臂 (带肩关节球)
+    // ==========================================
+    renderMonsterArms(pose) {
+        const c = this.config;
+        const bodyColor = c.skinColor;
+        const handColor = c.jacketColor;
+        
+        if (c.monsterBodyType === 'alien') {
+            return this.renderAlienTentacles(pose, bodyColor, handColor);
+        }
+        
+        let leftShoulder, rightShoulder, armWidth, shoulderR;
+        switch (c.monsterBodyType) {
+            case 'slim':
+                leftShoulder = { x: 66, y: 140 };
+                rightShoulder = { x: 134, y: 140 };
+                armWidth = 16; shoulderR = 10;
+                break;
+            case 'chubby':
+                leftShoulder = { x: 48, y: 175 };
+                rightShoulder = { x: 152, y: 175 };
+                armWidth = 22; shoulderR = 13;
+                break;
+            default:
+                leftShoulder = { x: 56, y: 145 };
+                rightShoulder = { x: 144, y: 145 };
+                armWidth = 20; shoulderR = 12;
+        }
+        
+        const totalLen = 80;
+        const upperArmLen = totalLen * 0.5;
+        const forearmLen = totalLen * 0.35;
+        
+        let leftElbow, leftWrist, rightElbow, rightWrist;
+        
+        if (pose === 'left_wave') {
+            leftElbow = { x: leftShoulder.x - 15, y: leftShoulder.y + upperArmLen * 0.7 };
+            leftWrist = { x: leftElbow.x - 20, y: leftElbow.y - forearmLen };
+            rightElbow = { x: rightShoulder.x + 12, y: rightShoulder.y + upperArmLen };
+            rightWrist = { x: rightElbow.x + 5, y: rightElbow.y + forearmLen };
+        } else if (pose === 'right_wave') {
+            leftElbow = { x: leftShoulder.x - 12, y: leftShoulder.y + upperArmLen };
+            leftWrist = { x: leftElbow.x - 5, y: leftElbow.y + forearmLen };
+            rightElbow = { x: rightShoulder.x + 15, y: rightShoulder.y + upperArmLen * 0.7 };
+            rightWrist = { x: rightElbow.x + 20, y: rightElbow.y - forearmLen };
+        } else {
+            leftElbow = { x: leftShoulder.x - 12, y: leftShoulder.y + upperArmLen };
+            leftWrist = { x: leftElbow.x - 5, y: leftElbow.y + forearmLen };
+            rightElbow = { x: rightShoulder.x + 12, y: rightShoulder.y + upperArmLen };
+            rightWrist = { x: rightElbow.x + 5, y: rightElbow.y + forearmLen };
+        }
+        
+        // ⭐ 先画肩膀关节球 (在手臂线条之下)
+        return `
+            <circle cx="${leftShoulder.x}" cy="${leftShoulder.y}" r="${shoulderR}" fill="${bodyColor}" />
+            <circle cx="${rightShoulder.x}" cy="${rightShoulder.y}" r="${shoulderR}" fill="${bodyColor}" />
+            
+            <line x1="${leftShoulder.x}" y1="${leftShoulder.y}" x2="${leftElbow.x}" y2="${leftElbow.y}" 
+                  stroke="${bodyColor}" stroke-width="${armWidth}" stroke-linecap="round" />
+            <line x1="${leftElbow.x}" y1="${leftElbow.y}" x2="${leftWrist.x}" y2="${leftWrist.y}" 
+                  stroke="${bodyColor}" stroke-width="${armWidth * 0.85}" stroke-linecap="round" />
+            <circle cx="${leftWrist.x}" cy="${leftWrist.y}" r="${armWidth * 0.65}" fill="${handColor}" />
+            
+            <line x1="${rightShoulder.x}" y1="${rightShoulder.y}" x2="${rightElbow.x}" y2="${rightElbow.y}" 
+                  stroke="${bodyColor}" stroke-width="${armWidth}" stroke-linecap="round" />
+            <line x1="${rightElbow.x}" y1="${rightElbow.y}" x2="${rightWrist.x}" y2="${rightWrist.y}" 
+                  stroke="${bodyColor}" stroke-width="${armWidth * 0.85}" stroke-linecap="round" />
+            <circle cx="${rightWrist.x}" cy="${rightWrist.y}" r="${armWidth * 0.65}" fill="${handColor}" />
+        `;
+    }
+
+    renderAlienTentacles(pose, bodyColor, handColor) {
+        const handBall = (x, y, r) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${handColor}" />`;
+        
+        if (pose === 'left_wave') {
+            return `
+                <path d="M 55 160 Q 20 130 15 70" stroke="${bodyColor}" stroke-width="14" fill="none" stroke-linecap="round" />
+                <path d="M 145 160 Q 180 200 170 240" stroke="${bodyColor}" stroke-width="14" fill="none" stroke-linecap="round" />
+                ${handBall(15, 70, 9)}
+                ${handBall(170, 240, 9)}
+            `;
+        }
+        if (pose === 'right_wave') {
+            return `
+                <path d="M 55 160 Q 20 200 30 240" stroke="${bodyColor}" stroke-width="14" fill="none" stroke-linecap="round" />
+                <path d="M 145 160 Q 180 130 185 70" stroke="${bodyColor}" stroke-width="14" fill="none" stroke-linecap="round" />
+                ${handBall(30, 240, 9)}
+                ${handBall(185, 70, 9)}
+            `;
+        }
+        return `
+            <path d="M 55 160 Q 25 200 35 240" stroke="${bodyColor}" stroke-width="14" fill="none" stroke-linecap="round" />
+            <path d="M 145 160 Q 175 200 165 240" stroke="${bodyColor}" stroke-width="14" fill="none" stroke-linecap="round" />
+            ${handBall(35, 240, 9)}
+            ${handBall(165, 240, 9)}
+        `;
+    }
+
+    // ==========================================
+    // 人形渲染
+    // ==========================================
+    renderHumanoid(anchors) {
+        const c = this.config;
+        const shadow = this.getShadow(0.08);
+        const yOff = c.faceType === 'sharp' ? 5 : 0;
+
+        let facePath = c.faceType === 'sharp' 
+            ? `<path d="M 65 85 C 65 45, 135 45, 135 85 C 135 115, 100 135, 100 135 C 100 135, 65 115, 65 85 Z" fill="${c.skinColor}" />`
+            : c.faceType === 'square'
+            ? `<rect x="62" y="45" width="76" height="80" rx="15" fill="${c.skinColor}" />`
+            : `<ellipse cx="100" cy="85" rx="38" ry="42" fill="${c.skinColor}" />`;
+
+        const neck = `<rect x="85" y="110" width="30" height="45" fill="${c.skinColor}" /><rect x="100" y="110" width="15" height="45" fill="${shadow}" />`;
+
+        let nose = '';
+        if (c.noseType === 'normal') nose = `<path d="M 95 ${85 + yOff} L 100 ${95 + yOff} L 105 ${85 + yOff} Z" fill="${shadow}" />`;
+        else if (c.noseType === 'tiny') nose = `<path d="M 98 ${85 + yOff} L 100 ${92 + yOff} L 102 ${85 + yOff} Z" fill="${shadow}" />`;
+
+        let backHair = '';
+        if (c.hairType === 'short') backHair = `<path d="M 50 80 C 40 30, 160 30, 150 80 C 160 140, 150 160, 140 160 L 130 160 C 135 120, 120 100, 100 100 C 80 100, 65 120, 70 160 L 60 160 C 50 160, 40 140, 50 80 Z" fill="${c.hairColor}" />`;
+        else if (c.hairType === 'long') backHair = `<path d="M 45 80 C 30 30, 170 30, 155 80 C 165 150, 170 220, 160 240 L 140 240 C 145 180, 140 130, 100 110 C 60 130, 55 180, 60 240 L 40 240 C 30 220, 35 150, 45 80 Z" fill="${c.hairColor}" />`;
+
+        let frontHair = '';
+        if (c.hairType === 'short') frontHair = `<path d="M 55 80 Q 60 40 100 35 Q 140 40 145 80 Q 130 60 100 55 Q 70 60 55 80 Z" fill="${c.hairColor}" />`;
+        else if (c.hairType === 'long') frontHair = `<path d="M 55 80 Q 60 35 100 30 Q 140 35 145 80 Q 120 50 90 60 Q 80 75 55 80 Z" fill="${c.hairColor}" />`;
+
+        const body = this.renderHumanoidBody();
+        const arms = this.renderHumanoidArms(c.armPose);
+
+        return backHair + body + neck + facePath + this.renderEyes(anchors) + this.renderEyePatch(anchors) + nose + this.renderMouth(anchors) + frontHair + arms;
+    }
+
+    renderHumanoidBody() {
+        const c = this.config;
+        const shadow = this.getShadow(0.2);
+
+        const baseShirt = `
+            <path d="M 70 145 L 130 145 L 140 320 L 60 320 Z" fill="${c.shirtColor}" />
+            <path d="M 100 145 L 130 145 L 140 320 L 80 320 Z" fill="${c.shirtShadowColor}" />
+        `;
+
+        let jacketSVG = '';
+        if (c.jacketType === 'blazer') {
+            jacketSVG = `
+                <path d="M 50 160 L 75 145 L 65 320 L 45 320 Z" fill="${c.jacketColor}" />
+                <path d="M 150 160 L 125 145 L 135 320 L 155 320 Z" fill="${c.jacketColor}" />
+            `;
+        } else if (c.jacketType === 'hoodie') {
+            jacketSVG = `
+                <path d="M 65 145 Q 100 170 135 145 L 140 180 Q 100 200 60 180 Z" fill="${c.jacketColor}" />
+                <path d="M 50 160 Q 100 180 150 160 L 160 320 L 40 320 Z" fill="${c.jacketColor}" />
+                <path d="M 70 260 L 130 260 L 125 300 L 75 300 Z" fill="${shadow}" />
+                <path d="M 90 180 L 90 230 M 110 180 L 110 230" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none" />
+            `;
+        } else if (c.jacketType === 'sweater') {
+            jacketSVG = `
+                <rect x="75" y="130" width="50" height="25" rx="5" fill="${c.jacketColor}" />
+                <rect x="75" y="130" width="25" height="25" fill="${shadow}" opacity="0.3" />
+                <path d="M 50 155 Q 100 170 150 155 L 160 320 L 40 320 Z" fill="${c.jacketColor}" />
+            `;
+        }
+
+        let pantsSVG = '';
+        if (c.pantsType === 'shorts') {
+            pantsSVG = `<path d="M 60 320 L 100 320 L 100 420 L 65 420 L 60 320 Z" fill="${c.pantsColor}" /><path d="M 100 320 L 140 320 L 135 420 L 100 420 Z" fill="${c.pantsColor}" /><polygon points="60,320 140,320 135,420 100,420" fill="${shadow}" /><rect x="65" y="420" width="30" height="200" fill="${c.skinColor}" /><rect x="105" y="420" width="30" height="200" fill="${c.skinColor}" />`;
+        } else if (c.pantsType === 'skirt') {
+            pantsSVG = `<path d="M 60 320 L 140 320 L 155 480 L 45 480 Z" fill="${c.pantsColor}" /><polygon points="100,320 140,320 155,480 100,480" fill="${shadow}" /><path d="M 80 320 L 70 480 M 120 320 L 130 480" stroke="${shadow}" stroke-width="2" fill="none" /><rect x="60" y="480" width="35" height="140" fill="${c.skinColor}" /><rect x="105" y="480" width="35" height="140" fill="${c.skinColor}" />`;
+        } else {
+            pantsSVG = `<path d="M 65 320 L 95 320 L 95 620 L 65 620 Z" fill="${c.pantsColor}" /><path d="M 105 320 L 135 320 L 135 620 L 105 620 Z" fill="${c.pantsColor}" /><polygon points="65,320 135,320 135,620 95,620" fill="${shadow}" />`;
+        }
+
+        const yBase = 610;
+        let shoesSVG = '';
+        if (c.shoesType === 'sneakers') {
+            shoesSVG = `<rect x="58" y="${yBase}" width="37" height="20" rx="6" fill="${c.shoesColor}" stroke="#ccc" stroke-width="1.5"/><path d="M 58 ${yBase + 10} Q 76 ${yBase + 20} 95 ${yBase + 10}" stroke="#e74c3c" stroke-width="2" fill="none"/><rect x="105" y="${yBase}" width="37" height="20" rx="6" fill="${c.shoesColor}" stroke="#ccc" stroke-width="1.5"/><path d="M 105 ${yBase + 10} Q 123 ${yBase + 20} 142 ${yBase + 10}" stroke="#e74c3c" stroke-width="2" fill="none"/>`;
+        } else if (c.shoesType === 'dress') {
+            shoesSVG = `<path d="M 60 ${yBase} L 95 ${yBase} L 95 ${yBase + 20} L 60 ${yBase + 20} Z" fill="#1a1a1a" /><path d="M 105 ${yBase} L 140 ${yBase} L 140 ${yBase + 20} L 105 ${yBase + 20} Z" fill="#1a1a1a" />`;
+        } else if (c.shoesType === 'boots') {
+            shoesSVG = `<rect x="58" y="${yBase - 30}" width="37" height="50" rx="4" fill="${c.shoesColor}" /><rect x="58" y="${yBase + 10}" width="37" height="10" fill="#5D2E0C" /><rect x="105" y="${yBase - 30}" width="37" height="50" rx="4" fill="${c.shoesColor}" /><rect x="105" y="${yBase + 10}" width="37" height="10" fill="#5D2E0C" />`;
+        }
+
+        return baseShirt + jacketSVG + pantsSVG + shoesSVG;
+    }
+
+    // ==========================================
+    // 怪物渲染 (带关节球过渡)
+    // ==========================================
+    renderMonster(anchors) {
+        const c = this.config;
+        const bodyColor = c.skinColor;
+        const torsoColor = c.torsoColor;
+        const accentColor = c.jacketColor;
+        const shadow = this.getShadow(0.25);
+
+        switch (c.monsterBodyType) {
+            case 'classic': return this.renderMonsterClassic(bodyColor, torsoColor, accentColor, shadow, anchors);
+            case 'round': return this.renderMonsterRound(bodyColor, torsoColor, accentColor, shadow, anchors);
+            case 'slim': return this.renderMonsterSlim(bodyColor, torsoColor, accentColor, shadow, anchors);
+            case 'chubby': return this.renderMonsterChubby(bodyColor, torsoColor, accentColor, shadow, anchors);
+            case 'alien': return this.renderMonsterAlien(bodyColor, torsoColor, accentColor, shadow, anchors);
+            case 'mech': return this.renderMonsterMech(bodyColor, torsoColor, accentColor, shadow, anchors);
+        }
+        return '';
+    }
+
+    renderMonsterFace(anchors) {
+        return this.renderEyes(anchors) + this.renderMouth(anchors);
+    }
+
+    renderMonsterLegs(color, accent, shadow, style = 'stubby') {
+        if (style === 'tentacle') {
+            return `
+                <path d="M 70 230 Q 60 270 70 280 Q 80 290 75 285" stroke="${color}" stroke-width="12" fill="none" stroke-linecap="round"/>
+                <path d="M 130 230 Q 140 270 130 280 Q 120 290 125 285" stroke="${color}" stroke-width="12" fill="none" stroke-linecap="round"/>
+            `;
+        }
+        if (style === 'slim') {
+            return `
+                <rect x="75" y="230" width="15" height="55" rx="5" fill="${color}" />
+                <rect x="110" y="230" width="15" height="55" rx="5" fill="${color}" />
+                <rect x="70" y="275" width="25" height="12" rx="4" fill="${accent}" />
+                <rect x="105" y="275" width="25" height="12" rx="4" fill="${accent}" />
+            `;
+        }
+        if (style === 'chubby') {
+            return `
+                <rect x="75" y="240" width="20" height="40" rx="10" fill="${color}" />
+                <rect x="105" y="240" width="20" height="40" rx="10" fill="${color}" />
+                <rect x="70" y="270" width="30" height="15" rx="7" fill="${accent}" />
+                <rect x="100" y="270" width="30" height="15" rx="7" fill="${accent}" />
+            `;
+        }
+        return `
+            <rect x="65" y="230" width="25" height="50" rx="5" fill="${color}" />
+            <rect x="110" y="230" width="25" height="50" rx="5" fill="${color}" />
+            <rect x="60" y="270" width="35" height="15" rx="5" fill="${accent}" />
+            <rect x="105" y="270" width="35" height="15" rx="5" fill="${accent}" />
+        `;
+    }
+
+    renderMonsterClassic(bodyColor, torsoColor, accentColor, shadow, anchors) {
+        return `
+            <ellipse cx="100" cy="285" rx="50" ry="8" fill="${shadow}"/>
+            ${this.renderMonsterLegs(bodyColor, accentColor, shadow, 'classic')}
+            <circle cx="77.5" cy="235" r="13" fill="${bodyColor}" />
+            <circle cx="122.5" cy="235" r="13" fill="${bodyColor}" />
+            <rect x="55" y="130" width="90" height="110" rx="10" fill="${torsoColor}" />
+            <rect x="75" y="160" width="50" height="20" rx="4" fill="${accentColor}" />
+            <rect x="50" y="40" width="100" height="100" rx="15" fill="${bodyColor}" />
+            <rect x="65" y="55" width="70" height="70" rx="10" fill="${accentColor}" />
+            ${this.renderMonsterFace(anchors)}
+            ${this.renderMonsterArms(this.config.armPose)}
+        `;
+    }
+
+    renderMonsterRound(bodyColor, torsoColor, accentColor, shadow, anchors) {
+        return `
+            <ellipse cx="100" cy="285" rx="50" ry="8" fill="${shadow}"/>
+            ${this.renderMonsterLegs(bodyColor, accentColor, shadow, 'classic')}
+            <circle cx="77.5" cy="230" r="13" fill="${bodyColor}" />
+            <circle cx="122.5" cy="230" r="13" fill="${bodyColor}" />
+            <rect x="55" y="130" width="90" height="100" rx="25" fill="${torsoColor}" />
+            <rect x="45" y="35" width="110" height="100" rx="30" fill="${bodyColor}" />
+            ${this.renderMonsterFace(anchors)}
+            ${this.renderMonsterArms(this.config.armPose)}
+        `;
+    }
+
+    renderMonsterSlim(bodyColor, torsoColor, accentColor, shadow, anchors) {
+        return `
+            <ellipse cx="100" cy="285" rx="40" ry="8" fill="${shadow}"/>
+            ${this.renderMonsterLegs(bodyColor, accentColor, shadow, 'slim')}
+            <circle cx="82.5" cy="235" r="9" fill="${bodyColor}" />
+            <circle cx="117.5" cy="235" r="9" fill="${bodyColor}" />
+            <rect x="65" y="120" width="70" height="120" rx="10" fill="${torsoColor}" />
+            <rect x="80" y="150" width="40" height="15" rx="4" fill="${accentColor}" />
+            <rect x="80" y="190" width="40" height="15" rx="4" fill="${accentColor}" />
+            <rect x="55" y="30" width="90" height="90" rx="20" fill="${bodyColor}" />
+            ${this.renderMonsterFace(anchors)}
+            ${this.renderMonsterArms(this.config.armPose)}
+        `;
+    }
+
+    renderMonsterChubby(bodyColor, torsoColor, accentColor, shadow, anchors) {
+        return `
+            <ellipse cx="100" cy="285" rx="55" ry="8" fill="${shadow}"/>
+            ${this.renderMonsterLegs(bodyColor, accentColor, shadow, 'chubby')}
+            <circle cx="85" cy="250" r="11" fill="${bodyColor}" />
+            <circle cx="115" cy="250" r="11" fill="${bodyColor}" />
+            <ellipse cx="100" cy="200" rx="65" ry="60" fill="${torsoColor}" />
+            <ellipse cx="100" cy="200" rx="35" ry="30" fill="${accentColor}" />
+            <ellipse cx="100" cy="90" rx="55" ry="55" fill="${bodyColor}" />
+            <circle cx="60" cy="100" r="8" fill="#f472b6" opacity="0.5" />
+            <circle cx="140" cy="100" r="8" fill="#f472b6" opacity="0.5" />
+            ${this.renderMonsterFace(anchors)}
+            ${this.renderMonsterArms(this.config.armPose)}
+        `;
+    }
+
+    renderMonsterAlien(bodyColor, torsoColor, accentColor, shadow, anchors) {
+        return `
+            <ellipse cx="100" cy="285" rx="50" ry="8" fill="${shadow}"/>
+            ${this.renderMonsterLegs(bodyColor, accentColor, shadow, 'tentacle')}
+            <ellipse cx="100" cy="180" rx="55" ry="70" fill="${torsoColor}" />
+            <ellipse cx="100" cy="180" rx="30" ry="40" fill="${accentColor}" />
+            <ellipse cx="100" cy="80" rx="45" ry="50" fill="${bodyColor}" />
+            ${this.renderMonsterFace(anchors)}
+            ${this.renderMonsterArms(this.config.armPose)}
+        `;
+    }
+
+    renderMonsterMech(bodyColor, torsoColor, accentColor, shadow, anchors) {
+        return `
+            <ellipse cx="100" cy="285" rx="45" ry="8" fill="${shadow}"/>
+            ${this.renderMonsterLegs(bodyColor, accentColor, shadow, 'classic')}
+            <circle cx="77.5" cy="235" r="13" fill="${bodyColor}" />
+            <circle cx="122.5" cy="235" r="13" fill="${bodyColor}" />
+            <rect x="60" y="130" width="80" height="100" rx="8" fill="${torsoColor}" />
+            <rect x="70" y="150" width="60" height="20" rx="4" fill="${accentColor}" />
+            <rect x="70" y="180" width="60" height="20" rx="4" fill="${accentColor}" />
+            <rect x="55" y="40" width="90" height="90" rx="15" fill="${bodyColor}" />
+            ${this.renderMonsterFace(anchors)}
+            ${this.renderMonsterArms(this.config.armPose)}
+        `;
+    }
+
+    // ==========================================
+    // 共享配饰
+    // ==========================================
+    renderAccessories(anchors) {
+        return this.renderEarrings(anchors) + this.renderNecklace(anchors) + this.renderGlasses(anchors) + this.renderScarf(anchors) + this.renderHat(anchors);
+    }
+
+    renderEarrings(anchors) {
+        const c = this.config;
+        if (c.earringType === 'none') return '';
+        const ey = anchors.earY;
+        const offset = c.species === 'monster' ? 8 : 0;
+        if (c.earringType === 'stud') {
+            return `<ellipse cx="${58 - offset}" cy="${ey + 10}" rx="4" ry="6" transform="rotate(15 ${58 - offset} ${ey + 10})" fill="${c.accessoryColor}" />
+                    <ellipse cx="${142 + offset}" cy="${ey + 10}" rx="4" ry="6" transform="rotate(-15 ${142 + offset} ${ey + 10})" fill="${c.accessoryColor}" />`;
+        } else if (c.earringType === 'hoop') {
+            return `<ellipse cx="${58 - offset}" cy="${ey + 15}" rx="5" ry="12" stroke="${c.accessoryColor}" stroke-width="3" fill="none" transform="rotate(15 ${58 - offset} ${ey + 15})" />
+                    <ellipse cx="${142 + offset}" cy="${ey + 15}" rx="5" ry="12" stroke="${c.accessoryColor}" stroke-width="3" fill="none" transform="rotate(-15 ${142 + offset} ${ey + 15})" />`;
+        }
+        return '';
+    }
+
+    renderNecklace(anchors) {
+        const c = this.config;
+        if (c.necklaceType === 'none') return '';
+        const ny = anchors.neckY + 20;
+        if (c.necklaceType === 'choker') {
+            return `<path d="M 80 ${ny} Q 100 ${ny + 10} 120 ${ny}" stroke="${c.accessoryColor}" stroke-width="4" fill="none" stroke-linecap="round" />`;
+        } else if (c.necklaceType === 'pearl') {
+            return `<path d="M 80 ${ny} Q 100 ${ny + 15} 120 ${ny}" stroke="${c.accessoryColor}" stroke-width="2" fill="none" stroke-linecap="round" stroke-dasharray="4,2" />
+                    <circle cx="100" cy="${ny + 13}" r="4" fill="${c.accessoryColor}" />`;
+        }
+        return '';
+    }
+
+    renderGlasses(anchors) {
+        const c = this.config;
+        if (c.glassesType === 'none') return '';
+        const lensOpacity = 0.3;
+        const r = anchors.eyePositions.length === 1 ? 20 : 14;
+        const positions = anchors.eyePositions;
+        
+        let lenses = '';
+        let frames = '';
+        positions.forEach(p => {
+            if (c.glassesType === 'round') {
+                lenses += `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${c.glassesLensColor}" opacity="${lensOpacity}" />`;
+                frames += `<circle cx="${p.x}" cy="${p.y}" r="${r}" stroke="${c.glassesColor}" stroke-width="3" fill="none" />`;
+            } else if (c.glassesType === 'square') {
+                const s = r * 2;
+                lenses += `<rect x="${p.x - r}" y="${p.y - r}" width="${s}" height="${s}" rx="4" fill="${c.glassesLensColor}" opacity="${lensOpacity}" />`;
+                frames += `<rect x="${p.x - r}" y="${p.y - r}" width="${s}" height="${s}" rx="4" stroke="${c.glassesColor}" stroke-width="3" fill="none" />`;
+            }
+        });
+        
+        let bridge = '';
+        if (positions.length === 2) {
+            bridge = `<path d="M ${positions[0].x + r} ${positions[0].y} L ${positions[1].x - r} ${positions[1].y}" stroke="${c.glassesColor}" stroke-width="3" />`;
+        }
+        
+        return lenses + frames + bridge;
+    }
+
+    renderScarf(anchors) {
+        const c = this.config;
+        if (c.scarfType === 'none') return '';
+        const shadow = this.getShadow(0.2);
+        const ny = anchors.neckY;
+
+        if (c.scarfType === 'basic') {
+            return `
+                <rect x="70" y="${ny + 15}" width="60" height="25" rx="8" fill="${c.scarfColor}" />
+                <path d="M 110 ${ny + 30} L 115 ${ny + 70} L 105 ${ny + 70} L 100 ${ny + 30} Z" fill="${c.scarfColor}" />
+                <rect x="70" y="${ny + 15}" width="60" height="10" rx="4" fill="${shadow}" />
+            `;
+        } else if (c.scarfType === 'chunky') {
+            return `
+                <rect x="65" y="${ny + 10}" width="70" height="35" rx="15" fill="${c.scarfColor}" />
+                <path d="M 110 ${ny + 35} L 125 ${ny + 120} L 100 ${ny + 120} L 90 ${ny + 35} Z" fill="${c.scarfColor}" />
+                <rect x="65" y="${ny + 10}" width="70" height="15" rx="7" fill="${shadow}" />
+                <path d="M 70 ${ny + 20} L 130 ${ny + 20} M 70 ${ny + 30} L 130 ${ny + 30}" stroke="${shadow}" stroke-width="2" fill="none" />
+            `;
+        }
+        return '';
+    }
+
+    renderHat(anchors) {
+        const c = this.config;
+        if (c.hatType === 'none') return '';
+        const hatYOffset = (c.species === 'humanoid' && c.hairType === 'bald') ? 10 : 0;
+        const baseY = anchors.hatBaseY + hatYOffset;
+        
+        let hatSVG = '';
+        if (c.hatType === 'beanie') {
+            hatSVG = `<path d="M 55 ${baseY} C 55 ${baseY - 45}, 145 ${baseY - 45}, 145 ${baseY} Z" fill="${c.hatColor}" />
+                      <rect x="55" y="${baseY - 5}" width="90" height="12" rx="6" fill="${c.hatColor}" />
+                      <circle cx="100" cy="${baseY - 37}" r="8" fill="${c.hatColor}" />`;
+        } else if (c.hatType === 'cap') {
+            hatSVG = `<path d="M 55 ${baseY + 5} C 55 ${baseY - 35}, 145 ${baseY - 35}, 145 ${baseY + 5} Z" fill="${c.hatColor}" />
+                      <path d="M 50 ${baseY + 5} Q 100 ${baseY + 15} 150 ${baseY + 5}" stroke="${c.hatColor}" stroke-width="8" fill="none" stroke-linecap="round" />
+                      <rect x="55" y="${baseY}" width="90" height="10" rx="5" fill="${c.hatColor}" />`;
+        } else if (c.hatType === 'fedora') {
+            hatSVG = `<ellipse cx="100" cy="${baseY}" rx="60" ry="15" fill="${c.hatColor}" />
+                      <path d="M 70 ${baseY} L 75 ${baseY - 40} L 125 ${baseY - 40} L 130 ${baseY} Z" fill="${c.hatColor}" />
+                      <rect x="70" y="${baseY - 10}" width="60" height="10" fill="${this.getShadow(0.3)}" />`;
+        } else if (c.hatType === 'top_hat') {
+            hatSVG = `<ellipse cx="100" cy="${baseY}" rx="50" ry="12" fill="${c.hatColor}" />
+                      <rect x="70" y="${baseY - 50}" width="60" height="50" fill="${c.hatColor}" />
+                      <rect x="70" y="${baseY - 15}" width="60" height="15" fill="#1a1a1a" />`;
+        } else if (c.hatType === 'bunny') {
+            hatSVG = `<rect x="50" y="${baseY - 10}" width="100" height="20" rx="10" fill="${c.hatColor}" />
+                      <ellipse cx="70" cy="${baseY - 20}" rx="12" ry="30" transform="rotate(-15 70 ${baseY - 20})" fill="${c.hatColor}" />
+                      <ellipse cx="70" cy="${baseY - 20}" rx="6" ry="18" transform="rotate(-15 70 ${baseY - 20})" fill="#ffb6c1" />
+                      <ellipse cx="130" cy="${baseY - 20}" rx="12" ry="30" transform="rotate(15 130 ${baseY - 20})" fill="${c.hatColor}" />
+                      <ellipse cx="130" cy="${baseY - 20}" rx="6" ry="18" transform="rotate(15 130 ${baseY - 20})" fill="#ffb6c1" />`;
+        }
+        return hatSVG;
+    }
+
+    generateSVG() {
+        const c = this.config;
+        const anchors = this.getAnchors();
+        
+        let viewBox = "0 0 200 700", transform = "translate(0, 0)";
+        if (c.aspectRatio === 'square') {
+            viewBox = "0 0 200 200";
+            transform = `translate(-40, ${100 - 85 * 1.4}) scale(1.4)`;
+        }
+        
+        const body = c.species === 'humanoid' 
+            ? this.renderHumanoid(anchors) 
+            : this.renderMonster(anchors);
+        
+        const accessories = this.renderAccessories(anchors);
+        
+        return `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="100%" height="100%">
+                ${this.renderAnimations(anchors)}
+                <g transform="${transform}">
+                    ${body}
+                    ${accessories}
+                </g>
+            </svg>
+        `;
+    }
+}
+
+// ==========================================
+// 配色算法
+// ==========================================
+function getRandomColors() {
+    return {
+        skinColor: rc(), torsoColor: rc(), hairColor: rc(), eyePatchColor: rc(), hatColor: rc(), scarfColor: rc(), 
+        jacketColor: rc(), pantsColor: rc(), shoesColor: rc(), glassesColor: rc(), glassesLensColor: rc(), accessoryColor: rc(),
+        shirtColor: rc(), shirtShadowColor: rc()
+    };
+}
+
+function getSmartColors() {
+    const H = Math.floor(Math.random() * 360);
+    return {
+        skinColor: hslToHex(Math.floor(Math.random() * 20) + 20, Math.floor(Math.random() * 30) + 40, Math.floor(Math.random() * 25) + 60),
+        torsoColor: hslToHex((H + 20) % 360, 50, 55),
+        hairColor: hslToHex(H, Math.floor(Math.random() * 20) + 10, Math.floor(Math.random() * 20) + 10),
+        jacketColor: hslToHex((H + 40) % 360, Math.floor(Math.random() * 30) + 40, Math.floor(Math.random() * 20) + 40),
+        pantsColor: hslToHex((H + 80) % 360, Math.floor(Math.random() * 30) + 30, Math.floor(Math.random() * 20) + 30),
+        shirtColor: hslToHex(H, 10, 90),
+        shirtShadowColor: hslToHex(H, 10, 75),
+        hatColor: hslToHex((H + 180) % 360, 60, 60),
+        scarfColor: hslToHex((H + 160) % 360, 60, 60),
+        glassesColor: hslToHex(H, 20, 20),
+        glassesLensColor: hslToHex(H, 20, 90),
+        accessoryColor: hslToHex((H + 180) % 360, 70, 65),
+        eyePatchColor: hslToHex(H, 20, 15),
+        shoesColor: hslToHex(H, 20, 25)
+    };
+}
+
+function getMonochromeColors() {
+    return {
+        skinColor: '#cccccc',
+        torsoColor: '#888888',
+        hairColor: '#111111', 
+        eyePatchColor: '#000000',
+        hatColor: '#2a2a2a', 
+        scarfColor: '#888888', 
+        jacketColor: '#333333',
+        pantsColor: '#555555', 
+        shoesColor: '#1a1a1a',
+        glassesColor: '#000000', 
+        glassesLensColor: '#ffffff', 
+        accessoryColor: '#ffffff',
+        shirtColor: '#ffffff', 
+        shirtShadowColor: '#dddddd'
+    };
+}
+
+// ==========================================
+// UI 交互
+// ==========================================
+const previewContainer = document.getElementById('avatar-preview');
+const kit = new CreatureKit();
+
+function render() {
+    const aspect = kit.config.aspectRatio;
+    previewContainer.style.height = aspect === 'square' ? '280px' : '500px';
+    previewContainer.innerHTML = kit.generateSVG();
+}
+
+const selectMappings = {
+    'select-face': 'faceType', 'select-hair': 'hairType', 'select-eyepatch': 'eyePatchType', 'select-nose': 'noseType',
+    'select-monster-body': 'monsterBodyType', 'select-monster-eyes': 'monsterEyeCount',
+    'select-eyes': 'eyeType', 'select-mouth': 'mouthType',
+    'select-glasses': 'glassesType', 'select-hat': 'hatType', 'select-scarf': 'scarfType',
+    'select-earring': 'earringType', 'select-necklace': 'necklaceType',
+    'select-jacket': 'jacketType', 'select-pants': 'pantsType', 'select-shoes': 'shoesType',
+    'select-ratio': 'aspectRatio'
+};
+const colorMappings = {
+    'color-skin': 'skinColor', 'color-torso': 'torsoColor', 'color-hair': 'hairColor', 'color-eyepatch': 'eyePatchColor',
+    'color-hat': 'hatColor', 'color-scarf': 'scarfColor', 'color-glasses-frame': 'glassesColor',
+    'color-glasses-lens': 'glassesLensColor', 'color-jacket': 'jacketColor',
+    'color-shirt': 'shirtColor', 'color-shirt-shadow': 'shirtShadowColor',
+    'color-pants': 'pantsColor', 'color-shoes': 'shoesColor', 'color-accessories': 'accessoryColor'
+};
+
+// ⭐ 物种切换 (带配色记忆)
+document.querySelectorAll('.species-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.species-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const species = btn.dataset.species;
+        
+        kit.switchSpecies(species);   // ⭐ 关键: 切换物种 + 加载对应配色
+        
+        document.querySelectorAll('.species-humanoid-only').forEach(el => {
+            el.classList.toggle('hidden', species !== 'humanoid');
+        });
+        document.querySelectorAll('.species-monster-only').forEach(el => {
+            el.classList.toggle('hidden', species !== 'monster');
+        });
+        
+        syncColorUI();   // ⭐ 同步颜色 UI
+        render();
+    });
+});
+
+document.querySelectorAll('.pose-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.pose-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        kit.update({ armPose: btn.dataset.pose });
+        render();
+    });
+});
+
+Object.entries(selectMappings).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', (e) => {
+        kit.update({ [key]: e.target.value });
+        render();
+    });
+});
+
+Object.entries(colorMappings).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', (e) => {
+        kit.update({ [key]: e.target.value });
+        render();
+    });
+});
+
+document.getElementById('anim-eye').addEventListener('change', (e) => {
+    const isChecked = e.target.checked;
+    const updates = { enableEyeAnimation: isChecked };
+    if (isChecked && kit.config.eyeType !== 'normal') {
+        updates.eyeType = 'normal';
+        document.getElementById('select-eyes').value = 'normal';
+    }
+    kit.update(updates);
+    render();
+});
+document.getElementById('anim-mouth').addEventListener('change', (e) => {
+    kit.update({ enableMouthAnimation: e.target.checked });
+    render();
+});
+
+document.getElementById('select-color-scheme').addEventListener('change', (e) => {
+    const scheme = e.target.value;
+    if (scheme === 'smart') kit.update(getSmartColors());
+    else if (scheme === 'random') kit.update(getRandomColors());
+    else if (scheme === 'monochrome') kit.update(getMonochromeColors());
+    syncColorUI();
+    render();
+});
+
+function syncSelectUI() {
+    Object.entries(selectMappings).forEach(([id, key]) => {
+        const el = document.getElementById(id);
+        if (el && kit.config[key] !== undefined) el.value = kit.config[key];
+    });
+}
+function syncColorUI() {
+    Object.entries(colorMappings).forEach(([id, key]) => {
+        const el = document.getElementById(id);
+        if (el && kit.config[key] !== undefined) el.value = kit.config[key];
+    });
+}
+
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.tab).classList.add('active');
+    });
+});
+
+document.getElementById('btn-random').addEventListener('click', () => {
+    const currentSpecies = kit.config.species;
+    
+    const faces = ['round', 'sharp', 'square'];
+    const hairs = ['short', 'long', 'bald'];
+    const monsterBodies = ['classic', 'round', 'slim', 'chubby', 'alien', 'mech'];
+    const monsterEyes = ['1', '2', '3', '4'];
+    const poses = ['default', 'left_wave', 'right_wave'];
+    const hats = ['none', 'beanie', 'cap', 'fedora', 'top_hat', 'bunny'];
+    const glasses = ['none', 'round', 'square'];
+    const eyes = ['normal', 'wink_left', 'wink_right', 'happy', 'squint', 'closed'];
+    const patches = ['none', 'left', 'right', 'both'];
+    const scarves = ['none', 'basic', 'chunky'];
+    const noses = ['normal', 'tiny', 'none'];
+    const mouths = ['smile', 'grin', 'neutral', 'surprised'];
+    const earrings = ['none', 'stud', 'hoop'];
+    const necklaces = ['none', 'choker', 'pearl'];
+    const jackets = ['blazer', 'hoodie', 'sweater'];
+    const pants = ['long', 'shorts', 'skirt'];
+    const shoes = ['sneakers', 'dress', 'boots'];
+    
+    let newEyeType = rand(eyes);
+    let newPatchType = currentSpecies === 'humanoid' ? rand(patches) : 'none';
+    if (newPatchType !== 'none') newEyeType = 'normal';
+    else if (newEyeType !== 'normal') newPatchType = 'none';
+
+    const scheme = rand(['smart', 'random', 'monochrome']);
+    document.getElementById('select-color-scheme').value = scheme;
+    let colorUpdates = {};
+    if (scheme === 'smart') colorUpdates = getSmartColors();
+    else if (scheme === 'random') colorUpdates = getRandomColors();
+    else if (scheme === 'monochrome') colorUpdates = getMonochromeColors();
+
+    const newPose = rand(poses);
+
+    kit.update({
+        species: currentSpecies,
+        faceType: rand(faces), hairType: rand(hairs), noseType: rand(noses),
+        monsterBodyType: rand(monsterBodies), monsterEyeCount: rand(monsterEyes),
+        armPose: newPose,
+        eyeType: newEyeType, eyePatchType: newPatchType, mouthType: rand(mouths),
+        hatType: rand(hats), glassesType: rand(glasses), scarfType: rand(scarves),
+        earringType: rand(earrings), necklaceType: rand(necklaces),
+        jacketType: rand(jackets), pantsType: rand(pants), shoesType: rand(shoes),
+        ...colorUpdates,
+        enableEyeAnimation: newEyeType === 'normal' && newPatchType === 'none',
+        enableMouthAnimation: true
+    });
+
+    // 同时更新物种配色记忆
+    kit.speciesColorCache[currentSpecies] = {
+        skinColor: kit.config.skinColor, torsoColor: kit.config.torsoColor, hairColor: kit.config.hairColor, eyePatchColor: kit.config.eyePatchColor,
+        hatColor: kit.config.hatColor, scarfColor: kit.config.scarfColor, jacketColor: kit.config.jacketColor,
+        pantsColor: kit.config.pantsColor, shoesColor: kit.config.shoesColor,
+        glassesColor: kit.config.glassesColor, glassesLensColor: kit.config.glassesLensColor,
+        accessoryColor: kit.config.accessoryColor,
+        shirtColor: kit.config.shirtColor, shirtShadowColor: kit.config.shirtShadowColor
+    };
+
+    syncSelectUI();
+    syncColorUI();
+    document.getElementById('anim-eye').checked = kit.config.enableEyeAnimation;
+    document.getElementById('anim-mouth').checked = kit.config.enableMouthAnimation;
+    document.querySelectorAll('.pose-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.pose === newPose);
+    });
+    render();
+});
+
+const downloadFile = (content, filename, type) => {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+};
+
+document.getElementById('btn-export-svg').addEventListener('click', () => {
+    downloadFile(kit.generateSVG(), `creaturekit_${kit.config.species}_${Date.now()}.svg`, 'image/svg+xml');
+});
+
+document.getElementById('btn-export-png').addEventListener('click', () => {
+    const svgString = kit.generateSVG();
+    const canvas = document.createElement('canvas');
+    canvas.width = kit.config.aspectRatio === 'square' ? 500 : 200;
+    canvas.height = kit.config.aspectRatio === 'square' ? 500 : 700;
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    img.onload = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `creaturekit_${Date.now()}.png`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 'image/png');
+    };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
+});
+
+document.getElementById('btn-export-json').addEventListener('click', () => {
+    downloadFile(JSON.stringify(kit.config, null, 2), `creaturekit_config_${Date.now()}.json`, 'application/json');
+});
+
+render();
+</script>
+</body>
+</html>
