@@ -74,6 +74,12 @@ function buildForest(count) {
             && z < I.HOUSE_CLEAR_BACK_Z
         ) continue;
 
+        // 🔴 屋身**之前**一棵都不要（2026-10-12，用户第 2 条：「幻想森林只出现
+        //    在老房子周边及后面。前面不需要。」）。切在屋身前墙那条线上 ⇒
+        //    留下的是屋身两侧 + 屋后，前院外面那一片整个清掉。
+        //    判据：`harness/probe-forest-corridor.mjs` 的"前面"那一条。
+        if (z > I.FOREST_FRONT_LIMIT_Z) continue;
+
         // 🔴 走廊的横截面：**任何 z 都不许有**（2026-10-11 用户报的
         //    「进门后……竹子出现了」）。走廊往 −z 是无限的，所以这必须是
         //    一条垂直于它的横截面判据，不能写成沿线的一段 z 区间。

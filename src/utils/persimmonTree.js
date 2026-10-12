@@ -53,7 +53,7 @@ import { seededRand, randRange } from '../engine/art';
 /* ------------------------------------------------------------------ */
 
 /** 树高（根 → 冠顶），世界单位。⚠️ 屋身檐口是 `FLOOR_Y + 6.0`，树要略矮。 */
-export const PERSIMMON_H = 5.95;
+export const PERSIMMON_H = 5.25;
 
 const KEY = 'persimmon-tree-3d-v1';
 
@@ -71,13 +71,13 @@ const LEN_FALLOFF = [0.76, 0.72, 0.68, 0.64];
 const RAD_FALLOFF = 0.575;
 
 /** 每层的向上偏置 —— 越往上越小，冠才不会长成一个尖锥。 */
-const UP_BIAS = [0.36, 0.30, 0.20, 0.14];
+const UP_BIAS = [0.30, 0.19, 0.11, 0.07];
 /**
  * 每层的**向外**偏置（沿"离开主干轴"的方向）。
  * 🔴 这一条是"冠饱满"的另一半：只有向上偏置的话，所有末梢都挤在轴附近，
  *    冠是一个细锥，加多少叶都盖不住。
  */
-const OUT_BIAS = [0.05, 0.20, 0.28, 0.26];
+const OUT_BIAS = [0.06, 0.32, 0.46, 0.44];
 /**
  * 每层额外的 **+z** 偏置 —— 树**本地 −z 朝墙**。
  *
@@ -86,7 +86,7 @@ const OUT_BIAS = [0.05, 0.20, 0.28, 0.26];
  *    檐下 —— 唯一不靠"缩尺寸"的办法就是让冠**朝外长**。真树贴着墙也是这样
  *    长的（朝光的那面旺）。
  */
-const FWD_BIAS = [0.02, 0.07, 0.10, 0.10];
+const FWD_BIAS = [0.02, 0.09, 0.15, 0.16];
 /**
  * 冠的**进深压扁系数**：归一化那一步顺带把 z 压到这么多。
  *
@@ -94,9 +94,9 @@ const FWD_BIAS = [0.02, 0.07, 0.10, 0.10];
  * 本来就比横向窄（它要往有光的地方摊开，不是往墙里长）。0.86 是人眼不会读成
  * "被压扁"的量级，但正好把冠的后缘从墙里拉出来。
  */
-const DEPTH_SQUASH = 0.62;
+const DEPTH_SQUASH = 0.55;
 /** 每层子枝相对父枝张开的角度（弧度）。 */
-const SPREAD = [0.58, 0.64, 0.68, 0.70];
+const SPREAD = [0.62, 0.72, 0.80, 0.84];
 
 /** 关节椭球（见文件头）。`SQUASH` 必须 ≥ 1 / `SCALE` 才包得住父枝端面。 */
 const JOINT_SCALE = 1.10;
@@ -108,11 +108,11 @@ const CHILD_DIR_BIAS = 0.32;
 
 /** 每个末梢周围撒几团叶、散布半径（世界单位）。 */
 const TUFTS_PER_TIP = 16;
-const TIP_BALL = 0.30;
+const TIP_BALL = 0.50;
 /** 冠体积里另外撒几团叶 —— 这一半是"饱满"的来源。 */
-const FILL_TUFTS = 1400;
+const FILL_TUFTS = 2800;
 /** 冠半径（**横向**）相对"末梢包围盒"的放大系数（叶要探出枝梢一点）。 */
-const CROWN_PAD = 1.06;
+const CROWN_PAD = 2.55;
 /**
  * 冠半径（**竖向**）的放大系数 —— 刻意比横向大。
  *
@@ -120,7 +120,7 @@ const CROWN_PAD = 1.06;
  *    `CROWN_PAD` 会长出一个**扁饼**：实测 3.76 宽 × 2.05 高。而"饱满"要的
  *    是一个球。竖向单独放宽只改**叶**的分布，不动枝干骨架。
  */
-const CROWN_PAD_Y = 1.32;
+const CROWN_PAD_Y = 2.40;
 
 /** 叶团里最多几片叶、叶的尺寸（世界单位）。 */
 export const LEAF_LEN = 0.24;
@@ -298,7 +298,7 @@ function grow(state, start, dir, length, r0, r1, depth) {
 
     // 主干抖得小一点（它要立得住），越往上越放肆
     const jit = depth === 0 ? 0.13 : 0.21;
-    const lift = depth === 0 ? 0.10 : 0.055;
+    const lift = depth === 0 ? 0.085 : 0.030;
     for (let i = 1; i <= SEGS; i++) {
         d = jitterDir(rand, d, jit);
         d.y += lift;

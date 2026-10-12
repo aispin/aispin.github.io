@@ -206,7 +206,7 @@ const DOG_YAW = 0.40;
 //    会顺手把树放下去（它只喂给着色器做接地变暗），结果整棵树**浮空 2.09**：
 //    冠顶冲到 5.95（檐口才 4.25），树干比门高两倍多。判据见 harness 的
 //    `probe-tree-dump.mjs`（它量的是真实世界包围盒，一眼就能看出浮空）。
-const PERSIMMON_POS = [-3.20, GRASS_Y, 2.85];
+const PERSIMMON_POS = [-3.35, GRASS_Y, 2.85];
 const PERSIMMON_YAW = 0.28;
 const RABBIT_YAW = -0.55;
 

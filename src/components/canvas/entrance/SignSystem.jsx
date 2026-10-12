@@ -231,9 +231,11 @@ const SignSystem = (props) => {
     });
 
     return (
-        <group {...props}>
-            {/* 1. THE MOUNT BEAM (simple rustic wood) */}
-            <mesh position={[0, BEAM_CY, 0.65]}>
+        <group {...props} name="sign-system">
+            {/* 1. THE MOUNT BEAM (simple rustic wood) —— `name` 给 harness 用：
+                用户 2026-10-12 要求「树冠要遮挡掉一点点挂招牌的横木」，
+                判据 `probe-tree-fit.mjs` 要能直接量到这根横木的世界包围盒。 */}
+            <mesh name="sign-beam" position={[0, BEAM_CY, 0.65]}>
                 <primitive object={sharedGeometry('box', BEAM_W, BEAM_H, 0.1)} attach="geometry" />
                 <meshStandardMaterial color={WOOD_EDGE} roughness={0.9} />
             </mesh>
