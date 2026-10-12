@@ -39,31 +39,37 @@
 已加 ⚠️；`ai-demo` 与 `threejs-architecture-effects` 是 MIT（做法可学）。
 ⚠️ 刻意没写"已参考它们做樱花树/飞行" —— 那两个当时还没做。
 
-## WO-20 · `me` 的源码内聚到 `src/me/` —— **已交付，待你验收**
+## WO-21 · `/me` 品牌标识换成根站的 SVG 字标 —— **已交付，待你验收**
 
-- **你的决定（2026-10-12）**：「根目录 `/me/index.html` 应该挪到 `src/me/` 目录下，
-  让源码内聚在各自业务域目录下」。
-- **改了什么**：`git mv me/index.html src/me/index.html`（与它的 5 个模块同目录）；
-  `vite.config.js` 的 entry 指向 `src/me/index.html`；新增 `flattenHtmlEntries`
-  插件把**产物**仍落在 `dist/me/index.html`；dev / preview 的重写目标**拆成两个**。
-- 🔴 **核心难点（也是这次唯一的真坑）**：Vite 让「产物路径 = 源码相对 root 的路径」⇒
-  挪完产物会落到 `dist/src/me/index.html`、URL 变成 `/src/me/`，
-  而 **CI 硬断言 `test -f dist/me/index.html`** ⇒ 构建直接失败。
-  所以必须把**源码路径**和**产物路径**解耦。
-- ⚠️ 插件**必须用 `writeBundle`**，不能用 `generateBundle`：Vite 是在**它自己的
-  post 阶段**才把 HTML 塞进 bundle 的，普通插件的 `generateBundle` 跑在那之前，
-  `bundle['src/me/index.html']` 还不存在 ⇒ **静默什么都不做**（第一版就这么写的，
-  产物照样落在 `dist/src/me/`，而且没有任何报错）。
-  而 `vite-compression` 用的是 `closeBundle`（扫盘再压），`writeBundle` 正好在它之前。
+- **需求原文**：「me的logo 更新，使用根站的 svg logo，但颜色保留当前的蓝色。」
+- **改了什么**：
+  - `src/me/index.html`：导航品牌块里那个 `<span class="brand-mark">Z</span>`
+    换成**内联的根站字标** —— 2 条 `path` + 1 个 `circle`，`d` / `cx,cy,r` /
+    `viewBox` / `stroke-width` **逐字取自 `public/favicon.svg`**，不是照着重画。
+  - `src/me/me.css`：牌子方块的 `background: linear-gradient(135deg, var(--brand), var(--accent))`
+    **一个字没动**（这就是"颜色保留当前的蓝色"）；字标走 `currentColor`。
+  - `src/me/main.js`：删掉 `$('nav-brand-text').textContent = model.brand`
+    —— 就是这行把静态的 `Z` 盖成了 `ZEO`，**22px 的方框里塞三个字**（旧样子是溢出的）。
+- **顺带修掉的一个真 bug**：旧版导航标识在运行时显示的是 `ZEO` 三个字母，
+  宽约 21px 挤在 22px 的方块里、且 `overflow` 没裁 ⇒ 视觉上糊出边界。
+  静态 HTML 写的 `Z` 从来没被用户看到过。现在标识是图形，没有这个问题。
 - **验收判据（全部实测通过）**：
-  | 判据 | 结果 |
-  | --- | --- |
-  | 搬前 vs 搬后的 `dist/me/index.html` | **逐字节相同**（搬家对产物零影响）|
-  | CI 三条 sanity-check | `dist/index.html` · `dist/me/index.html` · `dist/404.html` 全在 |
-  | dev `/me` 与 `/me/` | 200，且标题是**名片页自己的**（不是 3D 主站的）|
-  | preview `/me` 与 `/me/` | 200，同上 |
-  | 残留 `dist/src/` | 无（插件顺手清空目录）|
-  | lint | 0 error / 33 warning |
+  | 判据 | 工具 | 结果 |
+  | --- | --- | --- |
+  | 字标几何与 `public/favicon.svg` 逐字相同 | `probe-me-logo.mjs` | **9/9 PASS** |
+  | 该判据**能变红**（改 `r=38→40`、改 `294→290` 各试一次）| 同上 | 两次都 8/9 + exit 1 |
+  | 「字标 ∶ 牌子」比例 = 根站 | `measure-me-logo.py`（**像素反推**）| 根站 0.5870 / 本页 0.5885，Δ=0.0015 |
+  | 牌子底色仍是蓝紫渐变 | `probe-me-logo.mjs` L2a | PASS |
+  | lint | `npm run lint` | 0 error / 33 warning |
+- **为什么比例要用像素反推**：内联字标外面套了一层 `scale(1.133)`，
+  用来补偿"根站的圆角方块只占 viewBox 的 88.3%、而我们的牌子是满铺的"。
+  1.133 是算出来的 —— 算错了不会报错。所以从渲染结果量回来验证。
+- ⚠️ **已知差异（刻意不动）**：根站牌子是**超椭圆**（squircle），
+  本页是 `border-radius: 7px`。22px 下肉眼无差；要统一再开新 WO。
+- ⚠️ **顺带发现（不在本 WO 范围，未改）**：`src/utils/appIcons.js` 画的
+  apple-touch-icon 是 **"A" 字标**（AISPIN），而 `public/favicon.svg` 是
+  **"Z" 字标**（ZEO）。该文件注释写着"和 favicon.svg 保持一致"，**这句是错的**
+  —— 两者只有配色/笔法一致，几何完全不同。要不要统一请你定。
 
 ## WO-17 · 前院一棵樱花树（DR-L 已定）· 参考 `sakura-station-corner`
 

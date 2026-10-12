@@ -56,8 +56,22 @@
   <!-- 导航 -->
   <nav>
     <div class="nav-in">
-      <a class="brand" href="#top">
-        <span class="brand-mark" id="nav-brand-text">Z</span>
+      <!-- 品牌标识 = 根站的 SVG 字标（几何逐字取自 public/favicon.svg），
+           底色保留本页的蓝紫渐变。牌子是纯装饰，可访问名交给外层 <a> 的 aria-label，
+           所以这里 aria-hidden 掉，免得读屏念一遍图形。 -->
+      <a class="brand" href="#top" aria-label="ZEO">
+        <span class="brand-mark" aria-hidden="true">
+          <svg class="brand-glyph" viewBox="0 0 512 512" focusable="false">
+            <!-- 1.133 = 1 / (452/512)：根站 favicon 的圆角方块只占 viewBox 的 88.3%，
+                 而这里的牌子是满铺的，所以字标要等比放大，才能保持
+                 「字标 ∶ 牌子」的原始比例（≈59%）。 -->
+            <g transform="translate(256 256) scale(1.133) translate(-256 -256)">
+              <path d="M 150 154 L 362 154 L 294 210" />
+              <path d="M 218 302 L 150 358 L 362 358" />
+              <circle cx="256" cy="256" r="38" />
+            </g>
+          </svg>
+        </span>
       </a>
       <div class="nav-links" id="nav-links"></div>
       <div class="nav-actions">

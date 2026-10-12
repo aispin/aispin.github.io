@@ -103,7 +103,8 @@ function workVisual(kind) {
 const $ = (id) => document.getElementById(id)
 
 function renderNav(model) {
-  $('nav-brand-text').textContent = model.brand
+  // 品牌标识现在是一个**固定**的 SVG 字标（根站 favicon 的几何），
+  // 不再是 model.brand 的文字 —— 所以这里不写它。
   $('nav-links').innerHTML = model.nav
     .map((n) => `<a href="#${n.id}">${n.label}</a>`)
     .join('')

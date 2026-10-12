@@ -158,13 +158,25 @@ nav {
   font-weight: 700; font-size: 14px; letter-spacing: .02em; color: var(--n-900);
 }
 
+/* 牌子方块：底色仍是本页的蓝紫渐变（不动），里面装根站的 SVG 字标。 */
 .brand-mark {
   width: 22px; height: 22px; border-radius: 7px;
   background: linear-gradient(135deg, var(--brand), var(--accent));
   display: flex; align-items: center; justify-content: center;
-  color: #fff; font-size: 11px; font-weight: 800;
+  color: #fff;                     /* 字标走 currentColor，跟主题色脱钩 */
   box-shadow: 0 4px 12px -2px rgba(59, 91, 253, .35);
 }
+
+/* 字标：viewBox 铺满牌子（22×22），线条宽度用 user unit 写死 54，
+   和 public/favicon.svg 逐字一致；缩放交给 SVG 内部的 <g>，
+   这样换尺寸只改一处。 */
+.brand-glyph {
+  display: block; width: 100%; height: 100%;
+  fill: none; stroke: currentColor;
+  stroke-width: 54; stroke-linecap: round; stroke-linejoin: round;
+}
+
+.brand-glyph circle { fill: currentColor; stroke: none; }
 
 .nav-links { display: flex; gap: 26px; margin-left: auto; font-size: 13px; color: var(--n-600); }
 
