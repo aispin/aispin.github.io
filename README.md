@@ -284,6 +284,38 @@ python3 scripts/build-scene-fonts.py
 
 ---
 
+## 参考资料
+
+造型与技术上的参考。**它们都不是本项目的依赖** —— 每一项都写清了"参考了什么"
+以及"有没有真被用进代码"。
+
+| 项目 | 参考的是什么 | 用进代码了吗 |
+|---|---|---|
+| [ITomPoland/portfolio-itom](https://github.com/ITomPoland/portfolio-itom) | **本项目的上游**（MIT）。场景骨架、走廊与房间的结构来自它 | ✅ 衍生自它，见下方「许可」 |
+| [dgreenheck/tidewater](https://github.com/dgreenheck/tidewater) | 源码研读：渲染管线组织、几何/材质复用、性能清单 | ❌ 只读源码做判断，没有引代码 |
+| [dgreenheck/ez-tree](https://github.com/dgreenheck/ez-tree) | 程序化树生成：分叉参数的分层设计、LOD 分层、presets 的字段命名 | ❌ 见下方说明 |
+| [MengTo/sylva](https://github.com/MengTo/sylva) | **视觉参考**：梦幻森林那一套（苔藓/圆球的形态、指针交互） | ❌ **它不授权复用**，见下方说明 |
+
+> ⚠️ **`sylva` 不授权复用。** 它的 README 明确写着 *"No license is granted for reuse
+> or redistribution of the Sylva code, design, or artwork."*（只有它捆绑的 three.js
+> 与 Lexend 字体各自仍是 MIT / OFL）。所以它**只能看、不能抄** —— 列在这里是说清
+> "森林那套观感从哪来"，不是"代码从哪来"。
+>
+> ⚠️ **`ez-tree` 是 MIT，但本项目的树没有用它。** 它是 `Tree extends THREE.Group`，
+> 唯一干净的那一层是 `createGeometry()`（返回**不带材质**的 `{branches, leaves}`
+> `BufferGeometry`）；而默认路径会把 **20 张贴图以 base64 内联进库** ——
+> 产物 **4 MB / gzip 约 2.9 MB**，且贴图注册表 `Z` 是**模块级**、`import` 当场就把
+> 它们 `TextureLoader.load()` 解码成 `Texture`（所以 tree-shake 不掉）。这与本项目
+> 「**零位图**」的硬规矩（见上方"美术"）直接冲突。另外两处与这里的设计不一致：
+> 它的枝条是 **`cylinder without end caps`**（源码原话）、**没有关节几何**，
+> 而本项目的「树干衔接自然」正是靠**关节椭球**做的；它的叶子是 `alphaTest` 的
+> **公告板四边形**，而这里已经改成了有中脉的实体叶片。草地它也没有 ——
+> 库（`src/lib/`）的导出面里没有草。结论：**留作参考，不做依赖。**
+>
+> 这几条判断的依据都在 `.workbuddy-ai/memory/`（不随仓库发布）。
+
+---
+
 ## 许可
 
 代码以 [MIT License](LICENSE) 开源。

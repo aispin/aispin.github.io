@@ -124,9 +124,48 @@ content-type 分别是 `application/manifest+json` / `image/svg+xml` / `font/wof
 > **DR-C**（竹林 impostor）。三条用户都已答复并落地（见上面的快照），按白板规矩
 > **全部出表**。
 >
-> 🔴 顺带一个**还没答**的问题（从 DR-J 里继承下来）：**左窗会被柿子树的树冠
-> 压掉一部分**。3D 树重构之后已经缓解 —— 树冠底在 world y 1.83，而窗顶只有
-> 0.75，所以窗是**从冠下露出来**的；树干也从 x −3.55 往右挪到 −3.20，不再压
-> 在窗上。要不要再挪，看定妆照 `.workbuddy-ai/shots/wo-final-house/`。
->
 > 下一轮开始时这里应该是空的。**有分歧就是新一轮的新 WO。**
+
+### DR-K · 要不要用 `ez-tree` 重构树 / 草地
+
+- **用户问的**：评估用 [ez-tree](https://github.com/dgreenheck/ez-tree) 重构我们的
+  树和草地是否有问题。
+- **我的结论：有问题，建议不改**（理由是量出来的，不是猜的）：
+  1. 🔴 **它会把 20 张贴图以 base64 内联进库** —— 产物 **4 MB / gzip 2.9 MB**，
+     而且 `const Z = {...}` 是**模块级**、`import` 当场就 `TextureLoader.load()`
+     全部解码成 `Texture`。与「**零 jpg/png**、全站只允许 2 张位图」直接冲突，
+     而且 tree-shake 不掉（`Z` 被材质工厂引用）。
+  2. **分叉处没有关节处理**（全文件只有一处 `computeBoundingSphere`，没有
+     sphere/ellipsoid/joint）⇒ 会**退回**"树干衔接不像真树"——那正是你当初
+     让我参考 demo 解决掉的问题。
+  3. **叶子是 `alphaTest: 0.5` 的公告板四边形**（`Billboard.Single|Double`）——
+     零厚度平面，本项目为此栽过（侧面就是一张纸、还被背面剔除）。
+  4. **风是打在它自己的 `MeshStandardMaterial.onBeforeCompile` 上**，靠
+     `update(t)` 写 `uTime`；与本项目「一份共享 uniform + `useSeasonUniforms` +
+     四季色板 + `toShaderColor`」是两套系统。
+  5. **草地它根本没有** —— 库（`src/lib/`）里没有草；仓库里的 `src/app/grass.js`
+     是它那个 demo 用的，不在导出面里。
+  6. **森林更不适合**：每棵树的几何都不同 ⇒ 它给的是"一树一 `Group`（2 个 mesh）"，
+     170 棵就是 340+ 个 mesh，而本项目**全站基线只有 704**、森林现在是
+     **2 个 InstancedMesh**。
+- **唯一干净的那一层**：`createGeometry()` 返回**不带材质**的
+  `{ branches, leaves }` `BufferGeometry` —— 理论上可以只取枝条几何、保留我们
+  自己的叶/风/四季。但那样也拿不到关节球，且要付上面第 1 条的体积代价。
+- **建议**：**留作参考，不做依赖**。它真正可白拿的是 `src/lib/presets/*.json`
+  （MIT、纯数据）里那套参数命名与分层（`angle/children/gnarliness/force/length/
+  taper` 逐层给值），可以对照着调我们自己的
+  `SPREAD / OUT_BIAS / UP_BIAS / LEN_FALLOFF`。
+- **要不要我做**（三选一）：
+  - (a) **什么都不动**（我的建议）；README 的「参考资料」已记明原因。
+  - (b) 只把 ez-tree 的 **presets 参数映射**整理成一张对照表附在 `docs/`，
+    给以后调树形当尺子。
+  - (c) 真引 —— 那就得 **fork/vendor** 它的 `src/lib/`（剥掉 `Z` 贴图注册表）
+    并且只走 `createGeometry()`，是一条独立的 WO。
+
+> 🔴 另一个**还没答**的老问题（从 DR-J 里继承）：**左窗会被柿子树的树冠压掉
+> 多少**。2026-10-12 把树冠加大之后重算过：冠底在 world y **0.495**，而左窗
+> 洞口顶只有 **0.75** —— 冠底几乎贴到窗顶了；但**在窗那个高度上冠的横截面只有
+> 全冠的 22%**（宽 ≈0.57），够不到窗所在的 `x ∈ [−5.7, −4.3]`，
+> 判据 `probe-tree-fit.mjs` 的「撞左窗框 = **0 个实例**」也是这么说的。
+> 要不要再挪，看定妆照 `.workbuddy-ai/shots/wo-tree-final/`。
+
