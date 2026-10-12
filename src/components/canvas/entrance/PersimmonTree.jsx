@@ -12,7 +12,7 @@ import {
     TREE_SHADOW_VERT, TREE_SHADOW_FRAG,
 } from '../../../shaders/persimmonTree';
 import {
-    PERSIMMON_H, buildPersimmonTree, makeLeafTuftGeometry, makeFruitGeometry,
+    PERSIMMON_H, TUFT_EXTENT, buildPersimmonTree, makeLeafTuftGeometry, makeFruitGeometry,
 } from '../../../utils/persimmonTree';
 import { seasonLightFor } from '../../../config/seasonLight';
 import { toShaderColor } from '../../../config/theme';
@@ -57,13 +57,26 @@ import { WindChime } from './EntranceProps';
 /* ------------------------------------------------------------------ */
 
 const TREE_LOOK = {
-    spring: { leaves: true, fruit: false, shadow: 0.20, dx: -0.109, wind: 0.075 },
-    summer: { leaves: true, fruit: false, shadow: 0.11, dx: 0.000, wind: 0.062 },
-    autumn: { leaves: true, fruit: true, shadow: 0.17, dx: 0.000, wind: 0.070 },
-    winter: { leaves: false, fruit: false, shadow: 0.30, dx: 0.172, wind: 0.090 },
+    spring: { leaves: true, fruit: false, shadow: 0.20, dx: -0.109, wind: 0.075, bark: 1.00 },
+    summer: { leaves: true, fruit: false, shadow: 0.11, dx: 0.000, wind: 0.062, bark: 0.90 },
+    autumn: { leaves: true, fruit: true, shadow: 0.17, dx: 0.000, wind: 0.070, bark: 1.00 },
+    winter: { leaves: false, fruit: false, shadow: 0.30, dx: 0.172, wind: 0.090, bark: 1.20 },
 };
 
 const lookFor = (season) => TREE_LOOK[season] || TREE_LOOK.autumn;
+
+/**
+ * 树皮**法线扰动**的基准强度（乘上每季的 `bark` 系数）。
+ *
+ * 🔴 这一条是"树干不像粘土"的关键：原来 fbm 只拿去混颜色、法线一个像素没动，
+ *    所以无论颜色叠几层，光照下这片表面仍然是光滑圆柱。
+ * 单位是「局部空间梯度 × 该系数」加在法线上；实测 0.05 量级正好
+ * ——大到能看出凹凸，又不会把法线推到自交（出现负光）。
+ */
+const BARK_BUMP = 0.085;
+
+/** 叶的**透光**强度。0 = 不透（"硬纸片"），太大 = 像塑料发光片。 */
+const LEAF_TRANS = 0.55;
 
 /** 太阳方向（世界、归一化）。取那一季**白天**的主光位置 —— 影长是本项目
  *  手绘的，但明暗仍然跟着太阳高度角走（与 `SceneLighting` 同一把尺子）。 */
@@ -117,6 +130,10 @@ export function PersimmonTree({ position = [0, 0, 0], yaw = 0, rootY = 0 }) {
             uTreeH: { value: PERSIMMON_H },
             uTime: { value: 0 },
             uWind: { value: lookFor(s).wind },
+            // WO-19：树皮法线扰动 + 叶的透光/叶尖坐标（都是纯程序化，零位图）
+            uBarkBump: { value: BARK_BUMP * lookFor(s).bark },
+            uTuftExtent: { value: TUFT_EXTENT },
+            uLeafTrans: { value: LEAF_TRANS },
             uHaze: { value: new THREE.Color(0.85, 0.87, 0.86) },
             uHazeNear: { value: 20 },
             uHazeFar: { value: 60 },

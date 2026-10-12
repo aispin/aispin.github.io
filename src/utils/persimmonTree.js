@@ -126,15 +126,28 @@ const CROWN_PAD_Y = 2.40;
 export const LEAF_LEN = 0.24;
 export const LEAF_WID = 0.145;
 /**
+ * 每片叶**形状抖动**的上下限（`leafVerts` 用）。
+ *
+ * 🔴 为什么要把这两个数写成常量、而不是直接写进 `leafVerts`：
+ *    `TUFT_EXTENT`（下面）是**归一化分母的一部分** —— 它决定"树看起来多高"。
+ *    抖动一旦放大，叶团能探出去的比 `TUFT_EXTENT` 预测的更远，
+ *    冠顶就会**冲出 `PERSIMMON_H`**（WO-7 那条"树要略矮于屋身"的老账）。
+ *    所以把界限提出来，`TUFT_EXTENT` 按**最大可能的那片叶**算（偏保守）。
+ */
+export const LEAF_LEN_JIT = [0.82, 1.18];
+export const LEAF_WID_JIT = [0.80, 1.22];
+/**
  * 一团叶**从自己的原点往外能探多远**（世界单位）。
  *
  * 🔴 归一化那一步要用它 —— 树顶不只是最高那团叶的**中心**，还要加上这团叶
  *    自己探出去的那一截（叶尖离原点的距离 + 那 4 片叶的固定偏移）。
  *    少了这一截，冠顶会比 `PERSIMMON_H` 高出一小段（第一版就是这么冲过檐口
  *    的：量到 4.28，而檐口只有 4.25）。
- * ⚠️ 算的是**外接球**（不挑朝向），偏保守 —— 保守只会让树矮一点点，安全。
+ * ⚠️ 按**抖动上限**算（`*_JIT[1]`）：保守只会让树矮一点点，安全。
+ * ⚠️ 算的是**外接球**（不挑朝向）。
  */
-export const TUFT_EXTENT = Math.hypot(LEAF_LEN, LEAF_WID / 2) + 0.14;
+export const TUFT_EXTENT =
+    Math.hypot(LEAF_LEN * LEAF_LEN_JIT[1], (LEAF_WID * LEAF_WID_JIT[1]) / 2) + 0.14;
 
 /** 果实：半径范围、挂在哪个高度带。 */
 const FRUIT_R = [0.120, 0.170];
@@ -414,18 +427,23 @@ function grow(state, start, dir, length, r0, r1, depth) {
  *    （`RIDGE`）之后，两半叶面朝向不同 ⇒ 明暗不同 ⇒ 立刻读成一片叶子。
  *    法线**逐面**给（不跨中脉插值），那条折痕才看得出来。
  */
-function leafVerts(mat, out) {
-    const l = LEAF_LEN;
-    const w = LEAF_WID;
-    const RIDGE = 0.050;        // 中脉抬起的量（相对叶宽）
+function leafVerts(mat, out, rand) {
+    // 🔴 每片叶**自己的形状**：长 / 宽 / 中脉深浅 / 左右不对称 都抖一点。
+    //    不抖的话，3472 团 × 6 片 ≈ 2 万片叶**形状完全一致** ——
+    //    重复的轮廓比任何缺失的细节都显眼，这正是"一眼看出是纸片"的来源。
+    const l = LEAF_LEN * randRange(rand, LEAF_LEN_JIT[0], LEAF_LEN_JIT[1]);
+    const w = LEAF_WID * randRange(rand, LEAF_WID_JIT[0], LEAF_WID_JIT[1]);
+    const RIDGE = randRange(rand, 0.035, 0.075);   // 中脉抬起的量（相对叶宽）
+    const asym = randRange(rand, -0.11, 0.11);     // 左右肩不等高 ⇒ 不轴对称
+    const curl = RIDGE * w * randRange(rand, -0.35, 0.55);
     const at = (x, y, z) => {
         const v = new THREE.Vector3(x, y, z).applyMatrix4(mat);
         return { x: v.x, y: v.y, z: v.z };
     };
     const base = at(0, 0, -RIDGE * w);
-    const left = at(-w / 2, l * 0.42, 0);
-    const tip = at(0, l, -RIDGE * w * 0.5);
-    const right = at(w / 2, l * 0.42, 0);
+    const left = at(-w / 2, l * (0.42 + asym), curl);
+    const tip = at(w * randRange(rand, -0.12, 0.12), l, -RIDGE * w * 0.5);
+    const right = at(w / 2, l * (0.42 - asym), curl);
     // 中脉上的一个点：两半叶面在这里相交
     const ridge = at(0, l * 0.50, -RIDGE * w * 1.6);
 
@@ -448,14 +466,17 @@ function leafVerts(mat, out) {
 }
 
 /**
- * 一「团」叶 = 4 片朝向各异的叶。
+ * 一「团」叶 = **6** 片朝向各异的叶。
  *
  * 🔴 为什么是**一团**而不是一片：`InstancedMesh` 的实例数就是 draw 之外最贵的
- *    一笔开销（每个实例一份矩阵 + 4 个属性）。把 4 片叶烘进一个几何体，同样的
- *    覆盖度只要四分之一的实例，而三角形的总数一模一样。
+ *    一笔开销（每个实例一份矩阵 + 4 个属性）。把 6 片叶烘进一个几何体，同样的
+ *    覆盖度只要六分之一的实例，而三角形的总数一模一样。
  *
- * 🔴 4 片的朝向必须**散开**（尤其不能都躺在同一个平面里）：整团的明暗差异
+ * 🔴 6 片的朝向必须**散开**（尤其不能都躺在同一个平面里）：整团的明暗差异
  *    完全来自法线，朝向单一时整冠会是同一个颜色 —— 那正是"看着不饱满"。
+ *
+ * ⚠️ 2026-10-12 勘误：这段注释原来写「4 片」，而 `ROT` 一直是 **6** 项。
+ *    代码和注释对不上（同 `hard-rules §28` 那条家族）。
  */
 export function makeLeafTuftGeometry() {
     const acc = makeAcc();
@@ -476,11 +497,14 @@ export function makeLeafTuftGeometry() {
         [0.08, 0.07, 0.06],
         [-0.07, 0.11, -0.02],
     ];
+    // 每片叶的形状抖动 —— **固定 key** ⇒ 6 片叶的形状是确定的
+    //（契约 1：两次跑出来必须逐字节相同，否则判据之间不可比）。
+    const rand = seededRand('persimmon-leaf-blades-v1');
     for (let k = 0; k < ROT.length; k++) {
         const m = new THREE.Matrix4()
             .makeRotationFromEuler(new THREE.Euler(ROT[k][0], ROT[k][1], ROT[k][2]))
             .setPosition(OFF[k][0], OFF[k][1], OFF[k][2]);
-        leafVerts(m, acc);
+        leafVerts(m, acc, rand);
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(acc.pos, 3));
