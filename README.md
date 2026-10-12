@@ -302,15 +302,21 @@ python3 scripts/build-scene-fonts.py
 > "森林那套观感从哪来"，不是"代码从哪来"。
 >
 > ⚠️ **`ez-tree` 是 MIT，但本项目的树没有用它。** 它是 `Tree extends THREE.Group`，
-> 唯一干净的那一层是 `createGeometry()`（返回**不带材质**的 `{branches, leaves}`
-> `BufferGeometry`）；而默认路径会把 **20 张贴图以 base64 内联进库** ——
-> 产物 **4 MB / gzip 约 2.9 MB**，且贴图注册表 `Z` 是**模块级**、`import` 当场就把
-> 它们 `TextureLoader.load()` 解码成 `Texture`（所以 tree-shake 不掉）。这与本项目
-> 「**零位图**」的硬规矩（见上方"美术"）直接冲突。另外两处与这里的设计不一致：
-> 它的枝条是 **`cylinder without end caps`**（源码原话）、**没有关节几何**，
+> 并且**没有**「只取几何、不取材质」的出口：`generate()` 把顶点灌进
+> `this.branches/{verts,normals,indices,uvs,windFactor}` 与
+> `this.leaves/{verts,normals,indices,uvs}` 之后，`createBranchesGeometry()` /
+> `createLeavesGeometry()` **自己就建材质、写进 mesh**（不返回任何东西）。
+> 而默认路径会把 **20 张贴图以 base64 内联进库** —— 产物 **4 MB / gzip 2 936 KB**，
+> 且贴图注册表 `Z` 是**模块级**、`import` 当场就把它们 `TextureLoader.load()`
+> 解码成 `Texture`（所以 tree-shake 不掉）。这与本项目「**零位图**」的硬规矩
+> （见上方"美术"）直接冲突。另外三处与这里的设计不一致：
+> 它的枝条是 **`cylinder without end caps`**（源码原话）且**没有关节几何**，
 > 而本项目的「树干衔接自然」正是靠**关节椭球**做的；它的叶子是 `alphaTest` 的
-> **公告板四边形**，而这里已经改成了有中脉的实体叶片。草地它也没有 ——
-> 库（`src/lib/`）的导出面里没有草。结论：**留作参考，不做依赖。**
+> **交叉四边形**（`Billboard.Double` = 两片成 90° 的平面，**不是朝向相机的公告板**，
+> `side: DoubleSide`），而这里已经改成有中脉的实体叶片；它的材质是
+> `MeshPhongMaterial` 加自带的 `onBeforeCompile` 摆风，而这里走的是四季色板的
+> 共享 uniform。草地它也没有 —— 库（`src/lib/`）的导出面里没有草。
+> 结论：**留作参考，不做依赖。**
 >
 > 这几条判断的依据都在 `.workbuddy-ai/memory/`（不随仓库发布）。
 

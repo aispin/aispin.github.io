@@ -132,25 +132,36 @@ content-type 分别是 `application/manifest+json` / `image/svg+xml` / `font/wof
   树和草地是否有问题。
 - **我的结论：有问题，建议不改**（理由是量出来的，不是猜的）：
   1. 🔴 **它会把 20 张贴图以 base64 内联进库** —— 产物 **4 MB / gzip 2.9 MB**，
-     而且 `const Z = {...}` 是**模块级**、`import` 当场就 `TextureLoader.load()`
-     全部解码成 `Texture`。与「**零 jpg/png**、全站只允许 2 张位图」直接冲突，
+     而且贴图注册表 `Z` 是**模块级**（源码是 `const j = (…) => {…}, Z = {…}`）、
+     `import` 当场就 `TextureLoader.load()` 全部解码成 `Texture`。
+     与「**零 jpg/png**、全站只允许 2 张位图」直接冲突，
      而且 tree-shake 不掉（`Z` 被材质工厂引用）。
-  2. **分叉处没有关节处理**（全文件只有一处 `computeBoundingSphere`，没有
-     sphere/ellipsoid/joint）⇒ 会**退回**"树干衔接不像真树"——那正是你当初
+  2. **分叉处没有关节处理**（`src/lib/` 全目录扫下来，sphere/ellipsoid/joint
+     命中 **0** 处；只有 **2** 处 `computeBoundingSphere()`，那是枝条、叶片各自
+     算包围球，不是关节）⇒ 会**退回**"树干衔接不像真树"——那正是你当初
      让我参考 demo 解决掉的问题。
-  3. **叶子是 `alphaTest: 0.5` 的公告板四边形**（`Billboard.Single|Double`）——
-     零厚度平面，本项目为此栽过（侧面就是一张纸、还被背面剔除）。
-  4. **风是打在它自己的 `MeshStandardMaterial.onBeforeCompile` 上**，靠
-     `update(t)` 写 `uTime`；与本项目「一份共享 uniform + `useSeasonUniforms` +
-     四季色板 + `toShaderColor`」是两套系统。
+  3. **叶子是 `alphaTest` 的零厚度四边形**（`Billboard.Single` = 1 片，
+     `Double` = 2 片成 90°，**不是朝向相机的公告板**）—— 零厚度平面本项目为此
+     栽过。⚠️ 但它**不是**"被背面剔除"：材质写死 `side: DoubleSide`（别照抄错）。
+  4. **材质是 `MeshPhongMaterial`，风打在它自己的 `onBeforeCompile` 上**（当场内联
+     一份 ashima simplex noise），靠 `update(t)` 写
+     `leavesMesh.material.userData.shader.uniforms.uTime.value`；与本项目
+     「一份共享 uniform + `useSeasonUniforms` + 四季色板 + `toShaderColor`」
+     是两套系统。
   5. **草地它根本没有** —— 库（`src/lib/`）里没有草；仓库里的 `src/app/grass.js`
      是它那个 demo 用的，不在导出面里。
   6. **森林更不适合**：每棵树的几何都不同 ⇒ 它给的是"一树一 `Group`（2 个 mesh）"，
      170 棵就是 340+ 个 mesh，而本项目**全站基线只有 704**、森林现在是
      **2 个 InstancedMesh**。
-- **唯一干净的那一层**：`createGeometry()` 返回**不带材质**的
-  `{ branches, leaves }` `BufferGeometry` —— 理论上可以只取枝条几何、保留我们
-  自己的叶/风/四季。但那样也拿不到关节球，且要付上面第 1 条的体积代价。
+- 🔴 **别指望有「只取几何」的出口**（这一条 2026-10-12 深夜勘误过）：
+  真实的方法名是 `generate()` / `createBranchesGeometry()` / `createLeavesGeometry()`，
+  **没有** `createGeometry()`（`src/` 与 build 里各 **0** 处命中）。
+  `generate()` 只是把数据灌进 `this.{branches,leaves}` 的**裸数组**
+  （`verts/normals/indices/uvs[/windFactor]`），随后那两个 `create*Geometry()`
+  **自己 new `MeshPhongMaterial` 并写进 `this.branchesMesh/leavesMesh`**、无返回值。
+  所以「拿裸数组自己建几何」在**调用层面**可行，但**代价照付** —— `generate()`
+  无条件走完建材质那两步。真想只拿几何就得 fork。附带：`setIndex` 用的是
+  `Uint16Array` ⇒ 单树索引上限 65535。
 - **建议**：**留作参考，不做依赖**。它真正可白拿的是 `src/lib/presets/*.json`
   （MIT、纯数据）里那套参数命名与分层（`angle/children/gnarliness/force/length/
   taper` 逐层给值），可以对照着调我们自己的
@@ -159,8 +170,9 @@ content-type 分别是 `application/manifest+json` / `image/svg+xml` / `font/wof
   - (a) **什么都不动**（我的建议）；README 的「参考资料」已记明原因。
   - (b) 只把 ez-tree 的 **presets 参数映射**整理成一张对照表附在 `docs/`，
     给以后调树形当尺子。
-  - (c) 真引 —— 那就得 **fork/vendor** 它的 `src/lib/`（剥掉 `Z` 贴图注册表）
-    并且只走 `createGeometry()`，是一条独立的 WO。
+  - (c) 真引 —— 那就得 **fork/vendor** 它的 `src/lib/`（剥掉 `Z` 贴图注册表），
+    并且自己接管 `this.{branches,leaves}` 那两组裸数组来建几何，
+    是一条独立的 WO。
 
 > 🔴 另一个**还没答**的老问题（从 DR-J 里继承）：**左窗会被柿子树的树冠压掉
 > 多少**。2026-10-12 把树冠加大之后重算过：冠底在 world y **0.495**，而左窗
