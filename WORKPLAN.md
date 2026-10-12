@@ -3,11 +3,13 @@
 > **本文件是白板，不是台账。**
 >
 > 只放**待办**：待做的 **WO** + 待你拍板的 **DR**。
-> 🔴 **代码一提交，就把该 WO / 关闭的 DR 从这里删掉** —— 不等验收、不等下一轮。
-> 过程记录、实测数据、踩坑结论一律进 `.workbuddy-ai/memory/`（入口 `MEMORY.md`）。
+> 🔴 **你验收 OK 就当轮把它从本文件删掉** —— 不等下一轮迭代。
+> 过程记录、实测数据、踩坑结论一律进 `.workbuddy-ai/memory/`（入口 `MEMORY.md`）；
+> 沉淀下来的技术结论进 `docs/`；历史在 git。
 >
-> **新一轮迭代开始时，WO 和 DR 都应该是空的。**
-> **已交付的东西不留在这里** —— 技术结论在 `docs/`、过程在 git 历史。
+> **新一轮开始时，WO 和 DR 都应该是空的。**
+> ⚠️ 2026-10-12 用户明确反馈：**「你把快照滚动当流水帐去用了」** ——
+> 已删掉顶部的「📊 滚动快照」段。**状态写进每条 WO 自己，不再另开一段历史。**
 
 ## 规范
 
@@ -19,10 +21,10 @@
 流程：
 
 1. 收到需求 → 拆成 WO；**影响面大的，必须配一个 DR 请你 review WO**。
-2. 写完本文件**单独 commit**（交给 git 管版本）。
+2. 写完本文件**单独 commit**。
 3. 无 DR 的 WO → **直接开搞**；有 DR 的 WO → **等你决策完再开搞**。
 4. 做完 → 发起验收。
-5. 🔴 **代码提交后立刻把该 WO / 已答复的 DR 从本文件删掉。**
+5. 🔴 **你验收 OK 后立刻把该 WO / 已答复的 DR 从本文件删掉。**
    验收若有分歧，**作为新一轮的新 WO 重新进表**（版本历史在 git，不用怕丢）。
 
 ## 执行注意（常驻，细节在 memory）
@@ -36,157 +38,174 @@
 
 ---
 
-# 📊 滚动快照（2026-10-12 · 含柿子树重调与森林范围）
-
-主题：**孤岛院子（v1.2）** —— 把固定的正面院子改成真能绕一圈看的 3D 场景。
-分支 **`feat/v1.2.0-island-courtyard`**（不是 `main`，不影响线上）。
-
-已交付：环绕相机状态机 + 受限轨道、`IslandGround`、竹篱笆小院、
-**WO-6 三处封口**（雾 / 只在人在走廊里时渲染 / 退到门前自动退出）、
-「外观与内部解绑」、`settleLerp` dt 补偿、竹子贴脸让开（DR-H）、
-窄视口放开环绕上限（DR-I）、`sw.js` 的 `respondWith` 兜底修复（`v6 → v7`）。
-**WO-7~WO-12（用户 2026-10-11 的 6 条反馈）全部落地**：
-屋身加高（檐口 `FLOOR_Y + 6.0`，实测树冠顶 3.83 → 墙头 4.25）、
-山墙改黄白抹灰 + 侧面出檐（悬山，`ROOF_WIDTH` 22 → 23.8）、
-常春藤重做（铺满右半面墙、枝干 13/9 → 9/6 px、绕开右窗）、
-窗户离门 ×2（2.5 → 5.0）+ 左侧对称窗（三个洞 + 两个探头小人）、
-门缝透白边（洞口 alpha 必须 1.0）、进门时身后那堵黑墙（后端封口跟 `corridorVisible`）。
-**墙脚那道矮竹篱换成狗尾巴草草带**（`FoxtailGrass`）：沿整面前墙铺开
-（世界 x −10.5…10.5），程序化 3 棱锥台 + 纺锤穗、共 2 次 draw call，
-四季色板 `SEASON_FOXTAIL`；避让是**按每片叶的扫掠包围盒**和实测障碍物
-（台明 / 白狗 / 荷花缸 / 花箱）做三维相交判掉，判据 `probe-grass-clearance.mjs`。
-被替换的 `BambooFence.jsx` 与 `makeBambooFenceTexture` 一并删除（死代码）。
-**用户第二轮两条报障也全部落地**：
-① 「退出门口时的 BUG」= 屋外那一整套的**边界不统一** —— 退场滑行 1.3 s 里
-`hasEntered` 还是 true，而 `EntranceDoors` / `IslandGround` / `SignSystem` /
-`BambooGrove` / `WeatherLayer` 只写了 `!hasEntered` ⇒ 前墙上只剩一个**光洞**。
-提成一个 `outdoorVisible` 谓词，全部走它；另加"门从开着往回关"（`swingShut`），
-否则相机会穿过**关着的门板**（整屏门神年画闪一下）。判据 `probe-transition-leak.mjs`。
-② 「进门后竹子出现了」= 竹林的排除带只有 z ∈ [−2.85, 39.15]，而**走廊往 −z 是无限的**
-⇒ 屋后那一段竹子长在走廊的管子里（实测 150 根 |x| ≤ 3.7，走廊一直画到 z = −57.85）。
-新增 `CORRIDOR_CLEAR_HALF_W`：按 |x| 一刀切、**不看 z**。判据 `probe-bamboo-corridor.mjs`。
-**验收材料 / 探针 / 结论全在 `.workbuddy-ai/memory/`**（当日日志 + `MEMORY.md`）。
-
-**2026-10-12 三件事全部落地（用户当轮的三条指示）**：
-① **DR-J 答"留"** ⇒ 狗尾巴草草带就此定案（`7d33d9e`，无改动）。
-② **柿子树重构成真 3D**（`b951e4f`）：照用户给的 `public/demos/web3d/tree/`
-   搬到项目里 —— **锥形管 + 关节椭球**（"树干衔接自然"的全部秘密）+ **冠体积内
-   撒叶**（"树冠饱满"）。骨架 1 个 mesh、叶 / 果各 1 个 `InstancedMesh`、
-   地面投影 1 片 ⇒ **4 次 draw call**（demo 那棵树是 3000+ mesh）。
-   旧贴图树整段删除，`entranceArt.js` 2729 → 1543 行。
-③ **DR-A 答"要"**：雾从 36~66 拉远到 **76~128**，新增**天空穹顶**（地平线 =
-   雾色，天顶 = 季色，太阳方位一条暖晕），地面 60 → **180** 半宽，
-   轨道上限 28 → **38**（这才第一次看得见整座岛 + 海平线）。
-④ **DR-C 答"换成"**：竹林 → **超现实幻想梦幻森林**（`DreamForest`）：
-   细杆 + **完美圆球冠** + 外缘透光 + 球面斑点 + 云雾化；170 棵 / 2 次 draw call。
-   `BambooGrove.jsx` 删除，`BAMBOO_*` 一整套配置改名 `FOREST_*`。
-
-**2026-10-12 追加 · `sw.js` 预缓存的修复（用户贴控制台日志）**：
-用户贴的四条里其实有**两个病**。第一条（`Response.error()`）是**设计内**行为 ——
-服务器停了 + 该资源没进过缓存；`vite preview` 那条长寿命后台任务被回收了。
-但另外两条暴露了两个**真 bug**，都已修（`v7` → `v8`）：
-
-- `manifest.webmanifest: ERR_CONNECTION_REFUSED` —— 它在 `PRECACHE_URLS` 里，
-  但静态分支的正则**没有 `webmanifest`** ⇒ SW 根本不接管 ⇒ 走裸网络。
-  **"在预缓存清单里"≠"会被 fetch 处理器接管"。**
-- `assets/main-*.js` —— 静态分支只 `caches.open(RUNTIME)`，**从没读过 `PRECACHE`**
-  ⇒ install 期下的 favicon / maskable 图标 / 字体离线时**一个都取不出来**，
-  「精确预缓存核心外壳」实际只兑现了首页一张 HTML。
-  ⇒ 改成 RUNTIME 优先、落空再问 PRECACHE。
-
-判据 `probe-sw-fetch.mjs` 从 7 条扩到 **10 条**（新增三条"断网 + 只靠预缓存"），
-**先验过红**：拿 v7 跑 **7/10**（三条全 `Failed to fetch`）；v8 **10/10**，
-content-type 分别是 `application/manifest+json` / `image/svg+xml` / `font/woff2`。
-顺带修好 `check-sw-dev.mjs` —— 它**端口写死 5199** 而 dev 在 **5173**，长期跑不起来
-（"一条跑不起来的判据等于没有判据"），改成从 argv 取。
-
-**2026-10-12 追加 · 柿子树重调 + 森林只在屋后（用户当轮两条）**：
-① **柿子树**：整体降高（冠顶 3.89 → **3.28**）、树冠加大（横向 3.15 → **5.67**，×1.8）、
-   枝更水平（`UP_BIAS` 收、`OUT_BIAS` 放、张开角放）；叶冠贴到离外墙 **0.55**
-   且**一个实例都没穿墙**；树冠遮住招牌横木左侧 **21%**（渲染两遍逐像素比）。
-② **梦幻森林只出现在屋身两侧 + 屋后**：新增 `FOREST_FRONT_LIMIT_Z`（= 屋身前墙线），
-   `z >` 它的一棵都不生成 —— 反证关掉它立刻报出 **87/170 根**树干跑到屋身前头。
-判据：`probe-tree-fit.mjs`（几何不撞）、`probe-tree-occlusion.mjs`（遮挡）、
-`probe-forest-corridor.mjs`（+ "前面"那一条）。
-
----
-
 # 📋 待办 WO
 
-> 用户 2026-10-11 的 6 条反馈（4 条改动 + 2 个 bug）全部已交付
-> （WO-7…WO-12，见 git 历史）。本轮暂无待办 WO。
+## WO-16 · README「参考资料」+4 条（影响面小 ⇒ 无 DR，可直接做）
+
+- **需求原文**：「修改 readme 文档，添加下面参考资料」
+  - <https://github.com/MengTo/kage>
+  - <https://github.com/fanhuayishiy/ai-demo>
+  - <https://github.com/huangbai-AI/yingxian-pagoda>
+  - <https://github.com/lhlGitHub/threejs-architecture-effects>
+- **现状**：README 已有 `## 参考资料` 段（4 行表 + `sylva`/`ez-tree` 两条说明）。
+- **改什么**：补 4 行；其中 **2 项没有开源授权**，按现有体例加 `⚠️` 说明。
+  | 项目 | 是什么（已核实） | 用进代码了吗 |
+  | --- | --- | --- |
+  | `MengTo/kage` | 京都山寺夜游五章 Three.js 实时光影 · 1709★ | ❌ 仅观赏（**NONE 授权**） |
+  | `fanhuayishiy/ai-demo` | 三维 demo 合集（樱花街角 / 夕空飞行等的**上游**）· MIT · 95★ | 参考做法，见 WO-17/18 |
+  | `huangbai-AI/yingxian-pagoda` | 应县木塔六幕滚动三维科普站 + 可编辑模型 · 27★ | ❌ 仅参考（**NONE 授权**） |
+  | `lhlGitHub/threejs-architecture-effects` | 「可交互自装配 3D 建筑」的 Agent Skill · MIT · 530★ | ❌ 思路参考 |
+- **验收判据**：表格 8 行；两处无授权提示；段序仍是 `部署 / 参考资料 / 许可`。
+
+## WO-17 · 前院两棵樱花树（参考 `sakura-station-corner`）· **影响面大 ⇒ 配 DR-L**
+
+- **需求原文**：「参考 `aispin/ai-demo/tree/main/sakura-station-corner` 在前院种两棵樱花树」
+- **现状**：前院只有一棵柿子树（`PersimmonTree`，**4 draw call**：枝/叶/果/影）。
+  mesh 预算：**全站基线 704**。樱花树若各占 4 ⇒ +8 mesh，可接受。
+- **上游做法（已核实）**：demo 是**三株樱花 + 持续落樱**，代码在 `src/assets/flora`；
+  贴图**全部运行时 Canvas2D 程序化生成，零外部图片**；有 `?style=toon` 平涂 / 三渲二两套。
+  ⚠️ **它是另一套树生成器**，不是 ez-tree，也不与我们的 `persimmonTree.js` 同源。
+- **改什么（草案）**：新增 `utils/sakuraTree.js`（沿用柿子树的三条骨架原则：锥形管 /
+  关节椭球 / 子枝回退 + 朝向偏置）+ `components/canvas/entrance/SakuraTree.jsx`；
+  花瓣用 1 个 `InstancedMesh` 做持续飘落（复用 `WeatherLayer` 的粒子思路）；
+  四季表现接 `SEASON_*` 色板。
+- **要你定的（→ DR-L）**：放哪 / 两棵的大小关系 / 要不要落樱 / 落樱是否只春天。
+- **验收判据（草案）**：不穿墙、不压窗（`probe-tree-fit.mjs` 扩到樱花）；mesh 增量 ≤ 10；
+  两棵树的形态由不同 seed 决定且**各自稳定**（契约 1）。
+
+## WO-18 · 前院小飞机 + `/flight` 飞行模式（参考 `sunset-flight-study`）· **影响面最大 ⇒ 配 DR-M**
+
+- **需求原文**：「参考 `aispin/ai-demo/tree/main/sunset-flight-study`，前院摆一架小飞机，
+  点击在 `/flight` 路由下进入飞行模式。」
+- **现状（已核实）**：**本项目没有路由系统** —— "模式"一律靠 URL 查询参数
+  （`src/config/cameraMode.js` 读 `URLSearchParams`，如 `?fly`）。第二个页面是
+  `/me`（`me/index.html` + `vite.config.js` 的 `rewriteMePage` 中间件）。
+- **上游做法（已核实）**：`sunset-flight-study` 是一个**独立应用**
+  （`aircraft.js` 23 KB / `flight.js` / `pilot-input.js` / `cel-material.js` /
+  `anime-renderer.js` / `painted-clouds.js`），模型·环境·轨迹·音效**全程序生成**，
+  默认「夕空飞行」+ `?scene=classic` 日间双机。
+- **改什么（草案）**：前院加 1 架小飞机（`InstancedMesh`/单 mesh）+ 点击拾取
+  （`onClick`）→ 进入 `/flight`。
+- **要你定的（→ DR-M）**：`/flight` 是**查询参数**、**真前端路由**、还是**新的 Vite entry**？
+  进入后是"接管主站相机绕着岛飞"还是"独立页面/独立场景"？飞机在外面是静物还是待机动画？
+- **验收判据（草案）**：点击命中率；进入/退出后主站状态不残留（走既有 `probe-transition-leak`）；
+  新增 mesh / draw call 与体积增量报数。
+
+## WO-19 · 柿子树的"假"：叶子像纸片 / 果子飘离树冠 / 树干像粘土 · **影响面中～大 ⇒ 配 DR-O**
+
+- **需求原文**：「我们柿子树目前看起来还是很假，叶子像纸片，果子有飘离树冠的情况，
+  树干是光滑的像粘土没有树皮的感觉」
+- **现状（已逐条定位，见 DR-K）**：
+  1. **果子飘离树冠 —— 🔴 这是真 bug，且是注释与代码矛盾。**
+     `src/utils/persimmonTree.js:613-620`：注释写「半径 **0.97~1.02** ⇒ 果正好卡在叶壳上」，
+     而代码是 `randRange(rand, 1.10, 1.20)` —— **落在冠壳之外 10~20%**。
+     叶团最远只到 `rho` 0.86~1.0（同文件 592-604 行的 `shell` 分支）
+     ⇒ 果必然悬在叶外。历史：第一版果在叶**里面**（看不见），为了"看得见"把半径推出去，
+     **推过头了**。修法不能只改数字 —— 要**贴着真实叶团**放。
+  2. **树干像粘土** —— `shaders/persimmonTree.js` 的 `TREE_BARK_FRAG` **有**程序化 fbm 竖裂纹，
+     但**只改颜色、不扰动法线** ⇒ 表面在光照下仍是光滑的。真树的"糙"主要读自**法线变化**。
+  3. **叶子像纸片** —— `makeLeafTuftGeometry()` 是实体几何叶（2200 团 × 8 三角形），
+     `DoubleSide`，有 `uWind` 风。缺的是**叶缘不规整 / 叶脉细节 / 透光感**，
+     以及**单叶尺度的层次**。
+- **改什么（草案）**：① 果改为"取真实叶团、沿外法线偏移半颗果"⇒ 保证贴冠且露头；
+  ② 树皮把 fbm 的**梯度**转成法线扰动（`dFdx/dFdy` 或解析梯度）+ 提裂纹对比；
+  ③ 叶子加叶缘扰动 + 叶脉 + 双层（内层暗、外层亮）提体积感。
+- **要你定的（→ DR-O）**：**要不要为"树皮/叶"放宽"零位图"硬规矩**（见 DR-O）。
+- **验收判据（草案）**：果—叶"贴合度"用数值判据（每颗果到最近叶团的距离 ≤ 叶团半径），
+  **不靠截图**（本仓截图 A/B 噪声底 7.8%，见 `hard-rules §26`）。
 
 ---
 
 # 🙋 待你拍板的 DR
 
-> 本轮开始时表里是 **DR-J**（狗尾巴草留/调/换）、**DR-A**（拉远雾 + 天空盒）、
-> **DR-C**（竹林 impostor）。三条用户都已答复并落地（见上面的快照），按白板规矩
-> **全部出表**。
->
-> 下一轮开始时这里应该是空的。**有分歧就是新一轮的新 WO。**
+## DR-K · 树 / 草的写实度路线（原「要不要用 ez-tree」—— 根因已探明，请拍板往哪走）
 
-### DR-K · 要不要用 `ez-tree` 重构树 / 草地
+- **问题（2026-10-12 追加）**：「为什么它 demo（<https://www.eztree.dev/>）里面的树和草地
+  比我们的逼真很多？」
+- **答：因为它的逼真建立在「位图贴图 + glb 模型资产」上，而这两样本项目的硬规矩禁止。
+  不是我们的算法不如它，是我们选了一条不能靠贴图的路。** 四条证据（全部读过源码）：
 
-- **用户问的**：评估用 [ez-tree](https://github.com/dgreenheck/ez-tree) 重构我们的
-  树和草地是否有问题。
-- **我的结论：有问题，建议不改**（理由是量出来的，不是猜的）：
-  1. 🔴 **它会把 20 张贴图以 base64 内联进库** —— 产物 **4 MB / gzip 2.9 MB**，
-     而且贴图注册表 `Z` 是**模块级**（源码是 `const j = (…) => {…}, Z = {…}`）、
-     `import` 当场就 `TextureLoader.load()` 全部解码成 `Texture`。
-     与「**零 jpg/png**、全站只允许 2 张位图」直接冲突，
-     而且 tree-shake 不掉（`Z` 被材质工厂引用）。
-  2. **分叉处没有关节处理**（`src/lib/` 全目录扫下来，sphere/ellipsoid/joint
-     命中 **0** 处；只有 **2** 处 `computeBoundingSphere()`，那是枝条、叶片各自
-     算包围球，不是关节）⇒ 会**退回**"树干衔接不像真树"——那正是你当初
-     让我参考 demo 解决掉的问题。
-  3. **叶子是 `alphaTest` 的零厚度四边形**（`Billboard.Single` = 1 片，
-     `Double` = 2 片成 90°，**不是朝向相机的公告板**）—— 零厚度平面本项目为此
-     栽过。⚠️ 但它**不是**"被背面剔除"：材质写死 `side: DoubleSide`（别照抄错）。
-  4. **材质是 `MeshPhongMaterial`，风打在它自己的 `onBeforeCompile` 上**（当场内联
-     一份 ashima simplex noise），靠 `update(t)` 写
-     `leavesMesh.material.userData.shader.uniforms.uTime.value`；与本项目
-     「一份共享 uniform + `useSeasonUniforms` + 四季色板 + `toShaderColor`」
-     是两套系统。
-  5. **草地它根本没有** —— 库（`src/lib/`）里没有草；仓库里的 `src/app/grass.js`
-     是它那个 demo 用的，不在导出面里。
-  6. **森林更不适合**：每棵树的几何都不同 ⇒ 它给的是"一树一 `Group`（2 个 mesh）"，
-     170 棵就是 340+ 个 mesh，而本项目**全站基线只有 704**、森林现在是
-     **2 个 InstancedMesh**。
-- 🔴 **别指望有「只取几何」的出口**（这一条 2026-10-12 深夜勘误过）：
-  真实的方法名是 `generate()` / `createBranchesGeometry()` / `createLeavesGeometry()`，
-  **没有** `createGeometry()`（`src/` 与 build 里各 **0** 处命中）。
-  `generate()` 只是把数据灌进 `this.{branches,leaves}` 的**裸数组**
-  （`verts/normals/indices/uvs[/windFactor]`），随后那两个 `create*Geometry()`
-  **自己 new `MeshPhongMaterial` 并写进 `this.branchesMesh/leavesMesh`**、无返回值。
-  所以「拿裸数组自己建几何」在**调用层面**可行，但**代价照付** —— `generate()`
-  无条件走完建材质那两步。真想只拿几何就得 fork。附带：`setIndex` 用的是
-  `Uint16Array` ⇒ 单树索引上限 65535。
-- **建议**：**留作参考，不做依赖**。它真正可白拿的是 `src/lib/presets/*.json`
-  （MIT、纯数据）里那套参数命名与分层（`angle/children/gnarliness/force/length/
-  taper` 逐层给值），可以对照着调我们自己的
-  `SPREAD / OUT_BIAS / UP_BIAS / LEN_FALLOFF`。
-- **要不要我做**（三选一）：
-  - (a) **什么都不动**（我的建议）；README 的「参考资料」已记明原因。
-  - (b) 只把 ez-tree 的 **presets 参数映射**整理成一张对照表附在 `docs/`，
-    给以后调树形当尺子。
-  - (c) 真引 —— 那就得 **fork/vendor** 它的 `src/lib/`（剥掉 `Z` 贴图注册表），
-    并且自己接管 `this.{branches,leaves}` 那两组裸数组来建几何，
-    是一条独立的 WO。
+  1. 🔴 **草地根本不是程序化的。** demo 用 `GLTFLoader` 加载 **`/models/grass.glb`**
+     （外加 `flower_white/blue/yellow.glb` 三种花），`GrassOptions.instanceCount = 5000`
+     （上限 25000）、`scale = 100`、`patchiness = 0.7`（`src/app/grass.js`）。
+     ⇒ 一个**真实建模的草簇资产** × 5000 实例，对比我们的「3 棱锥台 + 纺锤穗」。
+     ⚠️ **而且它在库里根本没有** —— `src/lib/` 的导出面只有
+     `Tree / Trellis / TreePreset / BarkType / Billboard / LeafType / TreeType`，
+     `src/app/grass.js` 是 **demo 应用**的代码。**引 ez-tree 拿不到这片草。**
+  2. **树皮是 4 张 1k 位图/种**（color / normal / **ao** / roughness），
+     birch / oak / pine / willow 各一套 = **16 张**（`src/lib/assets/bark/*.jpg`）。
+     贴法见 `createBranchesGeometry()`：`mat.aoMap / mat.map / mat.normalMap / mat.roughnessMap`。
+     ⇒ 树干有纹理、有**凹凸**、有粗糙度变化。
+  3. **叶子是带 alpha 的位图四边形**（`src/lib/assets/leaves/{ash,aspen,oak,pine}_color.png`）
+     + `alphaTest` + `dithering: true`（`createLeavesGeometry()`）
+     ⇒ 叶形**不规整**、有叶脉、有明暗，不是干净的多边形。
+  4. **还有一整套环境**：`src/app/environment.js` 装配 `Ground + Grass + Skybox + Rocks + Clouds`。
+     "逼真"里有很大一块来自**光照与环境**（天空盒、云、岩石、地面、阴影），不只是树本身。
 
-> 🔴 另一个**还没答**的老问题（从 DR-J 里继承）：**左窗会被柿子树的树冠压掉多少**。
->
-> ⚠️ **2026-10-12 深夜勘误 —— 我原来那套"数字推理"会把人带偏。** 原来写的是：
-> 冠底 world y `0.495` 贴着窗洞顶 `0.75`；但冠**在窗那个高度**上的横截面只有
-> 全冠 **22%**、够不到窗的 `x ∈ [−5.7, −4.3]`；判据 `probe-tree-fit.mjs`
-> 「撞左窗框 = **0 个实例**」。**这些数都对，但它们只证明"几何不相交"，
-> 不证明"屏幕不遮挡"。** 把定妆照按窗洞矩形裁出来一看
-> （`.workbuddy-ai/shots/wo-tree-leftwindow.png`）：
-> **春/夏/秋三季窗洞被树叶整片盖住，一格玻璃都看不见**；冬天叶落才露出来。
-> ⇒ "0 个实例相交"（3D）与"完全遮住"（2D）**同时成立**。
-> 教训已进 `hard-rules §27.6`：遮挡问题只能"渲染两遍逐像素比"。
->
-> **要不要挪，请看**：`wo-tree-leftwindow.png`（窗洞四角已用单应矩阵标出，
-> 残差 0.006 px）与四张原图
-> `.workbuddy-ai/shots/wo-tree-final/{spring,summer,autumn,winter}-front.png`。
+- **三个抱怨的逐条归因**（与上面的根因一一对应）：
+  | 用户说的 | 根因 | 能不能在"零位图"下改善 |
+  | --- | --- | --- |
+  | 树干光滑像粘土 | 没有 normal 贴图 ⇒ 光照下表面平坦；我们的 fbm **只改颜色** | ✅ 能（把 fbm 的高频转成**法线扰动**） |
+  | 叶子像纸片 | 没有 alpha 叶位图 ⇒ 叶形规整、缺叶脉/透光 | ✅ 大部分能（叶缘扰动 + 叶脉 + 透光近似） |
+  | 果子飘离树冠 | 🔴 **我们自己的 bug**（半径 1.10~1.20 在外壳之外） | ✅ 能（且与 ez-tree 无关） |
 
+- **选项**：
+  - **(a) 什么都不动**（原建议，但现在有了新信息：三个抱怨里只有 1 个是 bug、2 个是"没贴图"）。
+  - **(b) 只出一张 `presets` 参数映射表**附 `docs/`（`angle/children/gnarliness/force/
+    length/taper/start/twist` ↔ 我们的 `SPREAD/OUT_BIAS/UP_BIAS/FWD_BIAS/LEN_FALLOFF`）。
+  - **(c) 真引 ez-tree** —— 仍要 fork/vendor 剥掉 base64 贴图注册表 `Z`；
+    而且**引了也不解决"像纸片/像粘土"**，因为那两样正是它的**贴图**带来的，
+    剥掉贴图后它比我们更差（枝条 `cylinder without end caps`、**没有关节几何**）。
+  - **(d) 【新·推荐】守住零位图，用程序化手段把写实度顶上去** —— 落到 **WO-19**。
+    这条路能修掉 3 个抱怨里的 3 个（1 个是 bug、2 个是 shader/几何问题），
+    且不破规矩、不加体积。
+
+## DR-L · 樱花树怎么放（属 WO-17）
+
+- 要你定：**两棵的相对位置与大小**（都在屋前？一棵左一棵右？一大一小？）、
+  **要不要持续落樱**、**落樱是否只在春天**、樱花色是否要走四季色板。
+- 已知约束：前院已有柿子树 + 荷花缸 + 花箱 + 石桌 + 白狗 + 草带，
+  樱花要**避让**这些（沿用草带那套"按每片叶的扫掠包围盒判相交"的做法）。
+
+## DR-M · `/flight` 怎么实现（属 WO-18）
+
+- 要你定三件事：
+  1. **`/flight` 的形态**：(i) 查询参数（如 `?flight`，与现有 `?fly`/`?season=` 一致）
+     / (ii) 真前端路由 / (iii) **新的 Vite entry**（像 `/me` 那样，最重、但最独立）。
+  2. **进入后是什么**：(i) 接管主站相机、就在这座岛上飞
+     / (ii) 独立场景（＝把 `sunset-flight-study` 搬进来当第二世界）。
+  3. **飞机在前院**：静物 / 待机动画 / 可点击的拾取物（要不要 hover 提示）。
+- 我的倾向：**(i) 查询参数 + (i) 接管主站相机** —— 最贴合现有架构、增量最小；
+  独立场景那条实质上是"把另一个项目整个搬进来"，体积与理念代价都很大。
+
+## DR-N · `me` 要不要挪到（生成到）`public/` 下
+
+- **现状（已核实）**：`me/index.html` 是**Vite 的第二个 entry**，里面是
+  `<script type="module" src="/src/me/main.js">` ⇒ **必须被打包**（模块图：
+  `fluidBg.js / main.js / me.css / meData.js / player.js`）。`/me` 由
+  `vite.config.js` 的 `rewriteMePage` 中间件改写到 `me/index.html`。
+- **关键结论：直接把 `me/` 挪进 `public/` 会坏掉。** `public/` 是**逐字节拷贝**，
+  Vite 不会处理它 —— `src="/src/me/main.js"` 会 404。`public/demos/*` 之所以能放那儿，
+  是因为它们是**已经构建好的产物**（预构建 dist），不是源码。
+- 两条路：
+  - **(i) 保持现状**（Vite entry）：`/me` 参与 `npm run build`、有 hash、不提交产物。
+    代价：多一个 entry + 一个中间件。
+  - **(ii) 预构建后生成到 `public/me/`**：`/me` 变成纯静态目录（现有
+    `rewritePublicDirIndex` 直接就能服务 `/me/`，中间件可删）、可独立分享。
+    代价：**必须把构建产物提交进仓库并保持同步** —— 这正是本项目栽过的
+    "**一份会漂移的副本**"（`hard-rules §28`），`public/demos/*` 已经在吃这个苦。
+- **我的建议：(i) 保持现状**，除非你的目标是「让 `/me` 能脱离主站单独部署/分享」。
+
+## DR-O · 「零位图」硬规矩要不要为「树皮 / 叶子」放宽（属 WO-19）
+
+- **现状**：全站只允许 2 张位图（`apple-touch-icon` 是只吃 PNG 的例外），其余全程序化。
+- **选项**：
+  - **(i) 不放宽**（继续程序化）：正常线扰动做树皮、叶缘扰动 + 叶脉做叶。
+    预期效果：从"粘土/纸片"提升到"能看"，但**到不了 ez-tree 的观感**。
+  - **(ii) 有限放宽**：为"树"这一类**最多放 2 张 webp**（例如 1 张树皮 normal +
+    1 张叶形 alpha）。预期效果：**一步接近 demo**。代价：破现有硬规矩，
+    需要同步改 README「美术」段与 `hard-rules`。
+  - **(iii) 完全学 demo**（每物种 4 图 + glb 草）：与项目定位（全程序化、零位图）冲突，不建议。
+- **我的建议：(i) 先做 (i)** —— 因为 3 个抱怨里有 1 个是 bug（果）、2 个是
+  shader/几何问题（粘土、纸片），**先把这三条做掉再回头看还差多少**。
+  真到了"必须贴图"那一步，再回来拍 (ii)，那时是**有依据的决定**，不是猜的。
