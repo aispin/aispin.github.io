@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import InfiniteCorridorManager from './corridor/InfiniteCorridorManager';
 import EntranceDoors from './entrance/EntranceDoors';
 import WeatherLayer from './entrance/WeatherLayer';
+import SkyClouds from './entrance/SkyClouds';
 import TeleportRoom from './corridor/TeleportRoom';
 import HouseExit from './corridor/HouseExit';
 import RoomWarmup from './corridor/RoomWarmup';
@@ -338,6 +339,18 @@ const Experience = ({ onSceneReady, performanceTier }) => {
                 的位移，而天象是**挂在相机上**的，坐标系必须干净。 */}
             {outdoorVisible && (
                 <WeatherLayer />
+            )}
+
+            {/* === 天上的云（WO-20）===
+                用户：「飞机飞行的效果没有案例好，能尽量对齐吗？包括天空、
+                **云彩**这些。」形状沿用 `utils/cloudArt.js` 的水墨云素描，
+                颜色每帧从**天空穹顶的 uniform** 派生（见 SkyClouds 的文件头）。
+
+                ⚠️ 边界与 `Airplane` 同一条（`outdoorVisible || flight.active`）：
+                   飞行中相机在天上，云必须一直画着，哪怕场景状态因为别的原因
+                   翻成了"屋里"。 */}
+            {(outdoorVisible || flight.active) && (
+                <SkyClouds />
             )}
 
             {/* === INFINITE CORRIDOR ===

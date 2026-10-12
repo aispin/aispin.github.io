@@ -224,6 +224,7 @@ pop，而一个开着过夜的标签页不值得为它 pop 一次。刷新即正
 | 天空 / 雾 / 三灯 / **全屏乘法 veil** | `canvas/SceneLighting.jsx` | 全局氛围 |
 | 窗内暖光（`color` 推过 1.0 抵消 veil） | `entrance/EntranceProps.jsx` → `WindowCurtain` | 灯亮着 |
 | 灯笼 emissive + pointLight + 闪烁 | `entrance/SignSystem.jsx` → `Lantern` | 灯亮着 |
+| **天上的云团**（`entrance/SkyClouds.jsx`） | 每帧读**穹顶的 uniform** | **派生**，不自己插值 |
 
 ### 4.2 改法：只换端点，**不动插值机器**
 
@@ -260,6 +261,17 @@ sky = SEASON_LIGHT[season].day.sky.lerp( SEASON_LIGHT[season].night.sky, k )
 | `SceneLighting`（天空 / 雾 / 三灯 / veil） | **有**（稳定后 early-return） | `lastSeason` ref + `t.current = -1` |
 | `EntranceProps` → `WindowCurtain`（窗光） | **有**（同上） | `lastSeason` ref + `lit.t = -1` |
 | `SignSystem` → `Lantern`（灯笼） | **没有**：那个 useFrame 每帧都写 | 不动（别加死代码） |
+
+> 🔴 `SkyClouds`（天上的云团）**不在**上面这张表里 —— 它**没有**自己的 `t` /
+> `lastSeason` ref，因为它每帧从**穹顶的 uniform** 派生颜色
+> （`uZenith` / `uHorizon` / `uCloud` / `uGlow` / `uSunDir`）。
+> 于是昼夜缓动与换季吸附**都是白拿的**：穹顶什么时候写，它就什么时候跟着变。
+>
+> 这正是"同一个事实存两份，迟早不同步"（§9.4i 甬路冻在首季）那条规矩的**正向**用法
+> —— **能派生就别复制**。云和天在结构上**不可能**不同步。
+> ⚠️ 代价：穹顶的材质必须找得到 ⇒ `SceneLighting.jsx` 给那个 mesh 挂了
+> `name="sky-dome"`，`SkyClouds` 用 `scene.traverse` 查一次。
+> **那是显式接口，不是巧合** —— 改名字会静默让云失去颜色真源（退回初始白色）。
 
 > `<fog args={…}>` 的 `args` 换季时确实会变（R3F 的 `is.equ` 对数组做逐元素比较），
 > 于是 R3F 会 `detach` 旧的再 `attach` 新的 —— 这一步是安全的（两个循环在

@@ -12,7 +12,8 @@
 
 `黄泽昊 / ZEO / AISPIN` 的个人主页。不是一页滚动的简历，
 而是一个可以用鼠标走进去的空间：院子里有柿子树、一棵樱花树、风铃和一条小白狗，
-左院草地上停着一架**可以点开的小飞机**（点它就接管镜头绕岛飞一圈，`Esc` 退出），
+左院草地上停着一架**可以点开的小飞机**（点它就接管镜头绕岛飞一圈；飞行中
+`WASD` / 方向键 / 拖拽都能操纵它的方向，松开自动回航线，`G` 回航，`Esc` 退出），
 走廊两侧是 8 扇门，每扇门后面是一个房间。
 
 </div>
@@ -129,6 +130,7 @@ node scripts/build-demos-index.mjs   # 手动跑；vite dev / build 也会自动
 | 音频 | 42 个 `PositionalAudio` 各自 `new AudioListener()` → **全站 1 个** |
 | 阴影 | `castShadow` / `receiveShadow` 全库 0 处，所以 shadow map pass 直接关掉 |
 | 前院小飞机 | 程序化几何 **3 mesh / 3 draw call / 1070 三角形 / 88 KB**，**零位图**（六个零件靠 `part` 顶点属性分色，材质只有一个） |
+| 天空云团 | 天空穹顶只富化片元（**0 mesh / 0 draw**）；云团复用画廊那 8 张程序化云草图当**灰度遮罩**，3 个 `InstancedMesh` / 14 朵 / **零位图**。颜色每帧从穹顶的 uniform **派生**，不另存一份色板 |
 | 生产构建 | three / react / gsap / r3f 各自独立 chunk（`three` 719 KB → gzip 187 KB） |
 | `/me` 的体积 | me chunk **20 KB** + 共享数据 71 KB + CSS 17 KB（gzip 后 ~39 KB），**不含 three** |
 

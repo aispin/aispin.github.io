@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 
 import { flightCameraAt } from '../../../utils/flightPath';
+import { pilot } from '../../../utils/pilotMotion';
 import { useFlightMode, exitFlight, flightTime } from '../../../config/flightMode';
 import { showToast } from '../../../utils/toast';
 
@@ -89,7 +90,7 @@ export function FlightCamera({ enabled }) {
         };
         window.addEventListener('keydown', onKey);
 
-        showToast('飞行中 · 按 Esc 退出', { duration: 3200 });
+        showToast('飞行中 · WASD / 拖拽控制方向 · G 回航 · Esc 退出', { duration: 4200 });
 
         return () => {
             dom.removeEventListener('click', swallow, true);
@@ -105,9 +106,17 @@ export function FlightCamera({ enabled }) {
 
     useFrame(() => {
         if (!active) return;
-        const cam = flightCameraAt(flightTime());
-        // ⚠️ 全部走**方法**（`copy` / `set` / `lookAt`），不碰任何属性 ——
-        //    项目里改相机一贯如此，也是 `react-hooks/immutability`（error）
+        /**
+         * 🔴 顺序：**先读操控、再写相机**。
+         *
+         * `pilot` 的积分由 `Airplane` 的 `useFrame` 做（那是唯一写入点），
+         * 而 `Airplane` 在 `Experience.jsx` 里排在 `<FlightCamera />` **之前**
+         * ⇒ 它的 `useFrame` 先跑 ⇒ 这里读到的是**本帧**的偏移，不是上一帧的。
+         * 顺序反了也不会崩，只是相机会慢一帧（肉眼看不出来），但没必要。
+         */
+        const cam = pilot.applyCamera(flightCameraAt(flightTime()));
+        // ⚠️ 全部走**方法**（`copy` / `set` / `lookAt` / `rotateZ`），不碰任何属性
+        //    —— 项目里改相机一贯如此，也是 `react-hooks/immutability`（error）
         //    允许的形式（见 `eslint.config.js` 的那条注释）。
         camera.position.copy(cam.position);
         // `lookAt` 用的是 `camera.up`：显式写回世界 up。
@@ -115,6 +124,10 @@ export function FlightCamera({ enabled }) {
         // 所以地平线是稳的 —— 飞机横滚时画面不会跟着翻。
         camera.up.set(0, 1, 0);
         camera.lookAt(cam.target);
+        // 段内轻微滚转（WO-21）。`rotateZ` 是**方法** ⇒ 投影矩阵没被碰过，
+        // 而滚转写在 `quaternion` 上 ⇒ 退出时那一次 `quaternion.copy(saved)`
+        // 就把它一起还原了（残留判据 R2 不受影响）。
+        if (cam.roll) camera.rotateZ(cam.roll);
     });
 
     return null;

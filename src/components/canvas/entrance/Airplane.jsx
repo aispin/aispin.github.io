@@ -5,10 +5,13 @@ import * as THREE from 'three';
 import { useSeasonUniforms } from '../../../hooks/useSeasonUniforms';
 import {
     PLANE_VERT, PLANE_FRAG, PLANE_SHADOW_VERT, PLANE_SHADOW_FRAG,
+    PLANE_OUTLINE_VERT, PLANE_OUTLINE_FRAG,
     airplanePalette, PLANE_INK,
 } from '../../../shaders/airplane';
 import { buildAirplane, PLANE } from '../../../utils/airplane';
-import { PARKED, planePoseAt, parkedPose } from '../../../utils/flightPath';
+import { PARKED, planePoseAt, parkedPose, flightCameraAt } from '../../../utils/flightPath';
+import { pilot } from '../../../utils/pilotMotion';
+import { usePilot } from '../../../hooks/usePilot';
 import { GRASS_Y } from '../../../config/entranceMetrics';
 import { seasonLightFor } from '../../../config/seasonLight';
 import { toShaderColor } from '../../../config/theme';
@@ -76,12 +79,39 @@ function lightDirFor(season) {
     return v;
 }
 
+/**
+ * 主光**颜色**（屏幕值）—— WO-21 的"朝阳暖边"要用它。
+ *
+ * 🔴 这是**光**，不是漆：漆色不跟季节走（见 `shaders/airplane.js` 文件头），
+ *    但"夕阳是什么颜色"当然要跟。所以暖边在春天是暖白、在冬夜是冷蓝 ——
+ *    这正是"同一架飞机在不同光下不一样"该有的因果。
+ *
+ * ⚠️ 必须过 `toShaderColor`：自定义 `ShaderMaterial` 的 fragment 输出**不过**
+ *    色彩空间编码，直接写线性值会明显偏暗偏橙（见 `config/theme.js` 那段）。
+ */
+const keyColorCache = new Map();
+function keyColorFor(season) {
+    if (keyColorCache.has(season)) return keyColorCache.get(season);
+    const hex = seasonLightFor(season).day.key.color;
+    const v = toShaderColor(new THREE.Color(hex), new THREE.Color());
+    keyColorCache.set(season, v);
+    return v;
+}
+
 export function Airplane() {
     const scene = useThree((state) => state.scene);
     const flight = useFlightMode();
     const active = flight.active;
 
     const plane = useMemo(() => buildAirplane(), []);
+
+    /**
+     * 驾驶输入（WO-22）。**它是 `pilot` 单例的唯一写入点** —— 见下面
+     * `useFrame` 里的 `pilot.update`。相机（`FlightCamera`）只读。
+     * ⚠️ 所以本组件必须排在 `FlightCamera` 前面挂载（`Experience.jsx` 里
+     *    就是这样：`<Airplane />` 在 `<FlightCamera />` 之前）。
+     */
+    const control = usePilot(active);
 
     const groupRef = useRef();
     const propRef = useRef();
@@ -106,6 +136,7 @@ export function Airplane() {
         (s) => ({
             ...airplanePalette(),
             uLightDir: { value: lightDirFor(s) },
+            uKey: { value: keyColorFor(s) },
             uHaze: { value: new THREE.Color(0.85, 0.87, 0.86) },
             uHazeNear: { value: 20 },
             uHazeFar: { value: 60 },
@@ -115,7 +146,7 @@ export function Airplane() {
         [],
     );
 
-    useFrame((state) => {
+    useFrame((state, delta) => {
         const g = groupRef.current;
         const prop = propRef.current;
         let px = PARKED.position.x;
@@ -127,7 +158,20 @@ export function Airplane() {
             //    （见 config/flightMode.js 顶上那段）—— 两边各记一个开始时刻
             //    迟早会差一帧，症状是"相机与飞机相对位置慢慢漂"。
             const t = flightTime();
-            const pose = planePoseAt(t);
+
+            // ---- 驾驶（WO-22）----
+            // 🔴 **先积分、再定位姿**，而且这里是全工程**唯一**的 `pilot.update`
+            //    调用点。相机那边（`FlightCamera`）只调 `applyCamera` 读结果。
+            //    ⚠️ `delta` 用 R3F 给的秒数 —— `pilotMotion` 的积分是解析式的，
+            //       所以位移与帧率无关（判据在 `probe-pilot.mjs`）。
+            pilot.update(delta, control.current?.sample(delta) ?? { x: 0, y: 0 });
+
+            // 航线位姿 + 操控偏移。**没在操控时零额外分配**（`applyPose`
+            // 在 `!active` 时直接把原对象返回），所以"没碰过摇杆"这条路上
+            // 每帧不会多造几个 Vector3。
+            const pose = pilot.active
+                ? pilot.applyPose(planePoseAt(t), flightCameraAt(t))
+                : planePoseAt(t);
             px = pose.position.x; py = pose.position.y; pz = pose.position.z;
             if (g) {
                 g.position.copy(pose.position);
@@ -204,6 +248,23 @@ export function Airplane() {
                         />
                     </mesh>
                 </group>
+
+                {/* 描边壳（WO-21）—— **只在飞行中挂**。
+                    同一份机身几何再画一遍，`BackSide` + 视空间法线外扩；
+                    看到的是"壳比本体多探出来的那一圈"，即一条均匀的墨线。
+                    ⚠️ 停机时不挂：那时飞机只有百来像素，那次 draw 不值
+                       （这是 WO-18 当时的判断，现在仍然成立 —— 变的只是
+                       "飞起来之后它是主角"）。 */}
+                {active && (
+                    <mesh name="airplane-outline" geometry={plane.body} frustumCulled={false}>
+                        <shaderMaterial
+                            vertexShader={PLANE_OUTLINE_VERT}
+                            fragmentShader={PLANE_OUTLINE_FRAG}
+                            uniforms={uniforms}
+                            side={THREE.BackSide}
+                        />
+                    </mesh>
+                )}
 
                 {/* 命中盒：不可见的盒子，只负责"点得到"。
                     ⚠️ 比飞机本身大一圈 —— 它在画面里只有百来个像素，

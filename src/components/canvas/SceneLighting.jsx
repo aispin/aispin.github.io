@@ -157,12 +157,56 @@ const lerp = (a, b, t) => a + (b - a) * t
 /* 下面再压一道暗色（那会立刻露馅）。                                    */
 /*                                                                     */
 /* 其余三条：半径必须 < `camera.far`（138 = 150 × 0.92）、每帧跟着相机   */
-/* 走（否则走两步天空就歪了）、`depthWrite: false` + `renderOrder -1000` */
-/* （永远最先画、且不写深度）。⚠️ 夜间的 veil 在 renderOrder 999，会把  */
-/* 它一起乘 —— 和以前 `scene.background` 的待遇一致，不用额外处理。     */
+/* 走（否则走两步天空就歪了）、`depthWrite: false`。⚠️ 夜间的 veil 在    */
+/* renderOrder 999，会把它一起乘 —— 和以前 `scene.background` 的待遇一 */
+/* 致，不用额外处理。                                                    */
+/*                                                                     */
+/* 🔴 WO-19：`renderOrder` 从 **-1000 改成 +1**（从"最先画"改成"最后画"） */
+/* ------------------------------------------------------------------ */
+/* 加云带之前，天空是一个 3 次 smoothstep —— 便宜到"先画后画无所谓"。     */
+/* 现在它多了 3 次 fbm（≈ 36 次 hash），而天空是**不写深度**的全屏层：    */
+/* 先画的话，房子盖住的那 40% 像素**照样跑完整段 fbm**，纯浪费。          */
+/*                                                                     */
+/* 改成"最后画 + `depthTest: true`"之后，早深度剔除会把被挡住的那部分     */
+/* 直接丢掉（不透明物体的 renderOrder 只在**不透明队列内部**排序，所以    */
+/* 它依然排在所有透明物之前，veil / 天象的合成顺序一点没变）。            */
+/* 地平线以下仍由 `t` 的 `-0.06` 兜住，与"地面化雾"逐位接上。             */
 /* ------------------------------------------------------------------ */
 
-const SKY_RADIUS_SCALE = 0.92;
+const SKY_RADIUS_SCALE = 0.92
+
+/* ------------------------------------------------------------------ */
+/* 云带 + 日轮（2026-10-12，WO-19）                                     */
+/*                                                                     */
+/* 用户：「飞机飞行的效果没有案例好，能尽量对齐吗？**包括天空、云彩这些**。」*/
+/*                                                                     */
+/* 对齐的是参考实现 `sunset-world.js` 里 `createSky()` 的**做法**：       */
+/*   ① 在"经度 × 高度"的二维噪声域里铺一层 **FBM 云带**，再用低频 warp  */
+/*      把拉长的条纹打散（否则是等距的直尺纹）；                        */
+/*   ② **日轮 + 指数光晕**（`exp(-ang²/σ)`），不是一个模糊的亮斑。       */
+/*                                                                     */
+/* 🔴 但**色板一个字都不抄**。参考实现是固定夕阳（`#382647` 天顶 /        */
+/*    `#c87675` 地平线 / `#ffbd71` 金），本项目是**四季 × 昼夜 8 态**，   */
+/*    色板必须仍然由 `seasonLight.js` 的端点驱动（`uZenith` /            */
+/*    `uHorizon` / `uGlow` 本来就是），云带色从**地平线色**派生。         */
+/*                                                                     */
+/* 🔴 云带要**克制**。本项目的四组白天天空全是高调浅色（`#EAF3E6` /      */
+/*    `#FFF6E0` / `#E9EEF3`），照抄案例的深紫云会变成暴风雨。所以：       */
+/*    云带色 = 地平线色**压暗一档 + 偏冷**，混合量 `uStrata` 只有         */
+/*    0.34（白天）/ 0.12（夜里）—— 读起来是「薄云」，不是「乌云」。      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 云带色相对地平线色的**线性**缩放：整体压暗、且蓝分量留得最高（偏冷）。
+ *
+ * ⚠️ 是**线性**空间的乘子，不是屏幕值。线性 0.80 ≈ 屏幕 0.90 —— 所以
+ *    "0.80" 看着很猛，实际只是浅浅一档。
+ */
+const SKY_CLOUD_DARKEN = new THREE.Color(0.80, 0.845, 0.93)
+
+/** 云带混合量（白天 / 夜里）。夜里几乎只剩一层很淡的月色薄云。 */
+const SKY_STRATA_DAY = 0.34
+const SKY_STRATA_NIGHT = 0.12;
 
 const SKY_VERT = /* glsl */`
     varying vec3 vDir;
@@ -177,12 +221,35 @@ const SKY_FRAG = /* glsl */`
     uniform vec3 uZenith;
     uniform vec3 uHorizon;
     uniform vec3 uGlow;
+    uniform vec3 uCloud;
     uniform vec3 uSunDir;
     uniform float uGlowAmt;
+    uniform float uStrata;
+    uniform float uSunDisk;
+    uniform float uTime;
     varying vec3 vDir;
 
+    /* 值噪声 —— 与参考实现同一套（hash → noise → 3 阶 fbm）。 */
+    float skyHash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+    }
+    float skyNoise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(skyHash(i), skyHash(i + vec2(1.0, 0.0)), f.x),
+            mix(skyHash(i + vec2(0.0, 1.0)), skyHash(i + vec2(1.0)), f.x), f.y);
+    }
+    float skyFbm(vec2 p) {
+        return skyNoise(p) * 0.57
+            + skyNoise(p * 2.07 + 17.4) * 0.28
+            + skyNoise(p * 4.13 + 31.8) * 0.15;
+    }
+
     void main() {
-        float h = vDir.y;
+        // 插值出来的方向长度略偏离 1，而下面要算 acos(dot(...)) —— 归一化一下。
+        vec3 dir = normalize(vDir);
+        float h = dir.y;
 
         // 天顶 → 地平线。「-0.06」而不是 0：让「就贴着地平线的那一圈」也已经
         // 是雾色，和地面完全化雾的那一段对齐。
@@ -194,8 +261,50 @@ const SKY_FRAG = /* glsl */`
         //    而「flat」在那里是**插值限定符关键字**，会报「'flat' : syntax error」
         //    并且整个 fragment shader 都不编译（背景直接退回 scene.background）。
         vec2 flatDir = normalize(vec2(uSunDir.x, uSunDir.z) + 1e-5);
-        float d = max(dot(normalize(vec2(vDir.x, vDir.z) + 1e-5), flatDir), 0.0);
+        float d = max(dot(normalize(vec2(dir.x, dir.z) + 1e-5), flatDir), 0.0);
+        float sunDot = max(dot(dir, uSunDir), 0.0);
         c += uGlow * uGlowAmt * pow(d, 3.0) * smoothstep(0.42, -0.02, h);
+
+        // ---- 云带：只算地平线以上（一致分支，地面那一半整个跳过）----
+        if (h > 0.0) {
+            float longitude = atan(dir.z, dir.x);
+            // 低频双轴 curl：把拉长的条带打散，否则是等距的直尺纹。
+            vec2 washSpace = vec2(longitude * 1.6, h * 5.2);
+            vec2 warp = vec2(
+                skyFbm(washSpace + vec2(9.2, 3.1)),
+                skyFbm(washSpace + vec2(23.8, 11.7))
+            ) - 0.5;
+            vec2 p = vec2(longitude * 5.8, h * 17.0);
+            p += warp * vec2(1.7, 3.6);
+            p.y += sin(longitude * 2.3 + warp.x * 4.0) * 0.72;
+            p += uTime * vec2(0.035, 0.018);
+            float wash = skyFbm(p);
+            float streak = smoothstep(0.38, 0.79, wash);
+            // 云只贴地平线那一带：再高就散掉。
+            float skyMask = smoothstep(-0.01, 0.08, h)
+                * (1.0 - smoothstep(0.55, 0.92, h));
+            // 破边：**复用** wash，不再多算一次 fbm（省 3 次噪声求值）。
+            float broken = smoothstep(0.30, 0.72, wash + warp.x * 0.9);
+            c = mix(c, uCloud,
+                streak * skyMask * (0.28 + broken * 0.72) * uStrata);
+            // 朝阳那一侧的云边染金（很窄的一条）。
+            float warmLip = smoothstep(0.44, 0.53, wash)
+                * (1.0 - smoothstep(0.53, 0.61, wash));
+            c = mix(c, uGlow,
+                warmLip * skyMask * pow(sunDot, 3.5) * 0.20 * uStrata);
+        }
+
+        // ---- 日轮 + 光晕 ----
+        // 两段光晕：紧的一圈 + 很宽的一圈。宽的那圈是为了「太阳在画面外时
+        // 也看得见它在哪」—— 本项目太阳高度角 30°~66°，而 fov 是 60°（竖向），
+        // 高日角的太阳经常落在画面之上。
+        float ang = acos(clamp(sunDot, 0.0, 1.0));
+        c += uGlow * exp(-ang * ang / 0.0060) * 0.22 * uSunDisk;
+        c += uGlow * exp(-ang * ang / 0.1000) * 0.10 * uSunDisk;
+        // 日轮本体。角半径 ~1.7°（真太阳 0.53°）—— 写实尺寸在 900 像素高的
+        // 画面里只有 8 个像素，读不出是个"轮"。
+        float disk = 1.0 - smoothstep(0.0295, 0.0335, ang);
+        c = mix(c, uGlow * 1.35 + vec3(0.10, 0.07, 0.035), disk * uSunDisk);
 
         gl_FragColor = vec4(c, 1.0);
     }
@@ -226,11 +335,20 @@ const SceneLighting = ({ isLowTier = false }) => {
         uZenith: { value: new THREE.Color(EP.day.sky) },
         uHorizon: { value: new THREE.Color(EP.day.haze) },
         uGlow: { value: new THREE.Color(EP.day.key) },
+        // 云带色 = 地平线色压暗偏冷（线性空间乘）。初值按当前昼夜给。
+        uCloud: { value: new THREE.Color(EP.day.haze).multiply(SKY_CLOUD_DARKEN) },
         uSunDir: { value: new THREE.Vector3(5, 8.5, 5).normalize() },
         uGlowAmt: { value: 0.12 },
+        // 云带强度 / 日轮强度 —— 都跟昼夜因子 k 走（见下面的 lerp）。
+        uStrata: { value: night ? SKY_STRATA_NIGHT : SKY_STRATA_DAY },
+        uSunDisk: { value: night ? 0 : 1 },
+        // 云带的漂移相位。**每帧都要写**（在下面那个"已稳定就 return"之前），
+        // 所以它不能进那段只在过渡期跑的逻辑。
+        uTime: { value: 0 },
     })
     // 每帧复用的临时量（不分配）
     const sunScratch = useRef(new THREE.Vector3())
+    const cloudScratch = useRef(new THREE.Color())
 
     // 0 = full day, 1 = full night. -1 means "nothing written yet": the first
     // frame snaps straight to the current theme rather than fading in from
@@ -250,11 +368,14 @@ const SceneLighting = ({ isLowTier = false }) => {
      */
     const lastSeason = useRef(season)
 
-    useFrame((_, delta) => {
+    useFrame((state, delta) => {
         // 🔴 穹顶跟相机走这一步**必须在下面那个"已稳定就 return"之前** ——
         //    否则每次昼夜过渡结束后天空就冻在最后一次的位置上，相机一走
         //    它就歪。
         if (skyRef.current) skyRef.current.position.copy(camera.position)
+
+        // 云带的漂移相位同理：**必须每帧写**（它就是"云在动"本身）。
+        skyUniforms.current.uTime.value = state.clock.elapsedTime
 
         if (lastSeason.current !== season) {
             lastSeason.current = season
@@ -306,6 +427,12 @@ const SceneLighting = ({ isLowTier = false }) => {
         toShaderColor(S.uZenith.value.copy(D.sky).lerp(N.sky, k), S.uZenith.value)
         toShaderColor(S.uHorizon.value.copy(D.haze).lerp(N.haze, k), S.uHorizon.value)
         toShaderColor(S.uGlow.value.copy(D.key).lerp(N.key, k), S.uGlow.value)
+        // 云带色：**从地平线色派生**（线性空间压暗 + 偏冷），不是另立一个色板。
+        // 这样换季 / 入夜时云和天永远同源，不会出现"紫色的云挂在青色的天上"。
+        toShaderColor(
+            cloudScratch.current.copy(D.haze).lerp(N.haze, k).multiply(SKY_CLOUD_DARKEN),
+            S.uCloud.value
+        )
         // 太阳方位：把两端的灯位插值之后再归一化
         sunScratch.current.set(D.keyPos[0], D.keyPos[1], D.keyPos[2]).normalize()
         const nx = N.keyPos[0], ny = N.keyPos[1], nz = N.keyPos[2]
@@ -317,6 +444,10 @@ const SceneLighting = ({ isLowTier = false }) => {
         skyUniforms.current.uSunDir.value.copy(sunScratch.current)
         // 白天光晕强一点（太阳在那儿），夜里几乎只剩一点天光
         skyUniforms.current.uGlowAmt.value = lerp(0.12, 0.045, k)
+        // 云带：白天是薄云，夜里只剩一层很淡的月色。
+        skyUniforms.current.uStrata.value = lerp(SKY_STRATA_DAY, SKY_STRATA_NIGHT, k)
+        // 日轮：**夜里直接灭掉** —— 没有太阳就不该画一个太阳。
+        skyUniforms.current.uSunDisk.value = 1 - k
 
         // --- the veil ---
         veilUniforms.current.uTint.value.copy(D.veil).lerp(N.veil, k)
@@ -349,8 +480,13 @@ const SceneLighting = ({ isLowTier = false }) => {
             <fog attach="fog" args={[EP.day.haze.getHex(), EP.day.fogNear, EP.day.fogFar]} />
 
             {/* 天空穹顶。`frustumCulled={false}` 必需 —— 它每帧被搬到相机位置，
-                自动包围球会在搬之前把它剔掉。 */}
-            <mesh ref={skyRef} renderOrder={-1000} frustumCulled={false} raycast={() => null}>
+                自动包围球会在搬之前把它剔掉。
+                ⚠️ `renderOrder = 1` + `depthTest` 是 WO-19 改的（原为 -1000 且
+                   不开深度测试）：云带的 fbm 不便宜，而天空不写深度 ⇒ 先画的
+                   话"被房子挡住的那些像素"照样白算一遍。改成最后画之后靠早深度
+                   剔除丢掉它们。不透明物体的 renderOrder 只在不透明队列内部
+                   排序 ⇒ veil / 天象的合成顺序完全没变。 */}
+            <mesh ref={skyRef} name="sky-dome" renderOrder={1} frustumCulled={false} raycast={() => null}>
                 <sphereGeometry args={[camera.far * SKY_RADIUS_SCALE, 32, 16]} />
                 <shaderMaterial
                     vertexShader={SKY_VERT}

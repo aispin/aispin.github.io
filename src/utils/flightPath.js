@@ -302,14 +302,44 @@ export function parkedPose() {
  */
 const SHOTS = [
     // 起飞：贴近、跟在后面偏低，看得见机尾和院子（最广，所以推得最少）
-    { at: 0.00, offset: [0.0, 2.6, -7.5], lens: 60 },
+    // `drift` 是**这一段之内**缓慢滑过的量（见下面那段），`roll` 是滚转角（弧度）。
+    { at: 0.00, offset: [0.0, 2.6, -7.5], drift: [0.8, 0.35, -1.1], roll: 0.018, lens: 60 },
     // 爬升：右后方拉远，露出整条航线
-    { at: 0.22, offset: [7.5, 3.4, -10.5], lens: 54 },
+    { at: 0.22, offset: [7.5, 3.4, -10.5], drift: [-1.3, 0.5, -0.9], roll: -0.030, lens: 54 },
     // 外圈：左前方，能看见机身侧面 + 岛
-    { at: 0.46, offset: [-11.0, 2.8, 6.0], lens: 58 },
+    { at: 0.46, offset: [-11.0, 2.8, 6.0], drift: [0.9, 0.6, 1.4], roll: 0.036, lens: 58 },
     // 回来：高后方俯视，院子重新进画面（最窄，推得最多）
-    { at: 0.74, offset: [0.0, 7.5, -12.0], lens: 50 },
+    { at: 0.74, offset: [0.0, 7.5, -12.0], drift: [1.2, -0.7, -1.6], roll: -0.024, lens: 50 },
 ];
+
+/**
+ * 每段镜头**内部**的缓慢漂移与轻微滚转（WO-21，对齐参考实现）。
+ *
+ * ---------------------------------------------------------------------------
+ * 为什么"段内漂移"值得加
+ * ---------------------------------------------------------------------------
+ * 参考实现 `flight.js` 的每一段都带一个 `drift`，并按
+ * `sin(progress·π − π/2)` 在段内从 `offset − drift` 滑到 `offset + drift`
+ * —— 于是**没有一个镜头是完全静止的**。差别的量级很小（相对 offset 约
+ * 10%），但"静止的镜头"和"极慢地滑动的镜头"在观感上差很多：前者像
+ * 游戏里的固定机位，后者像有人在掌机。
+ *
+ * 两端都回到 0（`sin(0−π/2) = −1`、`sin(π−π/2) = +1` —— 是**端点对称**的
+ * 往返，不是"从 0 开始漂"）⇒ 换段时位置不会跳。
+ *
+ * ---------------------------------------------------------------------------
+ * 🔴 滚转只能用**方法**写（`rotateZ`），不能碰 `camera.up` 或投影矩阵
+ * ---------------------------------------------------------------------------
+ * 滚转写在 `quaternion` 上 ⇒ 退出飞行时 `FlightCamera` 那一次
+ * `quaternion.copy(saved)` 就把它一起还原了 ⇒ 残留判据（R2）不受影响。
+ * 而且它只跟 `u` 有关、**与 `aspect` 无关** ⇒ 视口不变性（F3）照样成立。
+ */
+function shotProgress(uu, index) {
+    const start = SHOTS[index].at;
+    const end = index + 1 < SHOTS.length ? SHOTS[index + 1].at : 1;
+    const span = end - start;
+    return span > 1e-9 ? (uu - start) / span : 0;
+}
 
 /** 场景相机的 fov（`App.jsx` 的 `fov: 60`）。镜头换算的基准。 */
 export const FLIGHT_BASE_FOV = 60;
@@ -353,8 +383,9 @@ const CAM_FLOOR_Y = GRASS_Y + 1.5;
 export function cameraAt(u) {
     const uu = ((u % 1) + 1) % 1;
     // 找当前镜头：`at` 是升序的，取最后一个 ≤ uu 的（越界回落到最后一段）。
-    let shot = SHOTS[0];
-    for (const s of SHOTS) if (uu >= s.at) shot = s;
+    let shotIndex = 0;
+    for (let i = 0; i < SHOTS.length; i += 1) if (uu >= SHOTS[i].at) shotIndex = i;
+    const shot = SHOTS[shotIndex];
 
     const pose = poseAt(uu);
     const { position, quaternion } = pose;
@@ -379,12 +410,22 @@ export function cameraAt(u) {
     // 水平右轴 = UP × 水平前向 ⇒ **必然是水平的**，不受横滚影响。
     const rightH = new THREE.Vector3().crossVectors(UP, forwardH).normalize();
 
+    /**
+     * 段内漂移：`sin(progress·π − π/2)` 从 −1 走到 +1（两端对称）。
+     * 见 `shotProgress` 上面那段 —— 这是"镜头不静止"的来源。
+     */
+    const progress = shotProgress(uu, shotIndex);
+    const drift = Math.sin(progress * Math.PI - Math.PI / 2);
+    const ox = shot.offset[0] + shot.drift[0] * drift;
+    const oy = shot.offset[1] + shot.drift[1] * drift;
+    const oz = shot.offset[2] + shot.drift[2] * drift;
+
     const dolly = lensDolly(shot.lens);
     const camPos = position
         .clone()
-        .addScaledVector(rightH, shot.offset[0] * dolly)
-        .addScaledVector(UP, shot.offset[1] * dolly)
-        .addScaledVector(forwardH, shot.offset[2] * dolly);
+        .addScaledVector(rightH, ox * dolly)
+        .addScaledVector(UP, oy * dolly)
+        .addScaledVector(forwardH, oz * dolly);
 
     if (camPos.y < CAM_FLOOR_Y) camPos.y = CAM_FLOOR_Y;
 
@@ -394,11 +435,19 @@ export function cameraAt(u) {
         // 看不出"在往哪飞"。这里用**含俯仰的** forward，所以爬升/俯冲时镜头会跟着抬低，
         // 观众能读出"在往上爬"。
         target: position.clone().addScaledVector(forward, 4.0),
+        /**
+         * 滚转角（弧度）。段的两端为 0、中间最大（`sin(progress·π)`）。
+         * `FlightCamera` 用 `camera.rotateZ(roll)` 写 —— **是方法**，
+         * 不碰投影矩阵，退出时随 `quaternion` 一起还原。
+         */
+        roll: shot.roll * Math.sin(progress * Math.PI),
         /** 该段的名义镜头（诊断用；相机本身的 fov 不变，见上面）。 */
         lens: shot.lens,
         /** 该段的推远倍率（诊断用）。 */
         dolly,
-        shot: SHOTS.indexOf(shot),
+        /** 段内漂移量（诊断用）：−1 → +1。 */
+        drift,
+        shot: shotIndex,
     };
 }
 

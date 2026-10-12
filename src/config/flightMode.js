@@ -140,6 +140,18 @@ export function flightTime() {
     return (now() - snapshot.enteredAt) / 1000;
 }
 
+/**
+ * 现在能不能**驾驶**（WO-22）。
+ *
+ * 🔴 冻结时间（`?flight&t=N`）时**不能** —— 那个模式是探针 / 定妆照用的，
+ *    要求"给一个 t 就是逐位确定的机位"。操控一旦生效，位姿就带上了
+ *    **历史帧**的痕迹 ⇒ 同一张 `?flight&t=12` 拍两次会不一样。
+ *    所以"能不能操控"这个判断只写在这里一处。
+ */
+export function canPilotControl() {
+    return snapshot.active && snapshot.frozenT === null;
+}
+
 /** React 绑定。返回**快照对象本身**（稳定引用），别在调用处展开成新对象。 */
 export function useFlightMode() {
     return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);

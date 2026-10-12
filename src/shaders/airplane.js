@@ -42,6 +42,8 @@
  *    一律用「」。改完跑 `python3 .workbuddy-ai/harness/check-glsl-backticks.py`。
  */
 
+import * as THREE from 'three';
+
 /* ------------------------------------------------------------------ */
 /* 色板（sRGB 0..1，终值）                                              */
 /*                                                                     */
@@ -107,6 +109,8 @@ uniform vec3 uInk;
 uniform vec3 uTyre;
 uniform vec3 uBlade;
 uniform vec3 uLightDir;
+uniform vec3 uKey;        // 主光颜色 —— 朝阳暖边往它推（见下面"边"那段）
+uniform float uEdgeAmt;   // 朝阳暖边强度
 uniform vec3 uHaze;
 uniform float uHazeNear;
 uniform float uHazeFar;
@@ -187,29 +191,98 @@ void main() {
         gloss = 0.35;
     }
 
-    /* ---- 光照：主光 + 天光 ---- */
+    /* ---- 光照：**三档 cel 分色**（WO-21）----
+     * 参考实现「cel-material.js」的做法：「smoothstep(0.10,0.135,ndl)」与
+     * 「smoothstep(0.59,0.625,ndl)」—— 两条**极窄**的过渡带，把光照切成
+     * 暗 / 本色 / 亮三档。窄是关键：宽过渡带又变回平滑的 CG 塑料，
+     * 而"手绘的三个色阶"正是案例比我们"像画的"的头号原因。
+     *
+     * 三档的系数是按**原来那条连续公式**（「0.34 + 0.40*sky + 0.78*lam」）
+     * 配的，所以整体明度没变 —— 改的是"过渡变成了台阶"。
+     */
     vec3 n = normalize(vN);
     vec3 L = normalize(uLightDir);
-    float lam = max(dot(n, L), 0.0);
+    vec3 V = normalize(cameraPosition - vW);
+    float lam = dot(n, L);
     float sky = 0.5 + 0.5 * n.y;
-    c *= 0.34 + 0.40 * sky + 0.78 * lam;
+    float shadowBand = smoothstep(0.10, 0.135, lam);
+    float lightBand = smoothstep(0.59, 0.625, lam);
+    float level = mix(0.52, 0.95, shadowBand);
+    level = mix(level, 1.45, lightBand);
+    c *= level * (0.80 + 0.30 * sky);
 
     /* ---- 高光：只有漆面 / 金属有，橡胶和墨杆没有 ---- */
     if (gloss > 0.0) {
-        vec3 V = normalize(cameraPosition - vW);
         vec3 H = normalize(L + V);
         float spec = pow(max(dot(n, H), 0.0), 40.0) * gloss;
         c += vec3(spec) * 0.5;
     }
 
-    /* ---- 墨边：掠射角压暗 ----
-     * 和全站的水墨语汇一致。它同时替代了"描边 pass"（反向壳）
-     * —— 在院子这个尺度上，飞机只有几百像素，反向壳的收益不值那一次 draw。 */
-    vec3 V2 = normalize(cameraPosition - vW);
-    float rim = 1.0 - abs(dot(n, V2));
-    c *= 1.0 - 0.32 * pow(rim, 3.0);
+    /* ---- 边：**背阳侧压暗、朝阳侧染暖**（WO-21）----
+     * 原来只有"掠射角压暗"（全站的水墨语汇）。案例的边是**金**的 ——
+     * 那才是让飞机"被夕阳包住"的那一笔。两者不是二选一，而是同一条边的
+     * 两侧：用一个「sunSide」把两种行为分开，就不会互相抵消。
+     *   · 「sunSide」高（朝着太阳的那一圈）⇒ 往「uKey」暖色推；
+     *   · 「sunSide」低（背阳的那一圈）⇒ 压暗，保留水墨边。
+     */
+    float rim = pow(1.0 - abs(dot(n, V)), 3.0);
+    float sunSide = smoothstep(-0.12, 0.55, lam);
+    c *= 1.0 - 0.26 * rim * (1.0 - sunSide);
+    c = mix(c, uKey * 1.12, rim * sunSide * uEdgeAmt);
 
     c = mix(c, uHaze, smoothstep(uHazeNear, uHazeFar, vDepth));
+    gl_FragColor = vec4(c, 1.0);
+}
+`;
+
+/* ------------------------------------------------------------------ */
+/* 描边壳（WO-21）                                                      */
+/*                                                                     */
+/* 参考实现 `cel-material.js` 的 `createOutlineMaterial`：同一份几何     */
+/* **再画一遍**，`BackSide` + 沿**视空间法线**外扩。看到的只是"壳比本体  */
+/* 多探出来的那一圈" —— 一条均匀的墨线。                                 */
+/*                                                                     */
+/* 🔴 为什么只**飞行中**挂                                                     */
+/* ------------------------------------------------------------------ */
+/* 停机时飞机在画面里只有百来像素，一次额外的 draw 换不来可见的收益 ——      */
+/* 这是 WO-18 当时**故意**不做描边的理由，那条理由现在仍然成立。            */
+/* 但飞起来之后飞机是主角（几百像素、还会侧倾），墨线是"读起来像画的"       */
+/* 那一笔 —— 值那一次 draw。所以边界就是 `active`。                       */
+/*                                                                     */
+/* 🔴 厚度乘 `(-mv.z)`                                                    */
+/* ------------------------------------------------------------------ */
+/* 参考实现写的是**恒定世界厚度**（0.022）。那是可以的，因为它的相机距离   */
+/* 变化不大。本项目的镜头有推拉（`dolly` 1.0~1.24），而且飞机还会飞远 ——    */
+/* 恒定世界厚度在远处会细到看不见。乘上视空间深度 ⇒ 世界厚度 ∝ 距离        */
+/* ⇒ **屏幕上的线宽恒定**。                                                */
+/* ------------------------------------------------------------------ */
+
+export const PLANE_OUTLINE_VERT = /* glsl */ `
+uniform float uThickness;
+varying float vDepth;
+
+void main() {
+    // 法线矩阵会抵消掉继承来的非均匀缩放 ⇒ 每个壳的**世界**宽度一致
+    // （参考实现「outlineVertex」那条注释）。
+    vec3 viewNormal = normalize(normalMatrix * normal);
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    // 乘 (-mv.z)：世界厚度 ∝ 距离 ⇒ 屏幕上恒定线宽。见上面那段。
+    mv.xyz += viewNormal * uThickness * (-mv.z);
+    vDepth = -mv.z;
+    gl_Position = projectionMatrix * mv;
+}
+`;
+
+export const PLANE_OUTLINE_FRAG = /* glsl */ `
+uniform vec3 uInk;
+uniform vec3 uHaze;
+uniform float uHazeNear;
+uniform float uHazeFar;
+varying float vDepth;
+
+void main() {
+    // 描边也要吃霾 —— 否则飞远之后"飞机化进雾里、墨线还浮着"。
+    vec3 c = mix(uInk, uHaze, smoothstep(uHazeNear, uHazeFar, vDepth));
     gl_FragColor = vec4(c, 1.0);
 }
 `;
@@ -224,8 +297,25 @@ export function airplanePalette() {
         uTyre: { value: PLANE_TYRE },
         uBlade: { value: PLANE_BLADE },
         uTipBand: { value: TIP_BAND },
+        /** 主光颜色（**是光，不是漆** ⇒ 跟季节走，见文件头那段）。 */
+        uKey: { value: new THREE.Color(1, 0.96, 0.88) },
+        /** 朝阳暖边的强度。 */
+        uEdgeAmt: { value: EDGE_AMOUNT },
+        /** 描边壳厚度（× 视空间深度 ⇒ 屏幕线宽恒定）。 */
+        uThickness: { value: OUTLINE_THICKNESS },
     };
 }
+
+/** 朝阳暖边的强度 —— 与参考实现的 `edgeHighlight = 0.23` 同量级。 */
+const EDGE_AMOUNT = 0.34;
+
+/**
+ * 描边壳厚度。
+ *
+ * ⚠️ 它乘的是视空间深度 ⇒ 实际是"屏幕高度的百分之多少"。0.0045 在
+ *    fov 60 / 900 像素高的画面上 ≈ `0.0045 / (2·tan30°) × 900 ≈ 3.5` 像素。
+ */
+const OUTLINE_THICKNESS = 0.0045;
 
 /* ------------------------------------------------------------------ */
 /* 地面投影                                                            */
