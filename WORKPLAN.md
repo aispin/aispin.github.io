@@ -112,6 +112,18 @@
   `me/index.html` → `dist/me/index.html` → `/me/`；
   挪成 `apps/me/index.html` → `dist/apps/me/index.html` → **`/apps/me/`**
   （URL 变了）。要保住短 URL `/me` 就得加个改名插件或在输出后重排。
+- 🔴 **两条查证到的事实（2026-10-12 追问「两者什么联系」时查的）**：
+  1. **CI 里已经硬断言 `test -f dist/me/index.html`**（`deploy-gh-pages.yml`
+     的 "Sanity-check dist/" 步）。⇒ 只挪源码、不加改名插件，**构建会当场失败**。
+     这是**好事**：失败是响亮的。**它等于替我们规定了"产物必须落在
+     `dist/me/index.html`"** —— 那 (C) 就不只是"好看"，而是**和 CI 的现有契约一致**。
+  2. **`/me`（不带斜杠）由三处分别兜着**：dev/preview 走 `vite.config.js` 的
+     `rewriteMePage` 中间件；Cloudflare Pages 走 `public/_redirects` 的
+     `/me  /me/index.html  200`；GitHub Pages 靠它自己的目录重定向。
+     ⇒ 换路径时**这三处都要跟着动**，别只改一处。
+  3. `dist/` 被 `.gitignore` 忽略（`git ls-files dist` = **0 个文件**），
+     所以产物**不是**第二份真源 —— 这点和 `public/demos/*` 正相反
+     （那些是**提交进仓库**的预构建产物，会漂移）。
 - **三条路**：
   - **(A) 保持现状**（entry 在根）：零成本、URL 最干净；只有 1~2 个模块时不叫凌乱。
   - **(B) 源码挪进 `apps/<name>/`，URL 也变成 `/apps/<name>/`**：根目录干净、
