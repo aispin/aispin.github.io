@@ -295,11 +295,22 @@ python3 scripts/build-scene-fonts.py
 | [dgreenheck/tidewater](https://github.com/dgreenheck/tidewater) | 源码研读：渲染管线组织、几何/材质复用、性能清单 | ❌ 只读源码做判断，没有引代码 |
 | [dgreenheck/ez-tree](https://github.com/dgreenheck/ez-tree) | 程序化树生成：分叉参数的分层设计、LOD 分层、presets 的字段命名 | ❌ 见下方说明 |
 | [MengTo/sylva](https://github.com/MengTo/sylva) | **视觉参考**：梦幻森林那一套（苔藓/圆球的形态、指针交互） | ❌ **它不授权复用**，见下方说明 |
+| [MengTo/kage](https://github.com/MengTo/kage) | 京都山寺「五章夜游」的实时 Three.js 光影与章节叙事节奏 | ❌ **它不授权复用**，见下方说明 |
+| [fanhuayishiy/ai-demo](https://github.com/fanhuayishiy/ai-demo) | 三维 demo 合集：樱花街角的植被与落花、夕空飞行的飞行场景 | ❌ 只参考做法（MIT） |
+| [huangbai-AI/yingxian-pagoda](https://github.com/huangbai-AI/yingxian-pagoda) | 应县木塔「一木千年」：六幕滚动三维科普站与可编辑模型 | ❌ **它不授权复用**，见下方说明 |
+| [lhlGitHub/threejs-architecture-effects](https://github.com/lhlGitHub/threejs-architecture-effects) | 「可交互自装配 3D 建筑」的 Agent Skill：构件分层与建造动画的组织方式 | ❌ 思路参考（MIT） |
 
 > ⚠️ **`sylva` 不授权复用。** 它的 README 明确写着 *"No license is granted for reuse
 > or redistribution of the Sylva code, design, or artwork."*（只有它捆绑的 three.js
 > 与 Lexend 字体各自仍是 MIT / OFL）。所以它**只能看、不能抄** —— 列在这里是说清
 > "森林那套观感从哪来"，不是"代码从哪来"。
+>
+> ⚠️ **`kage` 与 `yingxian-pagoda` 同样不授权复用。** 两个仓库里都**没有 LICENSE**
+> （GitHub 上显示为 `NONE`）—— 没有许可证就等于**默认保留全部权利**，
+> 所以只能看、不能抄它的代码或素材。列在这里同样是说清"观感从哪来"。
+>
+> ⚠️ **`ai-demo` 与 `threejs-architecture-effects` 是 MIT**，所以**做法可以学**
+> （与上面那三条"只能看"的相反）。至于用不用、用到什么程度，以本项目自己的取舍为准。
 >
 > ⚠️ **`ez-tree` 是 MIT，但本项目的树没有用它。** 它是 `Tree extends THREE.Group`，
 > 并且**没有**「只取几何、不取材质」的出口：`generate()` 把顶点灌进
