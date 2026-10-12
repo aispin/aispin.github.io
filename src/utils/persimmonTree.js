@@ -1,6 +1,22 @@
 import * as THREE from 'three';
 
 import { seededRand, randRange } from '../engine/art';
+import {
+    makeAcc,
+    pushTri,
+    emitEllipsoid,
+    growSkeleton,
+    boxOfPositions,
+    boxOfPoints,
+    makeClusterGeometry,
+    emitBlade,
+    clusterExtent,
+    scatterCluster,
+    crownFromTips,
+    makeRhoOf,
+    packInstances,
+    shadeOf,
+} from './treeSkeleton';
 
 /**
  * 柿子树的 3D 骨架 / 叶 / 果 —— 纯数学，不碰 three 的场景图。
@@ -146,8 +162,13 @@ export const LEAF_WID_JIT = [0.80, 1.22];
  * ⚠️ 按**抖动上限**算（`*_JIT[1]`）：保守只会让树矮一点点，安全。
  * ⚠️ 算的是**外接球**（不挑朝向）。
  */
-export const TUFT_EXTENT =
-    Math.hypot(LEAF_LEN * LEAF_LEN_JIT[1], (LEAF_WID * LEAF_WID_JIT[1]) / 2) + 0.14;
+export const TUFT_EXTENT = clusterExtent(
+    LEAF_LEN, LEAF_WID, LEAF_LEN_JIT, LEAF_WID_JIT,
+    // ⚠️ 0.14 是**显式给**的，不是算出来的：它对应 `LEAF_OFF` 里最大那个偏移
+    //    （≈0.132）。改成"自动取 max|OFF|"会让这个数变成 0.132 ⇒ `TUFT_EXTENT`
+    //    变小 ⇒ 归一化分母变小 ⇒ **整棵树换尺寸**。数字要动就整棵重拍。
+    0.14
+);
 
 /** 果实：半径范围、挂在哪个高度带。 */
 const FRUIT_R = [0.120, 0.170];
@@ -185,285 +206,92 @@ const FRUIT_HOST_RHO = [0.90, 0.99];
 const FRUIT_RHO_MAX = 0.99;
 
 /* ------------------------------------------------------------------ */
-/* 骨架                                                                */
+/* 骨架的形态参数 —— 交给 `treeSkeleton.growSkeleton`                   */
+/*                                                                     */
+/* 🔴 「衔接自然」那三条原则（锥形管 / 关节椭球 / 子枝起点回退 + 起始   */
+/*    方向偏向父枝）的实现**只有一份**，在 `utils/treeSkeleton.js`。    */
+/*    这个文件只放柿子树自己的形态：树干多长多粗、每层怎么衰减、往哪偏。 */
+/*    樱花树（`utils/sakuraTree.js`）用同一台机器、换一份参数。          */
 /* ------------------------------------------------------------------ */
-
-/** 一个累加器：非索引三角形，逐顶点写 position / normal / 可选 part。 */
-function makeAcc(withPart = false) {
-    return { pos: [], nrm: [], part: withPart ? [] : null };
-}
-
-function pushVert(acc, v) {
-    acc.pos.push(v.px, v.py, v.pz);
-    acc.nrm.push(v.nx, v.ny, v.nz);
-    if (acc.part) acc.part.push(v.part || 0);
-}
-
-function pushTri(acc, a, b, c) {
-    pushVert(acc, a);
-    pushVert(acc, b);
-    pushVert(acc, c);
-}
-
-function jitterDir(rand, dir, angle) {
-    const ax = randRange(rand, -1, 1);
-    const ay = randRange(rand, -1, 1);
-    const az = randRange(rand, -1, 1);
-    const axis = new THREE.Vector3(ax, ay, az);
-    if (axis.lengthSq() < 1e-6) axis.set(0, 1, 0);
-    axis.normalize();
-    return dir.clone().applyAxisAngle(axis, angle).normalize();
-}
 
 /** 枝条的分段数 / 横截面边数：越细的枝越省（近处只有主干和一级枝）。 */
 const TUBULAR = [16, 12, 9, 8, 6];
 const RADIAL = [10, 8, 6, 5, 4];
 
-/**
- * 沿一条曲线铺一根**锥形管**。
- *
- * 帧（法线 / 副法线）用**平行输运**逐环推进，不是每环重新叉乘一个固定参考轴
- * —— 后者在切线转到与参考轴平行时会**翻转**，管子上会出现一道拧劲。
- */
-function emitTube(acc, curve, r0, r1, tubular, radial) {
-    const P = new THREE.Vector3();
-    const T = new THREE.Vector3();
-    const REF_UP = new THREE.Vector3(0, 1, 0);
-    const REF_SIDE = new THREE.Vector3(1, 0, 0);
-    let prevRing = null;
-    let prevN = null;
-
-    for (let i = 0; i <= tubular; i++) {
-        const t = i / tubular;
-        curve.getPointAt(t, P);
-        curve.getTangentAt(t, T).normalize();
-
-        let n = null;
-        if (prevN) {
-            // 把上一环的法线投影到当前环的法平面上
-            n = prevN.clone().addScaledVector(T, -prevN.dot(T));
-            if (n.lengthSq() < 1e-8) n = null;
-        }
-        if (!n) {
-            const ref = Math.abs(T.y) < 0.9 ? REF_UP : REF_SIDE;
-            n = ref.clone().addScaledVector(T, -ref.dot(T));
-            if (n.lengthSq() < 1e-8) n = new THREE.Vector3(1, 0, 0);
-        }
-        n.normalize();
-        const b = new THREE.Vector3().crossVectors(T, n).normalize();
-
-        const r = r0 + (r1 - r0) * t;
-        const ring = new Array(radial);
-        for (let j = 0; j < radial; j++) {
-            const a = (j / radial) * Math.PI * 2;
-            const ca = Math.cos(a);
-            const sa = Math.sin(a);
-            const dx = n.x * ca + b.x * sa;
-            const dy = n.y * ca + b.y * sa;
-            const dz = n.z * ca + b.z * sa;
-            ring[j] = {
-                px: P.x + dx * r, py: P.y + dy * r, pz: P.z + dz * r,
-                nx: dx, ny: dy, nz: dz,
-            };
-        }
-        if (prevRing) {
-            for (let j = 0; j < radial; j++) {
-                const k = (j + 1) % radial;
-                pushTri(acc, prevRing[j], prevRing[k], ring[k]);
-                pushTri(acc, prevRing[j], ring[k], ring[j]);
-            }
-        }
-        prevRing = ring;
-        prevN = n;
-    }
-}
-
-/**
- * 关节椭球：极轴对齐 `axis`，沿轴拉长 `elong`、垂直方向压扁 `squash`。
- * 缠绕方向与 `emitTube` 一致（都是朝外的）。
- */
-function emitEllipsoid(acc, c, axis, radius, elong, squash, latSeg = 6, lonSeg = 8, part = 0) {
-    const w = axis.clone().normalize();
-    const ref = Math.abs(w.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-    const u = new THREE.Vector3().crossVectors(ref, w).normalize();
-    const v = new THREE.Vector3().crossVectors(w, u).normalize();
-
-    const rx = radius * squash;
-    const ry = radius * elong;
-    const rz = radius * squash;
-
-    const at = (i, j) => {
-        const phi = (i / latSeg) * Math.PI;
-        const theta = (j / lonSeg) * Math.PI * 2;
-        const sp = Math.sin(phi);
-        const cp = Math.cos(phi);
-        const ct = Math.cos(theta);
-        const st = Math.sin(theta);
-        const lx = sp * ct;
-        const ly = cp;
-        const lz = sp * st;
-        // 椭球的法线 ∝ (lx/rx, ly/ry, lz/rz)，再转回世界
-        const nx = (lx / rx) * u.x + (ly / ry) * w.x + (lz / rz) * v.x;
-        const ny = (lx / rx) * u.y + (ly / ry) * w.y + (lz / rz) * v.y;
-        const nz = (lx / rx) * u.z + (ly / ry) * w.z + (lz / rz) * v.z;
-        const nl = Math.hypot(nx, ny, nz) || 1;
-        return {
-            px: c.x + u.x * rx * lx + w.x * ry * ly + v.x * rz * lz,
-            py: c.y + u.y * rx * lx + w.y * ry * ly + v.y * rz * lz,
-            pz: c.z + u.z * rx * lx + w.z * ry * ly + v.z * rz * lz,
-            nx: nx / nl, ny: ny / nl, nz: nz / nl,
-            part,
-        };
-    };
-
-    for (let i = 0; i < latSeg; i++) {
-        for (let j = 0; j < lonSeg; j++) {
-            const v00 = at(i, j);
-            const v01 = at(i, j + 1);
-            const v10 = at(i + 1, j);
-            const v11 = at(i + 1, j + 1);
-            pushTri(acc, v00, v11, v01);
-            pushTri(acc, v00, v10, v11);
-        }
-    }
-}
-
-/**
- * 递归生长。把骨架写进 `acc`，并记录：
- *   · `tips`   —— 末梢位置 + 朝向（叶团撒在这附近）
- *   · `joints` —— 每个分叉点的（位置 / 父枝方向 / 半径），叶团撒完再合并
- *   · `branches` —— 一级枝的曲线，用来挑风铃挂点
- */
-function grow(state, start, dir, length, r0, r1, depth) {
-    const { acc, rand } = state;
-    const pts = [start.clone()];
-    const p = start.clone();
-    let d = dir.clone().normalize();
-
-    // 主干抖得小一点（它要立得住），越往上越放肆
-    const jit = depth === 0 ? 0.13 : 0.21;
-    const lift = depth === 0 ? 0.085 : 0.030;
-    for (let i = 1; i <= SEGS; i++) {
-        d = jitterDir(rand, d, jit);
-        d.y += lift;
-        d.normalize();
-        p.addScaledVector(d, length / SEGS);
-        pts.push(p.clone());
-    }
-
-    const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.5);
-    const tubular = TUBULAR[depth];
-    const radial = RADIAL[depth];
-    emitTube(acc, curve, r0, r1, tubular, radial);
-
-    if (depth === 0) state.branches.push(curve);
-
-    const tip = p.clone();
-    const tipDir = d.clone();
-
-    if (depth >= MAX_DEPTH) {
-        state.tips.push({ p: tip, d: tipDir, r: r1 });
-        return;
-    }
-
-    // ---- 子枝 ----------------------------------------------------
-    const n = depth === 0 ? 3 : 2 + (rand() < 0.45 ? 1 : 0);
-    const children = [];
-    // 向外方向：从主干轴指向本枝末梢（在 xz 平面上）
-    const outward = new THREE.Vector3(tip.x, 0, tip.z);
-    if (outward.lengthSq() < 1e-6) {
-        outward.set(randRange(rand, -1, 1), 0, randRange(rand, -1, 1));
-    }
-    outward.normalize();
-
-    for (let i = 0; i < n; i++) {
-        const nd = jitterDir(rand, tipDir, randRange(rand, SPREAD[depth] * 0.55, SPREAD[depth]));
-        nd.addScaledVector(outward, OUT_BIAS[depth]);
-        nd.y += UP_BIAS[depth];
-        nd.z += FWD_BIAS[depth];
-        nd.normalize();
-        // 子枝起点半径提到父枝末端的 0.84~0.98：粗细过渡才不"断"
-        const nr0 = r1 * randRange(rand, 0.84, 0.98);
-        const nlen = length * randRange(rand, LEN_FALLOFF[depth] - 0.03, LEN_FALLOFF[depth] + 0.05);
-        children.push({ nd, nr0, nlen });
-    }
-
-    // ---- 关节 ----------------------------------------------------
-    const jointR = r1 * JOINT_SCALE;
-    const jointC = tip.clone().addScaledVector(tipDir, -jointR * JOINT_INSET);
-    emitEllipsoid(acc, jointC, tipDir, jointR, JOINT_ELONG, JOINT_SQUASH);
-
-    // 🔴 记下**一级枝**上的两个点做风铃候选挂点（见下面的 `chimeAnchor`）。
-    //    条件是"离主干够远、朝镜头这一侧、高度合适" —— 挂在主干附近或者
-    //    朝墙里那一侧，画面上就是悬空的。
-    if (depth === 1) {
-        state.hangCandidates.push({
-            far: Math.hypot(tip.x, tip.z),
-            z: tip.z,
-            y: tip.y,
-            p: curve.getPointAt(0.72),
-            dir: curve.getTangentAt(0.72),
-        });
-    }
-
-    // ---- 递归 ----------------------------------------------------
-    const inset = tipDir.clone().multiplyScalar(-jointR * CHILD_INSET);
-    const childStart = tip.clone().add(inset);
-    for (const c of children) {
-        const biased = c.nd.clone().lerp(tipDir, CHILD_DIR_BIAS).normalize();
-        grow(state, childStart, biased, c.nlen, c.nr0, c.nr0 * RAD_FALLOFF, depth + 1);
-    }
-}
+// ⚠️ 这里**不放** `rand` —— 随机数生成器由 `buildPersimmonTree` 每次新建后
+//    传进来（见那里的说明）。放这儿会让第二次调用接着上一棵树的序列长。
+const SPEC = {
+    segs: SEGS,
+    maxDepth: MAX_DEPTH,
+    trunkLen: TRUNK_LEN,
+    trunkR0: TRUNK_R0,
+    trunkR1: TRUNK_R1,
+    lenFalloff: LEN_FALLOFF,
+    radFalloff: RAD_FALLOFF,
+    upBias: UP_BIAS,
+    outBias: OUT_BIAS,
+    fwdBias: FWD_BIAS,
+    spread: SPREAD,
+    tubular: TUBULAR,
+    radial: RADIAL,
+    jointScale: JOINT_SCALE,
+    jointElong: JOINT_ELONG,
+    jointSquash: JOINT_SQUASH,
+    jointInset: JOINT_INSET,
+    childInset: CHILD_INSET,
+    childDirBias: CHILD_DIR_BIAS,
+    childRadiusJit: [0.84, 0.98],
+    childLenJit: [0.03, 0.05],
+    trunkJitter: 0.13,
+    trunkLift: 0.085,
+    branchJitter: 0.21,
+    branchLift: 0.030,
+    // ⚠️ depth === 0 时**不抽随机数**（固定 3 条）—— 这本身就是形态的一部分
+    childCount: (depth, rand) => (depth === 0 ? 3 : 2 + (rand() < 0.45 ? 1 : 0)),
+};
 
 /* ------------------------------------------------------------------ */
 /* 叶 / 果的几何体                                                     */
 /* ------------------------------------------------------------------ */
 
 /**
- * 一片叶 = **折起来**的 4 个三角（有中脉）。
+ * 柿子树这片叶的**形状参数** —— 折起来的 4 个三角（有中脉）。
  *
- * 🔴 为什么不是 2 个三角的平菱形：平片在正对镜头时是一整块**同色的多边形**，
- *    放大之后读成"绿色纸屑"而不是叶子（第一版就是这样）。把中脉抬起来
- *    （`RIDGE`）之后，两半叶面朝向不同 ⇒ 明暗不同 ⇒ 立刻读成一片叶子。
- *    法线**逐面**给（不跨中脉插值），那条折痕才看得出来。
+ * 画法本身在 `treeSkeleton.emitBlade`（「为什么不是 2 个三角的平菱形」
+ * 那段说明也在那里，两棵树共用）。这里只给柿子叶的尺寸与抖动幅度。
+ *
+ * 🔴 `LEAF_LEN_JIT` / `LEAF_WID_JIT` 提成常量而不是写死进调用处：
+ *    `TUFT_EXTENT`（上面）是**归一化分母的一部分** —— 它决定"树看起来多高"。
+ *    抖动一旦放大，叶团能探出去的比 `TUFT_EXTENT` 预测的更远，冠顶就会
+ *    **冲出 `PERSIMMON_H`**（WO-7 那条"树要略矮于屋身"的老账）。
  */
-function leafVerts(mat, out, rand) {
-    // 🔴 每片叶**自己的形状**：长 / 宽 / 中脉深浅 / 左右不对称 都抖一点。
-    //    不抖的话，3472 团 × 6 片 ≈ 2 万片叶**形状完全一致** ——
-    //    重复的轮廓比任何缺失的细节都显眼，这正是"一眼看出是纸片"的来源。
-    const l = LEAF_LEN * randRange(rand, LEAF_LEN_JIT[0], LEAF_LEN_JIT[1]);
-    const w = LEAF_WID * randRange(rand, LEAF_WID_JIT[0], LEAF_WID_JIT[1]);
-    const RIDGE = randRange(rand, 0.035, 0.075);   // 中脉抬起的量（相对叶宽）
-    const asym = randRange(rand, -0.11, 0.11);     // 左右肩不等高 ⇒ 不轴对称
-    const curl = RIDGE * w * randRange(rand, -0.35, 0.55);
-    const at = (x, y, z) => {
-        const v = new THREE.Vector3(x, y, z).applyMatrix4(mat);
-        return { x: v.x, y: v.y, z: v.z };
-    };
-    const base = at(0, 0, -RIDGE * w);
-    const left = at(-w / 2, l * (0.42 + asym), curl);
-    const tip = at(w * randRange(rand, -0.12, 0.12), l, -RIDGE * w * 0.5);
-    const right = at(w / 2, l * (0.42 - asym), curl);
-    // 中脉上的一个点：两半叶面在这里相交
-    const ridge = at(0, l * 0.50, -RIDGE * w * 1.6);
+const LEAF_PIECE = {
+    len: LEAF_LEN,
+    wid: LEAF_WID,
+    lenJit: LEAF_LEN_JIT,
+    widJit: LEAF_WID_JIT,
+    ridgeJit: [0.035, 0.075],
+    asymJit: [-0.11, 0.11],
+    curlJit: [-0.35, 0.55],
+};
 
-    // 逐面法线（不用顶点法线）：折痕要硬
-    const tri = (a, b, c) => {
-        const ux = b.x - a.x, uy = b.y - a.y, uz = b.z - a.z;
-        const vx = c.x - a.x, vy = c.y - a.y, vz = c.z - a.z;
-        let nx = uy * vz - uz * vy;
-        let ny = uz * vx - ux * vz;
-        let nz = ux * vy - uy * vx;
-        const nl = Math.hypot(nx, ny, nz) || 1;
-        nx /= nl; ny /= nl; nz /= nl;
-        const p = (q) => ({ px: q.x, py: q.y, pz: q.z, nx, ny, nz });
-        pushTri(out, p(a), p(b), p(c));
-    };
-    tri(base, left, ridge);
-    tri(left, tip, ridge);
-    tri(base, ridge, right);
-    tri(ridge, tip, right);
-}
+/** 一「团」叶 = **6** 片朝向各异的叶（朝向表是固定的，所以形态确定）。 */
+const LEAF_ROT = [
+    [0.95, 0.00, 0.55],
+    [-0.72, 2.10, -0.40],
+    [0.38, 4.05, 0.85],
+    [-0.50, 5.30, -0.68],
+    [1.25, 1.05, -0.22],
+    [-1.05, 3.35, 0.30],
+];
+const LEAF_OFF = [
+    [-0.05, 0.00, 0.04],
+    [0.06, 0.04, -0.03],
+    [-0.03, 0.09, -0.06],
+    [0.04, 0.13, 0.05],
+    [0.08, 0.07, 0.06],
+    [-0.07, 0.11, -0.02],
+];
 
 /**
  * 一「团」叶 = **6** 片朝向各异的叶。
@@ -479,37 +307,15 @@ function leafVerts(mat, out, rand) {
  *    代码和注释对不上（同 `hard-rules §28` 那条家族）。
  */
 export function makeLeafTuftGeometry() {
-    const acc = makeAcc();
-    // 固定的一组欧拉角（确定性，且每个轴都张得开）
-    const ROT = [
-        [0.95, 0.00, 0.55],
-        [-0.72, 2.10, -0.40],
-        [0.38, 4.05, 0.85],
-        [-0.50, 5.30, -0.68],
-        [1.25, 1.05, -0.22],
-        [-1.05, 3.35, 0.30],
-    ];
-    const OFF = [
-        [-0.05, 0.00, 0.04],
-        [0.06, 0.04, -0.03],
-        [-0.03, 0.09, -0.06],
-        [0.04, 0.13, 0.05],
-        [0.08, 0.07, 0.06],
-        [-0.07, 0.11, -0.02],
-    ];
-    // 每片叶的形状抖动 —— **固定 key** ⇒ 6 片叶的形状是确定的
-    //（契约 1：两次跑出来必须逐字节相同，否则判据之间不可比）。
-    const rand = seededRand('persimmon-leaf-blades-v1');
-    for (let k = 0; k < ROT.length; k++) {
-        const m = new THREE.Matrix4()
-            .makeRotationFromEuler(new THREE.Euler(ROT[k][0], ROT[k][1], ROT[k][2]))
-            .setPosition(OFF[k][0], OFF[k][1], OFF[k][2]);
-        leafVerts(m, acc, rand);
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(acc.pos, 3));
-    geo.setAttribute('normal', new THREE.Float32BufferAttribute(acc.nrm, 3));
-    return geo;
+    return makeClusterGeometry({
+        rot: LEAF_ROT,
+        off: LEAF_OFF,
+        // 每片叶的形状抖动 —— **固定 key** ⇒ 6 片叶的形状是确定的
+        //（契约 1：两次跑出来必须逐字节相同，否则判据之间不可比）。
+        rand: seededRand('persimmon-leaf-blades-v1'),
+        emit: emitBlade,
+        piece: LEAF_PIECE,
+    });
 }
 
 /**
@@ -551,21 +357,6 @@ export function makeFruitGeometry() {
 /* 主构建                                                             */
 /* ------------------------------------------------------------------ */
 
-/**
- * 矩形的包围盒累加器。
- */
-function makeBox() {
-    return { x0: 1e9, y0: 1e9, z0: 1e9, x1: -1e9, y1: -1e9, z1: -1e9 };
-}
-function boxAdd(b, p) {
-    if (p.x < b.x0) b.x0 = p.x;
-    if (p.y < b.y0) b.y0 = p.y;
-    if (p.z < b.z0) b.z0 = p.z;
-    if (p.x > b.x1) b.x1 = p.x;
-    if (p.y > b.y1) b.y1 = p.y;
-    if (p.z > b.z1) b.z1 = p.z;
-}
-
 let cached = null;
 
 /**
@@ -585,22 +376,14 @@ export function buildPersimmonTree() {
     if (cached) return cached;
 
     const rand = seededRand(KEY);
-    const state = {
-        rand,
-        acc: makeAcc(),
-        tips: [],
-        branches: [],
-        hangCandidates: [],
-    };
 
-    // 1. 骨架（树内部单位）
-    grow(state, new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1, 0), TRUNK_LEN, TRUNK_R0, TRUNK_R1, 0);
+    // 1. 骨架（树内部单位）—— 机器在 `treeSkeleton`，这里只给形态参数。
+    //    ⚠️ `rand` 每次**新建**再传进去：SPEC 是模块级的，如果随机数生成器
+    //    挂在 SPEC 上，第二次调用就会接着上一棵树的序列往下长（另一棵树）。
+    const state = growSkeleton({ ...SPEC, rand });
 
     // 骨架自己的包围盒（raw）。归一化要以"根在哪儿"为基准，所以先量出来。
-    const rawBox = makeBox();
-    for (let i = 0; i < state.acc.pos.length; i += 3) {
-        boxAdd(rawBox, { x: state.acc.pos[i], y: state.acc.pos[i + 1], z: state.acc.pos[i + 2] });
-    }
+    const rawBox = boxOfPositions(state.acc.pos);
 
     // ---- 2. 叶团（**先全在 raw 空间里摆**，尺度最后一步再定）----------
     //
@@ -609,56 +392,31 @@ export function buildPersimmonTree() {
     // 一大截（末梢包围盒 ×`CROWN_PAD` + 叶团自身的半径）。先按骨架归一化、
     // 再撒叶，量出来的"树顶"就比 `PERSIMMON_H` 高一截 —— 第一版正是如此，
     // 冠顶冲到 4.61（檐口才 4.25）。
-    const rawTipBox = makeBox();
     const tipsRaw = state.tips.map((t) => ({ p: t.p.clone(), d: t.d.clone().normalize() }));
-    for (const t of tipsRaw) boxAdd(rawTipBox, t.p);
+    const rawTipBox = boxOfPoints(tipsRaw.map((t) => t.p));
 
-    const crownC = new THREE.Vector3(
-        (rawTipBox.x0 + rawTipBox.x1) / 2,
-        (rawTipBox.y0 + rawTipBox.y1) / 2,
-        (rawTipBox.z0 + rawTipBox.z1) / 2
-    );
-    const crownR = new THREE.Vector3(
-        Math.max((rawTipBox.x1 - rawTipBox.x0) / 2, 0.4) * CROWN_PAD,
-        Math.max((rawTipBox.y1 - rawTipBox.y0) / 2, 0.35) * CROWN_PAD_Y,
-        Math.max((rawTipBox.z1 - rawTipBox.z0) / 2, 0.4) * CROWN_PAD
-    );
+    const { c: crownC, r: crownR } = crownFromTips(rawTipBox, CROWN_PAD, CROWN_PAD_Y, CROWN_PAD);
 
     /** 点在冠里的归一化半径：0 = 冠心、1 = 冠壳。叶的遮蔽就按它给。 */
-    const rhoOf = (p) => Math.hypot(
-        (p.x - crownC.x) / crownR.x,
-        (p.y - crownC.y) / crownR.y,
-        (p.z - crownC.z) / crownR.z
-    );
+    const rhoOf = makeRhoOf(crownC, crownR);
 
-    const spotsRaw = [];
-    for (const t of tipsRaw) {
-        for (let k = 0; k < TUFTS_PER_TIP; k++) {
-            const theta = randRange(rand, 0, Math.PI * 2);
-            const phi = Math.acos(randRange(rand, -1, 1));
-            const rad = TIP_BALL * Math.cbrt(rand());
-            spotsRaw.push(new THREE.Vector3(
-                t.p.x + rad * Math.sin(phi) * Math.cos(theta),
-                t.p.y + rad * Math.cos(phi) * 0.85,
-                t.p.z + rad * Math.sin(phi) * Math.sin(theta)
-            ));
-        }
-    }
-    for (let k = 0; k < FILL_TUFTS; k++) {
+    const spotsRaw = scatterCluster({
+        tips: tipsRaw,
+        crownC,
+        crownR,
+        rand,
+        perTip: TUFTS_PER_TIP,
+        tipBall: TIP_BALL,
+        tipBallYSquash: 0.85,
+        fill: FILL_TUFTS,
         // 冠体积均匀（cbrt），但**三成**刻意贴到外壳上 ——
         // 纯均匀撒会留下一个"毛边很薄"的冠，轮廓不够实。
-        const shell = rand() < 0.30;
-        const rad = shell ? randRange(rand, 0.86, 1.0) : Math.cbrt(rand());
-        const theta = randRange(rand, 0, Math.PI * 2);
-        const phi = Math.acos(randRange(rand, -1, 1));
-        spotsRaw.push(new THREE.Vector3(
-            crownC.x + crownR.x * rad * Math.sin(phi) * Math.cos(theta),
-            crownC.y + crownR.y * rad * Math.cos(phi),
-            crownC.z + crownR.z * rad * Math.sin(phi) * Math.sin(theta)
-        ));
-    }
+        shellChance: 0.30,
+        shellRange: [0.86, 1.0],
+    });
 
-    // 每团叶的缩放**先定下来**：树顶要用它（见下面的 TUFT_EXTENT）
+    // 每团叶的缩放**先定下来**：树顶要用它（见下面的 TUFT_EXTENT），
+    // 而且必须在"算果"**之前**抽 —— 抽晚了整棵树的随机序列会整体错位。
     const leafScale = new Float32Array(spotsRaw.length);
     for (let i = 0; i < spotsRaw.length; i++) leafScale[i] = randRange(rand, 0.78, 1.28);
 
@@ -750,33 +508,16 @@ export function buildPersimmonTree() {
     }
 
     // ---- 6. 叶 / 果的实例矩阵（最终空间）-----------------------------
+    // ⚠️ `shade` 用 **raw** 坐标算（`rhoOf` 的分母是 raw 空间的冠心/冠壳），
+    //    而实例矩阵用最终坐标 —— 两者不能混。见 `treeSkeleton.packInstances`。
+    const shade = shadeOf(spotsRaw, rhoOf);
     const spots = spotsRaw.map(toFinal);
-    const n = spots.length;
-    const matrices = new Float32Array(n * 16);
-    const phase = new Float32Array(n);
-    const tint = new Float32Array(n);
-    const accent = new Float32Array(n);
-    const shade = new Float32Array(n);
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const e = new THREE.Euler();
-    const scl = new THREE.Vector3();
-
-    for (let i = 0; i < n; i++) {
-        // 整团随机朝向（叶的明暗差异全靠它）+ 小幅度缩放
-        e.set(randRange(rand, 0, 6.283), randRange(rand, 0, 6.283), randRange(rand, 0, 6.283));
-        q.setFromEuler(e);
-        const kk = leafScale[i];
-        scl.set(kk, kk, kk);
-        m.compose(spots[i], q, scl);
-        m.toArray(matrices, i * 16);
-        phase[i] = randRange(rand, 0, Math.PI * 2);
-        tint[i] = rand();
-        accent[i] = rand() < 0.34 ? randRange(rand, 0.6, 1) : 0;
-        shade[i] = Math.min(1, Math.max(0, 1 - rhoOf(spotsRaw[i])));
-    }
+    const leaf = packInstances({ spots, rand, scales: leafScale, shade });
 
     const fMats = new Float32Array(fruitRaw.length * 16);
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const scl = new THREE.Vector3();
     for (let i = 0; i < fruitRaw.length; i++) {
         const f = fruitRaw[i];
         scl.set(f.r, f.r, f.r);
@@ -791,7 +532,7 @@ export function buildPersimmonTree() {
 
     cached = {
         bark,
-        leaf: { matrices, phase, tint, accent, shade, count: n },
+        leaf,
         fruit: { matrices: fMats, count: fruitRaw.length },
         chimeAnchor: toFinal(anchorRaw),
         crown: { c: toFinal(crownC), r: new THREE.Vector3(crownR.x * k, crownR.y * k, crownR.z * k * DEPTH_SQUASH) },
