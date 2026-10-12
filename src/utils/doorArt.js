@@ -25,7 +25,7 @@
  */
 
 import * as THREE from 'three';
-import { cropToInk, downscaleCanvas, hashString, makeCanvas, mulberry32, rgba, roundRectPath } from '../engine/art';
+import { cropToInk, downscaleCanvas, hashString, inkBBoxOf, makeCanvas, mulberry32, rgba, roundRectPath } from '../engine/art';
 
 const cache = new Map();
 
@@ -46,15 +46,17 @@ const TEX_SCALE = 0.5;
 /* Small helpers                                                        */
 /* ------------------------------------------------------------------ */
 
-function toTexture(canvas, key, { clamp = true, repeat = null, scale = 1, crop = false } = {}) {
+function toTexture(canvas, key, { clamp = true, repeat = null, scale = 1, crop = false, inkBox = null } = {}) {
     // 降采样 / 裁剪都是**画完之后的独立一步**，所以缓存键要把参数带上 ——
     // 否则同一个 key 先被请求大图、后被请求小图时会拿到错的尺寸。
+    // ⚠️ `inkBox` 不进键：它是由 canvas 内容唯一决定的（`paperGrain` 量的），
+    //    同一个 canvas 只会有一个框。
     const ck = `${key}|${scale}${crop ? '|c' : ''}`;
     if (cache.has(ck)) return cache.get(ck);
     let src = canvas;
     let uv = null;
     if (crop) {
-        uv = cropToInk(canvas);
+        uv = cropToInk(canvas, { inkBox });
         src = uv.canvas;
     }
     if (scale !== 1) src = downscaleCanvas(src, scale);
@@ -217,7 +219,16 @@ function drawWoodPanel(ctx, x, y, w, h, palette, rand, { vertical = true, streak
     ctx.restore();
 }
 
-/** Fine paper-grain noise, applied once over a finished canvas. */
+/**
+ * Fine paper-grain noise, applied once over a finished canvas.
+ *
+ * 🔴 **返回墨迹外接框**（`engine/art` 的 `inkBBoxOf`）。为什么顺手量（2026-10-12）：
+ * 这一趟本来就已经把整幅像素读在手里了，而 **alpha 没有被改过**（alpha = 0 的
+ * 像素直接 `continue`），所以顺手量的框和事后 `alphaBBox` 再整幅读一遍的结果
+ * **逐位相同**。少读一遍 = 少一次 GPU→CPU 同步，而且这样的画布不会再触发
+ * Chrome 的 `willReadFrequently` 警告（同一张画布读 ≥2 次才报）。
+ * 判据：`harness/probe-canvas-readback.mjs`。
+ */
 function paperGrain(ctx, w, h, rand, amount = 8) {
     const img = ctx.getImageData(0, 0, w, h);
     const d = img.data;
@@ -229,6 +240,7 @@ function paperGrain(ctx, w, h, rand, amount = 8) {
         d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n));
     }
     ctx.putImageData(img, 0, 0);
+    return inkBBoxOf(d, w, h);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1628,11 +1640,13 @@ export function makeHandleTexture(side = 'left', painted = false) {
     ctx.lineTo(tipX + 17, py + geo.tipMid - geo.tipHalf * 0.55);
     ctx.stroke();
 
-    paperGrain(ctx, W, H, rand, painted ? 7 : 6);
-
+    // 🔴 纸纹这一趟**顺手把墨迹框带出来**，给下面 `crop: true` 用 ——
+    //    否则 `toTexture` → `cropToInk` 会为量框再整幅读回一次，
+    //    这张 512×1310 就被读了 2 次，Chrome 会为此报 willReadFrequently 警告。
+    const inkBox = paperGrain(ctx, W, H, rand, painted ? 7 : 6);
     ctx.restore();
 
-    const texture = toTexture(canvas, key, { crop: true });
+    const texture = toTexture(canvas, key, { crop: true, inkBox });
     cache.set(key, texture);
     return texture;
 }

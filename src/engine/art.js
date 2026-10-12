@@ -98,7 +98,29 @@ export const pick = (rand, arr) => arr[Math.floor(rand() * arr.length) % arr.len
 /* canvas                                                              */
 /* ------------------------------------------------------------------ */
 
-/** 建一张离屏 canvas。尺寸取整并至少 1px。 */
+/**
+ * 建一张离屏 canvas。尺寸取整并至少 1px。
+ *
+ * ⚠️ 这里**故意没有** `willReadFrequently` 选项（2026-10-12 试过又撤了）。
+ * Chrome 会对「同一个 context 上 `getImageData` ≥ 2 次」的画布报
+ *   `Multiple readback operations using getImageData are faster with the
+ *    willReadFrequently attribute set to true`
+ * 而本项目的正解是**把那第二次读消掉**，不是开这个标记。理由：
+ *
+ *   1. 🔴 **它会改变像素**。开了之后画布换成 CPU 后端，光栅化就走另一条路。
+ *      实测（同页两个 canvas 画同一串指令，只差这个 flag）连一段最简单的
+ *      「渐变 + 二次曲线描边 + 半透明圆 + 文字」都差 **13.3% 的字节**
+ *      （最大通道差 32）；换成真的门把手贴图是 **46% 的像素不同、最大差 92**。
+ *      而本文件顶上的**契约 1** 要求「两次跑出来的画面必须逐字节相同」——
+ *      为了消一条警告去动光栅化后端，是把契约换掉了。
+ *   2. **消掉读回更赚**。全站 306 张画布里只有 4 张读了 2 次，那 4 张的第二次
+ *      读是 `cropToInk` 去量墨迹框；而墨迹框**本来就能在第一次读的时候顺手量**
+ *      （见 `inkBBoxOf` 的注释）。少一次 512×1310 的全幅读回是实打实的收益，
+ *      还不用付"换后端"的代价。
+ *
+ * 判据：`harness/probe-canvas-readback.mjs` —— 它同时报"读了几次"和"建的时候
+ * 带没带 opts"，要求**读了 ≥2 次的画布数为 0**。
+ */
 export function makeCanvas(w, h) {
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(1, Math.round(w));
@@ -160,13 +182,22 @@ export function roundRectPath(ctx, x, y, w, h, r) {
 /* ------------------------------------------------------------------ */
 
 /**
- * canvas 里实际有墨的像素外接框（alpha > 8 才算）。
+ * 从一坨**已经拿在手里的** RGBA 字节里量墨迹外接框（alpha > 8 才算）。
  * 返回 {x0, y0, x1, y1}，闭区间；整张全透明时返回整幅。
+ *
+ * 🔴 为什么把它从 `alphaBBox` 里抽出来（2026-10-12）
+ * -------------------------------------------------
+ * `getImageData` 是**整幅读回**：在 GPU 后端的画布上，每次都要做一次
+ * GPU→CPU 同步。而「纸纹」那一步（各 `*Art.js` 的 `paperGrain`）本来就已经
+ * 把整幅像素读在手里了 —— 它是**读、改、写**，而且**一个 alpha 字节都没动**
+ * （alpha 为 0 的像素直接 `continue`）。既然墨迹框要看的正是 alpha，
+ * 那就**顺手在那一趟里量掉**，不必再整幅读第二遍。
+ *
+ * ⚠️ **阈值 8 必须两边一致**：`paperGrain` 里量出来的框和事后
+ *    `alphaBBox` 再读一遍的结果要**逐位相同**，否则裁剪尺寸会变、贴图就变了。
+ *    所以这里和 `alphaBBox` 共用这一个函数，不各写一份。
  */
-export function alphaBBox(canvas) {
-    const w = canvas.width;
-    const h = canvas.height;
-    const d = canvas.getContext('2d').getImageData(0, 0, w, h).data;
+export function inkBBoxOf(d, w, h) {
     let x0 = w;
     let y0 = h;
     let x1 = -1;
@@ -184,6 +215,20 @@ export function alphaBBox(canvas) {
     }
     if (x1 < 0) return { x0: 0, y0: 0, x1: w - 1, y1: h - 1 };
     return { x0, y0, x1, y1 };
+}
+
+/**
+ * canvas 里实际有墨的像素外接框（alpha > 8 才算）。
+ * 返回 {x0, y0, x1, y1}，闭区间；整张全透明时返回整幅。
+ *
+ * ⚠️ 如果你**已经**拿着这张画布的 ImageData，用 `inkBBoxOf` 直接量，
+ *    别再调它 —— 它要整幅读回一次。
+ */
+export function alphaBBox(canvas) {
+    const w = canvas.width;
+    const h = canvas.height;
+    const d = canvas.getContext('2d').getImageData(0, 0, w, h).data;
+    return inkBBoxOf(d, w, h);
 }
 
 /**
@@ -275,9 +320,15 @@ export function downscaleCanvas(src, scale) {
  * 又：three 的 UV 原点在**左下**、canvas 在**左上**，所以 y 那一项还要翻过来。
  *
  * `pad` 给边缘留几个像素，避免 mipmap 低层级把 clamp 边吃到墨迹上。
+ *
+ * `inkBox` —— 调用方**已经量好**的墨迹框就直接传进来，省掉这里的一次整幅读回
+ * （`getImageData` 在 GPU 后端的画布上是一次 GPU→CPU 同步）。见 `inkBBoxOf`。
+ *
+ * ⚠️ 两个参数收进 options 对象，是因为它们**都是可选的**；原来长成
+ *    `cropToInk(src, pad = 8)`，加第二个可选参数就只能靠位置猜了。
  */
-export function cropToInk(src, pad = 8) {
-    const bb = alphaBBox(src);
+export function cropToInk(src, { pad = 8, inkBox = null } = {}) {
+    const bb = inkBox || alphaBBox(src);
     const x0 = Math.max(0, bb.x0 - pad);
     const y0 = Math.max(0, bb.y0 - pad);
     const x1 = Math.min(src.width - 1, bb.x1 + pad);
