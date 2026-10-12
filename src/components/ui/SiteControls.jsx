@@ -158,10 +158,16 @@ export default function SiteControls() {
 
         {/* 4 · Audio settings —— 图标按「现在有没有声音」取态（默认静音态），
                但**行为不变**：点它只打开音频设置面板。用户 2026-10-08 明确要
-               保留这个行为，因为播放/静音的开关就在面板里。 */}
+               保留这个行为，因为播放/静音的开关就在面板里。
+
+               🔴 静音时**只换图标，不给按钮加任何样式**（2026-10-12 用户要求：
+               「没有声音的图标，太暗了。不做透明度处理。因为图标已经有反馈了。」）。
+               原来这里还会加一个 `is-muted` 类，把按钮的背景改成透明的 ——
+               背景一透明就**透出身后的深色场景**，整颗按钮发暗、读成"坏了"。
+               换图标这**一件事**已经说清了状态，不需要第二个信号。 */}
         <button
           type="button"
-          className={`hud-btn ${openPanel === 'audio' ? 'is-open' : ''} ${soundOff ? 'is-muted' : ''}`}
+          className={`hud-btn ${openPanel === 'audio' ? 'is-open' : ''}`}
           style={dropDelay(3)}
           onClick={() => togglePanel('audio')}
           aria-label={zh ? '音频设置' : 'Audio settings'}

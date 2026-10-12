@@ -104,19 +104,20 @@
     border-color: rgba(200, 155, 123, .7);
   }
 
-  // Muted audio. The icon already swaps to a crossed-out speaker, but that is a
-  // 20px detail in a corner the eye skips — and mute is PERSISTED, so the user
-  // can come back to a silent site with no idea why. Dim the whole button and
-  // drop the fill so "off" reads at a glance.
+  // 🔴 静音态**故意不加任何样式** —— 2026-10-12 用户要求：
+  //    「没有声音的图标，太暗了。**不做透明度处理**。因为图标已经有反馈了。」
   //
-  // ⚠️ 别再改回 `border-style: dashed` —— 虚线在深色场景上看着像"这个按钮坏了/
-  //    是占位符"，用户 2026-10-09 明确要求去掉。实线 + 降低不透明度已经够了。
-  &.is-muted {
-    color: rgba(90, 70, 54, .5);
-    background: transparent;
-
-    &:hover { background: rgba(255, 246, 233, .6); }
-  }
+  // 这里原来给 `is-muted` 写了 `background: transparent` + 半透明 `color`。
+  // 后果比"不够醒目"严重得多：**背景一透明，按钮就把身后的深色 3D 场景透出来**，
+  // 于是它在浅色纸面按钮群里变成一块**发暗的方格** —— 读成"坏了 / 不可用"，
+  // 而它其实是个完全可用的按钮（点开是音频设置面板）。
+  //
+  // 静音这件事的反馈**已经由图标承担**：喇叭会换成打叉的（见 `SiteControls.jsx`
+  // 里 `soundOff` 那两个 `<svg>`）。把整颗按钮调暗是在**重复表达同一个状态**，
+  // 而且表达错了（"暗" 读作 disabled，不是 muted）。
+  //
+  // ⚠️ 别再给它 `opacity` / 半透明 `color` / 透明背景；也别用
+  //    `border-style: dashed`（2026-10-09 已否：虚线看着像占位符）。
 }
 
 // The language button carries a word instead of an icon, so it needs a touch
@@ -152,14 +153,6 @@ html[data-theme='dark'] .hud-btn {
 
   &:hover { background: #655044; }
   &.is-open { background: #655044; border-color: rgba(255, 246, 233, .5); }
-
-  &.is-muted {
-    color: rgba(245, 232, 217, .5);
-    background: transparent;
-    border-color: rgba(255, 246, 233, .28);
-
-    &:hover { background: rgba(48, 41, 35, .8); }
-  }
 
   &:disabled:hover { background: rgba(48, 41, 35, .94); }
 }
