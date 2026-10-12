@@ -36,21 +36,12 @@
 
 # 📋 待办 WO
 
-## WO-18 · 前院小飞机 + `/flight`（DR-M 已定）· 参考 `sunset-flight-study`
+**（空）**
 
-- **需求原文**：「前院摆一架小飞机，**点击**在 `/flight` 路由下进入飞行模式。」
-- **2026-10-12 决定**：**按建议的 (i) 查询参数 + (i) 接管主站相机**；
-  用户追加：**「效果要保障」**。
-- **现状**：本项目**没有路由系统** —— 模式一律靠查询参数（`config/cameraMode.js` 读
-  `URLSearchParams`，如 `?fly`）。
-- **改什么**：前院加 1 架小飞机（单 mesh 或 `InstancedMesh`）+ 点击拾取 → 进入 `?flight`；
-  **接管主站相机**做一段飞行；退出后主站状态**不得残留**。
-- **「效果要保障」落到判据上**（这条是 DR-M 的重点，不能只靠"看着还行"）：
-  - 进出场无残留：走既有 `probe-transition-leak.mjs`。
-  - 飞行相机的姿态/位置**可量**：加一个探针，进 `?flight` 后按脚本推进若干帧，
-    断言相机确实在预期的轨迹上（不是"镜头没动"）。
-  - 新增 mesh / draw call / 体积增量**报数**。
-  - **两种视口都要拍**（见 memory 的"屏幕空间效果尺寸必须跟视口走"）。
+> WO-18（前院小飞机 + `?flight`）已提交 `1d6173a`，按白板规矩**出表**。
+> 验收判据与实测数据在提交信息里，过程记录在 `.workbuddy-ai/memory/2026-10-12.md` §19。
+> 新探针（5 份）：`probe-flight-path.mjs` · `probe-airplane.mjs` ·
+> `probe-flight-camera.mjs` · `probe-flight-residue.mjs` · `shot-flight-multiviewport.mjs`。
 
 ---
 
