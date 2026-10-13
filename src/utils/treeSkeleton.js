@@ -32,6 +32,13 @@ import { randRange } from '../engine/art';
  * `persimmonTree.js` 和 `sakuraTree.js` 各自在文件顶上写一份 spec ——
  * 「改树」就是改自己那份 spec，不用碰这个文件。
  *
+ * 🔴 **可选**字段（不写 = 该特性整个关掉，逐位不影响原来那棵树）
+ * ------------------------------------------------------------
+ * 目前只有一个：`spec.droop`（垂枝，WO-28b）。给了就按那套参数把一部分枝条
+ * 长成"先上后垂"的弧；**不给就一行都不执行** —— 所以柿子树的几何哈希
+ * （`probe-tree-pair.mjs` W1 的锚点）不会因为这台机器多了一个特性而漂。
+ * 加新可选特性的铁律：**绝不能多抽一次随机数**，否则后面所有枝的形态整体错位。
+ *
  * 🔴 确定性（项目契约 1）
  * ----------------------
  * 生长过程**只能**通过 `spec.rand` 取随机数，而且**取数顺序即形态**：
@@ -199,35 +206,102 @@ export function emitEllipsoid(acc, c, axis, radius, elong, squash, latSeg = 6, l
  * ⚠️ 这个函数里 `spec.rand` 的**调用次数和顺序**就是树的形态本身。
  *    任何改动都要跑 `probe-tree-identity.mjs` 对一次字节。
  */
-function grow(state, spec, start, dir, length, r0, r1, depth) {
+function grow(state, spec, start, dir, length, r0, r1, depth, drooping = false) {
     const { acc, rand } = state;
     const pts = [start.clone()];
     const p = start.clone();
     let d = dir.clone().normalize();
 
+    // ---- 垂枝判定（**可选**，见文件头）--------------------------------
+    // 🔴 这一段**一次随机数都不抽**。计数器只在 `spec.droop` 存在时才动 ——
+    //    柿子树不给这个字段 ⇒ 整块跳过 ⇒ 几何逐位不变
+    //    （判据 `probe-tree-pair.mjs` 的 W1 锚点）。
+    //
+    // ⚠️ 计数器**按深度分开**（`every` 是 `{深度: 步长}` 的表），不是全局一个。
+    //    全局一个会栽跟头：一级枝的序号是 0/4/8（深度优先 + 二级枝数量不定），
+    //    `% 2` 正好**全是偶数** ⇒ 三根一级枝**全部**垂 —— 整棵树的主骨架都挂了
+    //    （实测 44/44 个末梢全被标成"垂枝子树"，冠体积退化成空集）。
+    //    分开之后：一级枝 3 根里挑 1 根（细看是"一根长弧"），二级枝每 2 根挑 1 根。
+    //    ⚠️ 还有一条：**已经在垂枝枝系里的枝不再垂**（`!drooping`）。
+    //       否则"垂"会**串成台阶**：一级垂枝的梢头再长一根垂枝、再垂一层，
+    //       整条链一路往下（实测冠的叶团下探到树高的 8%，快贴地了）。
+    //       一棵树上"几根垂枝"是分散的几根，不是一条挂到底的链。
+    let droop = null;
+    if (spec.droop && !drooping && depth >= 1 && depth <= spec.droop.depthMax) {
+        const n = (state.branchIdxByDepth[depth] = (state.branchIdxByDepth[depth] || 0) + 1);
+        const stride = spec.droop.every[depth] || 0;
+        if (stride > 0 && n % stride === 0) droop = spec.droop;
+    }
+    // 垂枝是**细枝**：整根（含它的子枝）按同一个系数收细。
+    // ⚠️ 只改半径，不改任何抽数 ⇒ 形态序列不动。
+    const r0s = droop ? r0 * droop.radiusScale : r0;
+    const r1s = droop ? r1 * droop.radiusScale : r1;
+
     // 主干抖得小一点（它要立得住），越往上越放肆
     const jit = depth === 0 ? spec.trunkJitter : spec.branchJitter;
     const lift = depth === 0 ? spec.trunkLift : spec.branchLift;
-    for (let i = 1; i <= spec.segs; i++) {
+    // 垂枝：段数更多（弧才圆）且更长（才垂得下来）。
+    // ⚠️ 段数变了 ⇒ `jitterDir` 的调用次数变了 ⇒ 后面所有枝的随机序列整体挪位。
+    //    这只对**开了垂枝的那棵树**成立 —— 柿子树的 `droop` 恒为 null，
+    //    走的还是 `spec.segs` / `length` 那条老路，逐位不变。
+    const segs = droop ? droop.segs : spec.segs;
+    const len = droop ? length * droop.lengthScale : length;
+    for (let i = 1; i <= segs; i++) {
         d = jitterDir(rand, d, jit);
         d.y += lift;
+        // 🔴 垂枝的"先上后垂"：**直接构造竖直分量**，不从父枝继承。
+        //
+        // ⚠️ 这里是整个特性最容易做错的一处，两版都栽过，都留档：
+        //    ① 第一版写 `d.y -= gravity * u`（**减一个量**）⇒ 假绿。
+        //       深度 1 的枝是从**主干方向**抖出来的，本身接近竖直（`d.y ≈ 0.87`），
+        //       减 0.62 还剩 +0.25 ⇒ 整根一路往上，**梢头反而是最高点**
+        //       （实测 `drop = −0.84`）。
+        //    ② 第二版写 `d.y = d.y*(1−u) − sink*u`（按 `u` 插值）⇒ 深度 1 修好了，
+        //       但**深度 2 又坏了**：它的父枝（一根垂枝）梢头方向已经朝下，
+        //       子枝从那个方向抖出来 ⇒ `rise = 0`，一出生就往下扎，
+        //       实测梢头 y = −0.20（**扎到地面以下**）。
+        //    ⇒ 正解：垂枝的竖直分量**完全由 `u` 决定**（`up − sink·u²`），
+        //       一个二次斜坡：先上扬、中途转平、末段猛坠。
+        //       父枝朝哪、抖动多大**都影响不到 y** ⇒ 深度 1 / 2 行为一致，
+        //       而且"末段朝下"是构造保证的。
+        //       水平分量（`d.x` / `d.z`）仍然吃抖动 ⇒ 垂枝照常向四面散开。
+        if (droop) {
+            const u = i / segs;
+            d.y = droop.up - droop.sink * u * u;
+        }
         d.normalize();
-        p.addScaledVector(d, length / spec.segs);
+        p.addScaledVector(d, len / segs);
         pts.push(p.clone());
     }
 
     const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.5);
     const tubular = spec.tubular[depth];
     const radial = spec.radial[depth];
-    emitTube(acc, curve, r0, r1, tubular, radial);
+    emitTube(acc, curve, r0s, r1s, tubular, radial);
 
     if (depth === 0) state.branches.push(curve);
 
     const tip = p.clone();
     const tipDir = d.clone();
 
+    // 垂枝的折线留档 —— 判据要能量"确实拱下来了"（`probe-tree-droop.mjs`）。
+    // ⚠️ 存的是**折线点**，不是 `curve`：`leanCrownForward` 要就地转这些点，
+    //    而 `curve` 只在 `state.branches` 里被挂件锚点用（那边单独转）。
+    if (droop) {
+        state.droops.push({ depth, pts });
+        // 🔴 垂枝**自己也要挂叶子**：把它的梢头也记成一个"撒叶团的点"。
+        //    不记的话垂枝是**光杆** —— 一根根秃枝吊在冠底下，读成"枯枝"而不是
+        //    "垂枝"。标 `droop: true` ⇒ 它照样**不参与冠体积**（见调用方那段），
+        //    但会拿到自己的 `perTip` 团，于是花/叶跟着垂下来。
+        state.tips.push({ p: tip, d: tipDir, r: r1s, droop: true });
+    }
+
     if (depth >= spec.maxDepth) {
-        state.tips.push({ p: tip, d: tipDir, r: r1 });
+        // 🔴 `droop` 标记"这根末梢属于一根垂枝的子树"。调用方要用它把
+        //    **垂枝的末梢排除在冠体积之外** —— 否则几根垂枝会把"末梢包围盒"
+        //    的上下左右全部拉大，冠心被拽低、冠半径被撑开（实测冠宽 6.1 → 24.4，
+        //    冠底下探到树根以下）。垂枝是**装饰性的外延**，它不该定义冠的体积。
+        state.tips.push({ p: tip, d: tipDir, r: r1s, droop: drooping });
         return;
     }
 
@@ -242,22 +316,39 @@ function grow(state, spec, start, dir, length, r0, r1, depth) {
     }
     outward.normalize();
 
+    // 🔴 子枝的**参考方向**。垂枝用"这根枝**进入时**的方向"，不是它垂下来之后的末段朝向。
+    //
+    //    为什么：子枝的出发方向是 `jitterDir(rand, refDir, spread)` —— **从参考方向
+    //    抖出来的**。只把最后那次 `lerp` 的目标换掉是不够的（第一版就是这么改的，
+    //    仍然扎穿地面）：抖动的**底**还是那根垂枝的末段朝向（≈ 竖直向下），
+    //    抖完再往回 lerp 32% 也还是朝下。
+    //    ⇒ 参考方向必须**整条换掉**：垂枝的侧枝仍然向上/向外长，
+    //      垂的是那一根，不是它整条枝系。
+    //    判据：`probe-tree-droop.mjs` 的 D7。
+    const refDir = droop ? dir.clone().normalize() : tipDir;
+
     for (let i = 0; i < n; i++) {
         const spread = spec.spread[depth];
-        const nd = jitterDir(rand, tipDir, randRange(rand, spread * 0.55, spread));
+        const nd = jitterDir(rand, refDir, randRange(rand, spread * 0.55, spread));
         nd.addScaledVector(outward, spec.outBias[depth]);
         nd.y += spec.upBias[depth];
         nd.z += spec.fwdBias[depth];
         nd.normalize();
         // 子枝起点半径提到父枝末端的 0.84~0.98：粗细过渡才不"断"
-        const nr0 = r1 * randRange(rand, spec.childRadiusJit[0], spec.childRadiusJit[1]);
+        const nr0 = r1s * randRange(rand, spec.childRadiusJit[0], spec.childRadiusJit[1]);
         const lenBase = spec.lenFalloff[depth];
+        // 🔴 用 `length`（**父枝传进来的、没有垂枝放大的**长度），不是 `len`。
+        //    `lengthScale` 只作用于垂枝**自己**那一节。让它沿深度级联的话，
+        //    4 级枝链的总长从 2.7 涨到 4.5，冠被撑成一朵蘑菇云
+        //    （实测冠宽 6.1 → 24.4）。注释和代码必须一致 —— 这里踩过一次。
         const nlen = length * randRange(rand, lenBase - spec.childLenJit[0], lenBase + spec.childLenJit[1]);
         children.push({ nd, nr0, nlen });
     }
 
     // ---- 关节 ----------------------------------------------------
-    const jointR = r1 * spec.jointScale;
+    // ⚠️ 用 `r1s`（垂枝收细之后的值）—— 关节椭球的硬约束是"垂直于父枝的半径
+    //    ≥ 父枝末端半径"，父枝是这一根自己，所以跟着它一起收才仍然包得住。
+    const jointR = r1s * spec.jointScale;
     const jointC = tip.clone().addScaledVector(tipDir, -jointR * spec.jointInset);
     emitEllipsoid(acc, jointC, tipDir, jointR, spec.jointElong, spec.jointSquash);
 
@@ -278,8 +369,13 @@ function grow(state, spec, start, dir, length, r0, r1, depth) {
     const inset = tipDir.clone().multiplyScalar(-jointR * spec.childInset);
     const childStart = tip.clone().add(inset);
     for (const c of children) {
-        const biased = c.nd.clone().lerp(tipDir, spec.childDirBias).normalize();
-        grow(state, spec, childStart, biased, c.nlen, c.nr0, c.nr0 * spec.radFalloff, depth + 1);
+        // ⚠️ `refDir`（见上面那段）—— 垂枝的子枝从"进入方向"出发，不从垂下来的末段出发。
+        const biased = c.nd.clone().lerp(refDir, spec.childDirBias).normalize();
+        // ⚠️ 子枝长度用**原来的** `length`，不是放大过的 `len` ——
+        //    `lengthScale` 只作用于垂枝**自己**那一节。让它沿深度级联的话，
+        //    4 级枝链的总长会从 2.7 涨到 4.5，冠被撑成一朵蘑菇云。
+        grow(state, spec, childStart, biased, c.nlen, c.nr0, c.nr0 * spec.radFalloff, depth + 1,
+            drooping || !!droop);
     }
 }
 
@@ -287,7 +383,8 @@ function grow(state, spec, start, dir, length, r0, r1, depth) {
  * 长一棵树（树**自己的一套单位**，还没归一化）。
  *
  * @param {object} spec 见 `persimmonTree.js` / `sakuraTree.js` 顶上的形态参数表
- * @returns {{ acc, tips, branches, hangCandidates }}
+ * @returns {{ acc, tips, branches, hangCandidates, droops }}
+ *   `droops` 只在 spec 给了 `droop` 时非空（WO-28b 的垂枝）。
  */
 export function growSkeleton(spec) {
     const state = {
@@ -296,6 +393,10 @@ export function growSkeleton(spec) {
         tips: [],
         branches: [],
         hangCandidates: [],
+        // 垂枝用的计数器（**按深度分开**，见 `grow` 里那段）+ 垂枝折线留档。
+        // 不给 `spec.droop` 时它们一路是空的，不参与任何计算。
+        branchIdxByDepth: {},
+        droops: [],
     };
     grow(
         state, spec,
