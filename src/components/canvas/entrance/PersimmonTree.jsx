@@ -98,12 +98,14 @@ const SHADOW_R = 2.15;
 const SHADOW_TINT = [0.149, 0.204, 0.094];
 const SHADOW_OPACITY = 0.42;
 
-export function PersimmonTree({ position = [0, 0, 0], yaw = 0, rootY = 0 }) {
+export function PersimmonTree({ position = [0, 0, 0], yaw = 0, rootY = 0, seed, chime = true, name = 'persimmon-tree' }) {
     const season = useSeason();
     const look = lookFor(season);
     const scene = useThree((state) => state.scene);
 
-    const tree = useMemo(() => buildPersimmonTree(), []);
+    // ⚠️ `seed` 不传（undefined）⇒ `buildPersimmonTree` 的默认参数生效
+    //    ⇒ 逐位等于改动前那棵参照树。第二棵树传一个新 seed（WO-27）。
+    const tree = useMemo(() => buildPersimmonTree(seed), [seed]);
 
     const barkMatRef = useRef();
     const leafMatRef = useRef();
@@ -187,7 +189,7 @@ export function PersimmonTree({ position = [0, 0, 0], yaw = 0, rootY = 0 }) {
     const anchor = tree.chimeAnchor;
 
     return (
-        <group name="persimmon-tree" position={position} rotation={[0, yaw, 0]}>
+        <group name={name} position={position} rotation={[0, yaw, 0]}>
             {/* ---- 骨架：枝 + 关节，一个几何体 ---- */}
             <mesh geometry={tree.bark} frustumCulled={false}>
                 <shaderMaterial
@@ -247,8 +249,11 @@ export function PersimmonTree({ position = [0, 0, 0], yaw = 0, rootY = 0 }) {
                 />
             </mesh>
 
-            {/* ---- 风铃挂在**真实的一级枝**上（挂点由生成器挑出来）---- */}
-            <WindChime position={[anchor.x, anchor.y, anchor.z]} />
+            {/* ---- 风铃挂在**真实的一级枝**上（挂点由生成器挑出来）----
+                ⚠️ 第二棵柿子树（WO-27）**不挂风铃**（`chime={false}`）：
+                   "这一进院子有一串风铃"是个**单数**的道具，两串既多一个重复的
+                   静物、两个铃的摆动相位也会互相打脸。 */}
+            {chime && <WindChime position={[anchor.x, anchor.y, anchor.z]} />}
         </group>
     );
 }

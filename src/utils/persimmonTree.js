@@ -357,12 +357,24 @@ export function makeFruitGeometry() {
 /* 主构建                                                             */
 /* ------------------------------------------------------------------ */
 
-let cached = null;
+/**
+ * 按 **seed** 缓存。⚠️ 原来这里是一个 `let cached = null`（单槽）——
+ * 第二棵柿子树（WO-27）一进来就会**拿到同一个对象**，两棵树逐位相同。
+ * 改成 Map 之后：`seed` 是键，同一个 seed 仍然只长一次（截图之间可比对），
+ * 不同 seed 各长各的。
+ */
+const cache = new Map();
 
 /**
- * 建树。**确定性**：同一个 key 永远长同一棵树，所以结果可以缓存、也所以
+ * 建树。**确定性**：同一个 seed 永远长同一棵树，所以结果可以缓存、也所以
  * 无头截图之间可比对。
  *
+ * 🔴 **`seed` 有默认值（= `KEY`）**，这一点是硬要求（WO-27）：
+ *    · 不传参 ⇒ 逐位等于改动前那棵「参照树」——秋天是回归锚点，
+ *      它的几何哈希**不许漂**（判据 `harness/probe-tree-identity.mjs`）。
+ *    · 传新 seed ⇒ 同一品种的**另一个个体**，骨架与叶团都不重样。
+ *
+ * @param {string} [seed] 默认 `KEY`（原参照树的种子）
  * @returns {{
  *   bark: import('three').BufferGeometry,
  *   leaf: { matrices: Float32Array, phase: Float32Array, tint: Float32Array,
@@ -372,10 +384,11 @@ let cached = null;
  *   crown: { c: import('three').Vector3, r: import('three').Vector3 },
  * }}
  */
-export function buildPersimmonTree() {
-    if (cached) return cached;
+export function buildPersimmonTree(seed = KEY) {
+    const hit = cache.get(seed);
+    if (hit) return hit;
 
-    const rand = seededRand(KEY);
+    const rand = seededRand(seed);
 
     // 1. 骨架（树内部单位）—— 机器在 `treeSkeleton`，这里只给形态参数。
     //    ⚠️ `rand` 每次**新建**再传进去：SPEC 是模块级的，如果随机数生成器
@@ -530,12 +543,13 @@ export function buildPersimmonTree() {
     bark.setAttribute('normal', new THREE.Float32BufferAttribute(state.acc.nrm, 3));
     bark.computeBoundingSphere();
 
-    cached = {
+    const built = {
         bark,
         leaf,
         fruit: { matrices: fMats, count: fruitRaw.length },
         chimeAnchor: toFinal(anchorRaw),
         crown: { c: toFinal(crownC), r: new THREE.Vector3(crownR.x * k, crownR.y * k, crownR.z * k * DEPTH_SQUASH) },
     };
-    return cached;
+    cache.set(seed, built);
+    return built;
 }
