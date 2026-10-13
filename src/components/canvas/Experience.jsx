@@ -32,6 +32,7 @@ import DreamForest from './entrance/DreamForest';
 import DebugFlyCamera from './entrance/DebugFlyCamera';
 import Airplane from './entrance/Airplane';
 import FlightCamera from './entrance/FlightCamera';
+import FlightFinish from './entrance/FlightFinish';
 import { resolveCameraMode, CAMERA_MODE, isFlyEnabled } from '../../config/cameraMode';
 import { useFlightMode } from '../../config/flightMode';
 
@@ -288,6 +289,19 @@ const Experience = ({ onSceneReady, performanceTier }) => {
                 存**，因为这套镜头把"长焦"换算成了推拉距离，投影矩阵从头到尾
                 没被碰过（⇒ 残留结构上不存在）。见 FlightCamera 的文件头。 */}
             <FlightCamera enabled={cameraMode === CAMERA_MODE.FLIGHT} />
+
+            {/* === 飞行视图的「单趟电影后期」（WO-29）===
+                颗粒 + 辉光 + 饱和度。它**接管这一帧的渲染**：场景先渲进一张
+                render target，再渲一趟全屏 quad 加后期。
+
+                🔴 挂载条件与 `FlightCamera` **同一条** —— 而且这里用
+                   「挂不挂载」而不是「挂上之后内部 return」，是为了让
+                   "不飞行时零影响"成为**结构性**的事实：组件不在场 ⇒
+                   R3F 的 `internal.priority` 是 0 ⇒ 它自己那一句渲染照常跑，
+                   管线与改动前逐位相同。详见 FlightFinish.jsx 的文件头。 */}
+            {cameraMode === CAMERA_MODE.FLIGHT && (
+                <FlightFinish />
+            )}
 
             {/* === COURTYARD SEASON BED (四季声床) ===
                 🔴 边界**故意**是 `!hasEntered`，**不是** `outdoorVisible` ——
