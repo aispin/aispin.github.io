@@ -13,7 +13,7 @@ import {
     SAKURA_SHADOW_VERT, SAKURA_SHADOW_FRAG,
 } from '../../../shaders/sakuraTree';
 import {
-    SAKURA_H, LEAF_EXTENT, buildSakuraTree,
+    LEAF_EXTENT, buildSakuraTree,
     makeBlossomGeometry, makeSakuraLeafGeometry, makePetalGeometry,
 } from '../../../utils/sakuraTree';
 import { seasonLightFor } from '../../../config/seasonLight';
@@ -67,10 +67,10 @@ import { toShaderColor } from '../../../config/theme';
 /* ------------------------------------------------------------------ */
 
 const TREE_LOOK = {
-    spring: { canopy: 'blossom', petal: true, shadow: 0.20, dx: -0.109, wind: 0.075, bark: 1.00 },
-    summer: { canopy: 'leaf', petal: false, shadow: 0.11, dx: 0.000, wind: 0.062, bark: 0.90 },
-    autumn: { canopy: 'leaf', petal: false, shadow: 0.17, dx: 0.000, wind: 0.070, bark: 1.00 },
-    winter: { canopy: null, petal: false, shadow: 0.30, dx: 0.172, wind: 0.090, bark: 1.20 },
+    spring: { canopy: 'blossom', petal: true, shadow: 0.20, dx: -0.109, bark: 1.00 },
+    summer: { canopy: 'leaf', petal: false, shadow: 0.11, dx: 0.000, bark: 0.90 },
+    autumn: { canopy: 'leaf', petal: false, shadow: 0.17, dx: 0.000, bark: 1.00 },
+    winter: { canopy: null, petal: false, shadow: 0.30, dx: 0.172, bark: 1.20 },
 };
 
 const lookFor = (season) => TREE_LOOK[season] || TREE_LOOK.autumn;
@@ -112,7 +112,8 @@ function lightDirFor(season) {
  *    不复制数据）。
  */
 function attachInstanceAttrs(geo, canopy) {
-    geo.setAttribute('aPhase', new THREE.InstancedBufferAttribute(canopy.phase, 1));
+    // ⚠️ WO-28 起**不挂 `aPhase`** —— 那个属性只被花冠的风摆用，花冠改静止之后
+    //    它是死的。`packInstances` 仍然产出 `phase`（柿子树的叶团也共用那份）。
     geo.setAttribute('aTint', new THREE.InstancedBufferAttribute(canopy.tint, 1));
     geo.setAttribute('aAccent', new THREE.InstancedBufferAttribute(canopy.accent, 1));
     geo.setAttribute('aShade', new THREE.InstancedBufferAttribute(canopy.shade, 1));
@@ -151,9 +152,7 @@ export function SakuraTree({ position = [0, 0, 0], rootY = 0 }) {
             ...sakuraSeasonUniforms(s),
             uLightDir: { value: lightDirFor(s) },
             uRootY: { value: rootY },
-            uTreeH: { value: SAKURA_H },
             uTime: { value: 0 },
-            uWind: { value: lookFor(s).wind },
             uBarkBump: { value: BARK_BUMP * lookFor(s).bark },
             uTuftExtent: { value: LEAF_EXTENT },
             uLeafTrans: { value: LEAF_TRANS },
@@ -201,6 +200,11 @@ export function SakuraTree({ position = [0, 0, 0], rootY = 0 }) {
 
     useFrame((state) => {
         // 🔴 所有材质引用的是**同一份** uniform 对象，所以这里只写一次。
+        //
+        // ⚠️ WO-28 起 `uTime` 的**唯一消费者是落樱**（`SAKURA_PETAL_VERT`）——
+        //    花冠的风摆已经删掉了。这一行**不能跟着删**：删了落樱就冻在天上。
+        //    （柿子树的 `useFrame` 里那一行 `uTime` 是**真的**删了，因为那边
+        //    连落樱都没有。两棵树的处理不同，理由就在这里。）
         const bm = barkMatRef.current;
         if (!bm) return;
         bm.uniforms.uTime.value = state.clock.elapsedTime;

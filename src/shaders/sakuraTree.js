@@ -114,14 +114,38 @@ void main() {
 /* 花簇（InstancedMesh）                                               */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 🔴 2026-10-13（WO-28）**樱花的花冠已改静止** —— 这里原来和柿子树一样有一段
+ * 两频风摆（系数 0.55 / 0.40）：
+ *
+ *     float s = sin(uTime * 0.83 + aPhase) * 0.7 + sin(uTime * 1.37 + aPhase * 2.3) * 0.3;
+ *     float bend = rel * rel;
+ *     lp.x += s * uWind * 0.55 * bend;
+ *     lp.z += cos(uTime * 0.71 + aPhase * 1.6) * uWind * 0.40 * bend;
+ *
+ * 用户 2026-10-13：「樱花树长的太像柿子树了……**树冠也停随风摆**」。
+ * （柿子树先一步停掉是 WO-25，同一句需求的另一棵。）
+ *
+ * 为什么一起停：这句话本身没有再问"有没有性能损毁"，而柿子树那一轮已经量过
+ * 这笔账 —— 风摆是顶点着色器里的几行位移，**0 额外顶点 / 0 额外三角形 /
+ * 0 额外 draw / 0 额外 CPU**，唯一的边际代价就是每个顶点每帧那几次 `sin`/`cos`。
+ * 判据与完整推演见 `shaders/persimmonTree.js` 的 `TREE_LEAF_VERT` 上面那段。
+ *
+ * ⚠️ **落樱（`SAKURA_PETAL_VERT`）不在这次改动范围内** —— 那是另一个几何体、
+ *    另一套 `aSeed`/`aOrigin` 驱动的运动，而且是"樱花"这个意象本身。
+ *    它仍然需要 `uTime`，所以 `SakuraTree.jsx` 里那个 `uTime` 写入**必须留**。
+ *
+ * ⚠️ 顺带说明：樱花的**叶冠**（夏/秋两季）用的是 `SAKURA_LEAF_VERT`，
+ *    那份是从 `shaders/persimmonTree.js` **再导出**的同一个 `TREE_LEAF_VERT`
+ *    ⇒ 它早在 WO-25 就已经没有风摆了。这里停的是**春季花冠**那一条。
+ *
+ * 判据：`.workbuddy-ai/harness/probe-tree-crown.mjs` 的 **C5**
+ * （原来断言樱花**仍然有** `uWind`，是防误伤的护栏；现已反向）。
+ */
 export const SAKURA_BLOSSOM_VERT = /* glsl */ `
-attribute float aPhase;
 attribute float aTint;
 attribute float aAccent;
 attribute float aShade;
-uniform float uTime;
-uniform float uWind;
-uniform float uTreeH;
 uniform vec3 uHaze;
 uniform float uHazeNear;
 uniform float uHazeFar;
@@ -140,18 +164,9 @@ void main() {
     //    画面上那棵树只剩枝、一朵花都没有，而 DOM 里那个 mesh 好端端地
     //    visible: true、count 也对 —— 症状是"看着光秃"，不是报错。
     vec3 lp = position;
-    vec3 o = vec3(0.0);
     #ifdef USE_INSTANCING
-        o = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
         lp = (instanceMatrix * vec4(lp, 1.0)).xyz;
     #endif
-
-    // 花比叶轻，但**摆动幅度要小** —— 樱花是"花团轻轻晃"，不是"柳枝甩"。
-    float rel = clamp(o.y / uTreeH, 0.0, 1.0);
-    float s = sin(uTime * 0.83 + aPhase) * 0.7 + sin(uTime * 1.37 + aPhase * 2.3) * 0.3;
-    float bend = rel * rel;
-    lp.x += s * uWind * 0.55 * bend;
-    lp.z += cos(uTime * 0.71 + aPhase * 1.6) * uWind * 0.40 * bend;
 
     vec3 nrm = normal;
     #ifdef USE_INSTANCING
