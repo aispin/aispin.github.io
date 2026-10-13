@@ -38,8 +38,29 @@
  *       ⇒ 模块脚本 MIME 不对 ⇒ 同样报 `Failed to load resource`。
  *       实测：`curl /assets/main-VgyU1IVL.js`（旧哈希）→ **200 + text/html**。
  *       两者都靠**普通刷新**治：导航分支是 network-first，刷一下就拿到新 HTML。
+ *
+ * 🔴 2026-10-13（**第三次**贴同一个报错）—— 上面那句"靠普通刷新治"**不成立**，
+ *    因为导航分支的回退读错了缓存。这次终于把链路走完了：
+ *
+ *      · 现象：`localhost:4173/assets/main-CiidtBUP.js`
+ *              `→ network error response: the promise was resolved with an
+ *                 error response object`（**resolved**，不是 rejected
+ *              ⇒ 走的是 `Response.error()` 那条分支，**不是** v6 的 undefined 病）
+ *      · 那个哈希**不在** `dist/`（现在是 `main-Bm67gdII.js`），
+ *        只在归档 `.workbuddy-ai/dist-prev-1791784813/`（= 2026-10-12 13:02 那次构建）
+ *        ⇒ 请求的是**旧构建的产物**。
+ *      · 为什么会去要旧构建的产物：导航分支的 catch 只读 `PRECACHE`，
+ *        而 `PRECACHE` 的 `/` 是 **install 时刻**的 HTML（冻结）。
+ *        写 `RUNTIME`、读 `PRECACHE` —— 修法见下面 catch 里的注释。
+ *      · 为什么 `fetch` 会失败：**`vite preview` 没在跑**（4173 三个回环地址全 000）。
+ *
+ *    ⇒ 两条独立的修，缺一不可：
+ *      ① 回退顺序改成 RUNTIME → PRECACHE（本文件）；
+ *      ② **本地 origin 干脆不注册 SW**（`src/main.jsx`）—— `vite preview`
+ *         服务的是生产构建，`import.meta.env.PROD` 为真，所以本地预览也挂 SW，
+ *         这才是这个报错反复出现的地基。
  */
-const VERSION = 'aispin-v8';
+const VERSION = 'aispin-v9';
 const PRECACHE = `${VERSION}-precache`;
 const RUNTIME = `${VERSION}-runtime`;
 
@@ -103,8 +124,22 @@ self.addEventListener('fetch', (event) => {
           cache.put('/', fresh.clone()).catch(() => {});
           return fresh;
         } catch {
-          const cache = await caches.open(PRECACHE);
-          return (await cache.match('/')) || (await cache.match(request)) || Response.error();
+          // 🔴 顺序必须是 **RUNTIME → PRECACHE**，和下面的静态分支一致。
+          //    2026-10-13 之前这里只读 `PRECACHE`，而上面 `cache.put` 写的是
+          //    `RUNTIME` —— **写一处、读另一处**。后果：预缓存里的 `/` 是
+          //    `install` **那一刻**抓的 HTML，之后**永不更新**；于是服务器没起来
+          //    时，SW 交出的是"安装当天的旧构建"HTML，它引用的
+          //    `assets/main-<旧哈希>.js` 早就不在盘上了 ⇒ 浏览器刷出一串
+          //    「The FetchEvent for … resulted in a network error response」。
+          //    `RUNTIME` 的 `/` 是每次成功导航覆盖的，那才是"最新那份"。
+          const runtime = await caches.open(RUNTIME);
+          const precache = await caches.open(PRECACHE);
+          return (
+            (await runtime.match('/')) ||
+            (await precache.match('/')) ||
+            (await precache.match(request)) ||
+            Response.error()
+          );
         }
       })()
     );

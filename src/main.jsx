@@ -39,8 +39,33 @@ if (typeof window !== 'undefined') {
 // 2026-10-10 用户报「过道两边的草冬天还是绿的」就是这一路：
 // 地面色板在 `entranceTextures.js` 里，页面拿到的是**修好之前**的那份。
 // 生产构建的产物带内容哈希，缓存它们是安全的，所以只有 dev 需要这份清理。
+//
+// 🔴 **本地 / 私有 origin 也一律不注册**（2026-10-13 加）。
+// `vite preview`（4173）服务的是**生产构建** ⇒ `import.meta.env.PROD` 为真
+// ⇒ 本地预览照样挂上 SW。后果：每次重新构建后，旧 SW 的缓存里躺着旧构建的
+// HTML；一旦 preview 停掉，导航回退就把那份旧 HTML 交出去，而它引用的
+// `assets/main-<旧哈希>.js` 早已不在盘上 ⇒ 控制台刷出
+// 「The FetchEvent for … resulted in a network error response」。
+// 这个报错 2026-10-11 / 10-12 / 10-13 被报了**三次**，前两次的答复都是
+// "刷新一下"，没有触及地基。本地预览不需要 PWA，所以按 origin 闸掉。
+//
+// ⚠️ 闸掉**不影响** SW 本体的验证：`harness/probe-sw-fetch.mjs` 是**手动**
+//    `navigator.serviceWorker.register('/sw.js')` 的，不经过这里。
+// 判据：`harness/check-sw-dev.mjs http://localhost:4173` 必须报 0 注册 0 缓存。
+const isLocalOrigin =
+  typeof location !== 'undefined' &&
+  (location.hostname === 'localhost' ||
+    location.hostname === '127.0.0.1' ||
+    location.hostname === '[::1]' ||
+    location.hostname === '::1' ||
+    location.hostname.endsWith('.local') ||
+    location.hostname.endsWith('.localhost') ||
+    /^10\./.test(location.hostname) ||
+    /^192\.168\./.test(location.hostname) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(location.hostname));
+
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-  if (import.meta.env.PROD) {
+  if (import.meta.env.PROD && !isLocalOrigin) {
     window.addEventListener('load', () => {
       navigator.serviceWorker
         .register('/sw.js')
@@ -62,6 +87,8 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     });
   } else {
     // 清掉历史会话留下的 SW 与缓存 —— 否则旧模块会一直被优先命中。
+    // 本地 origin 走这里还有一个作用：**自愈**。被旧 SW 毒过的预览页
+    // 只要成功加载一次（服务器起来了），就会把 SW 注销、把缓存清空。
     navigator.serviceWorker
       .getRegistrations()
       .then((regs) => regs.forEach((reg) => reg.unregister()))
