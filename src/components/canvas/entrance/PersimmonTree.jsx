@@ -191,7 +191,7 @@ export function PersimmonTree({ position = [0, 0, 0], yaw = 0, rootY = 0, seed, 
     return (
         <group name={name} position={position} rotation={[0, yaw, 0]}>
             {/* ---- 骨架：枝 + 关节，一个几何体 ---- */}
-            <mesh geometry={tree.bark} frustumCulled={false}>
+            <mesh name="persimmon-bark" geometry={tree.bark} frustumCulled={false}>
                 <shaderMaterial
                     ref={barkMatRef}
                     vertexShader={TREE_BARK_VERT}
@@ -203,6 +203,7 @@ export function PersimmonTree({ position = [0, 0, 0], yaw = 0, rootY = 0, seed, 
             {/* ---- 叶（冬季整棵不挂：`visible` 是项目既有的"隐藏"写法）---- */}
             <instancedMesh
                 ref={leafRef}
+                name="persimmon-leaf"
                 args={[leafGeo, null, tree.leaf.count]}
                 visible={look.leaves}
                 frustumCulled={false}
@@ -219,6 +220,7 @@ export function PersimmonTree({ position = [0, 0, 0], yaw = 0, rootY = 0, seed, 
             {/* ---- 果（只有秋天挂）---- */}
             <instancedMesh
                 ref={fruitRef}
+                name="persimmon-fruit"
                 args={[fruitGeo, null, Math.max(tree.fruit.count, 1)]}
                 visible={look.fruit}
                 frustumCulled={false}
@@ -233,6 +235,7 @@ export function PersimmonTree({ position = [0, 0, 0], yaw = 0, rootY = 0, seed, 
 
             {/* ---- 地面投影（贴地椭圆软斑，见 shaders 里那段注释）---- */}
             <mesh
+                name="persimmon-shadow"
                 position={[look.dx, 0.006, 0]}
                 rotation={[-Math.PI / 2, 0, 0]}
                 scale={[SHADOW_R * 2, SHADOW_R * 2 * look.shadow, 1]}
