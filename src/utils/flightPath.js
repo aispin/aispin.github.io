@@ -341,6 +341,162 @@ function shotProgress(uu, index) {
     return span > 1e-9 ? (uu - start) / span : 0;
 }
 
+/**
+ * 换段过渡（WO-23，2026-10-13）。
+ * ==================================================================
+ *
+ * 用户：「飞机先修复飞行过程中**生硬拼接转场**的问题。」
+ *
+ * ---------------------------------------------------------------------------
+ * 原来是什么样（量出来的）
+ * ---------------------------------------------------------------------------
+ * 原来在 4 段的边界上**直接换 offset** —— 也就是硬切。一圈里 4 步的位移
+ * 比中位数大 **8960×**：
+ *
+ *   u=0.22  一步挪 9.45 单位 · 视线转 30.7°
+ *   u=0.46  一步挪 **26.37** 单位 · 视线转 **113.1°**
+ *   u=0.74  一步挪 23.43 单位 · 视线转 87.9°
+ *   u=1.00  一步挪 12.34 单位 · 视线转 12.7°
+ *
+ * 相机最快 35960 单位/s = 飞机自己速度的 7403×。
+ * 判据 `probe-flight-camera-smooth.mjs`（纯函数上取导数，不用浏览器）。
+ *
+ * ---------------------------------------------------------------------------
+ * 🔴 参考实现**是故意切的**，本项目不能照抄
+ * ---------------------------------------------------------------------------
+ * `flight.js` 的原文是「Deliberate editorial cuts every 12 seconds」，
+ * 而且它给每一段配了标题卡（「01 掠海 / 02 追逐 / 03 交错 …」）——
+ * **切**是它叙事的一部分：切完观众看到一行标题，就知道"换场景了"。
+ *
+ * 本项目没有标题卡，也没有"换场景"这回事（一圈观光航线而已），
+ * 所以硬切在观感上就只剩"画面被甩了一下"。
+ *
+ * ---------------------------------------------------------------------------
+ * 改法：边界两侧各留一个窗口，按 `smoothstep` 混合相邻两段
+ * ---------------------------------------------------------------------------
+ * `SHOT_BLEND` 是窗口的**半宽**（以"一圈的几分之几"计），所以一次换段
+ * 的总时长 = `2 × SHOT_BLEND × FLIGHT_DURATION` = 4.4 s。
+ *
+ * 取 0.05 的两条约束（都要满足）：
+ *   · **窗口不许重叠**：`2 × SHOT_BLEND < 最短段长`（0.22）—— 否则一段里
+ *     会同时和前后两段混，"哪一段"就说不清了；
+ *   · **每段要留出"纯"时间**：最短那段（0.22 = 9.68 s）去掉两端窗口后
+ *     还剩 5.3 s 是纯粹的固定机位 —— 段落感还在。
+ *
+ * 混合的是**段配置**（offset / lens / roll），不是世界坐标 ——
+ * 于是相机全程"挂在飞机身上"，读起来是**绕过去**，而不是"闪现到别处"。
+ * 用 `smoothstep` 而不是线性：它两端导数为 0，所以进出过渡都不"拐硬弯"。
+ *
+ * ⚠️ 段内的 `drift`（"镜头不静止"）与 `roll` 照旧 —— 它们本来就是
+ *    段的两端归零的（`sin(progress·π)`），与过渡窗口天然接得上。
+ */
+const SHOT_BLEND = 0.05;
+
+/** `smoothstep` 夹到 [0,1]。 */
+function smoothstep01(t) {
+    const x = t < 0 ? 0 : t > 1 ? 1 : t;
+    return x * x * (3 - 2 * x);
+}
+
+/**
+ * 一段镜头在 `uu` 处的配置（**已经乘过 drift 与 roll 包络的终值**）。
+ *
+ * ---------------------------------------------------------------------------
+ * 🔴 邻段的 `progress` 必须**显式钉在它的那一端**，不能靠"夹到 [0,1]"
+ * ---------------------------------------------------------------------------
+ * 第一版让 `progress = clamp(raw, 0, 1)` 交给公式自己夹，**在环绕处是错的**：
+ *
+ *   · 上一段（`prev`）在非环绕时 `raw < 0` ⇒ 夹到 0（**起点**）——
+ *     可我们要的是它的**末端**；
+ *   · 下一段（`next`）在环绕时（第 4 段 → 第 1 段）`raw > 1` ⇒ 夹到 1
+ *     （**末端**）—— 可我们要的是它的**起点**。
+ *
+ * 于是相机在一圈接回起点的那一步上仍是硬切（探针量到 `u=1` 一步挪
+ * 3.75 单位、视线转 9.55°）。夹取的方向对**本段**是对的、对**邻段**是错的 ——
+ * 因为邻段此刻并不"在播"，它只是被借来当边界上的那一端。
+ *
+ * @param {number} index 段号
+ * @param {number} uu 归一化时间
+ * @param {0|1|null} endpoint `null` = 本段（用真实 progress）；
+ *   `1` = 上一段（钉在它的末端）；`0` = 下一段（钉在它的起点）
+ * @param {object} out 写回的目标（不返回新对象，见下）
+ */
+function shotConfig(index, uu, endpoint, out) {
+    const shot = SHOTS[index];
+    const raw = shotProgress(uu, index);
+    const p = endpoint === null ? Math.max(0, Math.min(1, raw)) : endpoint;
+    const drift = Math.sin(p * Math.PI - Math.PI / 2);
+    out.ox = shot.offset[0] + shot.drift[0] * drift;
+    out.oy = shot.offset[1] + shot.drift[1] * drift;
+    out.oz = shot.offset[2] + shot.drift[2] * drift;
+    out.lens = shot.lens;
+    out.roll = shot.roll * Math.sin(p * Math.PI);
+    return out;
+}
+
+/** 三个模块级暂存（`cameraAt` 每帧调，见 `shotConfig` 的注释）。 */
+const CFG_A = { ox: 0, oy: 0, oz: 0, lens: 60, roll: 0 };
+const CFG_B = { ox: 0, oy: 0, oz: 0, lens: 60, roll: 0 };
+const CFG_OUT = { ox: 0, oy: 0, oz: 0, lens: 60, roll: 0 };
+
+/**
+ * `uu` 处生效的段配置：段中间就是本段；落在边界窗口里则是相邻两段的混合。
+ *
+ * ---------------------------------------------------------------------------
+ * 🔴 权重必须是"**窗口外沿 = 0、边界上 = 0.5**"
+ * ---------------------------------------------------------------------------
+ * 第一版写成 `k = smoothstep01((left + W) / (2W))`，也就是"边界 0.5、
+ * 外沿 1" —— **方向反了**。后果不是"没效果"，而是把跳变**搬进了段内**：
+ * 在窗口外沿那一点，`k` 从 0 突跳到 1，于是相机从"本段 progress≈0.79 的
+ * 配置"一步跨到"邻段 progress=0 的配置" —— 跳变一点没少，只是从边界挪到了
+ * `u = 0.41 / 0.69`（探针里看得一清二楚：最大一步仍是中位数的 9064×）。
+ *
+ * 正确的形状：设 `w = 0.5 · smoothstep01((W − d) / W)`，`d` 是"离边界的距离"。
+ *   · `d = W`（窗口外沿）⇒ w = 0
+ *   · `d = 0`（边界上）  ⇒ w = 0.5
+ * 而且 `smoothstep` 两端导数为 0 ⇒ 窗口外沿的导数也是 0 ⇒ 进出窗口都**不拐硬弯**。
+ * 边界两侧的两个分支在 `d = 0` 处都给出 0.5，所以跨过边界也连续。
+ *
+ * @returns {{cfg: object, from: number, to: number, k: number}}
+ *   `k` = `to` 段的权重（1 = 纯 `to`）；`from === to` ⇒ 没在过渡。
+ */
+function blendedConfig(uu, shotIndex) {
+    const start = SHOTS[shotIndex].at;
+    const end = shotIndex + 1 < SHOTS.length ? SHOTS[shotIndex + 1].at : 1;
+    const past = uu - start;    // 离"进入本段的那个边界"多远
+    const left = end - uu;      // 离"离开本段的那个边界"多远
+
+    /** 邻居在混合里的权重（0 = 完全不掺，0.5 = 边界上各一半）。 */
+    const neighborWeight = (d) => 0.5 * smoothstep01((SHOT_BLEND - d) / SHOT_BLEND);
+
+    const mix = (a, b, k) => {
+        CFG_OUT.ox = a.ox + (b.ox - a.ox) * k;
+        CFG_OUT.oy = a.oy + (b.oy - a.oy) * k;
+        CFG_OUT.oz = a.oz + (b.oz - a.oz) * k;
+        CFG_OUT.lens = a.lens + (b.lens - a.lens) * k;
+        CFG_OUT.roll = a.roll + (b.roll - a.roll) * k;
+        return CFG_OUT;
+    };
+
+    if (past < SHOT_BLEND) {
+        // 刚进入本段：还在从上一段滑过来。`past = 0` ⇒ 本段占 0.5。
+        const prev = (shotIndex - 1 + SHOTS.length) % SHOTS.length;
+        const w = neighborWeight(past);
+        const a = shotConfig(prev, uu, 1, CFG_A);
+        const b = shotConfig(shotIndex, uu, null, CFG_B);
+        return { cfg: mix(a, b, 1 - w), from: prev, to: shotIndex, k: 1 - w };
+    }
+    if (left < SHOT_BLEND) {
+        // 快要离开本段：开始往下一段滑。`left = 0` ⇒ 本段占 0.5。
+        const next = (shotIndex + 1) % SHOTS.length;
+        const w = neighborWeight(left);
+        const a = shotConfig(shotIndex, uu, null, CFG_A);
+        const b = shotConfig(next, uu, 0, CFG_B);
+        return { cfg: mix(a, b, w), from: shotIndex, to: next, k: w };
+    }
+    return { cfg: shotConfig(shotIndex, uu, null, CFG_OUT), from: shotIndex, to: shotIndex, k: 1 };
+}
+
 /** 场景相机的 fov（`App.jsx` 的 `fov: 60`）。镜头换算的基准。 */
 export const FLIGHT_BASE_FOV = 60;
 
@@ -381,11 +537,20 @@ const CAM_FLOOR_Y = GRASS_Y + 1.5;
  *     写死世界尺寸的问题，不是跟随相机。别混。）
  */
 export function cameraAt(u) {
-    const uu = ((u % 1) + 1) % 1;
+    /**
+     * 🔴 归一化**不要**写成 `((u % 1) + 1) % 1` —— 它会丢一个比特。
+     *
+     * `0.22 + 1` 这个 double 略小于 `1.22`，再 `% 1` 得到
+     * `0.21999999999999997` ⇒ **恰好落在换段边界上**的输入
+     * （`?flight&t=9.68` 就是 `u = 0.22`）会被判进**前一段**。
+     * 症状极隐蔽：只有探针在"跨边界那一步"上取错采样点时才看得见
+     * （`probe-flight-camera-smooth.mjs` 第一版就栽在这上面）。
+     */
+    let uu = u % 1;
+    if (uu < 0) uu += 1;
     // 找当前镜头：`at` 是升序的，取最后一个 ≤ uu 的（越界回落到最后一段）。
     let shotIndex = 0;
     for (let i = 0; i < SHOTS.length; i += 1) if (uu >= SHOTS[i].at) shotIndex = i;
-    const shot = SHOTS[shotIndex];
 
     const pose = poseAt(uu);
     const { position, quaternion } = pose;
@@ -411,16 +576,25 @@ export function cameraAt(u) {
     const rightH = new THREE.Vector3().crossVectors(UP, forwardH).normalize();
 
     /**
-     * 段内漂移：`sin(progress·π − π/2)` 从 −1 走到 +1（两端对称）。
-     * 见 `shotProgress` 上面那段 —— 这是"镜头不静止"的来源。
+     * 段内漂移 + 换段过渡（WO-23）。
+     *
+     * `blend.cfg` 是**生效的段配置** —— 段中间就是本段，落在边界窗口里则是
+     * 相邻两段的 `smoothstep` 混合。见 `blendedConfig` 上面那一大段。
+     *
+     * ⚠️ 混合的是**配置**而不是世界坐标：`ox/oy/oz` 是"飞机本地系里的偏移"，
+     *    所以混合过程中相机始终挂在飞机身上，只是缓缓绕过去。
+     *    直接混世界坐标的话，飞机在这 4.4 秒里自己也在动，两者叠加会糊。
      */
+    const blend = blendedConfig(uu, shotIndex);
+    const cfg = blend.cfg;
     const progress = shotProgress(uu, shotIndex);
-    const drift = Math.sin(progress * Math.PI - Math.PI / 2);
-    const ox = shot.offset[0] + shot.drift[0] * drift;
-    const oy = shot.offset[1] + shot.drift[1] * drift;
-    const oz = shot.offset[2] + shot.drift[2] * drift;
+    // 诊断用的"本段自己的 drift"（过渡窗口里它仍是本段的值，不是混合值）。
+    const drift = Math.sin(Math.max(0, Math.min(1, progress)) * Math.PI - Math.PI / 2);
+    const ox = cfg.ox;
+    const oy = cfg.oy;
+    const oz = cfg.oz;
 
-    const dolly = lensDolly(shot.lens);
+    const dolly = lensDolly(cfg.lens);
     const camPos = position
         .clone()
         .addScaledVector(rightH, ox * dolly)
@@ -439,15 +613,21 @@ export function cameraAt(u) {
          * 滚转角（弧度）。段的两端为 0、中间最大（`sin(progress·π)`）。
          * `FlightCamera` 用 `camera.rotateZ(roll)` 写 —— **是方法**，
          * 不碰投影矩阵，退出时随 `quaternion` 一起还原。
+         * 过渡窗口里它是相邻两段的混合值（两段在边界上都 ≈ 0 ⇒ 仍然连续）。
          */
-        roll: shot.roll * Math.sin(progress * Math.PI),
-        /** 该段的名义镜头（诊断用；相机本身的 fov 不变，见上面）。 */
-        lens: shot.lens,
-        /** 该段的推远倍率（诊断用）。 */
+        roll: cfg.roll,
+        /** 生效的名义镜头（诊断用；相机本身的 fov 不变，见上面）。过渡中是混合值。 */
+        lens: cfg.lens,
+        /** 生效的推远倍率（诊断用）。 */
         dolly,
-        /** 段内漂移量（诊断用）：−1 → +1。 */
+        /** 本段自己的段内漂移量（诊断用）：−1 → +1。 */
         drift,
+        /** 当前段号。 */
         shot: shotIndex,
+        /** 过渡：`blend` = `to` 段的权重（1 = 纯 `to`）；`from === to` ⇒ 没在过渡。 */
+        blend: blend.k,
+        blendFrom: blend.from,
+        blendTo: blend.to,
     };
 }
 

@@ -60,7 +60,7 @@
 
 | 物件 | 春 | 夏 | 秋 | 冬 |
 |---|---|---|---|---|
-| 柿子树树冠 | 嫩芽 + 花 | 浓荫 | **红果 + 黄叶（现状）** | **不画（秃枝）** |
+| 柿子树树冠 | 嫩芽 + 花 | 浓荫 | **红果 + 黄叶（更黄一档 · WO-24）** | **不画（秃枝）** |
 | 地面影子（画在贴图里） | 中 | 短 | 长 | 最长 |
 | 草地 | 返青 + 多花 | 深绿茂盛 | 微黄 | 枯黄 + 雪 |
 | 墙上藤蔓（当**常春藤**看） | 嫩（偏黄绿） | **深绿（= 改动前）** | 转黄（偏橄榄） | 沉暗（**仍绿，不掉叶**） |
@@ -80,6 +80,11 @@
 > 🔴 **但"只改颜色深浅"是藤蔓专属的约束。** 花箱那丛**不是常绿**：用户 2026-10-10
 > 看过定妆照后又点名「**冬天的花箱绿植太绿了，改为黄色的叶子**」⇒ 花箱的冬天是
 > **枯黄**（连色相都换了，不是只压暗）。见 §5.1e。
+
+> 🔴 **柿子树的树冠自 WO-25（2026-10-13）起是静止的** —— 不再有任何风摆。
+> 用户原话：「**树冠不需要加动画。模拟真实世界的行为，树冠是不会有旋转动画的**」，
+> 判据是「**是否有性能损毁，有的话改成静止**」。
+> 秋叶"更黄一档"是 **WO-24**（`SEASON_TREE.autumn`）。两笔的实测都在 **§5.1f**。
 
 ### C · 季生（genuinely appears / disappears）
 
@@ -261,6 +266,7 @@ sky = SEASON_LIGHT[season].day.sky.lerp( SEASON_LIGHT[season].night.sky, k )
 | `SceneLighting`（天空 / 雾 / 三灯 / veil） | **有**（稳定后 early-return） | `lastSeason` ref + `t.current = -1` |
 | `EntranceProps` → `WindowCurtain`（窗光） | **有**（同上） | `lastSeason` ref + `lit.t = -1` |
 | `SignSystem` → `Lantern`（灯笼） | **没有**：那个 useFrame 每帧都写 | 不动（别加死代码） |
+| `PersimmonTree`（树冠 / 果实色板） | **没有**：走 `useSeasonUniforms`（身份锁 + `useLayoutEffect` 就地改值，§5.1d） | 不动 |
 
 > 🔴 `SkyClouds`（天上的云团）**不在**上面这张表里 —— 它**没有**自己的 `t` /
 > `lastSeason` ref，因为它每帧从**穹顶的 uniform** 派生颜色
@@ -367,7 +373,7 @@ const shadow = ctx.createRadialGradient(0, 0, 14, 0, 0, 300);
 
 | 项 | 位置 | 状态 |
 |---|---|---|
-| **树** | `entranceArt.makeTreeTexture(season)` | ✅ 见 §5.1；树干拼接缝一并修掉（§5.1b） |
+| **树** | `entrance/PersimmonTree.jsx`（3D：`SEASON_TREE` 色板 + `TREE_LOOK` 形态） | ✅ 见 §5.1；WO-13 起**不再是贴图** |
 | **草** | `shaders/entranceTextures.js` | ✅ 见 §5.2；雪见 §5.2b |
 | 藤蔓（常春藤） | `entranceTextures.SEASON_INK_TINT` → `INK_OVERLAY_FRAG` 的 `uInkTint` | ✅ 见 §5.1e |
 | 花箱植物 | `entranceTextures.SEASON_PLANT` → `EntranceProps.WoodenPlanter` | ✅ 见 §5.1e |
@@ -383,22 +389,40 @@ const shadow = ctx.createRadialGradient(0, 0, 14, 0, 0, 300);
 > 2026-10-10 用户拍板 **DR-4 选项 B**：两处都随季变，但**只改颜色深浅**
 > —— 常春藤常绿，**不做枯藤、不加红果**。上面那条警告的历史版本不再适用。
 
-#### 5.1 树的四个状态
+#### 5.1 树的四个状态（**3D 版**，WO-13 起）
 
-`makeTreeTexture(season)`，缓存键 `entrance:tree:${season}`：
+> ⚠️ 本节原来描述的是**画在 canvas 贴图里**的那棵树（`entranceArt.makeTreeTexture` /
+> `TREE_SEASON` 表）。**2026-10-12 WO-13 起那套已经不存在** —— 树整个重构成 3D。
+> 保留下来的只有**旧版量出来的两个数**（地面投影的压扁系数 `shadow` 与太阳方位偏移
+> `dx`，见 §4.4「影子是画出来的，不是算出来的」），以及 §5.1b / §5.1c 两条 canvas
+> 时期的教训（`closePath` 端面缝、冬雪跳过竖直段）。
+
+现在的树是四个东西：
+
+| 文件 | 是什么 |
+|---|---|
+| `utils/persimmonTree.js` | **几何**：骨架（枝 + 关节，~8k 三角形，一个 `BufferGeometry`）+ 叶团实例矩阵 + 果实例矩阵；导出 `PERSIMMON_H = 5.25` / `TUFT_EXTENT` |
+| `shaders/persimmonTree.js` | 四个着色器：`TREE_BARK_*` / `TREE_LEAF_*` / `TREE_FRUIT_*` / `TREE_SHADOW_*` |
+| `shaders/entranceTextures.js` | **色板** `SEASON_TREE`（四季各一组 `leafA` / `leafB` / `accent` / `accentMix`） |
+| `entrance/PersimmonTree.jsx` | 组装：4 个材质共用**一份** uniform 对象，**4 次 draw call** |
 
 | 季节 | 做法 | 状态 |
 |---|---|---|
-| `spring` | 新调色板 `TREE_SPRING`（提亮 + 偏黄绿）；**果实段换成落花段**（`blossoms: 26`）；地面落花瓣 | ✅ |
-| `summer` | 复用 `TREE_GREENS`；**跳过果实段**；树冠 rosette 加密（`rosetteR [36,30]`、`scatterChance 0.34`） | ✅ |
-| `autumn` | **逐位等于现状**：`TREE_GREENS` + `TREE_AUTUMN`(30%) + 34 果 + 3 落果 + 14 落叶 | ✅ |
-| `winter` | **跳过 canopy / fruit / windfalls / litter 四段**；保留树干/主枝/细枝；枝上积雪 | ✅ |
+| `spring` | 叶在、果不在；色板最亮、最偏黄绿；影中长（`shadow 0.20`、`dx −0.109`） | ✅ |
+| `summer` | 叶在、果不在；绿最沉；影最短（`shadow 0.11`、`dx 0`） | ✅ |
+| `autumn` | **叶 + 红果**（= 参照季）；`shadow 0.17`；**色板 WO-24 调黄一档**（见 §5.1f） | ✅ |
+| `winter` | **叶整个不画**（`visible={look.leaves}` ⇒ false）；无果；影最长（`shadow 0.30`）；树皮法线扰动最强（`bark 1.20`） | ✅ |
 
-> 冬秃枝是**删四段代码**，不是做一套新资产 —— 因为 `LIMBS` 那 13 条主枝是**手写死的**。
+> 冬秃枝 = **叶 InstancedMesh 的 `visible` 转 false**（项目既有的"隐藏"写法，§9.9），
+> 不是条件挂载 —— 因为几何是**全季共用**的，叶团实例矩阵挂载时只写一次。
 
-参数全部进 `TREE_SEASON` 表（`canopy / foliage / rosetteR / scatterChance / fruit /
-blossoms / windfalls / litter / litterKind / shadow / shadowDx / snow`），
-`treeSeasonOf(season)` 取；未知季节落到秋天。**秋天一栏是原值搬进表里，不是"又调了一遍"。**
+> 🔴 **树冠自 WO-25（2026-10-13）起是静止的** —— 没有任何风摆动画。
+> 用户原话与实测账见 **§5.1f（2）**。
+
+形态参数全部在 `entrance/PersimmonTree.jsx` 的 `TREE_LOOK` 表
+（`leaves / fruit / shadow / dx / bark`），`lookFor(season)` 取，未知季节落到秋天。
+**色板**在 `SEASON_TREE`，`treeSeasonUniforms(season)` 取。
+
 
 #### 5.1b 🔴 树干「像拼接出来的」—— 成因与修法（✅ 已修）
 
@@ -511,6 +535,71 @@ P1 的写法是 `useMemo(() => makeSurfaceUniforms(w, h, origin, season), [..., 
 **没有藤蔓**的那段青砖墙 ≤ 0.08 ⇒ 兔子、木箱、砖墙、门联一点没被碰。
 
 物证：`.workbuddy-ai/wo10-2026-10-10/`；工具 `harness/wo10-props-measure.py`。
+
+#### 5.1f 柿子树：秋叶更黄一档（WO-24）+ 树冠改静止（WO-25）
+
+**（1）秋叶更黄一点点（WO-24）**
+
+用户原话：「**柿子树秋天的叶子改黄一点点**」。🔴 关键字是"**一点点**" —— 秋天是
+**参照季**（旧 canvas 那棵树就是秋天），改猛了就不是"接住旧版"了。三个旋钮都只动
+一档，全部在 `src/shaders/entranceTextures.js` 的 `SEASON_TREE.autumn`：
+
+| 旋钮 | 旧 | 新 | 作用 |
+|---|---|---|---|
+| `accent` | `[0.749, 0.573, 0.224]`（H 39.9°） | `[0.780, 0.650, 0.215]`（H 46.2°） | 那三成黄叶：橙黄 → **黄** |
+| `accentMix` | 0.30 | **0.38** | 泛黄的那三成**更明显** |
+| `leafA` / `leafB` | 各带一点蓝 | 去蓝、加红 | 底绿 91.9° → 85.8° |
+
+**判据两层，都是实测**：
+
+1. **解析**（`harness/probe-autumn-leaf.mjs`，纯函数、无浏览器）：从**真实的实例数组**
+   读出 `vAccent` 均值（0.2633，即 32.9% 的叶子带黄），逐字复算 `TREE_LEAF_FRAG` 的
+   两级 `mix`，再转 HSV。冠平均色相 **84.68° → 78.55°（Δ −6.13°）**，明度 +0.0129。
+   ⚠️ 探针**不能**硬编码 `accentChance` —— 实测值比它差一点点，差在 A1 的边界上
+   就是红/绿之别。
+2. **渲染**（同季 A/B：`season=autumn theme=light 1600x900`，两份截图各 0 error）：
+   树冠区（左上 520×430）色相 **78.03° → 72.84°（Δ −5.19°）**、明度 +0.0094；
+   **对照区**（中右砖墙）只动 **+0.18°**（= 噪声底）⇒ 改动**只落在树上**。
+
+> ⚠️ 第一版"取全部变化像素求均值"只量到 −3.46° —— 因为 diff 掩码把**截图噪声底**
+> 也算进去了（`DreamForest.lowTier` 按 fps 掉档，同一份代码跑两次也不逐位相同，
+> 见 §9.6）。**必须框住树冠区**，不能拿全图 diff 当掩码。
+
+> 🔴 一个**反直觉但正确**的后果：秋叶变黄之后，**秋天的"黄"会超过春天**。
+> 探针原来的 A3 写的是"春天仍是最黄的" —— 那是我自己的错误预期，不是调色板的问题。
+> 真正的季节分界是**明度**：春 0.563 > 秋 0.459 > 夏 0.417。
+
+**（2）树冠改静止（WO-25）**
+
+用户原话：「**树冠不需要加动画。模拟真实世界的行为，树冠是不会有旋转动画的**」，
+追问后给的判据：「**是否有性能损毁，有的话改成静止**」。
+
+**先量，再改。** 风摆（`TREE_LEAF_VERT` 里三行顶点着色器）的账：
+
+| 项 | 实测 |
+|---|---|
+| 额外顶点 / 三角形 / draw call / CPU | **全部 0**（就是三行顶点着色器） |
+| 每帧三角函数 | **749,952 次**（3472 实例 × 72 顶点 × 3 次 sin/cos） |
+| 冠顶振幅（静止机位 1600×900，30.51 px/世界单位） | 冬 **≤ 3.37 px** / 秋 2.62 px |
+
+**"看起来在转"的真正成因**：风的 x 频率 **0.83** / z 频率 **0.71** ⇒ 每簇叶走一条
+Lissajous 环，**闭合周期 `2π/|0.83−0.71| ≈ 52.4 s`**，比 44 s 一圈还长
+—— **一圈之内不重复**，于是"缓慢搅动"被读成了"树冠在慢慢转"。
+（顺带：叶法线是 `mat3(instanceMatrix) * normal`，**`uTime` 根本碰不到它** ⇒
+这个效果**在数学上只可能是平移**，从来就没有旋转。）
+
+**改法**：把 `TREE_LEAF_VERT` 的 `aPhase` / `uTime` / `uWind` / `uTreeH` 与那三行一起
+删掉；组件里同步删 `aPhase` 绑定与三个 uniform。⚠️ **`uHaze` / `uHazeNear` /
+`uHazeFar` 的每帧同步必须留** —— 那让树和天在换季 / 入夜时一起变，与 `uTime` 无关。
+删掉 `uTime` 之后 `useFrame` 里没有任何时钟消费者，但它**仍然存在**（只为 `uHaze*`）。
+
+**判据** `harness/probe-tree-crown.mjs`（C1~C5）：C1 断言导出的 `TREE_LEAF_VERT`
+字符串里**没有** `uTime` / `uWind`；C2 叶几何**没有** `aPhase`；C3 组件里没有死键；
+C4 复算省下的 749,952 次三角函数；**C5 断言樱花树 `SAKURA_BLOSSOM_VERT` 仍然有
+`uWind`** —— 防的是"顺手把樱花也一起静音了"。
+
+> ⚠️ C1 查的是**导出的字符串**，不是文件正文 —— 文件里那段"为什么删掉它"的注释
+> 会逐字引用 `uTime` / `uWind`，否则这个守卫会被自己的注释弄红。
 
 #### 5.2 草地：**必须改 `grassSurface()`，不能分别改两个 shader**
 
@@ -1442,8 +1531,11 @@ if (/\.(js|css|woff2?|png|jpe?g|webp|svg|ico|json)$/i.test(url.pathname) || …)
 | `src/components/ui/SiteControls.jsx` | 第 3 个按钮：明暗 → **设置**（齿轮） | ✅ P4 |
 | `src/components/ui/NavigationUI.jsx` | 新增设置面板；四面板合并为单一 `openPanel`（互斥） | ✅ P4 |
 | `src/styles/NavigationUI.scss` | `$torn-paper-clip` 变量 + `.settings-panel` 全套 | ✅ P4 |
-| `src/utils/entranceArt.js` | `makeTreeTexture(season)`；`TREE_SEASON` 表；**树干 `closePath` 修复**；枝上积雪。**WO-3 加**：`makeVatWaterTexture(season)` / `makeBambooFenceTexture(season)` | ✅ |
-| `src/shaders/entranceTextures.js` | `grassSurface` 季节 palette + `uSnow`；`SONG_WALL_FRAG`/`STONE_FRAG` 积雪；`applyGroundSeason()` 就地更新；**`WEATHER_FRAG`（雨 + 雪单 pass）** | ✅ |
+| `src/utils/entranceArt.js` | `makeVatWaterTexture(season)` / `makeBambooFenceTexture(season)`（WO-3）。⚠️ 原来的 `makeTreeTexture(season)` / `TREE_SEASON` 表**已随 WO-13 删除**（树改 3D） | ✅ |
+| `src/shaders/entranceTextures.js` | `grassSurface` 季节 palette + `uSnow`；`SONG_WALL_FRAG`/`STONE_FRAG` 积雪；`applyGroundSeason()` 就地更新；**`WEATHER_FRAG`（雨 + 雪单 pass）**；**`SEASON_TREE` 柿子树四季色板（WO-13；WO-24 调秋）** | ✅ |
+| `src/utils/persimmonTree.js` | **WO-13 新**：3D 柿子树的几何（骨架 / 叶团实例 / 果实例）+ `PERSIMMON_H` / `TUFT_EXTENT` | ✅ |
+| `src/shaders/persimmonTree.js` | **WO-13 新**：树的四个着色器（`BARK` / `LEAF` / `FRUIT` / `SHADOW`）。**WO-25 删掉叶的风摆**（`uTime` / `uWind` / `aPhase` / `uTreeH`） | ✅ |
+| `src/components/canvas/entrance/PersimmonTree.jsx` | **WO-13 新**：3D 树组件（4 draw call、四材质共用一份 uniform）。**WO-25 树冠改静止** | ✅ |
 | `src/audio/ambience.js` | 4 条季节预设进 `PRESETS` | ⬜ P2 |
 
 ---

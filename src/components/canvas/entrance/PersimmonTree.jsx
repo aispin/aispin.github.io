@@ -12,7 +12,7 @@ import {
     TREE_SHADOW_VERT, TREE_SHADOW_FRAG,
 } from '../../../shaders/persimmonTree';
 import {
-    PERSIMMON_H, TUFT_EXTENT, buildPersimmonTree, makeLeafTuftGeometry, makeFruitGeometry,
+    TUFT_EXTENT, buildPersimmonTree, makeLeafTuftGeometry, makeFruitGeometry,
 } from '../../../utils/persimmonTree';
 import { seasonLightFor } from '../../../config/seasonLight';
 import { toShaderColor } from '../../../config/theme';
@@ -54,13 +54,16 @@ import { WindChime } from './EntranceProps';
 /* 的水平偏移。这两个数是从旧版 canvas 那棵树上量过来的（`TREE_SEASON`   */
 /* 的 `shadow` / `shadowDx`，128 px = 1 世界单位），不是重新拍的 ——      */
 /* 「影长是季节信号里最强的一条」这条设计没有变。                        */
+/*                                                                     */
+/* ⚠️ 这里原来还有一个 `wind`（每季不同的风摆幅度），WO-25 删掉了 ——    */
+/*    树冠改静止，理由与那笔账写在 `shaders/persimmonTree.js` 里。       */
 /* ------------------------------------------------------------------ */
 
 const TREE_LOOK = {
-    spring: { leaves: true, fruit: false, shadow: 0.20, dx: -0.109, wind: 0.075, bark: 1.00 },
-    summer: { leaves: true, fruit: false, shadow: 0.11, dx: 0.000, wind: 0.062, bark: 0.90 },
-    autumn: { leaves: true, fruit: true, shadow: 0.17, dx: 0.000, wind: 0.070, bark: 1.00 },
-    winter: { leaves: false, fruit: false, shadow: 0.30, dx: 0.172, wind: 0.090, bark: 1.20 },
+    spring: { leaves: true, fruit: false, shadow: 0.20, dx: -0.109, bark: 1.00 },
+    summer: { leaves: true, fruit: false, shadow: 0.11, dx: 0.000, bark: 0.90 },
+    autumn: { leaves: true, fruit: true, shadow: 0.17, dx: 0.000, bark: 1.00 },
+    winter: { leaves: false, fruit: false, shadow: 0.30, dx: 0.172, bark: 1.20 },
 };
 
 const lookFor = (season) => TREE_LOOK[season] || TREE_LOOK.autumn;
@@ -109,10 +112,11 @@ export function PersimmonTree({ position = [0, 0, 0], yaw = 0, rootY = 0 }) {
     const fruitRef = useRef();
 
     // ---- 几何体：带实例属性，所以**不能**用 sharedGeometry（会连坐）
+    // ⚠️ WO-25 起**不挂 `aPhase`** —— 那个属性只被风摆用，树冠改静止之后
+    //    它是死的（`packInstances` 仍然产出 `phase`，因为樱花树在用）。
     const leafGeo = useMemo(() => {
         const g = makeLeafTuftGeometry();
         const L = tree.leaf;
-        g.setAttribute('aPhase', new THREE.InstancedBufferAttribute(L.phase, 1));
         g.setAttribute('aTint', new THREE.InstancedBufferAttribute(L.tint, 1));
         g.setAttribute('aAccent', new THREE.InstancedBufferAttribute(L.accent, 1));
         g.setAttribute('aShade', new THREE.InstancedBufferAttribute(L.shade, 1));
@@ -127,9 +131,6 @@ export function PersimmonTree({ position = [0, 0, 0], yaw = 0, rootY = 0 }) {
             ...treeSeasonUniforms(s),
             uLightDir: { value: lightDirFor(s) },
             uRootY: { value: rootY },
-            uTreeH: { value: PERSIMMON_H },
-            uTime: { value: 0 },
-            uWind: { value: lookFor(s).wind },
             // WO-19：树皮法线扰动 + 叶的透光/叶尖坐标（都是纯程序化，零位图）
             uBarkBump: { value: BARK_BUMP * lookFor(s).bark },
             uTuftExtent: { value: TUFT_EXTENT },
@@ -166,12 +167,15 @@ export function PersimmonTree({ position = [0, 0, 0], yaw = 0, rootY = 0 }) {
         }
     }, [tree]);
 
-    useFrame((state) => {
-        // 🔴 三个材质**引用的是同一份 uniform 对象**（见文件头），所以这里
+    useFrame(() => {
+        // 🔴 四个材质**引用的是同一份 uniform 对象**（见文件头），所以这里
         //    只写一次就够了 —— 不是漏了 leaf / fruit。
+        //
+        // ⚠️ WO-25 起这里**不再写 `uTime`** —— 树冠改静止之后没有任何着色器
+        //    用它了（风摆是唯一的消费者）。但 `uHaze*` 这一同步**必须留**：
+        //    它让树和天在换季 / 入夜时一起变，与 `uTime` 无关。
         const bm = barkMatRef.current;
         if (!bm) return;
-        bm.uniforms.uTime.value = state.clock.elapsedTime;
         const fog = scene.fog;
         if (fog) {
             toShaderColor(fog.color, bm.uniforms.uHaze.value);

@@ -128,14 +128,40 @@ void main() {
 /* 叶（InstancedMesh）                                                 */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 🔴 2026-10-13（WO-25）**树冠已改静止** —— 这里原来有一段"风摆"：
+ *
+ *     float s = sin(uTime * 0.83 + aPhase) * 0.7 + sin(uTime * 1.37 + aPhase * 2.3) * 0.3;
+ *     float bend = rel * rel;
+ *     lp.x += s * uWind * bend;
+ *     lp.z += cos(uTime * 0.71 + aPhase * 1.6) * uWind * 0.7 * bend;
+ *     lp.y -= abs(s) * uWind * 0.12 * bend;
+ *
+ * 删掉的理由（用户 2026-10-13：「树冠不需要加动画。模拟真实世界的行为，
+ * 树冠是不会有旋转动画的」，追问后答复「是否有性能损毁，有的话改成静止」）：
+ *
+ *   · **代价**：它是顶点着色器里的三行位移 ⇒ 0 额外顶点 / 0 额外三角形 /
+ *     0 额外 draw / 0 额外 CPU。边际代价 = 每个叶顶点每帧多算 `2×sin + 1×cos`。
+ *     叶几何 3472 实例 × 72 顶点 = **249,984 顶点** ⇒ 每帧 **749,952 次
+ *     超越函数**。删掉就是净省。
+ *   · **幅度**：冠顶最大 **3.37 px**（冬天；秋天 2.62 px，静息机位 1600×900）
+ *     —— 静息机位上肉眼几乎不可见。
+ *   · **它不是旋转**（叶法线只由 `modelMatrix × instanceMatrix` 决定，
+ *     `uTime` 不参与），**但读起来像"打旋"**：x 用频率 0.83、z 用 0.71
+ *     ⇒ 每个叶团走一条**李萨如环**，`2π/|0.83−0.71| ≈ 52.4 s` 才闭合，
+ *     而一圈只有 44 s ⇒ 这一圈里看不到重复，观感是"树冠在慢慢搅"。
+ *     真实树冠不会这样。
+ *
+ * 判据：`.workbuddy-ai/harness/probe-tree-crown.mjs`（断言叶的顶点着色器里
+ * 没有 `uTime` / `uWind`，并把上面那笔账记下来）。
+ *
+ * ⚠️ 樱花树（`SAKURA_BLOSSOM_VERT`）是同一套两频风摆（系数 0.55 / 0.40）。
+ *    用户说的是柿子树，所以**那一棵没动** —— 要一起停说一声。
+ */
 export const TREE_LEAF_VERT = /* glsl */ `
-attribute float aPhase;
 attribute float aTint;
 attribute float aAccent;
 attribute float aShade;
-uniform float uTime;
-uniform float uWind;
-uniform float uTreeH;      // 树高（局部），把实例高度归一化
 uniform float uTuftExtent; // 一团叶从自己的原点往外能探多远（叶尖归一化用）
 uniform vec3 uLightDir;
 uniform vec3 uHaze;
@@ -150,24 +176,12 @@ varying float vEdge;       // 0 = 叶基（贴着叶团原点）· 1 = 叶尖
 varying float vDepth;
 
 void main() {
-    // 实例矩阵的平移列 = 这一簇叶挂在哪儿（树局部坐标）
-    vec3 o = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
-    float rel = clamp(o.y / uTreeH, 0.0, 1.0);   // 0 根部 · 1 冠顶
-
     vec3 lp = (instanceMatrix * vec4(position, 1.0)).xyz;
 
     // 🔴 叶尖 ↔ 叶基：叶团的**原点就在叶簇中心**，所以"这个顶点离原点多远"
     //    本身就是沿叶片的坐标。⇒ 不用新增 attribute，位置里已经带着它了。
     //    （叶基 ≈ 0.2·TUFT_EXTENT、叶尖 ≈ 1.0·TUFT_EXTENT，实测够分辨。）
     vEdge = clamp(length(position) / uTuftExtent, 0.0, 1.0);
-
-    // 风：两列低频叠加（单频会看出"整树齐步走"）。幅度 ∝ rel²，所以
-    // 冠底的叶几乎不动 —— 真树就是梢头摆得最凶。
-    float s = sin(uTime * 0.83 + aPhase) * 0.7 + sin(uTime * 1.37 + aPhase * 2.3) * 0.3;
-    float bend = rel * rel;
-    lp.x += s * uWind * bend;
-    lp.z += cos(uTime * 0.71 + aPhase * 1.6) * uWind * 0.7 * bend;
-    lp.y -= abs(s) * uWind * 0.12 * bend;        // 摆出去时略沉，不然像整片平移
 
     vec3 nrm = mat3(instanceMatrix) * normal;
     vec4 wp = modelMatrix * vec4(lp, 1.0);
