@@ -278,3 +278,131 @@ export function makeCloudTexture(index = 0, aspect = 1.9) {
 }
 
 export default makeCloudTexture;
+
+/**
+ * SDF + 逐瓣法线，烘进一张 DataTexture（2026-10-14，路线 C）。
+ * =====================================================================
+ *
+ * 为什么要有第二张生成器：`makeCloudTexture` 的产物是**素描**（R=G=B=灰度、
+ * A=硬跳变的覆盖度），摄影室（GalleryClouds + colorizeCloud）靠"乘色调"用它。
+ * 天空的云（路线 C）要的是**数据**：R=带符号距离场、G/B=法线 —— 两者**不能共用
+ * 一张贴图**，否则摄影室直接坏。所以这里**另起一个函数**，`makeCloudTexture`
+ * 一行不动。
+ *
+ * 🔴 形状与素描**逐位相同**：同一把种子（`cloud-<index>`）、同一个 `buildLobes`、
+ *    同一套 fit（pad 0.075、两轴独立）—— 只是把"画出来"换成"算出来"。
+ *    判据 S2/S3 的 A/B 都建立在"剪影没被换掉"上。
+ *
+ * 🔴 法线为什么是**解析精确**的：union-of-spheres 投到 billboard 平面上，
+ *    每个像素的可见表面就是「z 最靠前的那个瓣」的球面，其法线 =
+ *    `(dx, dy, sqrt(r²−d²)) / r`（d = 像素到瓣心的距离）。这不是近似 ——
+ *    WO-30 走过的弯路（把 alpha 模糊求梯度当法线）是被墨线弧带偏的**近似**，
+ *    这条是**解析**的，与墨线无关（墨线现在根本不在贴图里，见下）。
+ *
+ * 通道布局（**没有**墨线、**没有**腹灰 —— 那两样挪到片元里，见 `shaders/skyClouds.js`）：
+ *   R = 带符号距离场，`0.5 + sdf/SDF_RANGE`（云内为负 → < 0.5）
+ *   G = 法线 x（0.5 = 0）
+ *   B = 法线 y（0.5 = 0）；z 在片元里补：`sqrt(1 − x² − y²)`
+ *   A = 255（不用 —— 覆盖度由 R 的距离场给，比硬 alpha 抗锯齿得多）
+ *
+ * 🔴 **别**把这张贴图设成 sRGB：R/G/B 是**数据**不是颜色
+ *    （`THREE.NoColorSpace`，DataTexture 的默认值）。
+ *
+ * 🔴 RGB 要**延伸进云外的像素**（外面填 (0,0,1) 法线）：双线性过滤会采到
+ *    云外的纹素，若那里是 0 会得到一条黑边（参考实现 `painted-clouds.js`
+ *    的注释原话："RGB extends through transparent texels, preventing a
+ *    dark outline after filtering"）。
+ */
+export function makeCloudVolumeTexture(index = 0, aspect = 1.9) {
+    const key = `cloud-vol-${index}`;
+    if (cache.has(key)) return cache.get(key);
+
+    const def = CLOUD_DEFS[index % CLOUD_DEFS.length];
+    const W = 512;
+    const H = Math.max(1, Math.round(W / aspect));
+    // 与素描同一把种子 ⇒ 同一套瓣 ⇒ 同一个剪影
+    const rand = mulberry32(hashString(`cloud-${index}`));
+    const lobes = buildLobes(def, rand);
+
+    // 与 makeCloudTexture 完全相同的 fit
+    let x0 = Infinity;
+    let x1 = -Infinity;
+    let y0 = Infinity;
+    let y1 = -Infinity;
+    for (const l of lobes) {
+        x0 = Math.min(x0, l.x - l.r);
+        x1 = Math.max(x1, l.x + l.r);
+        y0 = Math.min(y0, l.y - l.r);
+        y1 = Math.max(y1, l.y + l.r);
+    }
+    const pad = 0.075;
+    const kx = (W * (1 - 2 * pad)) / (x1 - x0);
+    const ky = (H * (1 - 2 * pad)) / (y1 - y0);
+    const ox = (W - (x0 + x1) * kx) / 2;
+    const oy = (H - (y0 + y1) * ky) / 2;
+    // lobe 单位 → 像素：两轴独立缩放差 ≤ 20%，取几何平均近似各向同性
+    const kpx = Math.sqrt(kx * ky);
+
+    /** 距离场的存储量程（UV）。±0.05 ⇒ 墨线（~0.012）与侵蚀（±0.015）都在量程内。 */
+    const SDF_RANGE = 0.10;
+    const data = new Uint8Array(W * H * 4);
+    let p = 0;
+    // 🔴 DataTexture 的 `flipY` 是 false ⇒ 数据第 0 行 = v=0 = 面片**底部**。
+    //    素描画布的第 0 行是云**顶**（fit 不翻转）⇒ 这里自底向上填。
+    for (let row = 0; row < H; row += 1) {
+        const cy = H - 1 - row;
+        const ly = (cy + 0.5 - oy) / ky;
+        for (let cx = 0; cx < W; cx += 1) {
+            const lx = (cx + 0.5 - ox) / kx;
+            let sdf = Infinity;   // lobe 单位
+            let bestZ = -1;       // 最靠前的瓣的 z（lobe 单位）
+            let nx = 0;
+            let ny = 0;
+            for (let i = 0; i < lobes.length; i += 1) {
+                const lobe = lobes[i];
+                const dx = lx - lobe.x;
+                const dy = ly - lobe.y;
+                const d = Math.sqrt(dx * dx + dy * dy);
+                const sd = d - lobe.r;
+                if (sd < sdf) sdf = sd;
+                if (d < lobe.r) {
+                    const z = Math.sqrt(lobe.r * lobe.r - d * d);
+                    if (z > bestZ) {
+                        bestZ = z;
+                        nx = dx / lobe.r;
+                        // 🔴 canvas 的 y 向下，而片元/「uSunCam」里 y 是**屏幕上**为正
+                        //    ⇒ 这里必须翻符号。2026-10-14 漏了这一下：S4 反向
+                        //    （朝阳半反而更暗，corr −0.312），uSunCam 又被 y 主导。
+                        ny = -dy / lobe.r;
+                    }
+                }
+            }
+            const sdfUV = (sdf * kpx) / W;
+            // 云外没有可见表面 ⇒ 法线回退 (0,0,1)（正对镜头）。
+            // 🔴 距离场**照常写** —— 紧贴轮廓外侧那一两像素 bestZ<0 但 sdf 很小，
+            //    若一并填成"最远"，抗锯齿边就断在那儿（量具 S2 会量到一条断层）。
+            if (bestZ < 0) {
+                nx = 0;
+                ny = 0;
+            }
+            data[p] = Math.round(Math.max(0, Math.min(1, 0.5 + sdfUV / SDF_RANGE)) * 255);
+            data[p + 1] = Math.round((nx * 0.5 + 0.5) * 255);
+            data[p + 2] = Math.round((ny * 0.5 + 0.5) * 255);
+            data[p + 3] = 255;
+            p += 4;
+        }
+    }
+
+    const texture = new THREE.DataTexture(data, W, H, THREE.RGBAFormat);
+    texture.name = `cloud-vol-${index}`;
+    // 🔴 数据贴图：**不**做 sRGB（默认就是 NoColorSpace，这里写明是防有人顺手改）
+    texture.colorSpace = THREE.NoColorSpace;
+    texture.generateMipmaps = true;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.needsUpdate = true;
+    cache.set(key, texture);
+    return texture;
+}

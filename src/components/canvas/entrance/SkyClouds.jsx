@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { sharedGeometry } from '../../../engine/resources';
-import { makeCloudTexture } from '../../../utils/cloudArt';
+import { makeCloudVolumeTexture } from '../../../utils/cloudArt';
 import { CLOUD_SPRITES, toShaderColor } from '../../../config/theme';
 import {
     SKY_CLOUD_SPRITES, instancesForSlot, spriteForSlot, SKY_CLOUD_LAYERS,
@@ -93,7 +93,7 @@ export function SkyClouds({ lowTier = false }) {
                 sprite,
                 aspect: CLOUD_SPRITES[sprite].aspect,
                 instances: instancesForSlot(slot),
-                texture: makeCloudTexture(sprite, CLOUD_SPRITES[sprite].aspect),
+                texture: makeCloudVolumeTexture(sprite, CLOUD_SPRITES[sprite].aspect),
             };
         }),
         [],
@@ -121,6 +121,8 @@ export function SkyClouds({ lowTier = false }) {
         ax: new THREE.Vector3(),
         ay: new THREE.Vector3(),
         az: new THREE.Vector3(),
+        /** WO-32a：每帧重排用的下标缓冲（复用，不分配）。 */
+        order: [],
     });
 
     /** 几何：所有变体共用一张单位平面（尺寸每帧由实例矩阵给）。 */
@@ -156,10 +158,13 @@ export function SkyClouds({ lowTier = false }) {
 
         // ---- 每帧写 billboard 矩阵 ----
         // 相机四元数直接抄过来 ⇒ 面片永远正对镜头（和 GalleryClouds 同一条）。
+        // 🔴 WO-32a：同时按「到相机的距离」**远 → 近**写 —— 见 writeInstances。
+        const cam = state.camera.position;
         for (let gi = 0; gi < groups.length; gi += 1) {
             const mesh = meshRefs.current[gi];
             if (!mesh) continue;
-            writeInstances(mesh, groups[gi].instances, state.camera.quaternion, groups[gi].aspect, s);
+            writeInstances(mesh, groups[gi].instances, state.camera.quaternion,
+                groups[gi].aspect, s, cam.x, cam.y, cam.z);
         }
 
         // ---- uniform ----
@@ -190,7 +195,8 @@ export function SkyClouds({ lowTier = false }) {
                 u.uTop.value.copy(s.top);
                 u.uBottom.value.copy(s.bottom);
                 u.uGold.value.copy(sky.uGlow.value);
-                u.uSunDir.value.copy(sky.uSunDir.value);
+                // 太阳方向换算到**面片局部空间**：面片局部基 = 相机四元数。
+                // 用同一个 `state.camera.quaternion`，别用 `matrixWorld`（差一帧）。
                 const sd = sky.uSunDir.value;
                 u.uSunCam.value.set(sd.dot(s.ax), sd.dot(s.ay), sd.dot(s.az));
             }
@@ -244,7 +250,6 @@ export function SkyClouds({ lowTier = false }) {
                             uTop: { value: new THREE.Color(1, 1, 1) },
                             uBottom: { value: new THREE.Color(0.8, 0.82, 0.85) },
                             uGold: { value: new THREE.Color(1, 0.92, 0.75) },
-                            uSunDir: { value: new THREE.Vector3(0.6, 0.6, 0.5).normalize() },
                             // 面片局部空间的太阳方向 —— 每帧由相机四元数换算。
                             uSunCam: { value: new THREE.Vector3(0.6, 0.6, 0.5).normalize() },
                             uHaze: { value: new THREE.Color(0.9, 0.92, 0.9) },
@@ -252,16 +257,15 @@ export function SkyClouds({ lowTier = false }) {
                             uHazeFar: { value: 100 },
                             uOpacity: { value: CLOUD_SHAPE.OPACITY },
                             uInk: { value: CLOUD_SHAPE.INK },
-                            uGoldAmt: { value: CLOUD_SHAPE.GOLD_AMT },
-                            // WO-30 形体：侵蚀 + 太阳明暗。每帧写的只有 uDetail。
+                            // 路线 C：距离场 + 法线贴图（见 makeCloudVolumeTexture）
+                            uSdfRange: { value: CLOUD_SHAPE.SDF_RANGE },
+                            uInkW: { value: CLOUD_SHAPE.INK_W },
                             uErode: { value: CLOUD_SHAPE.ERODE },
                             uEdge: { value: CLOUD_SHAPE.EDGE },
                             uNoiseScale: { value: CLOUD_SHAPE.NOISE_SCALE },
-                            uSoftR: { value: CLOUD_SHAPE.SOFT_R },
-                            // 明暗用的**解析半球**鼓到多大（剪影用的还是 uSoftR）。
-                            uDomeSpread: { value: CLOUD_SHAPE.DOME_SPREAD },
                             uSunAmt: { value: CLOUD_SHAPE.SUN_AMT },
                             uShadeAmt: { value: CLOUD_SHAPE.SHADE_AMT },
+                            uGoldAmt: { value: CLOUD_SHAPE.GOLD_AMT },
                             uDetail: { value: CLOUD_SHAPE.DETAIL_HIGH },
                         }}
                         transparent
@@ -279,14 +283,45 @@ export function SkyClouds({ lowTier = false }) {
  *
  * `M = T(p) · R(camera) · Rz(spin) · S(w, h, 1)`
  *
+ * 🔴 WO-32a（2026-10-14）：写入顺序是**到相机距离的远 → 近**。
+ *
+ * 为什么必须做：`InstancedMesh` **内部永远按实例下标画** ——
+ * three 的 `reversePainterSortStable` 只在**对象之间**按 z 排
+ * （`groupOrder → renderOrder → z 降序 → id`），**实例之间不排**；
+ * 而透明材质这里 `depthWrite = false` ⇒ 谁后画谁在上。
+ * `instancesForSlot()` 给的下标顺序是「环 0（近）→ 环 2（远）」、
+ * 「layer 0（前）→ layer 2（后）」—— 直接按它画，就是**最远、最大、
+ * 最糊的那层最后画、盖在前面那层之上**（实测：云内部出现 60px 宽的
+ * 次级暗带，整个身子被拉向雾色 = 天空色）。
+ *
+ * ⚠️ 必须**每帧**重排，不能在 config 里排一次：`?flight` 飞出云环之外后，
+ * "朝外" 相对相机就翻转了，静态顺序会再反一次。
+ * 代价：15~42 个下标排一次序，每帧微秒级；矩阵本来就每帧重写。
+ *
  * ⚠️ `h` 由 `aspect` 反解 —— **不能用贴图自己的宽高比**：贴图是按
  *    `makeCloudTexture(index, aspect)` 画进那个比例的画布的，所以
  *    `CLOUD_SPRITES[i].aspect` 才是真值（`GalleryClouds` 里也是这么写的，
  *    那份注释写得很清楚）。
  */
-function writeInstances(mesh, instances, cameraQuaternion, aspect, s) {
-    for (let i = 0; i < instances.length; i += 1) {
-        const p = instances[i];
+function writeInstances(mesh, instances, cameraQuaternion, aspect, s, camX, camY, camZ) {
+    const ord = s.order;
+    if (ord.length !== instances.length) {
+        ord.length = instances.length;
+        for (let i = 0; i < ord.length; i += 1) ord[i] = i;
+    } else {
+        for (let i = 0; i < ord.length; i += 1) ord[i] = i;
+    }
+    ord.sort((a, b) => {
+        const pa = instances[a];
+        const pb = instances[b];
+        const da = (pa.x - camX) * (pa.x - camX) + (pa.y - camY) * (pa.y - camY)
+            + (pa.z - camZ) * (pa.z - camZ);
+        const db = (pb.x - camX) * (pb.x - camX) + (pb.y - camY) * (pb.y - camY)
+            + (pb.z - camZ) * (pb.z - camZ);
+        return db - da; // 远的排前面（先画）
+    });
+    for (let k = 0; k < ord.length; k += 1) {
+        const p = instances[ord[k]];
         const h = p.scale / (aspect || 1.8);
         s.q.copy(cameraQuaternion).multiply(s.spin.setFromAxisAngle(AXIS_Z, p.spin));
         s.m.compose(
@@ -294,7 +329,7 @@ function writeInstances(mesh, instances, cameraQuaternion, aspect, s) {
             s.q,
             s.scl.set(p.scale, h, 1),
         );
-        mesh.setMatrixAt(i, s.m);
+        mesh.setMatrixAt(k, s.m);
     }
     mesh.instanceMatrix.needsUpdate = true;
 }
