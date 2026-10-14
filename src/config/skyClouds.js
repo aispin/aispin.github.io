@@ -149,3 +149,98 @@ export function placementsForSlot(slot) {
 }
 
 export const SKY_CLOUD_COUNT = SKY_CLOUD_PLACEMENTS.length;
+
+/* ------------------------------------------------------------------------- */
+/* 层片（WO-30，2026-10-13）                                                  */
+/* ------------------------------------------------------------------------- */
+/*
+ * 用户：「云朵搞逼真一点（是否上 glsl）」→ 拍板 (A) 保留 billboard，
+ * 把「形体」交给 GLSL 片元。其中第三条是**一朵云叠 2~3 层薄片出视差**。
+ *
+ * 🔴 为什么层片要有**深度差**，不能只是同一位置叠三张
+ * ---------------------------------------------------------------------------
+ * 三张完全共面的面片在屏幕上是同一张图，叠了等于没叠。视差来自
+ * 「不同深度 + 相机移动」：三张沿**背离岛心的径向**拉开 0 / 3.2 / 6.8，
+ * 相机一动它们就互相错开；飞行时相机到最近那圈只有 20~30 单位，错开很明显。
+ *
+ * 🔴 为什么层片要**朝外拉 + 略微放大**
+ * ---------------------------------------------------------------------------
+ * 后画的层被前面的挡住就白画了。所以越远的那层越**大**：它的轮廓会从
+ * 前面那层后面探出来。而它同时也在雾里更远 ⇒ 由 `uHazeFar` 那一项自动
+ * 洗得更淡 —— **不需要**给每个实例单独的不透明度（那要新增 instance 属性）。
+ * 「大而淡」正是体积感的读法：一个清楚的核 + 一圈化在空气里的边。
+ *
+ * ⚠️ 层片是**真的几何**，所以 P2（不切航线）/ P3（穹顶内）/ P4（地面上）/
+ *    P5（抬头看得见）必须对**展开后的实例表**再断言一遍 —— 只验 14 条
+ *    逻辑摆位等于给一个假绿（§28）。`probe-sky-clouds.mjs` 就是这么改的。
+ */
+
+/** 每朵云叠几层。2 太少（视差读不出来），4 以上收益递减而实例数线性涨。 */
+export const SKY_CLOUD_LAYERS = 3;
+
+/**
+ * 每层相对逻辑摆位的偏移（**世界单位**）与缩放。
+ *
+ * `out` 沿「岛心 → 云」的径向朝外；`up` 世界 +Y；`tan` 切向（水平、垂直于径向）
+ * —— 切向那一点点是为了让三层的轮廓**不完全重合**，否则内层的边整条藏在
+ * 外层后面，叠了几层看起来还是一层。
+ *
+ * `up` 刻意取得很小（≤ 0.5）：云的高度角本来就贴着竖向 fov 的上沿
+ * （见文件头 ③），抬多了会跑出画面，那是 P5 在守的线。
+ */
+const LAYERS = [
+    { out: 0.0, up: 0.00, tan: 0.00, scale: 1.00, spin: 0.000 },
+    { out: 3.2, up: 0.22, tan: 0.80, scale: 1.07, spin: 0.050 },
+    { out: 6.8, up: 0.44, tan: -1.05, scale: 1.14, spin: -0.040 },
+];
+
+/**
+ * 把 14 条逻辑摆位展开成 `SKY_CLOUD_LAYERS × 14` 条**真实实例**。
+ *
+ * ⚠️ 展开是**纯函数**、**确定性**的（只用到常量表），所以每次算出来逐位相同；
+ *    并且**只算一次**（模块级），之后只读。
+ */
+function expandLayers() {
+    const out = [];
+    for (const p of SKY_CLOUD_PLACEMENTS) {
+        // 径向单位向量（岛心 → 云），以及它的切向（水平旋转 90°）。
+        const dx = p.x - ISLAND_X;
+        const dz = p.z - ISLAND_Z;
+        const r = Math.hypot(dx, dz) || 1;
+        const ux = dx / r;
+        const uz = dz / r;
+        const tx = -uz;
+        const tz = ux;
+        for (let k = 0; k < SKY_CLOUD_LAYERS; k += 1) {
+            const L = LAYERS[k % LAYERS.length];
+            out.push(Object.freeze({
+                x: p.x + ux * L.out + tx * L.tan,
+                y: p.y + L.up,
+                z: p.z + uz * L.out + tz * L.tan,
+                scale: p.scale * L.scale,
+                spin: p.spin + L.spin,
+                /** 槽位（第几个 InstancedMesh）。**不是** sprite 下标。 */
+                slot: p.slot,
+                /** 逻辑云的下标 + 第几层 —— 只有判据用，渲染不读。 */
+                cloud: SKY_CLOUD_PLACEMENTS.indexOf(p),
+                layer: k,
+            }));
+        }
+    }
+    return out;
+}
+
+/** 全部**真实实例**（含层片）。只算一次，之后只读。 */
+export const SKY_CLOUD_INSTANCES = Object.freeze(expandLayers());
+
+/**
+ * 某个**槽位**的全部真实实例 —— `SkyClouds.jsx` 用它建 `InstancedMesh`。
+ *
+ * ⚠️ 这里返回的是**展开后**的表：每槽位 `14 / 3 × SKY_CLOUD_LAYERS` 条。
+ *    一个槽位仍然只有 **1 次 draw**（`InstancedMesh` 的意义就在这）。
+ */
+export function instancesForSlot(slot) {
+    return SKY_CLOUD_INSTANCES.filter((p) => p.slot === slot);
+}
+
+export const SKY_CLOUD_INSTANCE_COUNT = SKY_CLOUD_INSTANCES.length;

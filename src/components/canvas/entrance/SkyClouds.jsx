@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -6,33 +6,38 @@ import { sharedGeometry } from '../../../engine/resources';
 import { makeCloudTexture } from '../../../utils/cloudArt';
 import { CLOUD_SPRITES, toShaderColor } from '../../../config/theme';
 import {
-    SKY_CLOUD_SPRITES, placementsForSlot, spriteForSlot,
+    SKY_CLOUD_SPRITES, instancesForSlot, spriteForSlot, SKY_CLOUD_LAYERS,
 } from '../../../config/skyClouds';
-import { CLOUD_VERT, CLOUD_FRAG, CLOUD_SHAPE } from '../../../shaders/skyClouds';
+import { CLOUD_VERT, CLOUD_FRAG, CLOUD_SHAPE, CLOUD_IDENTITY } from '../../../shaders/skyClouds';
 
 /**
- * SkyClouds — 天上那几朵云（WO-20，2026-10-12）。
+ * SkyClouds — 天上那几朵云（WO-20 摆位 / WO-30 形体，2026-10-12 → 2026-10-13）。
  * ==================================================================
  *
  * 用户：「飞机飞行的效果没有案例好，能尽量对齐吗？**包括天空、云彩这些**。」
+ * 用户（第三轮）：「云朵搞逼真一点（是否上 glsl）」→ 拍板 (A)。
  *
- * 摆位在 `config/skyClouds.js`（确定性），上色在 `shaders/skyClouds.js`，
- * 云的**形状**沿用本项目自己的 `utils/cloudArt.js`（摄影室那八张水墨云）。
+ * 摆位在 `config/skyClouds.js`（确定性 + 层片展开），形体与上色在
+ * `shaders/skyClouds.js`，云的**素描底**沿用本项目自己的 `utils/cloudArt.js`
+ * （摄影室那八张水墨云）。
  *
  * ---------------------------------------------------------------------------
  * 🔴 颜色**只有一个真源**：天空穹顶的 uniform
  * ---------------------------------------------------------------------------
  * 云顶 / 云底 / 朝阳色**不在这里另立色板**，而是每帧从天空穹顶的
- * `uZenith / uHorizon / uCloud / uGlow` 派生。理由是这套项目已经栽过一次：
- * "同一个事实存两份，迟早不同步"（甬路冻在首季那条）。
+ * `uZenith / uHorizon / uCloud / uGlow / uSunDir` 派生。理由是这套项目已经栽过
+ * 一次："同一个事实存两份，迟早不同步"（甬路冻在首季那条）。
  *
  * 具体地说，如果这里自己算一遍季节色，那么：
  *   · `SceneLighting` 改一季的端点 ⇒ 云还是旧色；
  *   · 昼夜过渡（0.9 s）时天空在插值、云**不插** ⇒ 天黑了云还亮着。
  * 从穹顶读就没有这两个问题 —— 云和天**不可能**不同步。
  *
- * 代价：穹顶的材质要能被找到。所以给那个 mesh 挂了 `name="sky-dome"`
- * （见 `SceneLighting.jsx`），这里只查一次。**这是显式接口，不是巧合。**
+ * 🔴 查法：**按 `name` 查，不是按某个 uniform 查**。
+ * 那条接口是 `SceneLighting.jsx` 里那个 `name="sky-dome"`。以前这里写的是
+ * `o.material?.uniforms?.uStrata`（= 按"有没有某个 uniform"猜），于是文件头
+ * 说的"这是显式接口"**在代码里并不成立** —— 改名不会报警，删掉 `uStrata`
+ * 反而会静默失联。WO-30 改成按名字查，并在找不到时**只警告一次**。
  *
  * ---------------------------------------------------------------------------
  * 为什么是 billboard（面片），不是 3D 云团
@@ -52,17 +57,34 @@ import { CLOUD_VERT, CLOUD_FRAG, CLOUD_SHAPE } from '../../../shaders/skyClouds'
  *    （`InstancedMesh.computeBoundingSphere` 取的是"实例中心均值 + 最大
  *      `|p−中心| + 几何半径`"，而 billboard 的旋转**不改变**实例中心
  *      （它就是 `p`），所以算一次就够，不用每帧重算。）
+ *
+ * ---------------------------------------------------------------------------
+ * WO-30：形体交给片元，代价是 0 新增 mesh / 0 新增 draw / 0 新增贴图
+ * ---------------------------------------------------------------------------
+ * 三刀（fbm 侵蚀剪影 / 太阳方向明暗 / 三层薄片）全在
+ * `shaders/skyClouds.js` 与 `config/skyClouds.js` 里，这里只负责
+ * **把每帧的真源喂进去**：
+ *
+ *   · `uSunCam` = 太阳方向换算到**面片局部空间**。面片局部基就是相机四元数
+ *     （billboard 抄的就是它），所以这里也用**同一个** `camera.quaternion`
+ *     去换算 —— 用 `camera.matrixWorld` 会差一帧，明暗就和朝向对不上。
+ *   · `uDetail` = fbm 档数，跟着 `lowTier` 走。**低端机是真的少算**
+ *     （GLSL 里是一致分支，不是乘 0）。
  */
 
 /** 复用的临时量（每帧不分配）。 */
 const AXIS_Z = new THREE.Vector3(0, 0, 1);
+const AXIS_X = new THREE.Vector3(1, 0, 0);
+const AXIS_Y = new THREE.Vector3(0, 1, 0);
 
-export function SkyClouds() {
+export function SkyClouds({ lowTier = false }) {
     const scene = useThree((state) => state.scene);
 
     // 每个**槽位**一个 InstancedMesh（⇒ 每槽位 1 次 draw，三张素描共 3 次）。
     // 🔴 `slot`（第几个 InstancedMesh）与 `sprite`（用哪张素描）**不是一回事**
     //    —— 混用会让 `placementsForSlot(6)` 返回空数组（探针 P1 抓到的）。
+    // 🔴 WO-30 起，实例数是**层展开后**的（每槽位 × `SKY_CLOUD_LAYERS`）——
+    //    仍然只有 3 次 draw，因为还是 3 个 InstancedMesh。
     const groups = useMemo(
         () => SKY_CLOUD_SPRITES.map((_, slot) => {
             const sprite = spriteForSlot(slot);
@@ -70,7 +92,7 @@ export function SkyClouds() {
                 slot,
                 sprite,
                 aspect: CLOUD_SPRITES[sprite].aspect,
-                placements: placementsForSlot(slot),
+                instances: instancesForSlot(slot),
                 texture: makeCloudTexture(sprite, CLOUD_SPRITES[sprite].aspect),
             };
         }),
@@ -82,6 +104,8 @@ export function SkyClouds() {
 
     // 天空穹顶（颜色真源）。只查一次 —— 见文件头。
     const skyRef = useRef(null);
+    /** 找不到穹顶时只喊一次 —— 每帧喊会把 console 刷爆。 */
+    const warnedRef = useRef(false);
 
     // 每帧复用的临时量
     const scratch = useRef({
@@ -94,6 +118,9 @@ export function SkyClouds() {
         bottom: new THREE.Color(),
         gold: new THREE.Color(),
         haze: new THREE.Color(),
+        ax: new THREE.Vector3(),
+        ay: new THREE.Vector3(),
+        az: new THREE.Vector3(),
     });
 
     /** 几何：所有变体共用一张单位平面（尺寸每帧由实例矩阵给）。 */
@@ -106,7 +133,7 @@ export function SkyClouds() {
         groups.forEach((g, gi) => {
             const mesh = meshRefs.current[gi];
             if (!mesh) return;
-            writeInstances(mesh, g.placements, identity, g.aspect, s);
+            writeInstances(mesh, g.instances, identity, g.aspect, s);
             mesh.computeBoundingSphere();
         });
         // 只跑一次：摆位是常量，`spin` 也是常量，`scratch` / `identity` 是 ref/局部量。
@@ -115,11 +142,15 @@ export function SkyClouds() {
     useFrame((state) => {
         const s = scratch.current;
 
-        // ---- 颜色真源：天空穹顶（查一次）----
+        // ---- 颜色真源：天空穹顶（按 `name` 查一次）----
         if (!skyRef.current) {
             scene.traverse((o) => {
-                if (!skyRef.current && o.material?.uniforms?.uStrata) skyRef.current = o;
+                if (!skyRef.current && o.name === 'sky-dome') skyRef.current = o;
             });
+            if (!skyRef.current && !warnedRef.current) {
+                warnedRef.current = true;
+                console.warn('[clouds] 找不到 name="sky-dome" ⇒ 云会停在初始色（见 SkyClouds 文件头）');
+            }
         }
         const sky = skyRef.current?.material?.uniforms;
 
@@ -128,25 +159,40 @@ export function SkyClouds() {
         for (let gi = 0; gi < groups.length; gi += 1) {
             const mesh = meshRefs.current[gi];
             if (!mesh) continue;
-            writeInstances(mesh, groups[gi].placements, state.camera.quaternion, groups[gi].aspect, s);
+            writeInstances(mesh, groups[gi].instances, state.camera.quaternion, groups[gi].aspect, s);
         }
 
         // ---- uniform ----
         const fog = scene.fog;
+        // fbm 档数跟着性能分级走：低端机少算两级噪声。
+        const detail = lowTier ? CLOUD_SHAPE.DETAIL_LOW : CLOUD_SHAPE.DETAIL_HIGH;
+
+        if (sky) {
+            // 云顶 = 天顶色偏朝阳（云被上面的太阳照亮），再提一档；
+            // 云底 = 云带色（天空里那条云的颜色）偏天顶。
+            // ⚠️ 都在**屏幕值**空间里插值 —— 不是物理正确的做法，
+            //    但云和天同源，这个近似看不出来。
+            s.top.copy(sky.uZenith.value).lerp(sky.uGlow.value, 0.28).multiplyScalar(1.04);
+            s.bottom.copy(sky.uCloud.value).lerp(sky.uZenith.value, 0.22);
+            // 太阳方向换算到**面片局部空间**：面片局部基 = 相机四元数。
+            // 用同一个 `state.camera.quaternion`，别用 `matrixWorld`（差一帧）。
+            const q = state.camera.quaternion;
+            s.ax.copy(AXIS_X).applyQuaternion(q);
+            s.ay.copy(AXIS_Y).applyQuaternion(q);
+            s.az.copy(AXIS_Z).applyQuaternion(q);
+        }
+
         for (const mat of matRefs.current) {
             if (!mat) continue;
             const u = mat.uniforms;
+            u.uDetail.value = detail;
             if (sky) {
-                // 云顶 = 天顶色偏朝阳（云被上面的太阳照亮），再提一档；
-                // 云底 = 云带色（天空里那条云的颜色）偏天顶。
-                // ⚠️ 都在**屏幕值**空间里插值 —— 不是物理正确的做法，
-                //    但云和天同源，这个近似看不出来。
-                s.top.copy(sky.uZenith.value).lerp(sky.uGlow.value, 0.28).multiplyScalar(1.04);
-                s.bottom.copy(sky.uCloud.value).lerp(sky.uZenith.value, 0.22);
                 u.uTop.value.copy(s.top);
                 u.uBottom.value.copy(s.bottom);
                 u.uGold.value.copy(sky.uGlow.value);
                 u.uSunDir.value.copy(sky.uSunDir.value);
+                const sd = sky.uSunDir.value;
+                u.uSunCam.value.set(sd.dot(s.ax), sd.dot(s.ay), sd.dot(s.az));
             }
             if (fog) {
                 // 霾和飞机 / 两棵树 / 竹林同一条：每帧从 scene.fog 拷，
@@ -159,6 +205,21 @@ export function SkyClouds() {
         }
     });
 
+    // 判据的抓手（只 dev）。和 `FlightFinish` 的 `__flightFinish` 同一个套路：
+    // 「剪影不再是死边」那条判据要在**真渲染的像素**上量，而不是在 JS 里
+    // 再实现一遍侵蚀（那等于拿副本当真源，§28.1）。
+    useEffect(() => {
+        if (!import.meta.env.DEV || typeof window === 'undefined') return undefined;
+        window.__skyClouds = {
+            materials: matRefs.current,
+            meshes: meshRefs.current,
+            shape: CLOUD_SHAPE,
+            identity: CLOUD_IDENTITY,
+            layers: SKY_CLOUD_LAYERS,
+        };
+        return () => { delete window.__skyClouds; };
+    }, []);
+
     return (
         <>
             {groups.map((g, gi) => (
@@ -166,7 +227,7 @@ export function SkyClouds() {
                     key={g.slot}
                     name={`sky-cloud-${g.slot}`}
                     ref={(el) => { meshRefs.current[gi] = el; }}
-                    args={[geometry, undefined, g.placements.length]}
+                    args={[geometry, undefined, g.instances.length]}
                     /* 🔴 显式 -1：three 对**透明**物排序时取的是 `matrixWorld`
                        的平移，而 InstancedMesh 自己的变换是单位矩阵 ⇒ 不显式
                        指定的话，这三组云会被当成"在原点"，排序纯属碰运气。
@@ -184,12 +245,24 @@ export function SkyClouds() {
                             uBottom: { value: new THREE.Color(0.8, 0.82, 0.85) },
                             uGold: { value: new THREE.Color(1, 0.92, 0.75) },
                             uSunDir: { value: new THREE.Vector3(0.6, 0.6, 0.5).normalize() },
+                            // 面片局部空间的太阳方向 —— 每帧由相机四元数换算。
+                            uSunCam: { value: new THREE.Vector3(0.6, 0.6, 0.5).normalize() },
                             uHaze: { value: new THREE.Color(0.9, 0.92, 0.9) },
                             uHazeNear: { value: 20 },
                             uHazeFar: { value: 100 },
                             uOpacity: { value: CLOUD_SHAPE.OPACITY },
                             uInk: { value: CLOUD_SHAPE.INK },
                             uGoldAmt: { value: CLOUD_SHAPE.GOLD_AMT },
+                            // WO-30 形体：侵蚀 + 太阳明暗。每帧写的只有 uDetail。
+                            uErode: { value: CLOUD_SHAPE.ERODE },
+                            uEdge: { value: CLOUD_SHAPE.EDGE },
+                            uNoiseScale: { value: CLOUD_SHAPE.NOISE_SCALE },
+                            uSoftR: { value: CLOUD_SHAPE.SOFT_R },
+                            // 明暗用的**解析半球**鼓到多大（剪影用的还是 uSoftR）。
+                            uDomeSpread: { value: CLOUD_SHAPE.DOME_SPREAD },
+                            uSunAmt: { value: CLOUD_SHAPE.SUN_AMT },
+                            uShadeAmt: { value: CLOUD_SHAPE.SHADE_AMT },
+                            uDetail: { value: CLOUD_SHAPE.DETAIL_HIGH },
                         }}
                         transparent
                         depthWrite={false}
@@ -211,9 +284,9 @@ export function SkyClouds() {
  *    `CLOUD_SPRITES[i].aspect` 才是真值（`GalleryClouds` 里也是这么写的，
  *    那份注释写得很清楚）。
  */
-function writeInstances(mesh, placements, cameraQuaternion, aspect, s) {
-    for (let i = 0; i < placements.length; i += 1) {
-        const p = placements[i];
+function writeInstances(mesh, instances, cameraQuaternion, aspect, s) {
+    for (let i = 0; i < instances.length; i += 1) {
+        const p = instances[i];
         const h = p.scale / (aspect || 1.8);
         s.q.copy(cameraQuaternion).multiply(s.spin.setFromAxisAngle(AXIS_Z, p.spin));
         s.m.compose(

@@ -90,8 +90,30 @@ export const PerformanceProvider = ({ children }) => {
     detectTier();
   }, []);
 
+  /* 判据的抓手（只 dev）：把**档位本身**挂出来。和 `window.__skyClouds` /
+     `window.__flightFinish` 同一个套路。
+     🔴 没有它，探针只能从**副产物**反推档位，而两条副产物都不够用：
+        `dpr` 在这台机器上三档都解析成 1（`clamp(devicePixelRatio, …)`），
+        `uDetail` 只区分 LOW / 非 LOW —— HIGH 与 MEDIUM **根本分不开**。
+        2026-10-14 为此白跑了两轮定妆照。 */
+  useEffect(() => {
+    if (!import.meta.env.DEV || typeof window === 'undefined') return undefined;
+    window.__tier = tier;
+    return () => { delete window.__tier; };
+  }, [tier]);
+
   // Function to manually downgrade tier (called by PerformanceMonitor)
   const downgradeTier = () => {
+    /* 🔴 判据的抓手（只 dev）：`window.__tierLock` 一挂上，fps 监视器就降不动档。
+       为什么必须有：本环境（swiftshader + dev）实测只有 **~1 fps**，而 drei 的
+       PerformanceMonitor 是**按真实 fps 降档**的 —— 它数的是真实帧、
+       读的是 `performance.now()`（**不是** `Clock.getDelta`，试过掰时钟，没用）。
+       `bounds` 在刷新率 ≤100 时是 [40, 60]，于是每批 10 个窗口全部 < 40
+       ⇒ 头几帧就把 HIGH 一路降到 LOW。2026-10-14 实测：三张定妆照**全是 LOW**，
+       连 `cores=真值` 的 HIGH 那页也是。
+       **只锁"降档"，不碰 detectTier()** ⇒ 档位仍然由伪造的硬件信号真判出来，
+       只是不让 fps 再改它。 */
+    if (import.meta.env.DEV && typeof window !== 'undefined' && window.__tierLock) return;
     setTier((current) => {
       if (current === TIERS.HIGH) return TIERS.MEDIUM;
       if (current === TIERS.MEDIUM) return TIERS.LOW;
