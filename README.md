@@ -308,7 +308,7 @@ python3 scripts/build-scene-fonts.py
 | [dgreenheck/ez-tree](https://github.com/dgreenheck/ez-tree) | 程序化树生成：分叉参数的分层设计、LOD 分层、presets 的字段命名 | ❌ 见下方说明 |
 | [MengTo/sylva](https://github.com/MengTo/sylva) | **视觉参考**：梦幻森林那一套（苔藓/圆球的形态、指针交互） | ❌ **它不授权复用**，见下方说明 |
 | [MengTo/kage](https://github.com/MengTo/kage) | 京都山寺「五章夜游」的实时 Three.js 光影与章节叙事节奏 | ❌ **它不授权复用**，见下方说明 |
-| [fanhuayishiy/ai-demo](https://github.com/fanhuayishiy/ai-demo) | 三维 demo 合集：樱花街角的植被与落花、夕空飞行的飞行场景 | ❌ 只参考做法（MIT） |
+| [fanhuayishiy/ai-demo](https://github.com/fanhuayishiy/ai-demo) → **[`sunset-flight-study`](https://github.com/fanhuayishiy/ai-demo/tree/main/sunset-flight-study)** | 三维 demo 合集。**飞机 / 天空 / 云只参考这一个子目录**（《红猪》风格的夕空飞行：奶油白单翼机、紫色雕塑云海、橙金天空、贴尾滚转运镜） | ❌ 只参考做法（MIT）；逐文件清单见下方 📌 |
 | [huangbai-AI/yingxian-pagoda](https://github.com/huangbai-AI/yingxian-pagoda) | 应县木塔「一木千年」：六幕滚动三维科普站与可编辑模型 | ❌ **它不授权复用**，见下方说明 |
 | [lhlGitHub/threejs-architecture-effects](https://github.com/lhlGitHub/threejs-architecture-effects) | 「可交互自装配 3D 建筑」的 Agent Skill：构件分层与建造动画的组织方式 | ❌ 思路参考（MIT） |
 
@@ -324,6 +324,45 @@ python3 scripts/build-scene-fonts.py
 > ⚠️ **`ai-demo` 与 `threejs-architecture-effects` 是 MIT**，所以**做法可以学**
 > （与上面那三条"只能看"的相反）。至于用不用、用到什么程度，以本项目自己的取舍为准。
 >
+### 📌 `ai-demo` 里我们参考的到底是哪一个：`sunset-flight-study`
+
+**源码入口** — <https://github.com/fanhuayishiy/ai-demo/tree/main/sunset-flight-study>
+（`main` @ **`bd4810c8`**，2026-10-10；仓库 MIT）
+
+**在线预览**（**不必 clone** 就能看效果）— <https://fanhuayishiy.github.io/ai-demo/sunset-flight-study/dist/>
+配套：效果图 `sunset-flight-study/docs/screenshots/` ·
+复现提示词 `sunset-flight-study/docs/RECREATE_PROMPT.zh-CN.md`
+
+> ⚠️ **2026-10-14 记下这一条，起因是「飞机 / 天空 / 云」要对齐时又在磁盘上找不着它了。**
+> 搜过全盘：本地**没有**副本，只剩我们自己代码里的引用注释。
+> ⇒ **别再假设本地有** —— 要重对齐先看上面的在线预览，或 clone 到
+> `.workbuddy-ai/.tmp/`（**别进 git**，它会带一堆位图资产）。
+
+逐文件 —— 只列我们**真的读过并据以做判断**的：
+
+| 参考文件 | 我们从它拿了什么 | 我们这边落在哪 |
+| --- | --- | --- |
+| `src/sunset-world.js` | `createCloudMaterial`（cel 分色 + 朝阳金边 + 距离霾）、`createSky()` 的穹顶做法 | `shaders/skyClouds.js` · `config/skyClouds.js` · `SceneLighting.jsx` |
+| `src/cel-material.js` | 分色阈值 `smoothstep(0.10, 0.135, ndl)`、`createOutlineMaterial` 的描边做法 | `shaders/airplane.js` |
+| `src/anime-renderer.js` | 单趟电影后期（**接管一帧的渲染**）、`LinearSRGBColorSpace` 的取色空间 | `entrance/FlightFinish.jsx` · `shaders/flightFinish.js` · `docs/color-space.md` |
+| `src/pilot-motion.js` | 「驾驶 = 位置指令」：输入 → 目标位置，航线照旧是航线 | `utils/pilotMotion.js` · `utils/pilotInput.js` |
+| `src/flight.js` | 航线的设计思路（`R_NEAR` / `R_FAR`） | `utils/flightPath.js` |
+| `docs/validation.md` | 它自己的验收清单 —— 参考"哪些量值得量" | 只读，没引代码 |
+
+**⚠️ 还没读、但下次该先读的：`src/painted-clouds.js`（7.2 KB）**
+它有一套**独立于 `sunset-world.js` 的"手绘云"**实现。我们做云的时候只看了
+`sunset-world.js` 的 `createCloudMaterial`，**从没打开过这个文件** ——
+2026-10-14 诊断"我们的云为什么不如它"时才发现它在这儿
+（诊断见 `docs/clouds.md`，待办见 `WORKPLAN.md` 的 WO-32 / DR-V）。
+同目录另有 `reference-*.js` 一整套（`reference-flight` / `reference-effects` /
+`reference-aircraft`），是它给自己留的「对照基准」。
+
+> ⚠️ **不做依赖、不引代码。** 与本项目「零位图 / 全程序化」冲突的部分明确**不搬**
+> （`MarchingCubes` metaball 云、`assets/` 里的位图）—— 见 `config/skyClouds.js`
+> 顶上那段「为什么**不**照抄参考实现的云」。
+> 另外它的云是**紫色色阶 + 金边**的 cel 语言，本项目是**水墨**（`utils/cloudArt.js`
+> 的白身 + 墨线 + 腹灰）—— 这条差异是**故意**的，不是没对齐，别当成 bug 去"修"。
+
 > ⚠️ **`ez-tree` 是 MIT，但本项目的树没有用它。** 它是 `Tree extends THREE.Group`，
 > 并且**没有**「只取几何、不取材质」的出口：`generate()` 把顶点灌进
 > `this.branches/{verts,normals,indices,uvs,windFactor}` 与
