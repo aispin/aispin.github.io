@@ -73,6 +73,7 @@ uniform float uSdfRange;
 uniform float uErode;
 uniform float uEdge;
 uniform float uNoiseScale;
+uniform float uVertBias;
 uniform float uSunAmt;
 uniform float uShadeAmt;
 uniform float uGoldAmt;
@@ -83,9 +84,13 @@ varying vec3 vW;
 varying float vDepth;
 
 /* 分色的三档（参考实现是四档 + uBandSoftness；我们只有两个体色 + 一个金）。
-   阈值抄参考实现的 −0.15 / 0.235 两档。 */
-const float BAND0 = -0.15;
-const float BAND1 = 0.30;
+   🔴 阈值**不能照抄**它的 −0.15 / 0.235：那是对着它 MarchingCubes 真 3D 法线的
+   l 分布校的（sunFacing/n.z 全域 −1..1）。我们的法线烘在 billboard 上 ⇒
+   n.z ≈ 1 居多 ⇒ l = 0.46·n.z + … 整体偏高，照抄阈值 ⇒ 大半身子落亮档
+   （实测 mesh 像素 p50 236、17.5% 削平到 255）。阈值按**我们的 l 分布**上移，
+   让暗档/亮档的覆盖面回到参考实现的观感比例。 */
+const float BAND0 = -0.20;
+const float BAND1 = 0.45;
 const float BAND_SOFT = 0.09;
 const float RIM_POWER = 2.2;
 
@@ -152,8 +157,13 @@ void main() {
     float a = (1.0 - smoothstep(cut + inkOuter - uEdge, cut + inkOuter + uEdge, sd)) * uOpacity;
     if (a < 0.004) discard;
 
-    /* ---- ② 体色（真源仍是穹顶，§5）------------------------------------- */
-    vec3 c = mix(uBottom, uTop, vUv.y);
+    /* ---- ② 体色（真源仍是穹顶，§5）-------------------------------------
+       🔴 WO-32e：竖向渐变**向底偏置**（pow > 1 ⇒ 中段身子更靠近云带色）。
+          背景：霾 A/B 已证伪（「wo32e-haze-ab.mjs」：fog 26/118 → 全关，
+          云足迹 p50 纹丝不动 232.4 —— 近云深度 30~60，霾系数本来就 ~0.1）
+          ⇒ 「云=天」的成因就是**派生色本身贴着天空色**。
+          uVertBias = 1 时与旧版逐位一致。 */
+    vec3 c = mix(uBottom, uTop, pow(vUv.y, uVertBias));
 
     /* ---- ③ 分色 + 明暗（真实逐瓣法线）----------------------------------
        权重抄参考实现：sunFacing*0.77 + n.y*0.24 + brush*0.20。
@@ -181,7 +191,10 @@ void main() {
           整圈亮就变成另一条墨线了。 */
     float sil = 1.0 - nrm.z;
     float sunEdge = pow(sil, RIM_POWER) * smoothstep(-0.34, 0.30, l);
-    c = mix(c, uGold * 1.13, smoothstep(0.035, 0.64, sunEdge) * uGoldAmt);
+    /* 🔴 参考实现是 uGold*1.13 —— 它的 uGold 是中间调橙金，×1.13 不削；
+       我们的 uGlow 本底 ~0.95 raw ⇒ 1.13 直接削平成 255（实测 9.5% 云像素）。
+       系数回到 1.0，「亮」交给 GOLD_AMT 的 mix 量。 */
+    c = mix(c, uGold, smoothstep(0.035, 0.64, sunEdge) * uGoldAmt);
 
     /* ---- ⑤ 墨线：距离场的等值带 ----------------------------------------
        🔴 同一朵云的三个层片、以及所有变体，用的都是**同一个相对宽度**
@@ -222,7 +235,11 @@ export const CLOUD_SHAPE = Object.freeze({
      *  ⚠️ 带的两肩是 `uEdge*0.5` —— 0.012 时带宽在屏上被软肩吃掉一半
      *     （首拍最暗只到 168、实测宽度只剩 2px）。 */
     INK_W: 0.020,
-    /** 金边满强度时的 mix 量（参考实现 0.87）。 */
+    /** 金边满强度时的 mix 量（参考实现 0.87）。
+     *  🔴 和 `TOP_GLOW_PULL` 同一条：**乘上 `uSunDisk`**。金边是"朝阳侧"的边，
+     *     夜里 `uSunDisk = 0`（日轮也灭了）⇒ 没有太阳就没有朝阳侧，
+     *     留一条亮边等于凭空多一个光源。实测夜里那圈只值 0.8/255（`wo32e-night-iso.mjs`
+     *     的 ② `gold=0` 一栏）—— 视觉上几乎不损失，但语义上是错的。 */
     GOLD_AMT: 0.87,
 
     /* ---- 距离场 / 侵蚀（都是 **UV** 单位）------------------------------ */
@@ -240,10 +257,49 @@ export const CLOUD_SHAPE = Object.freeze({
     NOISE_SCALE: 12.0,
 
     /* ---- 明暗（乘性，见片元 ③）---------------------------------------- */
-    /** 朝阳面提亮多少。 */
-    SUN_AMT: 0.20,
+    /** 朝阳面提亮多少。⚠️ 0.20 时 uTop×1.11 的亮档顶到 sRGB 253+（削平 7.7%）
+     *  ⇒ 收到 0.16（×1.088），亮档照样比天亮一档但不贴 255。 */
+    SUN_AMT: 0.18,
     /** 背光面压暗多少（同时驱动凹谷遮蔽）。 */
-    SHADE_AMT: 0.16,
+    SHADE_AMT: 0.05,
+
+    /* ---- WO-32e 明度分离（在 SkyClouds.jsx 的**派生**处用）--------------
+       霾 A/B 证伪后（见片元 ② 注释），「云=天」的正解是**派生时拉开出度**：
+       云顶在「天顶+朝阳」之上再亮一档、云底在「云带色」之下再压一档。
+       🔴 三个量都是**乘性**的 ⇒ 换季 / 入夜时云跟着穹顶走，不会变成新固定色。
+       🔴 TOP_LIFT 必须克制：×1.10 线性 ≈ 屏幕 +2%，头顶亮带不会削到 255；
+          BOTTOM_DROP 才是主力（云带色本来就只比天暗一档，再压才分得开）。 */
+    /**
+     * 云顶往**朝阳色**（uGlow）拉多少 —— 即"云顶被太阳照到"的量。
+     *
+     * 🔴 这一项**必须乘上天空自己的昼夜比例**（`uSunDisk` = 1 − k，见
+     *    `SkyClouds.jsx` 的派生处），**不能是常数**。2026-10-14 实测（`wo32e-night-iso.mjs`
+     *    的 ① 全季 uniform dump）：
+     *
+     *      白天  uZenith L 0.952 · uGlow L 0.835 ⇒ 拉 0.28 后 **比天顶暗** 0.033 ✓
+     *      秋夜  uZenith L 0.425 · uGlow L 0.771 ⇒ 拉 0.28 后 **比天顶亮** 0.097 🔴
+     *
+     *    同一个常数，昼夜**反号** —— 因为 uGlow 是"主光色"，白天它比近白的天顶暗、
+     *    夜里它比深蓝的天顶亮得多。常数 0.28 于是让秋夜出现「云比天亮着」。
+     *    天空自己用 uGlow 只有 `uGlowAmt` 那么点（白天 0.12 / 夜里 0.045）⇒
+     *    云这边按同一个昼夜比例缩，白天逐位不变、夜里收到 0。
+     *
+     *    （旁证：天空的云带 `uStrata` 昼夜比 = 0.12/0.34 = 0.353，与 `uGlowAmt` 的
+     *      0.045/0.12 = 0.375 几乎相同 —— 天自己那两个"额外的光"都是夜掉到 1/3。
+     *      我们直接取 `uSunDisk` 这个**现成的、从 0 到 1 的**标量，比再除一次比值稳。）
+     */
+    TOP_GLOW_PULL: 0.28,
+    /** 云顶派生色的线性提亮（原来硬编码 1.04）。⚠️ shader 输出**不过色彩空间
+     *  编码**（§19）⇒ raw >1 直接削平成 255：TOP_LIFT 1.10 实测 17.5%、1.02 仍
+     *  10.1% 云像素削平（uTop 本底 ~0.97 raw × SUN 1.11 就过 1）。收 0.94，
+     *  「云顶亮一档」交给 SUN 乘子（×1.11）去顶 —— 0.94×1.11=1.04 恰好不削。 */
+    TOP_LIFT: 0.99,
+    /** 云底派生色的线性压暗。⚠️ 屏幕直觉在这里失效：×0.74 线性 ≈ 屏幕只暗
+     *  ~13%（实测 uniform-check：p50 纹丝不动）—— linear mixing 还会把
+     *  中段推亮。要拉开 ≥25 必须 0.5 一档。 */
+    BOTTOM_DROP: 0.86,
+    /** 竖向渐变向底偏置的指数（uVertBias；1 = 与旧版一致，>1 = 中段偏暗）。 */
+    VERTICAL_BIAS: 1.0,
 
     /**
      * fbm 档数（HIGH / LOW）。🔴 低档是**真的少算**（一致分支）。

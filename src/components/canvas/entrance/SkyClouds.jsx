@@ -102,10 +102,53 @@ export function SkyClouds({ lowTier = false }) {
     const meshRefs = useRef([]);
     const matRefs = useRef([]);
 
+    /**
+     * 🔴 2026-10-14 踩到并修掉的大坑：uniforms 对象**必须是稳定引用**。
+     *
+     * `<shaderMaterial uniforms={{...}} />` 里的字面量**每次 React render 都是新对象**，
+     * R3F 会把它赋给 `material.uniforms`（换掉整个对象）。而 three 在**编译那一刻**
+     * 把 `materialProperties.uniformsList` 绑到当时的**描述符对象**上 —— 之后每帧
+     * `u.uTop.value.copy(...)` 写的是**新描述符**，GPU 收到的还是编译时那份。
+     *
+     * 症状（这一轮查了很久）：改 GLSL 常量（会重新编译）**立刻见效**；改任何
+     * 「每帧 feed 的派生值」（uTop / uBottom / uGold / uSunCam / uHaze / uDetail）
+     * **逐位不变**。判据：给材质 `needsUpdate = true` 后云立刻变色（28201 px 变红）。
+     *
+     * ⇒ 用 `useMemo` 建一次、只喂值不改对象。这样 R3F 即使重新赋值，描述符还是同一批。
+     */
+    const uniformSets = useMemo(() => groups.map((g) => ({
+        uMap: { value: g.texture },
+        uTop: { value: new THREE.Color(1, 1, 1) },
+        uBottom: { value: new THREE.Color(0.8, 0.82, 0.85) },
+        uGold: { value: new THREE.Color(1, 0.92, 0.75) },
+        // 面片局部空间的太阳方向 —— 每帧由相机四元数换算。
+        uSunCam: { value: new THREE.Vector3(0.6, 0.6, 0.5).normalize() },
+        uHaze: { value: new THREE.Color(0.9, 0.92, 0.9) },
+        uHazeNear: { value: 20 },
+        uHazeFar: { value: 100 },
+        uOpacity: { value: CLOUD_SHAPE.OPACITY },
+        uInk: { value: CLOUD_SHAPE.INK },
+        // 路线 C：距离场 + 法线贴图（见 makeCloudVolumeTexture）
+        uSdfRange: { value: CLOUD_SHAPE.SDF_RANGE },
+        uInkW: { value: CLOUD_SHAPE.INK_W },
+        uErode: { value: CLOUD_SHAPE.ERODE },
+        uEdge: { value: CLOUD_SHAPE.EDGE },
+        uNoiseScale: { value: CLOUD_SHAPE.NOISE_SCALE },
+        // WO-32e：竖向渐变向底偏置（1 = 与旧版一致）。
+        uVertBias: { value: CLOUD_SHAPE.VERTICAL_BIAS },
+        uSunAmt: { value: CLOUD_SHAPE.SUN_AMT },
+        uShadeAmt: { value: CLOUD_SHAPE.SHADE_AMT },
+        // ⚠️ 这里只是初值 —— 每帧会被 `GOLD_AMT * uSunDisk` 覆盖（见 useFrame）。
+        uGoldAmt: { value: CLOUD_SHAPE.GOLD_AMT },
+        uDetail: { value: CLOUD_SHAPE.DETAIL_HIGH },
+    })), [groups]);
+
     // 天空穹顶（颜色真源）。只查一次 —— 见文件头。
     const skyRef = useRef(null);
     /** 找不到穹顶时只喊一次 —— 每帧喊会把 console 刷爆。 */
     const warnedRef = useRef(false);
+    /** 穹顶在、但 `uSunDisk` 没了（改名）时也喊一次 —— 同上。 */
+    const warnedSunDiskRef = useRef(false);
 
     // 每帧复用的临时量
     const scratch = useRef({
@@ -171,14 +214,37 @@ export function SkyClouds({ lowTier = false }) {
         const fog = scene.fog;
         // fbm 档数跟着性能分级走：低端机少算两级噪声。
         const detail = lowTier ? CLOUD_SHAPE.DETAIL_LOW : CLOUD_SHAPE.DETAIL_HIGH;
+        // 🔴 WO-32e：云的「受光量」= 天空自己的昼夜比例。
+        //    `uSunDisk` 就是 SceneLighting 里的 `1 − k`（k = 0 白天 / 1 夜），
+        //    白天**恰好 1**、夜里**恰好 0**，而且昼夜过渡那 0.9 s 它自己在插值
+        //    ⇒ 云跟着一起淡出，不需要在这里再写一份端点（§5：同一事实不存两份）。
+        //    白天 = 1 ⇒ pull 0.28 / gold 0.87 **逐位不变**；夜里 = 0 ⇒ 两项都收 0。
+        //    为什么必须这样：见 CLOUD_SHAPE.TOP_GLOW_PULL 的注释（同一常数昼夜反号）。
+        let glowScale = 1;
 
         if (sky) {
+            // 🔴 按名字查的接口还有一个（见文件头）：改名要**报警**，不能静默退回 1
+            //    —— 退回 1 就是"永远当白天"，秋夜「云比天亮着」会原样复发。
+            if (sky.uSunDisk === undefined) {
+                if (!warnedSunDiskRef.current) {
+                    warnedSunDiskRef.current = true;
+                    console.warn('[clouds] 穹顶没有 uSunDisk ⇒ 云的受光量退回"永远白天"（见 SkyClouds 派生处）');
+                }
+                glowScale = 1;
+            } else {
+                glowScale = sky.uSunDisk.value;
+            }
             // 云顶 = 天顶色偏朝阳（云被上面的太阳照亮），再提一档；
             // 云底 = 云带色（天空里那条云的颜色）偏天顶。
             // ⚠️ 都在**屏幕值**空间里插值 —— 不是物理正确的做法，
             //    但云和天同源，这个近似看不出来。
-            s.top.copy(sky.uZenith.value).lerp(sky.uGlow.value, 0.28).multiplyScalar(1.04);
-            s.bottom.copy(sky.uCloud.value).lerp(sky.uZenith.value, 0.22);
+            // 🔴 WO-32e：插值完再**乘性分离**（TOP_LIFT / BOTTOM_DROP）——
+            //    霾 A/B 已证伪（近云深度 30~60，霾系数 ~0.1，动雾没用），
+            //    「云=天」的成因是派生色贴着天空色。乘性 ⇒ 换季/入夜自动跟随。
+            s.top.copy(sky.uZenith.value)
+                .lerp(sky.uGlow.value, CLOUD_SHAPE.TOP_GLOW_PULL * glowScale)
+                .multiplyScalar(CLOUD_SHAPE.TOP_LIFT);
+            s.bottom.copy(sky.uCloud.value).lerp(sky.uZenith.value, 0.22).multiplyScalar(CLOUD_SHAPE.BOTTOM_DROP);
             // 太阳方向换算到**面片局部空间**：面片局部基 = 相机四元数。
             // 用同一个 `state.camera.quaternion`，别用 `matrixWorld`（差一帧）。
             const q = state.camera.quaternion;
@@ -191,6 +257,8 @@ export function SkyClouds({ lowTier = false }) {
             if (!mat) continue;
             const u = mat.uniforms;
             u.uDetail.value = detail;
+            // 金边同样是"朝阳侧"的量 ⇒ 跟 uSunDisk 一起收（见 CLOUD_SHAPE.GOLD_AMT）。
+            u.uGoldAmt.value = CLOUD_SHAPE.GOLD_AMT * glowScale;
             if (sky) {
                 u.uTop.value.copy(s.top);
                 u.uBottom.value.copy(s.bottom);
@@ -245,29 +313,9 @@ export function SkyClouds({ lowTier = false }) {
                         ref={(el) => { matRefs.current[gi] = el; }}
                         vertexShader={CLOUD_VERT}
                         fragmentShader={CLOUD_FRAG}
-                        uniforms={{
-                            uMap: { value: g.texture },
-                            uTop: { value: new THREE.Color(1, 1, 1) },
-                            uBottom: { value: new THREE.Color(0.8, 0.82, 0.85) },
-                            uGold: { value: new THREE.Color(1, 0.92, 0.75) },
-                            // 面片局部空间的太阳方向 —— 每帧由相机四元数换算。
-                            uSunCam: { value: new THREE.Vector3(0.6, 0.6, 0.5).normalize() },
-                            uHaze: { value: new THREE.Color(0.9, 0.92, 0.9) },
-                            uHazeNear: { value: 20 },
-                            uHazeFar: { value: 100 },
-                            uOpacity: { value: CLOUD_SHAPE.OPACITY },
-                            uInk: { value: CLOUD_SHAPE.INK },
-                            // 路线 C：距离场 + 法线贴图（见 makeCloudVolumeTexture）
-                            uSdfRange: { value: CLOUD_SHAPE.SDF_RANGE },
-                            uInkW: { value: CLOUD_SHAPE.INK_W },
-                            uErode: { value: CLOUD_SHAPE.ERODE },
-                            uEdge: { value: CLOUD_SHAPE.EDGE },
-                            uNoiseScale: { value: CLOUD_SHAPE.NOISE_SCALE },
-                            uSunAmt: { value: CLOUD_SHAPE.SUN_AMT },
-                            uShadeAmt: { value: CLOUD_SHAPE.SHADE_AMT },
-                            uGoldAmt: { value: CLOUD_SHAPE.GOLD_AMT },
-                            uDetail: { value: CLOUD_SHAPE.DETAIL_HIGH },
-                        }}
+                        /* 🔴 稳定引用 —— 见上面 uniformSets 的注释（不这样写，
+                           每帧 feed 的 uniform 到不了 GPU）。 */
+                        uniforms={uniformSets[gi]}
                         transparent
                         depthWrite={false}
                         side={THREE.DoubleSide}
