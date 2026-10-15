@@ -18,8 +18,10 @@ import { CLOUD_VERT, CLOUD_FRAG, CLOUD_SHAPE, CLOUD_IDENTITY } from '../../../sh
  * 用户（第三轮）：「云朵搞逼真一点（是否上 glsl）」→ 拍板 (A)。
  *
  * 摆位在 `config/skyClouds.js`（确定性 + 层片展开），形体与上色在
- * `shaders/skyClouds.js`，云的**素描底**沿用本项目自己的 `utils/cloudArt.js`
- * （摄影室那八张水墨云）。
+ * `shaders/skyClouds.js`。云形仍取本项目自己的 `utils/cloudArt.js`
+ * （程序化 union-of-lobes），但天空版本**不再复用墨线观感**：参考实现的云
+ * **没有描边**，用户也明确反馈「黑色明显的描边」让云看起来很假。现在由 SDF
+ * 抗锯齿剪影 + 平滑前表面法线 + cel 明暗塑形。
  *
  * ---------------------------------------------------------------------------
  * 🔴 颜色**只有一个真源**：天空穹顶的 uniform
@@ -127,10 +129,8 @@ export function SkyClouds({ lowTier = false }) {
         uHazeNear: { value: 20 },
         uHazeFar: { value: 100 },
         uOpacity: { value: CLOUD_SHAPE.OPACITY },
-        uInk: { value: CLOUD_SHAPE.INK },
         // 路线 C：距离场 + 法线贴图（见 makeCloudVolumeTexture）
         uSdfRange: { value: CLOUD_SHAPE.SDF_RANGE },
-        uInkW: { value: CLOUD_SHAPE.INK_W },
         uErode: { value: CLOUD_SHAPE.ERODE },
         uEdge: { value: CLOUD_SHAPE.EDGE },
         uNoiseScale: { value: CLOUD_SHAPE.NOISE_SCALE },
@@ -138,6 +138,8 @@ export function SkyClouds({ lowTier = false }) {
         uVertBias: { value: CLOUD_SHAPE.VERTICAL_BIAS },
         uSunAmt: { value: CLOUD_SHAPE.SUN_AMT },
         uShadeAmt: { value: CLOUD_SHAPE.SHADE_AMT },
+        // WO-32g：笔触颗粒（复用侵蚀那张 fbm）。
+        uGrain: { value: CLOUD_SHAPE.GRAIN },
         // ⚠️ 这里只是初值 —— 每帧会被 `GOLD_AMT * uSunDisk` 覆盖（见 useFrame）。
         uGoldAmt: { value: CLOUD_SHAPE.GOLD_AMT },
         uDetail: { value: CLOUD_SHAPE.DETAIL_HIGH },

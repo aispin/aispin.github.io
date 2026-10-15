@@ -280,7 +280,7 @@ export function makeCloudTexture(index = 0, aspect = 1.9) {
 export default makeCloudTexture;
 
 /**
- * SDF + 逐瓣法线，烘进一张 DataTexture（2026-10-14，路线 C）。
+ * SDF + 前表面法线，烘进一张 DataTexture（2026-10-14 路线 C / 2026-10-15 WO-32g）。
  * =====================================================================
  *
  * 为什么要有第二张生成器：`makeCloudTexture` 的产物是**素描**（R=G=B=灰度、
@@ -289,15 +289,17 @@ export default makeCloudTexture;
  * 一张贴图**，否则摄影室直接坏。所以这里**另起一个函数**，`makeCloudTexture`
  * 一行不动。
  *
- * 🔴 形状与素描**逐位相同**：同一把种子（`cloud-<index>`）、同一个 `buildLobes`、
+ * 🔴 **剪影**与素描**逐位相同**：同一把种子（`cloud-<index>`）、同一个 `buildLobes`、
  *    同一套 fit（pad 0.075、两轴独立）—— 只是把"画出来"换成"算出来"。
- *    判据 S2/S3 的 A/B 都建立在"剪影没被换掉"上。
+ *    判据 S2/S3 的 A/B 都建立在"剪影没被换掉"上（距离场仍是**硬并集**）。
  *
- * 🔴 法线为什么是**解析精确**的：union-of-spheres 投到 billboard 平面上，
- *    每个像素的可见表面就是「z 最靠前的那个瓣」的球面，其法线 =
- *    `(dx, dy, sqrt(r²−d²)) / r`（d = 像素到瓣心的距离）。这不是近似 ——
- *    WO-30 走过的弯路（把 alpha 模糊求梯度当法线）是被墨线弧带偏的**近似**，
- *    这条是**解析**的，与墨线无关（墨线现在根本不在贴图里，见下）。
+ * 🔴 **法线**（2026-10-15 换过算法）：现在是**平滑并集的前表面高度场**的梯度
+ *    `n = normalize(−∂h/∂x, +∂h/∂y, 1)`，而不是"z 最靠前的那个瓣"的解析球面法线。
+ *    对单个瓣两者**完全等价**；差别只在瓣与瓣相交处 —— 旧算法在那里法线**硬跳**，
+ *    整朵云读成蜂窝（诊断图 `.workbuddy-ai/.tmp/wo32g/lmap-*.png`）。
+ *    详见函数体里 `frontHeight` 上方的注释。
+ *    （WO-30 走过的那条弯路 —— 把 alpha 模糊求梯度当法线 —— 仍然是不对的：
+ *      它求的是**素描**的梯度，会被画在里面的墨线弧带偏；现在求的是**几何**的梯度。）
  *
  * 通道布局（**没有**墨线、**没有**腹灰 —— 那两样挪到片元里，见 `shaders/skyClouds.js`）：
  *   R = 带符号距离场，`0.5 + sdf/SDF_RANGE`（云内为负 → < 0.5）
@@ -343,8 +345,60 @@ export function makeCloudVolumeTexture(index = 0, aspect = 1.9) {
     // lobe 单位 → 像素：两轴独立缩放差 ≤ 20%，取几何平均近似各向同性
     const kpx = Math.sqrt(kx * ky);
 
-    /** 距离场的存储量程（UV）。±0.05 ⇒ 墨线（~0.012）与侵蚀（±0.015）都在量程内。 */
+    /** 距离场的存储量程（UV）。±0.05 ⇒ 侵蚀（±0.015）在量程内。 */
     const SDF_RANGE = 0.10;
+
+    /* ---- 前表面高度场（**平滑并集**）------------------------------------
+     * 🔴 2026-10-15（WO-32g）换掉了法线的算法。
+     *
+     * 旧算法是「z 最靠前的那个瓣」的解析球面法线 —— 对**单个瓣**精确，
+     * 但瓣与瓣相交处 `bestZ` 会**跳号** ⇒ 法线在那里硬跳 ⇒ 整朵云读出来是
+     * **蜂窝**（每瓣一块平板 + 直边折痕）。用户 2026-10-15 的「云很假」
+     * 指的就是这个（诊断图 `.workbuddy-ai/.tmp/wo32g/lmap-*.png`：l 的等值面
+     * 是一堆多边形）。
+     *
+     * 新算法把云看成一张**高度场** `h(x, y)`（并集的**前表面**），法线取它的梯度：
+     *     `n = normalize(−∂h/∂x, +∂h/∂y, 1)`
+     * 对单个瓣这**恰好**等于原来的球面法线（可验证：`h = √(r²−d²)` ⇒
+     * `∂h/∂x = −dx/h` ⇒ `n ∝ (dx, −dy, h)/r`）—— 所以这不是换一套模型，
+     * 是把"取最靠前的瓣"换成"取并集"，后者在折痕处是**连续**的。
+     *
+     * 🔴 `h` 用**平滑并集**（多项式 smooth-max）而不是 `max`：`max` 的折痕
+     *    只是从"法线硬跳"变成"高度场折角"，梯度照样不连续。
+     *    这正是参考实现的 metaball 做的同一件事 —— 它的注释原话：
+     *    "A locally smoothed union retains each billow's shoulder and scalloped
+     *    valley. Additive metaballs overfill those valleys and become one balloon."
+     *    ⇒ 混合半径必须远小于瓣半径（0.025 vs 约 0.1）；过大就会压平肩部、填满凹谷，
+     *       整片云读成一个气球。
+     *
+     * ⚠️ **距离场（剪影）不走这条路** —— 它仍然是**硬并集** `min(dᵢ − rᵢ)`。
+     *    剪影必须和素描底（`makeCloudTexture`）逐位一致，S2/S3 的 A/B 契约
+     *    就架在"剪影没被换掉"上；而平滑并集会让轮廓外扩。
+     */
+    const SMAX_K = 0.025;
+    const frontHeight = (lx, ly) => {
+        let h = 0;
+        let any = false;
+        for (let i = 0; i < lobes.length; i += 1) {
+            const lobe = lobes[i];
+            const dx = lx - lobe.x;
+            const dy = ly - lobe.y;
+            const rr = lobe.r * lobe.r - dx * dx - dy * dy;
+            if (rr <= 0) continue;      // 这个瓣在这儿没有表面
+            const z = Math.sqrt(rr);
+            if (!any) { h = z; any = true; continue; }
+            // smooth-max polynomial. Use the original operand order in the identity:
+            // smoothMax(a, b, k) = b + (a - b) * t + k * t * (1 - t),
+            // t = clamp(0.5 + 0.5 * (a - b) / k). Reversed operands break associativity.
+            const t = Math.min(Math.max(0.5 + 0.5 * (z - h) / SMAX_K, 0), 1);
+            h += (z - h) * t + SMAX_K * t * (1 - t);
+        }
+        return h;   // 云外所有瓣都缺席 ⇒ 0
+    };
+    // 一个纹素在 lobe 单位里的步长（两轴独立 ⇒ 必须分开算，否则梯度被拉伸带偏）
+    const stepX = 1 / kx;
+    const stepY = 1 / ky;
+
     const data = new Uint8Array(W * H * 4);
     let p = 0;
     // 🔴 DataTexture 的 `flipY` 是 false ⇒ 数据第 0 行 = v=0 = 面片**底部**。
@@ -355,36 +409,31 @@ export function makeCloudVolumeTexture(index = 0, aspect = 1.9) {
         for (let cx = 0; cx < W; cx += 1) {
             const lx = (cx + 0.5 - ox) / kx;
             let sdf = Infinity;   // lobe 单位
-            let bestZ = -1;       // 最靠前的瓣的 z（lobe 单位）
-            let nx = 0;
-            let ny = 0;
             for (let i = 0; i < lobes.length; i += 1) {
                 const lobe = lobes[i];
                 const dx = lx - lobe.x;
                 const dy = ly - lobe.y;
-                const d = Math.sqrt(dx * dx + dy * dy);
-                const sd = d - lobe.r;
+                const sd = Math.sqrt(dx * dx + dy * dy) - lobe.r;
                 if (sd < sdf) sdf = sd;
-                if (d < lobe.r) {
-                    const z = Math.sqrt(lobe.r * lobe.r - d * d);
-                    if (z > bestZ) {
-                        bestZ = z;
-                        nx = dx / lobe.r;
-                        // 🔴 canvas 的 y 向下，而片元/「uSunCam」里 y 是**屏幕上**为正
-                        //    ⇒ 这里必须翻符号。2026-10-14 漏了这一下：S4 反向
-                        //    （朝阳半反而更暗，corr −0.312），uSunCam 又被 y 主导。
-                        ny = -dy / lobe.r;
-                    }
-                }
             }
             const sdfUV = (sdf * kpx) / W;
-            // 云外没有可见表面 ⇒ 法线回退 (0,0,1)（正对镜头）。
-            // 🔴 距离场**照常写** —— 紧贴轮廓外侧那一两像素 bestZ<0 但 sdf 很小，
-            //    若一并填成"最远"，抗锯齿边就断在那儿（量具 S2 会量到一条断层）。
-            if (bestZ < 0) {
-                nx = 0;
-                ny = 0;
+
+            /* 法线 = 前表面高度场的中心差分梯度。
+               🔴 符号：lobe 单位里 y **向下**（`ly` 越大越靠底），而片元 /「uSunCam」
+                  里 y 是**屏幕上**为正 ⇒ `n.y = +∂h/∂ly`（不是 −）。
+                  2026-10-14 漏过一次同类的翻号（S4 反向、corr −0.312），见 hard-rules。 */
+            let nx = 0;
+            let ny = 0;
+            if (sdf < 0) {   // 只有云内才有"前表面"可谈
+                const hx = (frontHeight(lx + stepX, ly) - frontHeight(lx - stepX, ly)) / (2 * stepX);
+                const hy = (frontHeight(lx, ly + stepY) - frontHeight(lx, ly - stepY)) / (2 * stepY);
+                const inv = 1 / Math.sqrt(hx * hx + hy * hy + 1);
+                nx = -hx * inv;
+                ny = hy * inv;
             }
+            // 云外没有可见表面 ⇒ 法线回退 (0,0,1)（正对镜头）。
+            // 🔴 距离场**照常写** —— 紧贴轮廓外侧那一两像素 sdf 很小，
+            //    若一并填成"最远"，抗锯齿边就断在那儿（量具 S2 会量到一条断层）。
             data[p] = Math.round(Math.max(0, Math.min(1, 0.5 + sdfUV / SDF_RANGE)) * 255);
             data[p + 1] = Math.round((nx * 0.5 + 0.5) * 255);
             data[p + 2] = Math.round((ny * 0.5 + 0.5) * 255);
