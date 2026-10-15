@@ -549,10 +549,10 @@ export function buildPersimmonTree(seed = KEY) {
         fruit: { matrices: fMats, count: fruitRaw.length },
         chimeAnchor: toFinal(anchorRaw),
         crown: { c: toFinal(crownC), r: new THREE.Vector3(crownR.x * k, crownR.y * k, crownR.z * k * DEPTH_SQUASH) },
-        // ⚠️ 柿子树**没有**垂枝（`SPEC` 里不给 `droop`）⇒ 这里恒为空数组。
-        //    `harness/probe-tree-droop.mjs` 的 D5 拿它当**对照**：
+        // ⚠️ 柿子树**没有**横展枝（`SPEC` 里不给 `reach`）⇒ 这里恒为空数组。
+        //    `harness/probe-tree-reach.mjs` 的 D5 拿它当**对照**：
         //    一旦这个数组非空，说明那个"可选"特性漏进了共用机器。
-        droops: state.droops,
+        reaches: state.reaches,
     };
     cache.set(seed, built);
     return built;
@@ -560,10 +560,10 @@ export function buildPersimmonTree(seed = KEY) {
 
 /**
  * 判据用的调试口 —— 与 `sakuraTree.js` 的同名函数对称。
- * 🔴 柿子树**必须**返回空数组：垂枝是 WO-28b 给樱花树加的**可选**特性，
- *    共用机器（`utils/treeSkeleton.js`）在 spec 不给 `droop` 时一行都不执行。
- *    判据 D5 量的就是这件事。
+ * 🔴 柿子树**必须**返回空数组：横展枝（WO-28b 时叫垂枝，WO-33f 改形并改名）
+ *    是给樱花树加的**可选**特性，共用机器（`utils/treeSkeleton.js`）在 spec
+ *    不给 `reach` 时一行都不执行。判据 D5 量的就是这件事。
  */
-export function debugDroops(seed = KEY) {
-    return buildPersimmonTree(seed).droops;
+export function debugReaches(seed = KEY) {
+    return buildPersimmonTree(seed).reaches;
 }

@@ -44,7 +44,7 @@ import {
  * | 树形 | 主干高、冠偏圆 | **主干矮、冠像伞**（比高更宽） |
  * | 枝 | 上扬 | **横展**，梢头略垂（`UP_BIAS` 更小 / `OUT_BIAS` 更大） |
  * | 枝数 | 3 → 2~3 | 同 |
- * | 垂枝 | 无 | **有**（`DROOP`，WO-28b 第二刀）|
+ * | 垂枝 | 无 | **有**（`REACH`，WO-28b 第二刀）|
  * | 冠 | `PAD` 2.55 / 2.40（近圆）| **2.90 宽 / 1.75 高**（扁而阔）|
  * | 冠的朝向 | 随机（可能歪向墙） | **强制朝外**（`leanCrownForward`）|
  * | 春 | 嫩叶 | **满树花**（叶是夏秋的事）|
@@ -61,7 +61,7 @@ import {
  *      （柿子树 5.25），一高一矮、一圆一伞，并排站着才不会认错。
  *      ⚠️ 这一刀**推翻了**原来那句"樱花是比柿子树大一点的那棵"（WO-17 的
  *      注释），是 WO-28b 有意改的：差异化优先于体量写实。
- *   ② **垂枝** —— 4~6 根细枝"先上后垂"（`DROOP`，机器在 `treeSkeleton`）。
+ *   ② **垂枝** —— 4~6 根细枝"先上后垂"（`REACH`，机器在 `treeSkeleton`）。
  *   ③ **簇尺度** —— 花簇比柿子叶团**更小、更密**（`TUFTS_PER_TIP` 更高、
  *      `TIP_BALL` 更小、每团的 `scales` 更小）。
  *
@@ -161,10 +161,11 @@ const DEPTH_SQUASH = 0.58;
 const SPREAD = [0.74, 0.86, 0.94, 0.96];
 
 /**
- * 🔴 垂枝（WO-28b ②）—— **可选**特性，机器在 `utils/treeSkeleton.js` 的 `grow`。
+ * 🔴 **横展枝** —— **可选**特性，机器在 `utils/treeSkeleton.js` 的 `grow`。
  *
- * 用户要的是「4~6 根**下垂**的细枝（先上后垂）」。做法：给 `grow` 一个可选
- * `spec.droop`，让它对一部分枝在过 `startT` 之后**逐步**叠一个向下的量。
+ * 挑一部分枝（1~2 级）让它们**又长又细、先横着出去、末段转上扬**。
+ * 做法：给 `grow` 一个可选 `spec.reach`，它把这部分枝的**竖直分量直接写死**成
+ * `d.y = flat + rise·u²`（`u` = 走到第几段 / 总段数），水平分量照旧吃抖动。
  *
  * ⚠️ 这个字段**不写就等于没有这个特性**：柿子树不写 ⇒ 那块代码整段跳过、
  *    一次随机数都不多抽 ⇒ 它的几何哈希逐位不变
@@ -172,56 +173,59 @@ const SPREAD = [0.74, 0.86, 0.94, 0.96];
  *
  * | 字段 | 含义 |
  * | --- | --- |
- * | `depthMax` | 只让 1~2 级枝垂（再深就整冠下垂了，那是垂枝樱，不是染井吉野）|
+ * | `depthMax` | 只让 1~2 级枝横展（再深就整冠散开了）|
  * | `every` | `{深度: 步长}` —— 该深度每 `步长` 根挑 1 根（**按深度分开数**）|
- * | `segs` | 垂枝用几段折线（比 `SEGS` 多：3 段画不出弧）|
- * | `up` | 起始竖直分量（> 0 ⇒ 先上扬）|
- * | `sink` | 竖直分量按 `up − sink·u²` 走 ⇒ 中途转平、末段猛坠 |
- * | `lengthScale` | 垂枝更长（有地方可垂）；**只作用于这一节**，不级联 |
- * | `radiusScale` | 垂枝是**细枝**：整根（含子枝）按此收细 |
+ * | `segs` | 用几段折线（比 `SEGS` 多：3 段画不出"先平后扬"的弧）|
+ * | `flat` | **起步**的竖直分量（≈ 0 ⇒ 一出生就横着走）|
+ * | `rise` | **末段**上扬的量（`d.y = flat + rise·u²`，二次曲线 ⇒ 越走越抬）|
+ * | `lengthScale` | 更长（要够长才谈得上"横着长"）；**只作用于这一节**，不级联 |
+ * | `radiusScale` | 是**细枝**：整根（含子枝）按此收细 |
  *
  * ⚠️ `every` 必须**按深度分开**：一级枝的序号是 0/4/8（深度优先、二级枝数量
- *    不定），全局一个 `% 2` 正好全中 ⇒ 三根一级枝**全部**垂，主骨架都挂了。
+ *    不定），全局一个 `% 2` 正好全中 ⇒ 三根一级枝**全部**中招，主骨架都变了。
  * ⚠️ 竖直分量是**构造**出来的，不从父枝继承；而且**不级联给子枝** ——
  *    否则骨架一路扎穿地面（`rawBox.y0 = −0.53`），归一化把整棵树抬起来。
  *    两处错误的完整记录在 `treeSkeleton.grow()` 的注释里。
  *
- * 判据：`harness/probe-tree-droop.mjs`（D1 条数 4~6 · D2 先上后垂 ·
- * D3 梢头低于起点 ≥ 自身弧长的 10% · D4 是弧不是直棍 · D5 柿子树没有垂枝 ·
+ * 判据：`harness/probe-tree-reach.mjs`（D1 条数 4~6 · D2 先横后扬 —— 梢头比起点
+ * **高** · D3 抬升 ≥ 自身弧长的 10% · D4 是弧不是直棍 · D5 柿子树没有这个特性 ·
  * D6 梢头不扎到树根以下 · D7 整根骨架不扎到树根以下）。
  *
- * 🔴 WO-33e ②：`sink` 2.30 → **1.70**、`lengthScale` 1.35 → **1.15**
- *    （用户：「分叉树枝的那一小撮叶子」；在四个选项里选了**减小垂枝下垂深度**）。
+ * ---------------------------------------------------------------------------
+ * 形态史（这段留着，免得同一个坑再踩一遍）
+ * ---------------------------------------------------------------------------
+ * · **WO-28b**：用户说「樱花树长的太像柿子树了」⇒ 加了这个特性，当时叫
+ *   `droop`（垂枝），形态是「先上后垂」：`d.y = up − sink·u²`。
+ * · **WO-33e**：用户指着"分叉处那一小撮叶子"说突兀。查明那是末梢 42/43/44/45
+ *   的 `perTip` 团叠在一起（**4 个连号末梢 = 一条垂枝分出的叉**）。
+ *   试着只把 `sink` 压浅（2.30→1.70）—— ⚠️ **只治标**：横展枝的**起点**就在
+ *   y = 1.12~2.04（局部），而冠底在 2.581 ⇒ **起点本身就在冠底下**，
+ *   `sink` 压到极限梢头仍在冠底以下 0.59~1.47，只是孤立感减轻。
+ * · **WO-33f（当前）**：用户拍板一句话解决 ——
+ *   **「取消下垂，横着长，然后正常往上长」** ⇒ 竖直侧写改成
+ *   `d.y = flat + rise·u²`，**下垂彻底取消**；名字从 `droop` 改成 `reach`
+ *   （继续叫"垂枝"会骗人）。
  *
- *    ① 那团叶子是什么：末梢 **42/43/44/45** 的 `perTip` 团叠在一起
- *       —— **4 个连号末梢 = 一条垂枝分出的叉**，`|q|` = 1.16~1.38（在冠椭球**外**）。
- *       4 个梢头的团叠成一坨 ⇒ 看上去就是"分叉处挂着一团叶子"。
- *    ② ⚠️ **这一刀只能治标，必须说清楚**（量过才敢说，见
- *       `harness/wo33e-droop-sweep.mjs` 的扫描表）：垂枝的**起点**就在
- *       y = 1.12~2.04（局部），而冠底在 **2.581** ⇒ **起点本身就在冠底下**，
- *       所以无论 `sink` 压到多少，梢头都够不到冠里：
- *         `sink` 2.30 → 梢头离冠底 0.87/1.82/0.91/0.86
- *         `sink` 1.30 + `len` 0.90（极限）→ 也只到 0.60/1.47/0.63/0.59。
- *       ⇒ 它把梢头**抬起来 0.15~0.25、并且把梢头水平拉近冠**，孤立感会减轻，
- *         但**不会**让那团叶子真的并进主体。真要"去掉"得动骨架（少一根垂枝
- *         或把垂枝的起点选高一点），那是设计回退，要另起一轮问。
- *    ③ `lengthScale` 也一起收（1.35 → 1.15）：只收 `sink` 的话，梢头是"抬起来
- *       但仍甩得很远"，水平方向那截孤立感还在。
- *    ④ ⚠️ **不能再往下压** —— D3 要求"梢头低于起点 ≥ 自身弧长的 10%"。实测
- *       `sink` 1.30 时第 2 条的落差只剩 0.01（弧长 ~1.0）⇒ D3 会红。
- *       取 1.70 的实测（`probe-tree-droop.mjs`）：落差 0.150~0.202、
- *       弧长 0.916~1.198 ⇒ 比值 **0.126~0.216**（门槛 0.1，余量最小那条约 25%）。
- *       ⇒ 这就是这条路的**下界**附近了，别再往 1.5 以下压。
- *    ⑤ 这两个数都只是 `d.y = up − sink·u²` 与 `len = length × lengthScale` 里的
- *       **乘数** ⇒ **一次随机数都不多抽**，骨架形态 / 随机序列 / 柿子树的锚点
- *       （`probe-tree-pair.mjs` 的 `30e58fd9…`）全都不动。
+ * ⚠️ 这一刀**只改了竖直分量的写法**：`segs` / `lengthScale` / 取数顺序一个没动
+ *    ⇒ 除这 4 根之外的骨架**逐位不变**，柿子树锚点也不动
+ *    （`probe-tree-pair.mjs` 的 `30e58fd9…`）。
+ *    ⇒ **想再调形态就改 `flat` / `rise` 两个数**，别回去动取数顺序。
  */
-const DROOP = {
+const REACH = {
     depthMax: 2,
     every: { 1: 2, 2: 2 },
     segs: 6,
-    up: 0.34,
-    sink: 1.70,
+    // 取值来自 `harness/wo33f-reach-sweep.mjs` 的扫描表（真探针量的，树局部坐标）：
+    //   flat/rise   抬升   梢头|q|   梢头离冠底（负 = 还在冠底之下）
+    //   0.10/1.30   0.58   1.36     -0.03 -0.71 -0.04 +0.01
+    //   0.10/1.60   0.63   1.29     +0.01 -0.64 +0.01 +0.06
+    //   0.10/2.10   0.70   1.20     +0.07 -0.55 +0.06 +0.12   ← 取这个
+    //   0.20/2.40   0.81   1.09     +0.16 -0.38 +0.15 +0.22
+    // 取 2.10 的理由：**4 根里 3 根的梢头已经回到冠底或冠里**，只剩最矮那根
+    // 还差 0.55；再往上抬（0.20/2.40）边际收益小，而那会让末段**更陡地立起来**，
+    // 背离"横着长"。
+    flat: 0.10,
+    rise: 2.10,
     lengthScale: 1.15,
     radiusScale: 0.66,
 };
@@ -373,7 +377,7 @@ const SPEC = {
     branchJitter: 0.24,
     branchLift: 0.026,
     // 🔴 WO-28b ②：垂枝（**可选**，柿子树的 spec 里没有这个字段 ⇒ 那边逐位不变）
-    droop: DROOP,
+    reach: REACH,
     // ⚠️ depth === 0 时**不抽随机数**（固定 3 条）
     childCount: (depth, rand) => (depth === 0 ? 3 : 2 + (rand() < 0.45 ? 1 : 0)),
 };
@@ -638,9 +642,9 @@ function leanCrownForward(state) {
     // 挂件候选（樱花树用不到，但**不能留着不转** —— 那是一个"位置对不上"的陷阱）
     for (const h of state.hangCandidates) { rot(h.p); rot(h.dir); }
     // 🔴 垂枝的折线（WO-28b）**必须一起转**：它和 `tips` 是同一类东西
-    //    （"从几何里挑出来、留档给判据用"的点）。漏了它，`probe-tree-droop.mjs`
+    //    （"从几何里挑出来、留档给判据用"的点）。漏了它，`probe-tree-reach.mjs`
     //    量的就是**转之前**的坐标 —— 判据仍然绿，但它量的不是场景里那棵树。
-    for (const dr of state.droops) { for (const q of dr.pts) rot(q); }
+    for (const dr of state.reaches) { for (const q of dr.pts) rot(q); }
     return theta;
 }
 
@@ -668,7 +672,7 @@ export function buildSakuraTree() {
     leanCrownForward(state);
 
     // ---- 2. 冠：先全在 raw 空间里摆，尺度最后一步再定 ----------------
-    const tipsRaw = state.tips.map((t) => ({ p: t.p.clone(), d: t.d.clone().normalize(), droop: !!t.droop }));
+    const tipsRaw = state.tips.map((t) => ({ p: t.p.clone(), d: t.d.clone().normalize(), reach: !!t.reach }));
     // 🔴 冠体积只由**非垂枝**的末梢决定（WO-28b ②）。
     //
     // 垂枝是装饰性的外延：几根梢头一垂，"末梢包围盒"的**上下左右**会同时被
@@ -677,7 +681,7 @@ export function buildSakuraTree() {
     // 实测不排除时：冠宽 6.1 → **24.4**，冠底下探到 y = −0.73（**树根以下**）。
     // 排除之后冠体积仍由主冠决定，垂枝照常带着自己的叶团挂在外面 ——
     // 那正是"枝条垂出冠沿"的样子。
-    const coreTips = tipsRaw.filter((t) => !t.droop);
+    const coreTips = tipsRaw.filter((t) => !t.reach);
     const rawTipBox = boxOfPoints((coreTips.length ? coreTips : tipsRaw).map((t) => t.p));
     const { c: crownC, r: crownR } = crownFromTips(rawTipBox, CROWN_PAD_X, CROWN_PAD_Y, CROWN_PAD_Z);
     const rhoOf = makeRhoOf(crownC, crownR);
@@ -722,17 +726,17 @@ export function buildSakuraTree() {
     //
     // ⚠️ 产序一变这里就错，所以下面**断言**总数对得上 —— 对不上直接抛，
     //    不要让它静默地标错（判据标错比判据变红更坏）。
-    const droopSpotMask = new Uint8Array(spotsRaw.length);
+    const reachSpotMask = new Uint8Array(spotsRaw.length);
     {
         let si = 0;
         for (const t of tipsRaw) {
-            for (let k = 0; k < TUFTS_PER_TIP; k++) droopSpotMask[si++] = t.droop ? 1 : 0;
+            for (let k = 0; k < TUFTS_PER_TIP; k++) reachSpotMask[si++] = t.reach ? 1 : 0;
         }
         if (si !== tipsRaw.length * TUFTS_PER_TIP || spotsRaw.length !== si + FILL_TUFTS) {
             throw new Error(
                 `scatterCluster 的产序变了：perTip 铺了 ${si}（期望 ${tipsRaw.length * TUFTS_PER_TIP}）、` +
                 `fill 铺了 ${spotsRaw.length - si}（期望 ${FILL_TUFTS}）—— ` +
-                `见 buildSakuraTree 里 droopSpotMask 那段`
+                `见 buildSakuraTree 里 reachSpotMask 那段`
             );
         }
     }
@@ -787,8 +791,8 @@ export function buildSakuraTree() {
         crown: { c: toFinal(crownC), r: new THREE.Vector3(crownR.x * k, crownR.y * k, crownR.z * k * DEPTH_SQUASH) },
         // WO-28b ②：垂枝的折线（**树内部单位**，未归一化）。
         // `leanCrownForward` 已经就地转过它们 ⇒ 与场景里那棵树一致。
-        // 只给判据用（`harness/probe-tree-droop.mjs`），组件不读它。
-        droops: state.droops,
+        // 只给判据用（`harness/probe-tree-reach.mjs`），组件不读它。
+        reaches: state.reaches,
         // 归一化的**中间量** —— 只给判据/排查用（`harness/probe-sakura.mjs`）。
         // 🔴 为什么值得留在产物里：`SAKURA_H` 只约束**高度**，横向尺寸完全由
         //    「末梢包围盒 × `CROWN_PAD_*` × `k`」决定，而 `k` 又反过来随冠顶
@@ -811,19 +815,19 @@ export function buildSakuraTree() {
             crownC,
             crownR,
             // 判据 C2 用：1 = 这一团是垂枝梢头的（不算进"主冠"）
-            droopSpotMask,
+            reachSpotMask,
         },
     };
     return cached;
 }
 
 /**
- * 判据用的调试口（`harness/probe-tree-droop.mjs`）。
+ * 判据用的调试口（`harness/probe-tree-reach.mjs`）。
  * 返回垂枝的折线（树内部单位）。柿子树那边同名函数返回**空数组** ——
  * 这个对照本身就是判据 D5："垂枝是樱花独有的行为"。
  */
-export function debugDroops() {
-    return buildSakuraTree().droops;
+export function debugReaches() {
+    return buildSakuraTree().reaches;
 }
 
 /** 判据用的调试口（`harness/probe-sakura.mjs`）：归一化的中间量。 */
