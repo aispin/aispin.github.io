@@ -3,6 +3,7 @@ import { useThree } from '@react-three/fiber';
 import gsap from 'gsap';
 
 import { useScene } from '../../../context/SceneContext';
+import { REST_POSE } from '../../../config/restPose';
 
 /**
  * HouseExit — walks the camera back out of the front door.
@@ -28,8 +29,13 @@ import { useScene } from '../../../context/SceneContext';
  * camera would clip straight through them on the way out.
  */
 
-/** Where the camera sits outside, looking at the front door. */
-const OUTSIDE = { x: 0, y: 0.2, z: 28 };
+/**
+ * Where the camera sits outside, looking at the front door.
+ *
+ * ⚠️ 就是**休息机位**（`config/restPose.js`），不是另一个数字 ——
+ * 退出屋子之后要回到和首屏**同一个**构图上，否则"出去"会落在别的地方。
+ */
+const OUTSIDE = REST_POSE;
 /** Matches the entrance fly-in duration so the two read as the same move. */
 const GLIDE_SECONDS = 1.3;
 /** How long to keep waiting for a door animation before forcing our way in. */

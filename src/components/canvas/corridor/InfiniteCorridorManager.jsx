@@ -42,7 +42,8 @@ const SegmentVisibilityWrapper = ({ children, segmentIndex }) => {
         // This MUST be measured against the camera's *own* segment, not against
         // `startZ`. The previous version used `z > startZ + 30`, which is broken
         // whenever the camera stands outside the segment's own span — and the
-        // camera can, because it starts at z=28 while segment 0 begins at
+        // camera can, because it starts at the rest pose (z=45, see
+        // config/restPose.js) while segment 0 begins at
         // CORRIDOR_FRONT_Z (≈ 4.15), and NOTHING CLAMPS targetZ (see
         // useInfiniteCamera: scrolling back is unbounded). So as soon as the user
         // stepped back past z=40, segment 0 failed `z > 40` and switched itself off

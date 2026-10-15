@@ -16,6 +16,7 @@ import Toast from './components/ui/Toast';
 import { useDocumentMeta } from './hooks/useDocumentMeta';
 import { loadContentData } from './hooks/useContentData';
 import SceneLighting from './components/canvas/SceneLighting';
+import { REST_POSE } from './config/restPose';
 import { SitePreferencesProvider } from './context/SitePreferences';
 import SiteControls from './components/ui/SiteControls';
 
@@ -214,7 +215,9 @@ function AppContent() {
           <div className="canvas-wrapper">
             <Canvas
               camera={{
-                position: [0, 0.2, 28],
+                // ⚠️ 必须与 `useInfiniteCamera` 的 targetZ/currentZ 初值一致 ——
+                // 两者都用 `config/restPose.js` 的 REST_POSE，见那个文件的注释。
+                position: [REST_POSE.x, REST_POSE.y, REST_POSE.z],
                 fov: 60,
                 near: 0.1,
                 far: 150

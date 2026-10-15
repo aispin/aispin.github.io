@@ -9,6 +9,7 @@ import { useAchievements } from '../context/AchievementsContext';
 import { reducedMotion } from './useReducedMotion';
 import { settleLerp, SETTLE_POS, SETTLE_ANGLE } from '../utils/settle';
 import { INTERIOR_FRONT_Z } from '../config/island';
+import { REST_POSE, REST_LOOK_AHEAD, REST_LOOK_Y } from '../config/restPose';
 
 // Door positions for auto-glance
 const DOOR_POSITIONS = [
@@ -72,9 +73,10 @@ const useInfiniteCamera = ({
 } = {}) => {
     const { camera } = useThree();
 
-    // Camera tracking
-    const targetZ = useRef(28);
-    const currentZ = useRef(28);
+    // Camera tracking. ⚠️ 初值必须 = `<Canvas camera>` 的机位（同一真源
+    // `config/restPose.js`）；不一致会让**第一帧**停在旧 z、第二帧瞬移。
+    const targetZ = useRef(REST_POSE.z);
+    const currentZ = useRef(REST_POSE.z);
     const parallax = useRef({ x: 0, y: 0 });
     const targetParallax = useRef({ x: 0, y: 0 });
     const glanceOffset = useRef(0);
@@ -209,8 +211,8 @@ const useInfiniteCamera = ({
             // Sync parallax with CURRENT camera position ONLY if we just enabled
             // To prevent snapping when achievements update the component
             if (!wasScrollEnabled) {
-                parallax.current = { x: camera.position.x, y: camera.position.y - 0.2 };
-                targetParallax.current = { x: camera.position.x, y: camera.position.y - 0.2 };
+                parallax.current = { x: camera.position.x, y: camera.position.y - REST_POSE.y };
+                targetParallax.current = { x: camera.position.x, y: camera.position.y - REST_POSE.y };
             }
 
             // Initialize glanceOffset with the CORRECT value for current position
@@ -508,7 +510,7 @@ const useInfiniteCamera = ({
             // recomputes the matrix once per frame instead of three times, and
             // the mutation stays behind a method call rather than reaching into
             // a property of a hook-owned object.
-            camera.position.set(parallax.current.x, 0.2 + parallax.current.y, currentZ.current);
+            camera.position.set(parallax.current.x, REST_POSE.y + parallax.current.y, currentZ.current);
 
             // Look direction with glance + swipe glance
             const lookX = parallax.current.x * 0.3 + glanceOffset.current * 3 + swipeGlance.current * 4;
@@ -516,7 +518,7 @@ const useInfiniteCamera = ({
             // BLEND-IN PHASE: Smoothly transition from saved rotation to lookAt
             if (blendInFrames.current > 0) {
                 // Calculate what lookAt WOULD set the rotation to
-                camera.lookAt(lookX, 0.13 + parallax.current.y, currentZ.current - 10);
+                camera.lookAt(lookX, REST_LOOK_Y + parallax.current.y, currentZ.current - REST_LOOK_AHEAD);
                 const targetRotation = {
                     x: camera.rotation.x,
                     y: camera.rotation.y,
@@ -538,7 +540,7 @@ const useInfiniteCamera = ({
                 blendInFrames.current--;
             } else {
                 // Normal mode - apply lookAt directly
-                camera.lookAt(lookX, 0.13 + parallax.current.y, currentZ.current - 10);
+                camera.lookAt(lookX, REST_LOOK_Y + parallax.current.y, currentZ.current - REST_LOOK_AHEAD);
             }
 
             // Update segment tracking
@@ -550,11 +552,11 @@ const useInfiniteCamera = ({
             // Parallax-only mode (during GSAP animation)
             // Apply parallax as offset to current camera position, and adjust lookAt
             // Don't override camera.position.z - GSAP controls it
-            camera.position.set(parallax.current.x, 0.2 + parallax.current.y, camera.position.z);
+            camera.position.set(parallax.current.x, REST_POSE.y + parallax.current.y, camera.position.z);
 
             // Look direction with parallax offset
             const lookX = parallax.current.x * 0.3 + swipeGlance.current * 4;
-            camera.lookAt(lookX, 0.13 + parallax.current.y, camera.position.z - 10);
+            camera.lookAt(lookX, REST_LOOK_Y + parallax.current.y, camera.position.z - REST_LOOK_AHEAD);
         }
     });
 
@@ -572,8 +574,8 @@ const useInfiniteCamera = ({
             currentSegment.current = initSegment;
 
             // Sync parallax
-            parallax.current = { x: camera.position.x, y: camera.position.y - 0.2 };
-            targetParallax.current = { x: camera.position.x, y: camera.position.y - 0.2 };
+            parallax.current = { x: camera.position.x, y: camera.position.y - REST_POSE.y };
+            targetParallax.current = { x: camera.position.x, y: camera.position.y - REST_POSE.y };
 
             // Calculate "Ideal" glance for this position
             const initialGlance = calculateGlance(z, initSegment);
