@@ -75,6 +75,8 @@ function endpointsFor(season) {
 
     const out = {
         day: {
+            // WO-33c：每季的**乘性**气氛染色（线性空间）。秋天是恒等白。
+            tint: new THREE.Color(d.tint),
             sky: new THREE.Color(d.sky),
             haze: new THREE.Color(d.haze),
             ambient: new THREE.Color(d.ambient.color),
@@ -90,6 +92,8 @@ function endpointsFor(season) {
             fillPos: d.fill.position,
         },
         night: {
+            // WO-33c：夜里的染色**更淡**（暗色上一个比例会读得更重）。
+            tint: new THREE.Color(n.tint),
             /** `scene.background` is multiplied by the veil afterwards, so the
              *  sky we actually want to see has to be un-multiplied first —
              *  otherwise it gets darkened twice and the horizon goes black.
@@ -202,11 +206,21 @@ const SKY_RADIUS_SCALE = 0.92
  * ⚠️ 是**线性**空间的乘子，不是屏幕值。线性 0.80 ≈ 屏幕 0.90 —— 所以
  *    "0.80" 看着很猛，实际只是浅浅一档。
  */
-const SKY_CLOUD_DARKEN = new THREE.Color(0.80, 0.845, 0.93)
+/*
+ * 🔴 WO-32f：原来这两个数**做出来了但看不见**。实测（`shots.mjs` 同机位、
+ *    `eval` 把 `uStrata` 与 `uSunDisk` 清零做 A/B，天空带 1400×360）：
+ *      · 云带对天空的逐像素贡献：**中位 1/255、均值 2.57、最大 11/255**
+ *      · 开着带时"逐列均值 std" 只有 **0.99/255** —— 验收要的"横向亮度结构"
+ *        在这个量级上读不出来，天空看起来就是一条纯色渐变。
+ *    原因不是没画，而是**两头都太轻**：`uStrata` 0.34 × 云色只比地平线暗 9%
+ *    （浅色在 sRGB 曲线上本来就压不出差）⇒ 乘积之后只剩个位数。
+ *    ⇒ 同时加深云色 + 提高混合量，把它推到"看得见但仍读作薄云"的档位。
+ */
+const SKY_CLOUD_DARKEN = new THREE.Color(0.62, 0.67, 0.79)
 
 /** 云带混合量（白天 / 夜里）。夜里几乎只剩一层很淡的月色薄云。 */
-const SKY_STRATA_DAY = 0.34
-const SKY_STRATA_NIGHT = 0.12;
+const SKY_STRATA_DAY = 0.72
+const SKY_STRATA_NIGHT = 0.22;
 
 const SKY_VERT = /* glsl */`
     varying vec3 vDir;
@@ -349,6 +363,8 @@ const SceneLighting = ({ isLowTier = false }) => {
     // 每帧复用的临时量（不分配）
     const sunScratch = useRef(new THREE.Vector3())
     const cloudScratch = useRef(new THREE.Color())
+    /** WO-33c：当帧的季节气氛染色（在线性空间插值出来的那一份）。 */
+    const tintScratch = useRef(new THREE.Color(1, 1, 1))
 
     // 0 = full day, 1 = full night. -1 means "nothing written yet": the first
     // frame snaps straight to the current theme rather than fading in from
@@ -409,12 +425,17 @@ const SceneLighting = ({ isLowTier = false }) => {
         // does, so it is disabled here with the reason instead.
         /* eslint-disable react-hooks/immutability */
 
+        // --- 当帧的季节染色（WO-33c）---
+        // 🔴 天穹 / 雾 / 云必须乘**同一份**，否则水平线处露缝（地平线色 = 雾色）。
+        //    秋天是恒等白 ⇒ `?season=autumn` 逐位不变。
+        const TINT = tintScratch.current.copy(D.tint).lerp(N.tint, k)
+
         // --- background + fog (owned here, see the header) ---
-        sky.current.copy(D.sky).lerp(N.sky, k)
+        sky.current.copy(D.sky).lerp(N.sky, k).multiply(TINT)
         scene.background = sky.current
 
         if (scene.fog) {
-            scene.fog.color.copy(D.haze).lerp(N.haze, k)
+            scene.fog.color.copy(D.haze).lerp(N.haze, k).multiply(TINT)
             scene.fog.near = lerp(D.fogNear, N.fogNear, k)
             scene.fog.far = lerp(D.fogFar, N.fogFar, k)
         }
@@ -424,13 +445,15 @@ const SceneLighting = ({ isLowTier = false }) => {
         // ⚠️ 三个都要过 `toShaderColor`：先在线性空间插值（那是物理上对的），
         //    再转成屏幕值 —— 否则天会明显更暗更橙（见 `config/theme.js`）。
         const S = skyUniforms.current
-        toShaderColor(S.uZenith.value.copy(D.sky).lerp(N.sky, k), S.uZenith.value)
-        toShaderColor(S.uHorizon.value.copy(D.haze).lerp(N.haze, k), S.uHorizon.value)
-        toShaderColor(S.uGlow.value.copy(D.key).lerp(N.key, k), S.uGlow.value)
+        // ⚠️ 三个都要过 `toShaderColor`，而且**先乘 TINT 再转**（染的是线性色）。
+        toShaderColor(S.uZenith.value.copy(D.sky).lerp(N.sky, k).multiply(TINT), S.uZenith.value)
+        toShaderColor(S.uHorizon.value.copy(D.haze).lerp(N.haze, k).multiply(TINT), S.uHorizon.value)
+        toShaderColor(S.uGlow.value.copy(D.key).lerp(N.key, k).multiply(TINT), S.uGlow.value)
         // 云带色：**从地平线色派生**（线性空间压暗 + 偏冷），不是另立一个色板。
         // 这样换季 / 入夜时云和天永远同源，不会出现"紫色的云挂在青色的天上"。
+        // WO-33c：TINT 也一起乘 —— 云的季节色相就是从这里来的（§5 单一真源不变）。
         toShaderColor(
-            cloudScratch.current.copy(D.haze).lerp(N.haze, k).multiply(SKY_CLOUD_DARKEN),
+            cloudScratch.current.copy(D.haze).lerp(N.haze, k).multiply(SKY_CLOUD_DARKEN).multiply(TINT),
             S.uCloud.value
         )
         // 太阳方位：把两端的灯位插值之后再归一化

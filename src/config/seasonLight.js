@@ -37,6 +37,8 @@ import { SCENE, LIGHTS, NIGHT } from './theme';
  *    什么程度"的起点，不再是任一态的真值。
  */
 const AUTUMN_DAY = {
+    // ⚠️ WO-33c 的 tint：秋天**必须是恒等**（见 SEASON_LIGHT 上面那段）。
+    tint: '#FFFFFF',
     sky: SCENE.background,
     haze: SCENE.fogColor,
     fogNear: 24,
@@ -48,6 +50,8 @@ const AUTUMN_DAY = {
 
 /** 秋天的夜晚 = 现状，逐字引用。 */
 const AUTUMN_NIGHT = {
+    // ⚠️ 同 AUTUMN_DAY：秋天恒等，保住"逐位不变"这个回归锚点。
+    tint: '#FFFFFF',
     veil: { ...NIGHT.veil },
     sky: NIGHT.sky,
     haze: NIGHT.haze,
@@ -64,10 +68,35 @@ const AUTUMN_NIGHT = {
  * `fogNear/Far` 也在表里：季节的空气感一半靠雾 —— 春天湿润（雾稍近）、
  * 夏天通透（雾最远）、冬天雪雾（雾最近）。
  */
+/*
+ * 🔴 WO-33c：`tint` —— 每季一盏**乘性**的气氛染色（线性空间乘子，写法用 sRGB 十六进制，
+ *    three 会自己转进工作空间）。
+ *
+ * 为什么需要它：四季的端点**色相其实已经不同**（春绿 / 夏暖黄 / 秋橙 / 冬冷蓝），
+ * 但它们全是高调浅色，派生到云身上就互相靠近了。实测（`probe-cloud-season-hue.mjs`，
+ * with/without 藏云两帧取云像素均值）：
+ *
+ *   | 季 | 云均值 RGB | 色相 | 饱和 |
+ *   | --- | --- | --- | --- |
+ *   | 春 | (178, 185, 171) | 88.0° |  7.4% |
+ *   | 夏 | (198, 182, 151) | 39.1° | 24.0% |
+ *   | 秋 | (199, 180, 153) | 34.4° | 23.0% |  ← 与夏只差 **4.7°**，读起来是同一片天
+ *   | 冬 | (184, 187, 189) | 207.4° |  2.8% |
+ *
+ * ⇒ 两个毛病：① **夏秋几乎同色**；② 春冬**近乎无彩**（色相是噪声，"梦幻"就更谈不上）。
+ *
+ * 规矩（§5、以及用户"只能乘性调光、不许另立一套色板"的要求）：
+ *   · 它**只乘**，不换掉任何端点；乘完云色仍然从穹顶派生（单一真源不变）。
+ *   · **秋天 = `#FFFFFF`（恒等）** ⇒ `?season=autumn` 与改动前**逐位一致**，
+ *     这是本项目的回归锚点，不能被"顺手美化"。
+ *   · 天穹、雾、云一起乘同**一份** tint —— 三者本来就同源（地平线色 = 雾色），
+ *     只染天空会在水平线处露出一条缝。
+ */
 export const SEASON_LIGHT = {
     /* ---- 春：清透、微冷、空气里有水汽。太阳中等高度。 ---- */
     spring: {
         day: {
+            tint: '#F5FFF0',
             sky: '#EAF3E6',
             haze: '#DCE9D9',
             fogNear: 26,
@@ -77,6 +106,7 @@ export const SEASON_LIGHT = {
             fill: { color: '#C8DEEA', intensity: 0.38, position: [-5, 8, -10] },
         },
         night: {
+            tint: '#F6FFF2',
             veil: { r: 0.42, g: 0.46, b: 0.62 },
             sky: '#2E3550',
             haze: '#252C42',
@@ -91,6 +121,7 @@ export const SEASON_LIGHT = {
     /* ---- 夏：强烈、高对比、饱和。太阳最高（影子最短、最硬）。 ---- */
     summer: {
         day: {
+            tint: '#F5FFE0',
             sky: '#FFF6E0',
             haze: '#FFE8C2',
             fogNear: 22,
@@ -100,6 +131,7 @@ export const SEASON_LIGHT = {
             fill: { color: '#BADAF0', intensity: 0.30, position: [-5, 9, -10] },
         },
         night: {
+            tint: '#F6FFE8',
             veil: { r: 0.36, g: 0.42, b: 0.60 },
             sky: '#262C48',
             haze: '#1F2540',
@@ -118,6 +150,7 @@ export const SEASON_LIGHT = {
      *      夜里 veil 反而更亮 —— 雪把天光反上来，这是冬夜与秋夜最直观的区别。 ---- */
     winter: {
         day: {
+            tint: '#F0F7FF',
             sky: '#E9EEF3',
             haze: '#DEE5EB',
             fogNear: 17,
@@ -127,6 +160,7 @@ export const SEASON_LIGHT = {
             fill: { color: '#B4C6DA', intensity: 0.30, position: [-5, 6, -10] },
         },
         night: {
+            tint: '#F4F8FF',
             veil: { r: 0.54, g: 0.60, b: 0.76 },
             sky: '#3E4A66',
             haze: '#333D56',
