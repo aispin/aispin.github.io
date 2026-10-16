@@ -243,21 +243,38 @@ const SKY_FRAG = /* glsl */`
     uniform float uTime;
     varying vec3 vDir;
 
-    /* 值噪声 —— 与参考实现同一套（hash → noise → 3 阶 fbm）。 */
+    const float TAU = 6.28318530718;
+    const float INV_TAU = 0.15915494309;
+
+    /* 云带横向坐标的周期，单位 = 噪声格点数。必须是**整数**。
+       取值和原来几乎一样：原「经度 × 1.6」= 10.05 格/圈、「经度 × 5.8」= 36.44 格/圈。 */
+    const float WASH_W = 10.0;
+    const float CLOUD_W = 36.0;
+
+    /* 值噪声 —— 与参考实现同一套（hash → noise → 3 阶 fbm）。
+       🔴 WO-32h：横向格点**必须周期化**，wrap = 横向周期（整数格点数）。
+       为什么：云带的横向坐标是**经度**，而经度在 ±π 处跳一整圈 —— 不周期化的话
+       两侧采到的是完全不同的噪声值，屏幕上就是一条贯穿地平线的**竖直接缝**
+       （实测单列跳变 7.2/255，左右邻居只有 0.1，隔离比 85 倍）。
+       周期化之后 noise(x + wrap) == noise(x) 逐位成立 ⇒ 接缝在数学上不存在。
+       只做横向周期：绕一圈正好走满**一个**周期，所以看不出平铺。 */
     float skyHash(vec2 p) {
         return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
     }
-    float skyNoise(vec2 p) {
+    float skyNoise(vec2 p, float wrap) {
         vec2 i = floor(p);
         vec2 f = fract(p);
+        i.x = mod(i.x, wrap);
         f = f * f * (3.0 - 2.0 * f);
         return mix(mix(skyHash(i), skyHash(i + vec2(1.0, 0.0)), f.x),
             mix(skyHash(i + vec2(0.0, 1.0)), skyHash(i + vec2(1.0)), f.x), f.y);
     }
-    float skyFbm(vec2 p) {
-        return skyNoise(p) * 0.57
-            + skyNoise(p * 2.07 + 17.4) * 0.28
-            + skyNoise(p * 4.13 + 31.8) * 0.15;
+    /* 倍频必须是**整数** 2 / 4，周期也跟着乘 —— 否则第二个八度接不上
+       （原为 2.07 / 4.13，非整数就周期化不了）。 */
+    float skyFbm(vec2 p, float wrap) {
+        return skyNoise(p, wrap) * 0.57
+            + skyNoise(p * 2.0 + 17.4, wrap * 2.0) * 0.28
+            + skyNoise(p * 4.0 + 31.8, wrap * 4.0) * 0.15;
     }
 
     void main() {
@@ -281,18 +298,21 @@ const SKY_FRAG = /* glsl */`
 
         // ---- 云带：只算地平线以上（一致分支，地面那一半整个跳过）----
         if (h > 0.0) {
-            float longitude = atan(dir.z, dir.x);
+            // 横向坐标 = **经度的圈数**（[-0.5, 0.5)，跨 ±π 是连续的），再乘一个
+            // 整数周期。见 skyNoise 的注 —— 整数是周期化的前提。
+            float lon = atan(dir.z, dir.x) * INV_TAU;
             // 低频双轴 curl：把拉长的条带打散，否则是等距的直尺纹。
-            vec2 washSpace = vec2(longitude * 1.6, h * 5.2);
+            vec2 washSpace = vec2(lon * WASH_W, h * 5.2);
             vec2 warp = vec2(
-                skyFbm(washSpace + vec2(9.2, 3.1)),
-                skyFbm(washSpace + vec2(23.8, 11.7))
+                skyFbm(washSpace + vec2(9.2, 3.1), WASH_W),
+                skyFbm(washSpace + vec2(23.8, 11.7), WASH_W)
             ) - 0.5;
-            vec2 p = vec2(longitude * 5.8, h * 17.0);
+            vec2 p = vec2(lon * CLOUD_W, h * 17.0);
             p += warp * vec2(1.7, 3.6);
-            p.y += sin(longitude * 2.3 + warp.x * 4.0) * 0.72;
+            // ⚠️ 横向相位也必须是**整数**谐波（原来 2.3，非整数在 ±π 处对不上）。
+            p.y += sin(lon * TAU * 2.0 + warp.x * 4.0) * 0.72;
             p += uTime * vec2(0.035, 0.018);
-            float wash = skyFbm(p);
+            float wash = skyFbm(p, CLOUD_W);
             float streak = smoothstep(0.38, 0.79, wash);
             // 云只贴地平线那一带：再高就散掉。
             float skyMask = smoothstep(-0.01, 0.08, h)
