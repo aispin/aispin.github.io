@@ -36,20 +36,119 @@
 
 # 📋 待办 WO
 
-> 云朵第四轮已交付：路线 C（`ee10d13`）+ 云身明度分离（`64cd88f`）+ 云身对齐参考实现（`e75be1a`）。
-> 第五轮（用户 2026-10-15 追加）原拆 WO-33a/b/c —— **WO-33a**（`2e4a6dd`，休息机位
-> 后移到 z=45）与 **WO-33b ①**（`2f24fdc`，冠椭球抬高、树冠不再扁）**已提交，条已出表**。
-> **WO-33e**（冠从"橄榄球"变圆 + 垂枝收浅）也已交付，条已出表。
-> **WO-33f**（取消下垂：横展枝改成"横着长、然后上扬"）也已交付 —— 它把
-> WO-33b ② / WO-33d 那条"分叉处的一小撮叶子"**一并解决**（那团就是垂枝梢头）。
-> **WO-33c**（云与天空的颜色随季节走）与 **WO-32f**（天空自己的云带看得见）
-> 也已交付（`02f13f3`）—— **待办 WO 清空**。
->
-> ⚠️ 顺手纠了那条 WO-32f 里的错话：`uStrata` **没有被移掉**，从 WO-19 起一直在，
-> 只是太轻、屏幕上看不出来（贡献中位 1/255）。真正要做的不是"拿回来"，
-> 而是"调到看得见"。
+> 上一轮（云朵第四轮 / 第五轮）的 WO-32a~f、WO-33a~f 全部已提交出表，历史在 git。
+> 本轮（2026-10-16 用户追加）：**「档案馆」改成「履历」房间**，新路由 `/career`，
+> 数据源换成 `experiences.json`，墙面参考 `public/demos/web3d/career/index.html`
+> 的"文字生成背景"技法；同时把该技法抽成独立模块供其他房间复用。
+
+## 本轮已量的底数（不是障碍，但决定设计）
+
+- **对着门那面墙**：平面 24 × 16（`ContentRoom.BackWall`，房间局部 z = −10）。
+  相机进门后停在墙前 **8.11** 单位、正对法线（实测 `camDir` 与 `wallNormal`
+  点积 = −1.000），此时**屏幕上看得见的墙面是 16.59 × 9.35**，中心在墙局部
+  y ≈ +0.65 ⇒ 全幅贴图会有 **31% 宽 / 42% 高**落在框外，白付显存。
+  探针 `probe-career-room.mjs`。
+- **房间现状**：4 列 × 3 行 = 12/页；`about` 现在渲染 **11 张卡**
+  （profile 简介 + 5 条经历 + 4 个项目 + 关注方向），**只用了 experiences 的前 5 条**。
+  而 `experiences.json` 有 **8 条**（中英各 8）⇒ 8 条正好 **4×2 一页**放得下，不用翻页。
+- **渲染开销（在房间里，HIGH 档）**：26 draw calls / 1060 tri / 134 textures /
+  68 programs；全场 canvas 贴图 114 张 ≈ **78.5 MB** 估算显存。
+- **文字生成背景的模块已经有了**：`src/utils/texturalArt.js`（技法来自那个 demo，
+  复用 `engine/art.js` 的种子/画布/纹理缓存；配色参数化，暖色一组是
+  `WARM_TEXTURAL`）。已验：同输入两次**逐字节相同**、模糊真的生效、
+  1024×683 → 74 ms / 1536×1024 → 160 ms / 2048×1366 → 304 ms（含强制冲刷）。
+  预览图见 `.workbuddy-ai/shots/career/textural-*.png`，
+  探针 `probe-textural-module.mjs`。
+
+---
+
+## WO-C2 · 房间改名「履历」+ 新路由 `/career`
+
+**改什么**（显示名 + 路由；内部 id 是否一起改见 **DR-2**）
+- `src/config/theme.js`：`ROOMS` 第 1 条 `zh:'档案'` → **`zh:'履历'`**；
+  `ROOM_COPY` 换成履历的一句话。
+- `src/hooks/useDocumentMeta.js`：`ROOM_META` 的 `path:'/about'` → **`'/career'`**，
+  title/description 跟着改；`PATH_TO_ROOM` 加 `'/career'`。
+- `src/components/canvas/rooms/ContentRoom.jsx`：`ROOM_TITLES` 的 `about` → 履历。
+- `public/sitemap.xml`：`<loc>.../about</loc>` → `/career`。
+- `index.html` SEO fallback：`<a href="/about">` → `/career`、`<article id="about">`、
+  以及第 76 行那句「ABOUT 档案」。
+- `public/_redirects` 注释里提到的 `/about` 一并更新。
+
+**验收判据**
+1. 直接打开 `/career` → 自动传送进房间（深链）；`document.title`、`link[rel=canonical]`、
+   `og:url` 三者都是 `/career`。
+2. 走廊地图（`NavigationUI`）第 1 格显示「履历 / CAREER」。
+3. `sitemap.xml` 里不再有 `/about`。
+
+## WO-C3 · 履历房间的内容与墙面
+
+**改什么**
+- 数据源换成 `getLocalizedCollection('experiences', language)` **全 8 条**，
+  不再掺 profile / projects / skills。
+- 布局改成 **4 × 2 = 8/页**（现在是 4×3=12/页），一页放下，**去掉翻页**。
+- 卡面重排：公司名（大字）+ 岗位 + 日期（`endDate` 缺失 ⇒ 「至今 / Present」）
+  + 地点 + `responsibilities` 摘要。`performance[]` 可选，有则带一条。
+- **对着门那面墙**用 `texturalArt` 生成背景（暖色版，`WARM_TEXTURAL`），
+  把公司名平铺进去。贴图尺寸**按 tier 分档**（见下面的坑 ②）。
+- 生成时机放进 `RoomWarmup`（`RoomWarmup.jsx:122` 那处已经预挂 `roomId="about"`），
+  让 HIGH/MEDIUM 档在预加载屏后面付掉成本。
+
+**验收判据**
+1. 同机位 before/after 截图（`?noloader=1`，`probe-career-room.mjs` 的 `suggestCam`）。
+2. 8 条经历的卡面**四角投影全部落在可见窗口内**（|x| ≤ 8.3、−4.0 ≤ y ≤ 5.3）。
+3. 无翻页控件；`pageCount === 1`。
+4. 进房间那一刻**帧间隔没有 > 100 ms 的尖峰**（`room-entry-stall.mjs` 的 HIGH 档读数）。
+5. draw calls 增量 **< 15**；新增贴图显存 ≤ 8 MB（MEDIUM 档）。
+6. `env -u NODE_OPTIONS npm run lint` → 0 error / 33 warning。
+
+---
 
 # 🙋 待你拍板的 DR
+
+### DR-1 · 旧的 `/about` 链接怎么处理
+
+**背景**：`/about` 是**已经公开索引过**的 URL（`public/sitemap.xml` 里就有一条），
+外面可能已经有人存了链接。改成 `/career` 之后，旧链接会走 SPA 兜底落到走廊
+（不报错，但深链失效、也不会自动跳）。
+
+- **(A) 保留别名**：在 `getInitialRoomFromUrl()` 里把 `/about` 映射到 `career`，
+  旧链接照常进房间（URL 仍是 `/about`，或再 `replaceState` 成 `/career`）。
+  代价：多一处要维护的映射。
+- **(B) 直接弃用**：只留 `/career`。代价：旧链接静默失效。
+- **(C) 别名 + Cloudflare 301**：`public/_redirects` 加一条真 301
+  （GitHub Pages 会忽略该文件，只有 Cloudflare Pages 生效）。
+
+### DR-2 · 内部 `roomId` 要不要一起从 `about` 改成 `career`
+
+**背景**：现在全站满足 `route === roomId` 的不变量（`/gallery`↔`gallery` …）。
+只改路由不改 id，这个不变量就破了 —— 能用，但下一个人会踩。
+
+- **(A) 一起改**（推荐）：动 9 个文件（`theme` / `CorridorSegment` / `RoomInterior` /
+  `RoomWarmup` / `TeleportRoom` / `App` 的 `DOOR_Z` / `ContentRoom` /
+  `ScreenReaderOverlay` / `useDocumentMeta`）。不变量保持。
+- **(B) 只改显示名与路由**：内部仍叫 `about`，改动面最小。
+
+### DR-3 · 墙面配色走哪一套
+
+**背景**：参考的 demo 是**深色霓虹**（底色 `#06070c`、色团低明度、整体很暗），
+而房间是**暖白奶油 + 木色**。照搬会把房间撕开。
+
+- **(A) 只借技法、配色改暖**（推荐）：文字平铺 + 色团 + 模糊全部保留，
+  但底色用房间的奶油、色团用 `ACCENT.about = #E0A46A` 系的琥珀。
+  墙还是"房间的一部分"。
+- **(B) 整面墙照搬 demo 的深色**：做成"房间里嵌了一块暗色屏幕"，对比强烈。
+  代价：和现有 `#FFF6E9` 墙、`PALETTE.wood` 地板的关系要重新设计，
+  而且房间没有独立光源（全站 `shadows={false}`、房间只有一盏 `pointLight`）。
+
+### DR-4 · 文本背景落在**墙**上还是落在**卡片**上
+
+- **(A) 整面墙做文本背景 + 8 张卡片叠上去**（推荐）：一进门就是一整面
+  "文字浮雕墙"，卡片浮在前面。视觉冲击最大，也最像 demo 的气质。
+- **(B) 卡片各自带文本背景，墙保持素色**：等于把 demo 的**每张卡**搬过来
+  （demo 本来就是每张卡一张贴图）。代价：8 张卡 = 8 张贴图，
+  显存和生成耗时都是 (A) 的数倍（实测 1024×683 一张 110 ms ⇒ 8 张 ≈ 880 ms）。
+- **(C) 两者都做**：墙一层淡背景 + 卡片各带一层。最贵。
 
 ### DR-P · 「零位图」要留一个**有限放宽**的口子吗（备查，当前**不启用**）
 
