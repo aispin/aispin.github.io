@@ -41,8 +41,8 @@
 > 「已答复的 DR」）。设计底数、实测开销、踩坑结论都在
 > `.workbuddy-ai/memory/2026-10-17.md`。
 >
-> 交付那一轮**新冒出两条**待办：**WO-C5**（预热期 `compileAsync` 的既有竞态）
-> 与 **DR-E**（暗色对比度被夜幕后乘封顶）—— 都是验收时量出来的，不是原计划里的。
+> 那一轮验收时量出来的两条待办：**WO-C5**（预热期 `compileAsync` 竞态）已修完提交；
+> **DR-E**（暗色对比度被夜幕后乘封顶）还等你拍板。
 
 ---
 
@@ -61,32 +61,6 @@ WO-30 → WO-32g 连续四轮调出来的。换噪声族会同时改掉剪影的
 **开工前先量**：在云身 ROI 上把对比拉到满量程看有没有平板。
 ⚠️ 别再用"逐列亮度台阶"那类 1-D 统计 —— 本轮证明它**分不开**
 "平板"和"云自己竖直的边"（`probe-sky-seam-py.py` 连修复前/后都给出同一个量级）。
-
----
-
-## WO-C5 · `RoomWarmup` 的 `compileAsync` 轮询会在 promise 链外抛错
-
-**现象**：进任意房间前后，控制台**偶发**一条
-
-```
-TypeError: Cannot read properties of undefined (reading 'isReady')
-    at WebGLRenderer.compileAsync → checkMaterialsReady   (three-*.js)
-```
-
-**归因（已做，不是猜）**：同一份构建、同一条 `enter() → teleport()` 链路，
-`/career`（改过的房间）**0 条**、`/studio`（没动过的房间）**1 条** ⇒ 与房间内容无关。
-`src/components/canvas/corridor/RoomWarmup.jsx` 的注释自己就写明了这个竞态：
-three 从自己的 `setTimeout` 里轮询 `materialProperties.currentProgram`，
-期间任何材质被 dispose 就让 `currentProgram` 变 `undefined`，异常抛在 promise 链**外**，
-`.catch()` 收不到。现有代码用 6s 硬超时兜住了"预热永不结束"⇒ **功能无损**，
-只是控制台多一条红字。
-
-**要改的**：让轮询不可能撞上已 dispose 的材质。候选：
-(a) 预热期间冻结材质 dispose（R3F 卸载延后到 `isDone` 之后）；
-(b) 不用 `compileAsync`，改回同步 `gl.compile()`（牺牲它换来的不卡主线程）；
-(c) 自己实现轮询 —— `materialProperties` 是 three 私有字段，等于 monkey-patch，不推荐。
-
-**开工前先量触发率**（同一房间跑 N 次、数出现次数），别拿"跑一次没冒"当修好。
 
 ---
 
