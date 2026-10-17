@@ -26,7 +26,7 @@
 
 | 房间  | 内容                |
 | --- | ----------------- |
-| 档案  | 经历、教育、在意的方向       |
+| 履历  | 工作经历、教育、在意的方向       |
 | 摄影  | 摄影作品              |
 | 工作室 | 做过的项目，以及还在实验的念头   |
 | 文稿  | 随笔、笔记，以及站外连载的小说   |
@@ -195,7 +195,7 @@ npm run lint
 
 ```
 site.json         站点标题、作者、SEO
-profile.json      档案（教育、技能、联系方式）
+profile.json      履历（工作经历、教育、技能、联系方式）
 projects.json     工作室项目
 articles.json     文稿
 photography.json  摄影
@@ -265,16 +265,22 @@ python3 scripts/build-scene-fonts.py
 ## 部署
 
 构建产物是纯静态文件，`dist/` 直接丢给任意静态托管即可。  
-仓库里带了 GitHub Pages 的配置：
+**本站的实际部署目标是 GitHub Pages**（`https://aispin.github.io`），仓库里的配置：
 
-- `.github/workflows/deploy.yml` —— push 到 `main` 自动部署
-- `public/.nojekyll` —— 让 GitHub Pages 发布下划线开头的文件
-- `public/_headers` · `public/_redirects` —— Cloudflare Pages 用
+- `.github/workflows/deploy-gh-pages.yml` —— push 到 `main` 自动部署
+- `public/.nojekyll` —— 关掉 GitHub Pages 的 Jekyll 处理
 - 构建时会把 `index.html` 复制成 `404.html`，保证任意深链都能落到 SPA 入口
 
-两个 entry 的路径都能直接命中：`/demos/` 命中 `demos/index.html`。  
-只有不带尾斜杠的 `/me` 需要一条重写规则  
-（`public/_redirects` 里一条，dev/preview 由 `vite.config.js` 的中间件兜住）。
+> ⚠️ **没有 `_redirects` / `_headers`，也不要加回来。** 那两个是**另一套**静态托管
+> 平台的语法，GitHub Pages **完全忽略** —— 放在仓库里只会让人以为"重写和响应头
+> 是配好了的"。深链与 `/me` 的跳转都由 GitHub Pages 自己的行为解决（见下）。
+
+两个 entry 的路径都能直接命中：`/demos/` 命中 `demos/index.html`，
+`/me` 命中 `me/index.html`（GitHub Pages 会把无尾斜杠的目录请求 301 到带斜杠形式）。
+dev / preview 下这条由 `vite.config.js` 的中间件兜住，生产环境不需要额外规则。
+
+站内路由（`/career`、`/gallery`…）是 History API 的虚拟路由，靠 `404.html`
+回到 SPA 入口再解析 —— 不需要服务端重写。
 
 > ⚠️ **`/me` 的源码路径 ≠ 产物路径**（2026-10-12 起）。源码在  
 > `src/me/index.html`（与它的模块同目录 —— 让每个业务域自己内聚一个目录），  

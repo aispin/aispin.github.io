@@ -131,7 +131,7 @@ function DebugBridge() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const DOOR_Z = {
-      about: -6, gallery: -20, studio: -36, posts: -50,
+      career: -6, gallery: -20, studio: -36, posts: -50,
       videos: -86, music: -100, ai: -116, contact: -130,
     };
     window.__aispin = {

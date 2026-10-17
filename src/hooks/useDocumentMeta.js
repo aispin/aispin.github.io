@@ -15,12 +15,12 @@ const ROOM_META = {
     null: {
         path: '/',
         title: 'ZEO · 泽昊 · WEB3D HOUSE',
-        description: '一个可以走进去的个人主页：8 个 3D 房间，装着档案、摄影、项目、文章、视频、音乐与 AI 技能。',
+        description: '一个可以走进去的个人主页：8 个 3D 房间，装着履历、摄影、项目、文章、视频、音乐与 AI 技能。',
     },
-    about: {
-        path: '/about',
-        title: '档案 · About — AISPIN',
-        description: '关于 AISPIN：15+ 年互联网研发经验，做过智能设计平台与即时配送业务，也写歌、拍照、做 AI 技能。',
+    career: {
+        path: '/career',
+        title: '履历 · Career — AISPIN',
+        description: 'AISPIN 的履历房间：15+ 年互联网研发经历，从百度、腾讯、京东到美团与轻远科技，一条时间线看完。',
     },
     gallery: {
         path: '/gallery',
@@ -59,10 +59,17 @@ const ROOM_META = {
     },
 };
 
-// Map URL paths back to room IDs for deep linking
+// Map URL paths back to room IDs for deep linking.
+//
+// 🔴 `/about` 是**已公开索引过的旧地址**（曾经在 sitemap 里），所以它作为
+//    别名保留：仍然能进房间，但 `useDocumentMeta` 会在首帧把它 replaceState
+//    成 `/career`（因为 canonical / og:url 都取 `ROOM_META[room].path`）。
+//    也就是说：旧链接不会失效，地址栏会自己纠正，搜索引擎拿到的是新地址。
+//    别名只此一处，别在组件里再写一遍 `/about` 的分支。
 const PATH_TO_ROOM = {
     '/': null,
-    '/about': 'about',
+    '/career': 'career',
+    '/about': 'career',   // 旧地址别名 —— 见上面的说明
     '/gallery': 'gallery',
     '/studio': 'studio',
     '/posts': 'posts',

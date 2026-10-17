@@ -150,7 +150,10 @@ const SmoothButton = ({ texture, onClick, position, size, text, fontPath }) => {
 };
 
 // Web3Forms API Key — loaded from environment variable so it's not exposed in the repo.
-// Set VITE_WEB3FORMS_KEY in .env (local dev) and in Cloudflare Pages dashboard (production).
+// Set VITE_WEB3FORMS_KEY in .env for local dev.
+// ⚠️ 部署用的是 GitHub Pages（.github/workflows/deploy-gh-pages.yml），那个 workflow
+//    目前**没有**注入这个变量 ⇒ 生产构建里它是空串，表单会走"没配 key"的分支。
+//    要让它生效，得给 workflow 的 build 步骤加 env: VITE_WEB3FORMS_KEY: ${{ secrets.… }}。
 const WEB3FORMS_KEY = import.meta.env.VITE_WEB3FORMS_KEY || '';
 
 // Only these domains are allowed to submit the form.
@@ -425,10 +428,14 @@ const MessagePaper = ({ position = [0, 0.05, 2], onSend }) => {
             }
 
             // --- 3. Email Domain MX Record Validation (DoH) ---
+            //
+            // 走阿里云公共 DNS 的 DoH（Google 那套 JSON 接口的兼容实现）。
+            // 换掉原来的海外 DoH：本站只部署在 GitHub Pages，不再依赖那家服务；
+            // 而且那个端点在境内经常解析不动。失败一律 bypass（见 catch）。
             const domain = email.split('@')[1];
             if (domain) {
                 try {
-                    const dnsRes = await fetch(`https://cloudflare-dns.com/dns-query?name=${domain}&type=MX`, {
+                    const dnsRes = await fetch(`https://dns.alidns.com/resolve?name=${domain}&type=MX`, {
                         headers: { 'Accept': 'application/dns-json' }
                     });
                     const dnsData = await dnsRes.json();

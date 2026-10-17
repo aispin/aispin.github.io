@@ -198,7 +198,7 @@ export function unmultiplyVeil(skyHex, veil = NIGHT_VEIL) {
 }
 
 export const ROOMS = [
-  { id: 'about', zh: '档案', en: 'ABOUT', door: 0 },
+  { id: 'career', zh: '履历', en: 'CAREER', door: 0 },
   { id: 'gallery', zh: '摄影', en: 'GALLERY', door: 1 },
   { id: 'studio', zh: '工作室', en: 'STUDIO', door: 2 },
   { id: 'posts', zh: '文稿', en: 'POSTS', door: 3 },
@@ -213,7 +213,7 @@ export const ROOMS = [
  * ROOMS[].zh / ROOM_TITLES so the header never just repeats itself.
  */
 export const ROOM_COPY = {
-  about: { zh: '一路走来的经历与在意的方向', en: 'Where I have been, and what I care about' },
+  career: { zh: '一路走来的经历与在意的方向', en: 'Where I have been, and what I care about' },
   gallery: { zh: '摄影作品', en: 'Photography' },
   studio: { zh: '做过的东西，与还在做实验的念头', en: 'Things I have built, and ideas still in the lab' },
   posts: { zh: '随笔、笔记，以及站外连载的小说', en: 'Notes, essays and novels published elsewhere' },
@@ -259,8 +259,8 @@ export const NOVELS = {
 
 /**
  * Sky clouds — used by the Gallery room (GalleryClouds) and the Contact room.
- * (The About room used to keep its own copy via SkyChunk.jsx; that whole
- * directory was dead code and was deleted on 2026-10-07 — `about` renders
+ * (The career room used to keep its own copy via SkyChunk.jsx; that whole
+ * directory was dead code and was deleted on 2026-10-07 — `career` renders
  * through ContentRoom like every other room.)
  *
  * The eight sprites are drawn at runtime (utils/cloudArt.js) and painted by

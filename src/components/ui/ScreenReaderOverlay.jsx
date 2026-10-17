@@ -38,8 +38,8 @@ const ScreenReaderOverlay = () => {
                         <p>你正在走廊里。选择一个房间探索：</p>
                         <ul>
                             <li>
-                                <button onClick={() => teleportTo('about')} type="button">
-                                    档案 About — 我的经历与技能
+                                <button onClick={() => teleportTo('career')} type="button">
+                                    履历 Career — 我的经历与技能
                                 </button>
                             </li>
                             <li>
@@ -84,7 +84,7 @@ const ScreenReaderOverlay = () => {
                 {hasEntered && isInRoom && (
                     <>
                         <p>
-                            You are in the {currentRoom === 'about' ? 'About' :
+                            You are in the {currentRoom === 'career' ? 'Career' :
                                 currentRoom === 'gallery' ? 'Gallery' :
                                     currentRoom === 'contact' ? 'Contact' :
                                         currentRoom === 'studio' ? 'Studio' : currentRoom} room.
@@ -94,10 +94,10 @@ const ScreenReaderOverlay = () => {
                         </button>
 
                         {/* Room-specific content descriptions */}
-                        {currentRoom === 'about' && (
-                            <div aria-label="About room content">
-                                <h3>About Me</h3>
-                                <p>This room contains my personal story, awards, journey milestones, and technology skills displayed as interactive balloons.</p>
+                        {currentRoom === 'career' && (
+                            <div aria-label="Career room content">
+                                <h3>Career</h3>
+                                <p>My working history, newest first, as a wall of cards — each one opens the full record for that role.</p>
                                 
                                 {awards && (
                                     <section>
@@ -163,8 +163,8 @@ const ScreenReaderOverlay = () => {
                         {/* Quick navigation to other rooms */}
                         <h3>Quick Navigation</h3>
                         <ul>
-                            {currentRoom !== 'about' && (
-                                <li><button onClick={() => teleportTo('about')} type="button">Go to About</button></li>
+                            {currentRoom !== 'career' && (
+                                <li><button onClick={() => teleportTo('career')} type="button">Go to Career</button></li>
                             )}
                             {currentRoom !== 'gallery' && (
                                 <li><button onClick={() => teleportTo('gallery')} type="button">Go to Gallery</button></li>

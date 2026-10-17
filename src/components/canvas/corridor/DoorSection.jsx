@@ -1314,7 +1314,7 @@ const DoorSection = ({
                     {/* The four "legacy sign variant" blocks that used to live
                         here (THE GALLERY / THE STUDIO / THE ABOUT / LET'S
                         CONNECT) were unreachable: `label` is always
-                        `ROOMS[n][language]`, i.e. 档案/ABOUT, 摄影/GALLERY…,
+                        `ROOMS[n][language]`, i.e. 履历/CAREER, 摄影/GALLERY…,
                         never the old "THE …" strings. They were also the
                         last CabinSketch users, so they went with the font. */}
 

@@ -286,6 +286,37 @@ export function drawTexturalBackground(w, h, cfg = {}) {
 }
 
 /**
+ * 带缓存的**画布**版本（不是 Texture）。
+ *
+ * 给"要把这张图当底子、再在上面画别的东西"的调用方用 —— 房间卡片就是：
+ * 一张卡的纹理 = 文字肌理 + 卡面排版，每次重画（切语言、翻页）都想复用
+ * 底子，而不是把 8 张肌理重新生成一遍。
+ *
+ * `key` 必须唯一标识这张图（含配色档、尺寸、种子）。缓存按插入顺序淘汰，
+ * 上限 `TEXTURAL_CANVAS_LIMIT` 张 —— 卡片的 key 是有限的（房间 × 档 × 卡），
+ * 不会无限增长。
+ */
+const canvasCache = new Map()
+const TEXTURAL_CANVAS_LIMIT = 32
+
+export function texturalCanvas(key, w, h, cfg = {}) {
+    const hit = canvasCache.get(key)
+    if (hit) return hit
+    const canvas = drawTexturalBackground(w, h, cfg)
+    if (canvasCache.size >= TEXTURAL_CANVAS_LIMIT) {
+        const oldest = canvasCache.keys().next().value
+        canvasCache.delete(oldest)
+    }
+    canvasCache.set(key, canvas)
+    return canvas
+}
+
+/** 释放画布缓存（改生成器 / 换档位 / 探针里要量冷启动时用）。 */
+export function clearTexturalCanvasCache() {
+    canvasCache.clear()
+}
+
+/**
  * 带缓存的版本。`key` 必须**唯一标识**这一张图（含语言、色相、尺寸）——
  * 缓存只认 key，不认 cfg。
  *

@@ -32,7 +32,7 @@ const rootDir = dirname(fileURLToPath(import.meta.url));
 const ME_PAGE_PATHS = new Set(['/me', '/me/']);
 /** 源码里的 entry 位置（dev 用）。 */
 const ME_ENTRY_SRC = resolve(rootDir, 'src/me/index.html');
-/** 产物里的位置 —— URL `/me/`、CI 的 sanity-check、`public/_redirects` 认的都是它。 */
+/** 产物里的位置 —— URL `/me/`、CI 的 sanity-check 认的都是它。 */
 const ME_ENTRY_OUT = '/me/index.html';
 
 /**

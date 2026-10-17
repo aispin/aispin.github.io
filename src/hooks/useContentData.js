@@ -60,7 +60,7 @@ const content = isFilled(store.studioContent)
     }))
   : null
 
-// About room certificates / milestones.
+// Career room certificates / milestones.
 // Stored flat (matches the SEO output), grouped here for the sky manager.
 const AWARD_GROUPS = {
   sotd: { id: 'award-sotd', layout: 'certificate_grid', title: 'Site of the Day Awards', platformConfig: { label: 'ACHIEVEMENT', color: '#1a1a1a', icon: '🏆' } },

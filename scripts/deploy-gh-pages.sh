@@ -232,11 +232,12 @@ fi
 [ -f dist/me/index.html ] || warn "dist/me/index.html 不见了 —— 名片页入口可能没构建出来"
 [ -f dist/404.html ] || warn "dist/404.html 不见了 —— GitHub Pages 的 SPA 深链会 404"
 
-# .nojekyll：GitHub Pages 默认跑 Jekyll，会把下划线开头的文件/目录丢掉
-# （我们就有 _headers / _redirects）。public/.nojekyll 会带出来，这里再兜一次。
+# .nojekyll：GitHub Pages 默认跑 Jekyll，会跳过下划线开头的文件/目录。
+# 站点现在没有下划线资源了（_headers / _redirects 已删，见 README「部署」），
+# 但 .nojekyll 仍然要留着：Jekyll 还会改写/丢弃它不认识的文件，关掉它最省心。
 if [ ! -f dist/.nojekyll ]; then
   : > dist/.nojekyll
-  warn "dist/.nojekyll 原本没有，已补上（防止 Jekyll 丢掉 _headers / _redirects）"
+  warn "dist/.nojekyll 原本没有，已补上（关掉 GitHub Pages 的 Jekyll 处理）"
 fi
 
 # 站点的硬约束：零 jpg/png（只允许 2 张 webp 位图）。这里只报告，不拦。

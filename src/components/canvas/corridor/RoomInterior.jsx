@@ -101,7 +101,7 @@ const RoomInterior = ({ label, roomId, showRoom, onReady, isExiting }) => {
 
     const isGallery = roomId === 'gallery';
     const isContact = roomId === 'contact';
-    const contentRoomIds = ['about', 'studio', 'posts', 'videos', 'music', 'ai'];
+    const contentRoomIds = ['career', 'studio', 'posts', 'videos', 'music', 'ai'];
     // Debug hook (?noloader probes): window.__forceRoom renders a room without
     // walking the door animation. No-op in normal sessions.
     const roomVisible = showRoom || (typeof window !== 'undefined' && window.__forceRoom === roomId);

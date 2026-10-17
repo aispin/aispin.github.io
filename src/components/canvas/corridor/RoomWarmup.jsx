@@ -119,7 +119,7 @@ const RoomWarmup = ({ onWarmupComplete, isLowTier }) => {
             </Suspense>
             <Suspense fallback={null}>
                 <group position={[20, 0, 0]}>
-                    <ContentRoom roomId="about" showRoom={true} onReady={noop} />
+                    <ContentRoom roomId="career" showRoom={true} onReady={noop} />
                 </group>
             </Suspense>
             <Suspense fallback={null}>

@@ -4,7 +4,7 @@ import { useScene } from '../../../context/SceneContext';
 
 // Global Z for all eight rooms (segment offset + relative door Z + door offset).
 const DOOR_POSITIONS_Z = {
-    about: -6,
+    career: -6,
     gallery: -20,
     studio: -36,
     posts: -50,

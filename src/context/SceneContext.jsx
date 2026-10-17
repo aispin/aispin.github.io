@@ -81,7 +81,7 @@ export const SceneProvider = ({ children }) => {
         }
     }, []);
 
-    const [currentRoom, setCurrentRoom] = useState(null); // null = corridor, 'about', 'portfolio', etc.
+    const [currentRoom, setCurrentRoom] = useState(null); // null = corridor, 'career', 'gallery', etc.
     const [hasEntered, setHasEntered] = useState(false);  // Has user clicked entrance doors?
     // Set while the camera is gliding back out of the house. The corridor's
     // scroll hook checks this so it stops driving camera.position.z and lets the
