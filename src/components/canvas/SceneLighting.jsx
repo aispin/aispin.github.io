@@ -261,13 +261,42 @@ const SKY_FRAG = /* glsl */`
     float skyHash(vec2 p) {
         return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
     }
+    /* 🔴 WO-32i：**梯度噪声**（Perlin），不再是「hash 值 + smoothstep 插值」的值噪声。
+       ──────────────────────────────────────────────────────────────────────────
+       值噪声只在**格点**上有值，格内靠 smoothstep 插值，而 smoothstep 在两端
+       **导数恰好为 0** ⇒ 每条格线两侧都摊平成一段十几像素的平板。
+       天空是一整片平滑渐变，人眼对 Mach band 极敏感 ⇒ 那些平板被读成
+       **一条条竖直直线**，用户说的「明显的拼接痕迹」就是它。
+
+       实测（「harness/probe-sky-tess.mjs」只渲染天穹、把「wash」直接渲成灰度）：
+         · 剖面在 x=390..407 连续 **17 px 一模一样**（97,97,97,…）；
+         · 最大相邻跳变只有 **2/255** —— 没有台阶，只是"不弯了"；
+         · 球面 32×16 → 128×64 → 256×128，折痕位置**一格没动** ⇒ 与顶点插值无关；
+         · 「CLOUD_W」36 → 37 也没动 ⇒ 不是"格点在哪"的问题，是**插值曲线本身**。
+       所以换插值曲线治不了（quintic 更平、linear 更硬），必须换噪声族：
+       梯度噪声格内是**线性梯度**，格线处导数不为 0 ⇒ 平板不存在。
+
+       ⚠️ 周期化约定全部保留：四个角的下标**都要 mod**（只 mod 「i.x」的话，
+          「i.x + 1」会在 wrap 处越界，接缝又回来了）。
+       ⚠️ 值域归一：Perlin 原始 std ≈ 0.195、值噪声 ≈ 0.18 ⇒ ×0.92 + 0.5
+          之后分布与原来几乎一致，「smoothstep(0.38, 0.79, …)」这些阈值不用重调。 */
+    vec2 skyGrad(float ix, float iy) {
+        float a = skyHash(vec2(ix, iy)) * TAU;
+        return vec2(cos(a), sin(a));
+    }
     float skyNoise(vec2 p, float wrap) {
         vec2 i = floor(p);
         vec2 f = fract(p);
-        i.x = mod(i.x, wrap);
-        f = f * f * (3.0 - 2.0 * f);
-        return mix(mix(skyHash(i), skyHash(i + vec2(1.0, 0.0)), f.x),
-            mix(skyHash(i + vec2(0.0, 1.0)), skyHash(i + vec2(1.0)), f.x), f.y);
+        float x0 = mod(i.x, wrap);
+        float x1 = mod(i.x + 1.0, wrap);
+        // quintic fade：C2 连续，二阶导也不跳（Mach band 对二阶导同样敏感）
+        vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+        float n00 = dot(skyGrad(x0, i.y), f);
+        float n10 = dot(skyGrad(x1, i.y), f - vec2(1.0, 0.0));
+        float n01 = dot(skyGrad(x0, i.y + 1.0), f - vec2(0.0, 1.0));
+        float n11 = dot(skyGrad(x1, i.y + 1.0), f - vec2(1.0, 1.0));
+        return clamp(mix(mix(n00, n10, u.x), mix(n01, n11, u.x), u.y) * 0.92 + 0.5,
+            0.0, 1.0);
     }
     /* 倍频必须是**整数** 2 / 4，周期也跟着乘 —— 否则第二个八度接不上
        （原为 2.07 / 4.13，非整数就周期化不了）。 */
