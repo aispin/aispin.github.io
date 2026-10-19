@@ -136,16 +136,44 @@ const float LIT_K = 0.20;    // ×(1 + uSunAmt·0.20)     朝阳面
 const float HOLLOW_K = 0.42; // 凹谷再压一档（参考实现的 hollow 项）
 const float RIM_POWER = 2.2;
 
-/* 值噪声 —— 与天空穹顶（「SceneLighting.jsx」的 SKY_FRAG）同一套。 */
+/* 噪声族 —— 与天空穹顶（「SceneLighting.jsx」的 SKY_FRAG）同一套**梯度噪声**。
+   ──────────────────────────────────────────────────────────────────────────
+   🔴 WO-32j：原来是「hash 值 + smoothstep 插值」的**值噪声**。值噪声只在格点上
+   有值，格内靠 smoothstep 插值，而 smoothstep 在两端**导数恰好为 0** ⇒ 每条格线
+   两侧都摊平成一段平板。天空那边（WO-32i）已经吃过这个亏 —— 用户说的「明显的
+   拼接痕迹」就是它。云身上同样存在。
+
+   **先量了再改**（harness/probe-cloud-noise-field.mjs）：把云的着色全关掉
+   （uShadeAmt = uSunAmt = uErode = 0、uGrain = 1.2）⇒ 云变成噪声场本身，
+   这时噪声里能看到**直角拼块的直边**（截图 .tmp/wo32j/noise-before.png）。
+   不这么做根本看不出来 —— SDF 球面的明暗会盖掉一大半。
+
+   梯度噪声格内是**线性梯度**，格线处导数不为 0 ⇒ 平板不存在。
+
+   ⚠️ 值域归一：Perlin 原始 std ≈ 0.195、值噪声 ≈ 0.18 ⇒ ×0.92 + 0.5 之后分布与
+      原来几乎一致，「uErode / uGrain / l 里的 (n − 0.5) × 0.20」都不用重调。
+   ⚠️ 云**不需要**周期化（uMap 是逐 billboard 的 UV，没有 tiling 接缝），
+      所以没有天空那边的 wrap 参数。
+   ⚠️ 代价：每个角点一次 sin/cos（原来只有一次 hash）。八度数由 uDetail 管，
+      LOW 只算 1 个 ⇒ 4 次 sin/cos。 */
 float cloudHash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+vec2 cloudGrad(vec2 i) {
+    float a = cloudHash(i) * 6.28318530718;
+    return vec2(cos(a), sin(a));
 }
 float cloudNoise(vec2 p) {
     vec2 i = floor(p);
     vec2 f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
-    return mix(mix(cloudHash(i), cloudHash(i + vec2(1.0, 0.0)), f.x),
-        mix(cloudHash(i + vec2(0.0, 1.0)), cloudHash(i + vec2(1.0)), f.x), f.y);
+    // quintic fade：C2 连续。smoothstep 只有 C1，二阶导在格点上会跳 ——
+    // Mach band 对二阶导同样敏感，所以这里不能省。
+    vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    float n00 = dot(cloudGrad(i), f);
+    float n10 = dot(cloudGrad(i + vec2(1.0, 0.0)), f - vec2(1.0, 0.0));
+    float n01 = dot(cloudGrad(i + vec2(0.0, 1.0)), f - vec2(0.0, 1.0));
+    float n11 = dot(cloudGrad(i + vec2(1.0, 1.0)), f - vec2(1.0, 1.0));
+    return clamp(mix(mix(n00, n10, u.x), mix(n01, n11, u.x), u.y) * 0.92 + 0.5, 0.0, 1.0);
 }
 
 /* fbm。🔴 档数走**一致分支**（「uDetail」是 uniform ⇒ 整个 draw 同一条路），
