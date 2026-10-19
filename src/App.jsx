@@ -11,6 +11,7 @@ import { PerformanceProvider, usePerformance } from './context/PerformanceContex
 import { SceneProvider, useScene } from './context/SceneContext';
 import NavigationUI from './components/ui/NavigationUI';
 import GlobalOverlay from './components/ui/GlobalOverlay';
+import CareerHud from './components/ui/CareerHud';
 import ScreenReaderOverlay from './components/ui/ScreenReaderOverlay';
 import Toast from './components/ui/Toast';
 import { useDocumentMeta } from './hooks/useDocumentMeta';
@@ -269,6 +270,7 @@ function AppContent() {
             <>
               <SiteControls />
               <NavigationUI />
+              <CareerHud />
               <GlobalOverlay />
               <PaperTransition />
               <ScreenReaderOverlay />

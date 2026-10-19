@@ -1,0 +1,548 @@
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
+import * as THREE from 'three'
+import { useSitePreferences } from '../../../context/SitePreferences'
+import { usePerformance } from '../../../context/PerformanceContext'
+import { getLocalizedCollection } from '../../../hooks/useContentData'
+import { ensureFontsReady, texturalCanvas } from '../../../utils/texturalArt'
+import { setTunnelCount, setTunnelProgress, tunnelRequest, tunnelCardZ, tunnelTargetZ, TUNNEL_SPACING } from '../../../state/careerTunnel'
+
+/**
+ * 履历房间 —— 「时空隧道」。
+ *
+ * 这是 `public/demos/web3d/career/index.html` 那套东西的移植，不是"参考它的配色"：
+ * 卡片沿螺旋排进一条深空隧道，滚动＝在时间里穿行。原来那个 4×2 贴墙网格
+ * 与它是两种空间，用户 2026-10-20 明确要的是这一种。
+ *
+ * ── 为什么要**接管渲染**，而不是把这堆东西塞进主场景 ────────────────────
+ * 主场景结尾有一个全屏乘性夜幕（`SceneLighting` 的 uTint，renderOrder 999）。
+ * 任何画在它之前的像素都会被乘暗：深空会被压成黑，卡片会按季节/昼夜变暗，
+ * 而"太空"不该有白天和夜晚。接管渲染 = 在夜幕之后另起一趟，隧道因此
+ * **昼夜/季节完全恒定**，也不需要为 veil 做任何补偿。
+ *
+ * ⚠️ `useFrame(cb, 1)` 一旦注册，R3F 就**不再**自动渲染主场景。所以接管
+ *    放在子组件 `TunnelRenderer` 里、且只在真正进房间时挂载 —— 预热副本
+ *    （`RoomWarmup` 会挂一份）绝不能注册它，否则两份接管互相覆盖。
+ */
+
+/* 与 demo 逐字相同的一几何组数（世界单位）。改这几个数要重新看螺旋是否咬合。
+   `SPACING` / 卡片 z / 相机落点由 state/careerTunnel 统一提供 —— HUD 的
+   时间刻度也要算同一个位置。 */
+const CARD_W = 3.4
+const CARD_H = 4.8
+const RADIUS = 3.2
+const TURN = 1.15 // 每张卡转过的弧度
+
+const FOG_COLOR = 0x06070c
+
+/* 贴图尺寸按档位分：8 张 680×960 的 canvas 在 LOW 档是纯浪费。
+   🔴 canvas 是**惰性光栅化**的，真正的成本在第一次读像素/上传时（§42）。 */
+const TEX = {
+    HIGH: { w: 680, h: 960 },
+    MEDIUM: { w: 560, h: 790 },
+    LOW: { w: 440, h: 620 },
+}
+
+const hash32 = (s) => {
+    let h = 2166136261 >>> 0
+    for (let i = 0; i < s.length; i += 1) {
+        h ^= s.charCodeAt(i)
+        h = Math.imul(h, 16777619) >>> 0
+    }
+    return h >>> 0
+}
+
+/* demo 的每张卡手写了一条风格：单字（创/淘/微/浙）、色相、模式、模糊、字阶。
+   这里改成按序循环 —— 数据是 8 条履历，手写 8 条不值当，但**不能让八张
+   看起来是同一张的复制品**，所以模式轮转、色相按黄金角散开。 */
+const CARD_MODES = ['tile', 'flow', 'tile', 'hero']
+
+function cardStyleFor(item, i) {
+    const title = [...String(item.title || '')]
+    return {
+        // demo 用公司名的首字当水印字（创/淘/微/浙）
+        text: title[0] || '履',
+        hue: (i * 137.508 + 212) % 360,
+        mode: CARD_MODES[i % CARD_MODES.length],
+        blur: 0.35 + (i % 3) * 0.05,
+        scale: 1 + (i % 2) * 0.1,
+        intensity: 0.65,
+    }
+}
+
+function mulberry32(seed) {
+    let a = seed >>> 0
+    return function next() {
+        a = (a + 0x6d2b79f5) >>> 0
+        let t = a
+        t = Math.imul(t ^ (t >>> 15), 1 | t)
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+    }
+}
+
+/** 按宽度折行，最多 `maxLines` 行，超出加省略号。 */
+function wrapText(ctx, text, x, y, maxW, lh, maxLines) {
+    const chars = [...String(text || '')]
+    let line = ''
+    let count = 0
+    let cy = y
+    for (let i = 0; i < chars.length; i += 1) {
+        const test = line + chars[i]
+        if (ctx.measureText(test).width > maxW && line) {
+            ctx.fillText(line, x, cy)
+            line = chars[i]
+            count += 1
+            cy += lh
+            if (maxLines && count >= maxLines - 1) {
+                let rest = chars.slice(i).join('')
+                while (rest.length && ctx.measureText(`${rest}…`).width > maxW) rest = rest.slice(0, -1)
+                ctx.fillText(`${rest}…`, x, cy)
+                return
+            }
+        } else {
+            line = test
+        }
+    }
+    if (line) ctx.fillText(line, x, cy)
+}
+
+/** 单张卡面：demo 的 `drawCard`，尺寸按 `w/680` 等比缩放。 */
+function drawCareerCard(item, w, h, style) {
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')
+    const k = w / 680
+
+    // 1. 肌理打底。参数与 demo 的 `texturalCanvas` 逐项对齐：
+    //    底 l=0.06、色团 5 团 l 10~22% α0.55、单字 α0.075。
+    //    🔴 demo 的模糊是 `minSide × 0.035 × cfg.blur`（blur 0.35~0.5）
+    //    ⇒ 折算到本模块的 `blur`（也是 × minSide）是 0.0122~0.0175。
+    // 🔴 色相只有**一个**入口：`hue`。`base.h` / `glyph.h` 只覆盖各自那一层，
+    //    **色团认的是 `cfg.hue`**（`resolve()` 里 `hue` 缺省 = 32）。
+    //    只写 `base.h` 会得到「蓝底 + 橙团」—— 实测 212 号的卡渲成 (60,37,27)
+    //    的砖红。别写 `h`，写 `hue`。
+    const bg = texturalCanvas(
+        `tunnel|${item.id}|${w}x${h}|${style.mode}|${Math.round(style.hue)}`,
+        w, h,
+        {
+            hue: style.hue,
+            base: { s: 0.2, l: 0.06 },
+            blob: { count: 5, hueSpread: 90, s: 0.52, light: [0.1, 0.22], alpha: 0.55, radius: [0.35, 0.85] },
+            glyph: {
+                s: 0.3, l: 0.92,
+                alpha: 0.075 * (style.intensity / 0.6),
+                scale: style.scale,
+                spacing: [2.1, 2.8],
+            },
+            text: style.text,
+            mode: style.mode,
+            // 缓存只认 key、种子只认 seedKey，两个都要带上 id 才不是八张一样的底。
+            seedKey: `tunnel|${item.id}|${style.mode}`,
+            blur: 0.035 * style.blur,
+        },
+    )
+    ctx.drawImage(bg, 0, 0)
+
+    // 2. 顶部日期
+    ctx.save()
+    ctx.fillStyle = 'rgba(139,163,255,0.85)'
+    ctx.font = `700 ${Math.round(15 * k)}px system-ui, "PingFang SC", sans-serif`
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'alphabetic'
+    ctx.fillText(item.kicker, 40 * k, 70 * k)
+    ctx.restore()
+
+    // 3. 底部渐变遮罩
+    const g = ctx.createLinearGradient(0, h * 0.35, 0, h)
+    g.addColorStop(0, 'rgba(0,0,0,0)')
+    g.addColorStop(1, 'rgba(0,0,0,0.78)')
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, w, h)
+
+    // 4. 文字
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'alphabetic'
+
+    ctx.fillStyle = '#fff'
+    ctx.font = `800 ${Math.round(44 * k)}px system-ui, "PingFang SC", sans-serif`
+    ctx.fillText(item.title, 40 * k, h - 210 * k)
+
+    ctx.fillStyle = 'rgba(255,255,255,0.82)'
+    ctx.font = `600 ${Math.round(19 * k)}px system-ui, "PingFang SC", sans-serif`
+    wrapText(ctx, item.subtitle, 40 * k, h - 172 * k, w - 80 * k, 26 * k, 2)
+
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'
+    ctx.font = `400 ${Math.round(16 * k)}px system-ui, "PingFang SC", sans-serif`
+    wrapText(ctx, item.summary, 40 * k, h - 110 * k, w - 80 * k, 24 * k, 3)
+
+    // 5. 内描边
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)'
+    ctx.lineWidth = 2 * k
+    ctx.strokeRect(1, 1, w - 2, h - 2)
+
+    return canvas
+}
+
+function useExperiences(language) {
+    return useMemo(() => {
+        return getLocalizedCollection('experiences', language).map((item) => {
+            const start = (item.startDate || '').slice(0, 7).replace('-', '.')
+            const end = item.endDate
+                ? item.endDate.slice(0, 7).replace('-', '.')
+                : (language === 'zh' ? '至今' : 'Present')
+            return {
+                id: item.id,
+                title: item.company,
+                subtitle: [item.position, item.department].filter(Boolean).join(' · '),
+                summary: (item.responsibilities || []).join(' '),
+                kicker: `${start} — ${end}`,
+                start,
+            }
+        })
+    }, [language])
+}
+
+/** 只在"真的进了房间"时挂载 —— 见文件头关于接管的说明。 */
+function TunnelRenderer({ sceneRef, cameraRef, controlsRef, fadeRef }) {
+    const size = useThree((s) => s.size)
+
+    useEffect(() => {
+        const cam = cameraRef.current
+        if (!cam) return
+        cam.aspect = size.width / size.height
+        cam.updateProjectionMatrix()
+    }, [size, cameraRef])
+
+    useFrame((state, delta) => {
+        const scene = sceneRef.current
+        const cam = cameraRef.current
+        const controls = controlsRef.current
+        if (!scene || !cam || !controls) {
+            // 隧道还没搭好（字体没就绪 / 首帧）：**照常画主场景**。
+            // 直接 return 会把上一帧留在 framebuffer 上，看着像卡住。
+            state.gl.render(state.scene, state.camera)
+            return
+        }
+
+        controls.step(delta)
+
+        state.gl.render(scene, cam)
+
+        // 幕布：一趟正交覆盖屏，颜色 = 隧道底色。进/出场都靠它把"硬切"变成
+        // 一次呼吸 —— 门还关着的那一帧不会直接露出星空。
+        const fade = fadeRef.current
+        if (fade && fade.material.opacity > 0.002) {
+            state.gl.autoClear = false
+            state.gl.render(fade.scene, fade.camera)
+            state.gl.autoClear = true
+        }
+    }, 1)
+
+    return null
+}
+
+const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
+    const { language } = useSitePreferences()
+    const { tier } = usePerformance()
+    const gl = useThree((s) => s.gl)
+    const experiences = useExperiences(language)
+
+    const [fontsReady, setFontsReady] = useState(false)
+    useEffect(() => {
+        let alive = true
+        ensureFontsReady().then(() => { if (alive) setFontsReady(true) })
+        return () => { alive = false }
+    }, [])
+
+    const sceneRef = useRef(null)
+    const cameraRef = useRef(null)
+    const cardsRef = useRef([])
+    /* 幕布：一趟正交覆盖屏，颜色 = 隧道底色。接管渲染是**瞬时**的 ——
+       门还关着的那一帧就整个换成星空了，硬切很难看。进场从底色淡入、
+       退场淡回底色，中间那一下就成了"呼吸"而不是"啪"。 */
+    const fadeRef = useRef(null)
+    /* 场景搭好后由 build effect 填进来的"每帧动作"。单独放一个 ref，是为了
+       让下面的 `controls.step` 只**读**它 —— 每帧要改的东西不能挂在 useMemo
+       的返回值上（`react-hooks/immutability` 会直接报 error）。 */
+    const frameRef = useRef(null)
+
+    // 退场动画期间把幕布拉上。用 ref 转一道，免得 build effect 因为 isExiting
+    // 变化整个重建场景。
+    const exitingRef = useRef(isExiting)
+    useEffect(() => { exitingRef.current = isExiting }, [isExiting])
+
+    // 门要等隧道搭好再开 —— 否则门先开到一片空白，几百毫秒后星空才"啪"地出现。
+    // 只发一次：换语言/换档位会重建场景，但门已经开了，不需要再喊。
+    const readySent = useRef(false)
+    const sendReady = useCallback(() => {
+        if (readySent.current) return
+        readySent.current = true
+        onReady?.()
+    }, [onReady])
+
+    // 滚动状态：目标 / 当前，与 demo 同一个手感（指数趋近，但按帧时间归一）。
+    // ⚠️ 用 layout effect 建、存 ref —— 这个对象每帧都被改。
+    const controlsRef = useRef(null)
+    useLayoutEffect(() => {
+        const n = Math.max(experiences.length, 1)
+        const zStart = 6
+        const zEnd = tunnelTargetZ(n - 1)
+        const st = { camZ: zStart, targetZ: zStart, zStart, zEnd }
+        const clamp = (z) => Math.max(zEnd, Math.min(zStart, z))
+        controlsRef.current = {
+            st,
+            clamp,
+            step: (delta) => {
+                if (tunnelRequest.z !== null) {
+                    st.targetZ = clamp(tunnelRequest.z)
+                    tunnelRequest.z = null
+                }
+                // 指数趋近 + 帧时间归一：60fps 与 30fps 手感一致
+                st.camZ += (st.targetZ - st.camZ) * (1 - Math.exp(-8 * delta))
+                frameRef.current?.(st.camZ, delta)
+            },
+        }
+    }, [experiences.length])
+
+
+    useEffect(() => {
+        setTunnelCount(experiences.length)
+        return () => setTunnelCount(0)
+    }, [experiences.length])
+
+    // ---- 场景一次性搭建（字体就绪后）----
+    useEffect(() => {
+        if (!fontsReady || experiences.length === 0) return undefined
+
+        const tex = TEX[tier] || TEX.HIGH
+        const scene = new THREE.Scene()
+        scene.background = new THREE.Color(FOG_COLOR)
+        scene.fog = new THREE.FogExp2(FOG_COLOR, 0.028)
+
+        const camera = new THREE.PerspectiveCamera(58, 16 / 9, 0.1, 300)
+        camera.position.set(0, 0, controlsRef.current.st.zStart)
+
+        // ---- 幕布（一趟正交覆盖屏）----
+        const fadeScene = new THREE.Scene()
+        const fadeCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
+        const fadeMaterial = new THREE.MeshBasicMaterial({
+            color: FOG_COLOR,
+            transparent: true,
+            opacity: 1,
+            depthTest: false,
+            depthWrite: false,
+            toneMapped: false,
+        })
+        const fadeQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), fadeMaterial)
+        fadeQuad.frustumCulled = false
+        fadeScene.add(fadeQuad)
+        fadeRef.current = { scene: fadeScene, camera: fadeCamera, material: fadeMaterial }
+        let fadeOpacity = 1
+
+        const cards = []
+        const geometries = []
+        const materials = []
+        const textures = []
+        // demo 设了 anisotropy = maxAnisotropy。卡面是**斜着看**的（螺旋 + 30%
+        // 面向相机），各向异性过滤关掉的话远处那张卡的正文直接糊成一片。
+        const maxAniso = gl.capabilities.getMaxAnisotropy?.() ?? 1
+
+        experiences.forEach((item, i) => {
+            const style = cardStyleFor(item, i)
+            const canvas = drawCareerCard(item, tex.w, tex.h, style)
+            const texture = new THREE.CanvasTexture(canvas)
+            texture.colorSpace = THREE.SRGBColorSpace
+            texture.anisotropy = maxAniso
+            texture.minFilter = THREE.LinearFilter
+            texture.magFilter = THREE.LinearFilter
+            textures.push(texture)
+
+            const material = new THREE.MeshBasicMaterial({
+                map: texture,
+                transparent: true,
+                side: THREE.DoubleSide,
+                fog: true,
+                // 🔴 R3F 的 Canvas 默认把 gl.toneMapping 设成 ACESFilmic。主场景
+                // 的颜色是**在 ACES 下调出来**的，但隧道不是 —— demo 的渲染器
+                // 是默认的 NoToneMapping。不关掉的话卡面被 ACES 的输入矩阵一混：
+                // 实测 (12,15,18) 的深蓝底渲成 (3,17,22) 的青，亮度只剩 1/5。
+                // 关在这一个材质上（`toneMapped=false` 会生成不带 TONE_MAPPING
+                // 的 program 变体），不用去动全局 gl，也不影响主场景。
+                toneMapped: false,
+            })
+            materials.push(material)
+
+            const geometry = new THREE.PlaneGeometry(CARD_W, CARD_H)
+            geometries.push(geometry)
+
+            const mesh = new THREE.Mesh(geometry, material)
+            const angle = i * TURN
+            const z = tunnelCardZ(i)
+            mesh.position.set(Math.cos(angle) * RADIUS, Math.sin(angle) * RADIUS * 0.55, z)
+            mesh.lookAt(0, 0, z)
+            mesh.rotateZ(Math.sin(angle) * 0.15)
+            scene.add(mesh)
+            cards.push({ mesh, baseZ: z, phase: i * 1.7, baseY: mesh.position.y })
+        })
+
+        // ---- 光点（隧道内）----
+        const rnd = mulberry32(hash32('career-tunnel'))
+        const dotCount = tier === 'LOW' ? 260 : 600
+        const dotPos = new Float32Array(dotCount * 3)
+        const dotColors = new Float32Array(dotCount * 3)
+        const tmpColor = new THREE.Color()
+        for (let i = 0; i < dotCount; i += 1) {
+            const a = rnd() * Math.PI * 2
+            const r = RADIUS * (0.9 + rnd() * 0.3)
+            dotPos[i * 3] = Math.cos(a) * r
+            dotPos[i * 3 + 1] = Math.sin(a) * r * 0.55
+            dotPos[i * 3 + 2] = -rnd() * (experiences.length + 4) * TUNNEL_SPACING
+            tmpColor.setHSL(0.6 + rnd() * 0.15, 0.8, 0.6 + rnd() * 0.3)
+            dotColors[i * 3] = tmpColor.r
+            dotColors[i * 3 + 1] = tmpColor.g
+            dotColors[i * 3 + 2] = tmpColor.b
+        }
+        const dotGeom = new THREE.BufferGeometry()
+        dotGeom.setAttribute('position', new THREE.BufferAttribute(dotPos, 3))
+        dotGeom.setAttribute('color', new THREE.BufferAttribute(dotColors, 3))
+        const dotMat = new THREE.PointsMaterial({
+            size: 0.06, vertexColors: true, transparent: true, opacity: 0.7,
+            blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+            toneMapped: false,
+        })
+        const dots = new THREE.Points(dotGeom, dotMat)
+        scene.add(dots)
+
+        // ---- 远景星尘 ----
+        const farCount = tier === 'LOW' ? 200 : 400
+        const farPos = new Float32Array(farCount * 3)
+        for (let i = 0; i < farCount; i += 1) {
+            farPos[i * 3] = (rnd() - 0.5) * 60
+            farPos[i * 3 + 1] = (rnd() - 0.5) * 40
+            farPos[i * 3 + 2] = -rnd() * 260
+        }
+        const farGeom = new THREE.BufferGeometry()
+        farGeom.setAttribute('position', new THREE.BufferAttribute(farPos, 3))
+        const farMat = new THREE.PointsMaterial({
+            color: 0x8ba3ff, size: 0.08, transparent: true, opacity: 0.5,
+            depthWrite: false, fog: false, toneMapped: false,
+        })
+        const far = new THREE.Points(farGeom, farMat)
+        scene.add(far)
+
+        sceneRef.current = scene
+        cameraRef.current = camera
+        cardsRef.current = cards
+        // 场景搭完才开门（8 张 680×960 的 canvas 惰性光栅化是几百毫秒的活，
+        // 这段时间必须藏在还关着的门后面）。
+        sendReady()
+
+        // 每帧的位移/朝向/进度（由 controls.step 调用，只读这个 ref）
+        const { st } = controlsRef.current
+        // 🔴 卡片不是固定的朝向 —— demo 每帧把 rotation.y 往"面向相机"拉 30%，
+        //    这**是这张脸能读的前提**：`lookAt(0,0,z)` 让卡面朝隧道轴，而相机
+        //    也在轴上、顺着轴看 ⇒ 不修正的话每张卡都是 74°+ 的侧脸，文字全糊。
+        //    demo 写死 0.98/0.02 是逐帧的（掉帧就变慢），这里按帧时间归一：
+        //    -ln(0.98) × 60 ≈ 1.212 是 60fps 下等价的连续速率。
+        const BILLBOARD_K = 1.212
+        // 幕布速率：进 ~0.45s 淡到 0（k=8 ⇒ 0.45s 时约 3%），退 ~0.55s 拉满。
+        const FADE_IN_K = 8
+        const FADE_OUT_K = 6
+        frameRef.current = (camZ, delta) => {
+            camera.position.set(0, 0, camZ)
+            camera.lookAt(0, 0, camZ - 10)
+            dots.position.z = camZ * 0.5
+            far.position.z = camZ * 0.15
+
+            const fadeWant = exitingRef.current ? 1 : 0
+            const fadeK = exitingRef.current ? FADE_OUT_K : FADE_IN_K
+            fadeOpacity += (fadeWant - fadeOpacity) * (1 - Math.exp(-fadeK * delta))
+            fadeMaterial.opacity = fadeOpacity
+
+            const a = 1 - Math.exp(-BILLBOARD_K * delta)
+            let closest = 0
+            let best = Infinity
+            const t = performance.now() * 0.0008
+            cards.forEach((c, i) => {
+                const d = Math.abs(c.baseZ - (camZ - 6))
+                if (d < best) { best = d; closest = i }
+                c.mesh.position.y = c.baseY + Math.sin(t + c.phase) * 0.08
+                const ry = Math.atan2(camera.position.x - c.mesh.position.x, camera.position.z - c.mesh.position.z)
+                c.mesh.rotation.y += (ry * 0.3 - c.mesh.rotation.y) * a
+            })
+            const progress = (st.zStart - camZ) / (st.zStart - st.zEnd)
+            setTunnelProgress(closest, Math.max(0, Math.min(1, progress)))
+        }
+
+        return () => {
+            frameRef.current = null
+            scene.traverse((o) => {
+                if (o.isMesh || o.isPoints) {
+                    o.geometry?.dispose?.()
+                }
+            })
+            geometries.forEach((g) => g.dispose())
+            materials.forEach((m) => m.dispose())
+            textures.forEach((t) => t.dispose())
+            dotGeom.dispose(); dotMat.dispose(); farGeom.dispose(); farMat.dispose()
+            fadeQuad.geometry.dispose(); fadeMaterial.dispose()
+            fadeRef.current = null
+            sceneRef.current = null
+            cameraRef.current = null
+            cardsRef.current = []
+        }
+    }, [fontsReady, experiences, tier, sendReady, gl])
+
+    // 没有履历数据时不能把门锁死：8s 兜底虽然会开，但没必要让人干等。
+    useEffect(() => {
+        if (fontsReady && experiences.length === 0) sendReady()
+    }, [fontsReady, experiences.length, sendReady])
+
+    // ---- 输入 ----
+    useEffect(() => {
+        // 出门动画期间松手：滚轮不该和"倒着退出房间"抢目标位置。
+        if (warmup || isExiting) return undefined
+
+        // 事件里现读 controlsRef —— 换语言会让它整体换一个对象（zEnd 跟着条数走），
+        // 把旧对象闭进监听器里会拿错 clamp 边界。
+        const nudge = (dz) => {
+            const c = controlsRef.current
+            if (c) c.st.targetZ = c.clamp(c.st.targetZ + dz)
+        }
+
+        const onWheel = (e) => {
+            e.preventDefault()
+            nudge(-e.deltaY * 0.008)
+        }
+        let touchY = 0
+        const onTouchStart = (e) => { touchY = e.touches[0].clientY }
+        const onTouchMove = (e) => {
+            const dy = e.touches[0].clientY - touchY
+            touchY = e.touches[0].clientY
+            nudge(-dy * 0.03)
+        }
+        const onKey = (e) => {
+            if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') nudge(TUNNEL_SPACING * 0.8)
+            if (e.key === 'ArrowDown' || e.key === 'ArrowRight') nudge(-TUNNEL_SPACING * 0.8)
+        }
+
+        window.addEventListener('wheel', onWheel, { passive: false })
+        window.addEventListener('touchstart', onTouchStart, { passive: true })
+        window.addEventListener('touchmove', onTouchMove, { passive: true })
+        window.addEventListener('keydown', onKey)
+        return () => {
+            window.removeEventListener('wheel', onWheel)
+            window.removeEventListener('touchstart', onTouchStart)
+            window.removeEventListener('touchmove', onTouchMove)
+            window.removeEventListener('keydown', onKey)
+        }
+    }, [warmup, isExiting])
+
+    if (warmup) return null
+
+    return <TunnelRenderer sceneRef={sceneRef} cameraRef={cameraRef} controlsRef={controlsRef} fadeRef={fadeRef} />
+}
+
+export default CareerTunnel

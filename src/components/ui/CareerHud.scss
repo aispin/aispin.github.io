@@ -1,0 +1,194 @@
+/* 时空隧道 HUD —— 布局与 demo 对齐（左时间刻度 / 右玻璃面板 / 底部进度）。
+   ⚠️ 全层 pointer-events: none，只有按钮自己打开；否则会盖住右下角的返回按钮。 */
+
+.career-hud {
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    pointer-events: none;
+    color: #e9edf5;
+
+    --accent: #8ba3ff;
+    --dim: #8792a6;
+    --mute: #5a6478;
+
+    &__brand {
+        position: absolute;
+        top: 32px;
+        left: 40px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 800;
+        font-size: 15px;
+        letter-spacing: -0.01em;
+
+        small {
+            display: block;
+            font-size: 10.5px;
+            font-weight: 600;
+            color: var(--dim);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            margin-top: 3px;
+        }
+    }
+
+    &__mark {
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        font-size: 14px;
+        font-weight: 900;
+        background: linear-gradient(135deg, #4f6bff, #a678ff);
+        box-shadow: 0 8px 28px rgba(79, 107, 255, 0.45);
+    }
+
+    &__timeline {
+        position: absolute;
+        top: 50%;
+        left: 40px;
+        transform: translateY(-50%);
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        pointer-events: auto;
+
+        button {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: none;
+            border: 0;
+            padding: 0;
+            cursor: pointer;
+            color: var(--mute);
+            font: inherit;
+            font-size: 11px;
+            letter-spacing: 0.12em;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            transition: color 0.3s;
+
+            &::before {
+                content: '';
+                width: 24px;
+                height: 1px;
+                background: currentColor;
+                opacity: 0.5;
+                transition: width 0.4s cubic-bezier(0.2, 0.8, 0.3, 1), opacity 0.3s;
+            }
+
+            &.on {
+                color: var(--accent);
+
+                &::before {
+                    width: 48px;
+                    opacity: 1;
+                }
+            }
+
+            &:hover {
+                color: #e9edf5;
+            }
+        }
+    }
+
+    &__info {
+        position: absolute;
+        right: 40px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 280px;
+        padding: 24px 26px;
+        border-radius: 18px;
+        background: rgba(18, 22, 34, 0.62);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(20px) saturate(180%);
+        -webkit-backdrop-filter: blur(20px) saturate(180%);
+    }
+
+    &__date {
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        font-weight: 700;
+        color: var(--accent);
+        margin-bottom: 10px;
+        font-variant-numeric: tabular-nums;
+    }
+
+    &__title {
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        line-height: 1.15;
+        margin-bottom: 8px;
+    }
+
+    &__sub {
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--dim);
+        margin-bottom: 16px;
+        line-height: 1.5;
+    }
+
+    &__desc {
+        font-size: 13px;
+        line-height: 1.75;
+        color: #b6c0d2;
+        padding-top: 14px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        max-height: 168px;
+        overflow: hidden;
+    }
+
+    &__hint {
+        position: absolute;
+        bottom: 40px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 11.5px;
+        color: var(--mute);
+        letter-spacing: 0.05em;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+
+        &::before {
+            content: '';
+            width: 32px;
+            height: 1px;
+            background: currentColor;
+            opacity: 0.4;
+        }
+    }
+
+    &__bar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        height: 2px;
+        background: linear-gradient(90deg, #4f6bff, #a678ff);
+        box-shadow: 0 0 12px rgba(120, 150, 255, 0.6);
+        transition: width 0.1s linear;
+    }
+
+    @media (max-width: 900px) {
+        &__info {
+            display: none;
+        }
+
+        &__brand {
+            top: 22px;
+            left: 22px;
+        }
+
+        &__timeline {
+            left: 20px;
+        }
+    }
+}

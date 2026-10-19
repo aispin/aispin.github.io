@@ -14,6 +14,7 @@ import {
 import GalleryRoom from '../rooms/Gallery/GalleryRoom';
 import ContactRoom from '../rooms/Contact/ContactRoom';
 import ContentRoom from '../rooms/ContentRoom';
+import CareerTunnel from '../rooms/CareerTunnel';
 import { SCENE_FONTS } from '../../../config/theme';
 
 // Room configurations
@@ -32,6 +33,15 @@ const SUBTITLES = {
     'DEV DIARY': 'My development journey',
     "LET'S CONNECT": 'Get in touch with me'
 };
+
+// 用 ContentRoom 那套「贴卡的房间」的 roomId。
+// `career` **不在**里面 —— 它不再是一面贴卡的墙，而是一整条星空隧道
+// （见 rooms/CareerTunnel.jsx 的文件头）。两者是两种空间，不能共用一个分支。
+const CONTENT_ROOM_IDS = ['studio', 'posts', 'videos', 'music', 'ai'];
+
+// 自己会喊 `onReady` 的房间。必须在下面的兜底里排除掉，否则门会在房间还没
+// 搭好时就打开 —— 隧道尤其明显：先开到一片空白，再"啪"地出现。
+const SELF_READY_IDS = ['gallery', 'contact', 'career', ...CONTENT_ROOM_IDS];
 
 /**
  * RoomInterior Component
@@ -101,14 +111,13 @@ const RoomInterior = ({ label, roomId, showRoom, onReady, isExiting }) => {
 
     const isGallery = roomId === 'gallery';
     const isContact = roomId === 'contact';
-    const contentRoomIds = ['career', 'studio', 'posts', 'videos', 'music', 'ai'];
     // Debug hook (?noloader probes): window.__forceRoom renders a room without
     // walking the door animation. No-op in normal sessions.
     const roomVisible = showRoom || (typeof window !== 'undefined' && window.__forceRoom === roomId);
 
     // Keep a ready fallback for unknown IDs; custom rooms signal readiness themselves.
     useEffect(() => {
-        if (showRoom && !['gallery', 'contact', ...contentRoomIds].includes(roomId)) onReady?.();
+        if (showRoom && !SELF_READY_IDS.includes(roomId)) onReady?.();
     }, [showRoom, roomId, onReady]);
 
     return (
@@ -187,7 +196,14 @@ const RoomInterior = ({ label, roomId, showRoom, onReady, isExiting }) => {
                                 <ContactRoom showRoom={roomVisible} onReady={onReady} isExiting={isExiting} />
                             </Suspense>
                         </group>
-                    ) : contentRoomIds.includes(roomId) ? (
+                    ) : roomId === 'career' ? (
+                        // === 时空隧道 ===
+                        // 它自带 Scene + Camera，并**接管渲染**（见文件头）。
+                        // 所以这里不能包 `<group position=…>`：那个变换对它是死的。
+                        <Suspense fallback={null}>
+                            <CareerTunnel onReady={onReady} isExiting={isExiting} />
+                        </Suspense>
+                    ) : CONTENT_ROOM_IDS.includes(roomId) ? (
                         <ContentRoom roomId={roomId} showRoom={roomVisible} onReady={onReady} />
                     ) : (
                         // === DEFAULT GENERIC ROOM (For other sections) ===
