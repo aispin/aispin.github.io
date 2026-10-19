@@ -278,21 +278,21 @@ const CARD_LIGHT = {
  * little toward white instead of being pulled toward ink.
  *
  * ⚠️ These values are what the card looks like BEFORE the full-frame night veil
- * (SceneLighting multiplies the whole frame by ~(0.40, 0.46, 0.66)). A card
- * authored at L=0.16 therefore lands near L=0.07 on screen — which is the
- * demo's own ground. Authoring it at the demo's L=0.06 directly would come out
- * almost black.
+ * (`SceneLighting` multiplies the whole frame by `NIGHT.veil`). A card authored
+ * at L=0.11 therefore lands near L=0.05 on screen — which is the demo's own
+ * ground. Authoring it at the demo's L=0.06 directly would come out almost
+ * black.
  *
- * 🔴 THE VEIL IS A HARD CEILING ON DARK-MODE CONTRAST, and it is worth knowing
- * the number before tuning anything else here. Because the veil multiplies the
- * finished frame, **no colour drawn into a card texture can ever be brighter on
- * screen than the veil itself**: pure white lands at (102, 117, 168), i.e.
- * L = 0.184. Against a card face at (35, 31, 29) that caps the achievable
- * contrast at **3.64 : 1** — WCAG AA (4.5 : 1) for body copy is *unreachable* in
- * dark mode without changing the veil, no matter what the palette says.
- * So the ink below is deliberately pushed to ~white: it buys 2.2 : 1 → ~3.2 : 1,
- * which is the most that exists. Anything that needs more than that is a veil
- * decision (see WORKPLAN), not a palette decision.
+ * 🔴 DARK-MODE CONTRAST USED TO BE CAPPED BY THE VEIL. A pure multiply meant
+ * **no colour drawn into a card texture could be brighter on screen than the
+ * veil itself** — pure white landed at (102, 117, 168), L 0.184, and against a
+ * card face at (35, 31, 29) that capped body copy at **3.64 : 1**, so WCAG AA
+ * was unreachable no matter what the palette said.
+ *
+ * DR-E lifted the veil (`mix(veil·x, x, 0.30)` — see `config/theme.js`), which
+ * moved the same ceiling to (148, 159, 194) and made AA reachable. The ink below
+ * stays ~white; the extra contrast now comes from pushing the **ground** down
+ * (base L 0.16 → 0.11), measured 2.73 → 4.65 : 1.
  */
 const CARD_DARK = {
   ink: [250, 246, 238],
@@ -320,10 +320,10 @@ const TEXTURAL_CARD_LIGHT = {
   blur: 0.02,
 }
 
-/** Dark: the demo's own hue family, lifted for the veil (see CARD_DARK). */
+/** Dark: the demo's own hue family, pushed down for AA (see CARD_DARK). */
 const TEXTURAL_CARD_DARK = {
-  base: { h: 232, s: 0.22, l: 0.16 },
-  blob: { count: 4, hueSpread: 60, s: 0.58, light: [0.24, 0.42], alpha: 0.55, radius: [0.45, 0.95] },
+  base: { h: 232, s: 0.22, l: 0.11 },
+  blob: { count: 4, hueSpread: 60, s: 0.58, light: [0.16, 0.30], alpha: 0.45, radius: [0.45, 0.95] },
   glyph: { h: 220, s: 0.28, l: 0.92, alpha: 0.11, scale: 0.9, spacing: [1.9, 2.4] },
   blur: 0.02,
 }

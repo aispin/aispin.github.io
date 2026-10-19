@@ -26,7 +26,7 @@
  *    （见 `utils/entranceArt.js` 里树的 `ctx.scale(1, squash)`）。
  *    两者都要，别混为一谈。
  */
-import { SCENE, LIGHTS, NIGHT } from './theme';
+import { SCENE, LIGHTS, NIGHT, liftVeil, VEIL_GLOW_ANCHOR } from './theme';
 
 /**
  * 秋天的白天。
@@ -107,7 +107,7 @@ export const SEASON_LIGHT = {
         },
         night: {
             tint: '#F6FFF2',
-            veil: { r: 0.42, g: 0.46, b: 0.62 },
+            veil: liftVeil({ r: 0.42, g: 0.46, b: 0.62 }),
             sky: '#2E3550',
             haze: '#252C42',
             fogNear: 20,
@@ -132,7 +132,7 @@ export const SEASON_LIGHT = {
         },
         night: {
             tint: '#F6FFE8',
-            veil: { r: 0.36, g: 0.42, b: 0.60 },
+            veil: liftVeil({ r: 0.36, g: 0.42, b: 0.60 }),
             sky: '#262C48',
             haze: '#1F2540',
             fogNear: 20,
@@ -161,7 +161,7 @@ export const SEASON_LIGHT = {
         },
         night: {
             tint: '#F4F8FF',
-            veil: { r: 0.54, g: 0.60, b: 0.76 },
+            veil: liftVeil({ r: 0.54, g: 0.60, b: 0.76 }),
             sky: '#3E4A66',
             haze: '#333D56',
             fogNear: 14,
@@ -187,8 +187,13 @@ export const seasonLightFor = (season) => SEASON_LIGHT[season] || SEASON_LIGHT.a
 /* 0.54/0.60/0.76（雪把天光反上来），比秋天的 0.40/0.46/0.66 亮 ~30%，   */
 /* 窗会直接削顶。削顶就是把暖色烧成白，而一扇白窗等于没有窗。            */
 /*                                                                      */
-/* 所以系数取 veil 亮度的**倒数**，归一到秋天（= 1，逐位不变）。         */
-/* 这是**推导**出来的，不是手调的：谁改了哪一季的 veil，灯自己会跟上。   */
+/* 所以系数取 veil 亮度的**倒数**：`veil · glow` 恒定 ⇒ 窗的落屏亮度不随 */
+/* 季节漂。                                                             */
+/*                                                                      */
+/* 🔴 DR-E：分子用**未抬**的秋夜 veil 亮度（`VEIL_GLOW_ANCHOR`），分母用  */
+/* **抬过**的各季 veil —— 于是 `veil · glow` 逐位保持原值。             */
+/* 若分子也跟着抬（= 原来的写法），秋夜的窗会整体亮 35%：过驱量被钉在 1，*/
+/* 抬 veil 换来的亮度没人抵消，暖色直接削顶成白。                        */
 /*                                                                      */
 /* ⚠️ 只乘在"过驱量"上（`1 + A * k * s`），不乘那个 1。                 */
 /* 因为那个 1 是**白天**的窗（veil 是纯白、等于没乘），乘了会让冬天的    */
@@ -196,7 +201,7 @@ export const seasonLightFor = (season) => SEASON_LIGHT[season] || SEASON_LIGHT.a
 /* 恰好落在"冬夜窗看起来略亮一点"的方向上，不必再修。                   */
 /* ------------------------------------------------------------------ */
 const veilLuma = (v) => 0.2126 * v.r + 0.7152 * v.g + 0.0722 * v.b;
-const AUTUMN_LUMA = veilLuma(AUTUMN_NIGHT.veil);
+const AUTUMN_LUMA = VEIL_GLOW_ANCHOR;
 
 export function seasonGlowFor(season) {
     const night = (SEASON_LIGHT[season] || SEASON_LIGHT.autumn).night;

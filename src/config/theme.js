@@ -132,14 +132,44 @@ export const UI = {
  * and contrast reads right) but they are the seasoning, not the meal.
  *
  * ⚠️ THE BACKGROUND IS MULTIPLIED TOO. `scene.background` is drawn into the
- * same framebuffer before the veil, so the colour below is the sky *before*
- * the veil — not what you see. To land on a visible sky of #2B3152 with the
- * veil at (0.40, 0.46, 0.66):  (0.169, 0.192, 0.322) / (0.40, 0.46, 0.66)
- * = (0.42, 0.42, 0.49) = #6B6B7D. Same story for `fogColor`.
- * (`premultiply()` below does this division for you — change either number
- *  and the other follows.)
+ * same framebuffer before the veil, so `NIGHT.sky` below is the sky you want
+ * to SEE; `unmultiplyVeil()` divides it back out for `scene.background`.
+ * Change the veil and the background follows — never hand-copy those numbers.
+ *
+ * DR-E — THE VEIL IS **LIFTED**, NOT A PURE MULTIPLY
+ * -------------------------------------------------
+ * A pure multiply caps every authored colour at the multiplier itself: white
+ * lands on (0.40, 0.46, 0.66), L = 0.184, so a card face at L ≈ 0.02 tops out
+ * at **3.18 : 1** against its own ink — and WCAG AA wants 4.5 : 1. That is a
+ * structural ceiling: no amount of repainting the card can get past it.
+ *
+ * So night is `mix(veil * x, x, K)` instead, which per channel is just a
+ * multiply by `veil·(1−K) + K`: the dark end lifts, the bright end barely
+ * moves. **Day stays exact** — the day veil is pure white, and `lift(1) = 1`.
+ *
+ * ⚠️ `NIGHT_VEIL_RAW` is kept because the lamp overdrive in `seasonGlowFor()`
+ *    normalises against the **un-lifted** veil; that keeps the on-screen
+ *    brightness of the lit windows bit-identical across the lift. Don't
+ *    "simplify" the two apart.
  */
-const NIGHT_VEIL = { r: 0.40, g: 0.46, b: 0.66 }
+const NIGHT_LIFT_K = 0.30
+const NIGHT_VEIL_RAW = { r: 0.40, g: 0.46, b: 0.66 }
+
+/** `mix(veil * x, x, k)` written as the multiplier it actually is. */
+export function liftVeil(v, k = NIGHT_LIFT_K) {
+    return {
+        r: v.r * (1 - k) + k,
+        g: v.g * (1 - k) + k,
+        b: v.b * (1 - k) + k,
+    }
+}
+
+const NIGHT_VEIL = liftVeil(NIGHT_VEIL_RAW)
+
+/** Luma of the un-lifted autumn veil — the lamp-overdrive anchor (DR-E). */
+export const VEIL_GLOW_ANCHOR = 0.2126 * NIGHT_VEIL_RAW.r
+    + 0.7152 * NIGHT_VEIL_RAW.g
+    + 0.0722 * NIGHT_VEIL_RAW.b
 
 export const NIGHT = {
     /** Full-frame multiplier. Day is pure white = a no-op, so the veil can
