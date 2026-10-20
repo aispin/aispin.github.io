@@ -178,7 +178,7 @@ public/                静态资源（字体、声音、贴图、demos）
 
 ```bash
 npm install
-npm run dev          # http://localhost:5173
+npm run dev          # http://localhost:5199（端口写死在 vite.config.js）
 npm run build        # 产出 dist/
 npm run preview      # 本地预览构建结果
 npm run lint

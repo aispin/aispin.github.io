@@ -201,6 +201,25 @@ function emit404Fallback() {
 
 // https://vite.dev/config/
 export default defineConfig({
+  /**
+   * 🔴 dev 端口**固定 5199**，不再用默认的 5173。
+   *
+   * 2026-10-20 用户：「5173 被另外一个仓库占用了。本次固定 5199 做为 dev 端口」。
+   * 本机 5173 上常驻的是另一个仓（`proj/xsin.github.io/apps/web`），于是裸 `vite`
+   * 会**静默顺延**到 5174 —— 同一份源码跑出两个 dev server，探针打在 A 上、
+   * 页面开在 B 上（2026-10-10 与 10-15 各踩过一次，第二次是用户发现的）。
+   *
+   * `strictPort` 才是这件事的关键：端口被占就**报错退出**，绝不悄悄换号。
+   * 少了它，`port` 只是个"首选值"，该有的静默仍然会有。
+   *
+   * ⚠️ `preview` 不跟着改：它服务的永远是 `dist/`，留在默认 4173，
+   *    「5199=源码 / 4173=产物」这个对应关系才不会被打破。
+   */
+  server: {
+    port: 5199,
+    strictPort: true,
+  },
+
   plugins: [
     serveExtraPages(),
     // 源码 src/me/index.html → 产物 dist/me/index.html（见函数注释）
