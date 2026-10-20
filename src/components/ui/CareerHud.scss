@@ -7,43 +7,36 @@
     z-index: 900;
     pointer-events: none;
     color: #e9edf5;
+    /* 退出时整层淡掉：它是 DOM，隧道那层 WebGL 已经化开了，HUD 不能还钉在
+       屏幕上等 currentRoom 变 null（那要等到门关完）。 */
+    transition: opacity 0.32s ease;
+
+    &.is-exiting {
+        opacity: 0;
+    }
 
     --accent: #8ba3ff;
     --dim: #8792a6;
     --mute: #5a6478;
 
-    &__brand {
+    /* 房间名：只有「履历」两个字，顶部正中。
+       🔴 左上角是返回按钮的地盘（.hud-cluster--left: top 18 / left 18），
+       原来的品牌块（top 32 / left 40）正好把它盖住 —— 用户点不到返回。
+       ⚠️ 类名**不能**叫 `__title`：那块是右侧卡片里公司名的（见下面的
+       `&__title`），同名会把卡片标题一起绝对定位到屏幕中间。 */
+    &__heading {
         position: absolute;
-        top: 32px;
-        left: 40px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        font-weight: 800;
-        font-size: 15px;
-        letter-spacing: -0.01em;
-
-        small {
-            display: block;
-            font-size: 10.5px;
-            font-weight: 600;
-            color: var(--dim);
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            margin-top: 3px;
-        }
-    }
-
-    &__mark {
-        width: 32px;
-        height: 32px;
-        border-radius: 10px;
-        display: grid;
-        place-items: center;
-        font-size: 14px;
-        font-weight: 900;
-        background: linear-gradient(135deg, #4f6bff, #a678ff);
-        box-shadow: 0 8px 28px rgba(79, 107, 255, 0.45);
+        top: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 12.5px;
+        font-weight: 700;
+        letter-spacing: 0.34em;
+        /* 字距会在最后一个字后面也留一份，translateX(-50%) 是按含它算的宽
+           居中 ⇒ 视觉上偏左。补一格字距抵消掉。 */
+        text-indent: 0.34em;
+        color: rgba(233, 237, 245, 0.66);
+        white-space: nowrap;
     }
 
     &__timeline {
@@ -157,6 +150,13 @@
         display: flex;
         align-items: center;
         gap: 10px;
+        transition: color 0.25s, opacity 0.25s;
+
+        /* 已经退到隧道口、还在继续往回滚：这句话换成"继续往回滚，退出房间"，
+           颜色提到 --accent —— 不然这个手势没有任何提示，谁也发现不了。 */
+        &.is-armed {
+            color: var(--accent);
+        }
 
         &::before {
             content: '';
@@ -182,9 +182,8 @@
             display: none;
         }
 
-        &__brand {
+        &__heading {
             top: 22px;
-            left: 22px;
         }
 
         &__timeline {

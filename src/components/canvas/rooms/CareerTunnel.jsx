@@ -2,10 +2,11 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useSitePreferences } from '../../../context/SitePreferences'
+import { useScene } from '../../../context/SceneContext'
 import { usePerformance } from '../../../context/PerformanceContext'
 import { getLocalizedCollection } from '../../../hooks/useContentData'
 import { ensureFontsReady, texturalCanvas } from '../../../utils/texturalArt'
-import { setTunnelCount, setTunnelProgress, tunnelRequest, tunnelCardZ, tunnelTargetZ, TUNNEL_SPACING } from '../../../state/careerTunnel'
+import { setTunnelArmed, setTunnelCount, setTunnelProgress, tunnelRequest, tunnelCardZ, tunnelTargetZ, TUNNEL_SPACING } from '../../../state/careerTunnel'
 
 /**
  * 履历房间 —— 「时空隧道」。
@@ -205,7 +206,7 @@ function useExperiences(language) {
 }
 
 /** 只在"真的进了房间"时挂载 —— 见文件头关于接管的说明。 */
-function TunnelRenderer({ sceneRef, cameraRef, controlsRef, fadeRef }) {
+function TunnelRenderer({ sceneRef, cameraRef, controlsRef, fadeRef, exitingRef }) {
     const size = useThree((s) => s.size)
 
     useEffect(() => {
@@ -228,16 +229,41 @@ function TunnelRenderer({ sceneRef, cameraRef, controlsRef, fadeRef }) {
 
         controls.step(delta)
 
-        state.gl.render(scene, cam)
-
-        // 幕布：一趟正交覆盖屏，颜色 = 隧道底色。进/出场都靠它把"硬切"变成
-        // 一次呼吸 —— 门还关着的那一帧不会直接露出星空。
+        const gl = state.gl
         const fade = fadeRef.current
-        if (fade && fade.material.opacity > 0.002) {
-            state.gl.autoClear = false
-            state.gl.render(fade.scene, fade.camera)
-            state.gl.autoClear = true
+
+        if (!exitingRef.current) {
+            // ── 在隧道里：整屏归隧道，幕布压在最后把"硬切"变成一次呼吸 ──
+            gl.render(scene, cam)
+            if (fade && fade.material.opacity > 0.002) {
+                const prev = gl.autoClear
+                gl.autoClear = false
+                gl.render(fade.scene, fade.camera)
+                gl.autoClear = prev
+            }
+            return
         }
+
+        // ── 退场：**先把走廊画出来**，再把隧道整体溶掉叠在上面 ──────────
+        //
+        // 以前这里只画隧道、幕布一路拉满到隧道底色 ⇒ 用户点后退看到的是
+        // 一片黑，等门关完才"啪"地换成走廊。那不是卡顿，是**整段退场
+        // 动画根本没被渲染**（接管期间主场景一帧都没画）。
+        //
+        // 现在三趟：走廊（自带清屏）→ 空间底色（把走廊压住）→ 卡片/星点。
+        // 后两者的透明度由 frameRef 按同一个 t 从 1 降到 0 ⇒ 隧道像一层
+        // 墨在走廊上化开，门在底下关、相机在底下退。
+        gl.render(state.scene, state.camera)
+
+        const prev = gl.autoClear
+        gl.autoClear = false
+        // 🔴 走廊那一趟把深度缓冲也写满了。隧道有自己的相机和世界坐标，
+        //    接着用这份深度去测，卡片会被走廊的墙/地面按错误的 z 剔掉。
+        //    clearDepth() 不受 autoClear 影响（three 里它就是一次 gl.clear）。
+        gl.clearDepth()
+        if (fade && fade.material.opacity > 0.002) gl.render(fade.scene, fade.camera)
+        gl.render(scene, cam)
+        gl.autoClear = prev
     }, 1)
 
     return null
@@ -246,6 +272,7 @@ function TunnelRenderer({ sceneRef, cameraRef, controlsRef, fadeRef }) {
 const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
     const { language } = useSitePreferences()
     const { tier } = usePerformance()
+    const { requestExit } = useScene()
     const gl = useThree((s) => s.gl)
     const experiences = useExperiences(language)
 
@@ -333,9 +360,15 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
             opacity: 1,
             depthTest: false,
             depthWrite: false,
+            // 🔴 这块屏原来摆在 z=0，而正交相机也在 z=0、near=0 —— 它正好落在
+            //    **近平面上**，被裁掉，于是一帧都没画出来过（进场那个"呼吸"
+            //    其实一直是硬切）。挪到相机前方半格就好。
+            //    ⚠️ 别用 DoubleSide 救：透明双面会被拆成**两趟**画，
+            //    alpha 变成 1-(1-a)²，淡入淡出的曲线整个被拉歪。
             toneMapped: false,
         })
         const fadeQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), fadeMaterial)
+        fadeQuad.position.z = -0.5
         fadeQuad.frustumCulled = false
         fadeScene.add(fadeQuad)
         fadeRef.current = { scene: fadeScene, camera: fadeCamera, material: fadeMaterial }
@@ -447,19 +480,43 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
         //    demo 写死 0.98/0.02 是逐帧的（掉帧就变慢），这里按帧时间归一：
         //    -ln(0.98) × 60 ≈ 1.212 是 60fps 下等价的连续速率。
         const BILLBOARD_K = 1.212
-        // 幕布速率：进 ~0.45s 淡到 0（k=8 ⇒ 0.45s 时约 3%），退 ~0.55s 拉满。
+        // 进场：幕布 1→0（k=8 ⇒ 0.45s 时约 3%），卡片始终不透明 —— 星空从
+        //       底色里浮出来。
+        // 退场：exitT 0→1（k=6.5 ⇒ 0.46s 到 95%）。幕布按 a 降、卡片按 a² 降 ——
+        //       两者都得降（只降幕布会露出一张张悬在走廊上的卡；只降卡片会被
+        //       幕布压成一片纯色），但**卡片必须先走**，否则深灰卡片会残留在
+        //       已经亮起来的走廊上。
         const FADE_IN_K = 8
-        const FADE_OUT_K = 6
+        const DISSOLVE_K = 6.5
+        /* 退场时幕布**不拉满**：0.92 就够压住走廊，留 8% 让第一帧和上一帧
+           （纯星空）几乎无缝 —— 拉满再降会闪一下。 */
+        const EXIT_VEIL = 0.92
+        let exitT = 0
         frameRef.current = (camZ, delta) => {
             camera.position.set(0, 0, camZ)
             camera.lookAt(0, 0, camZ - 10)
             dots.position.z = camZ * 0.5
             far.position.z = camZ * 0.15
 
-            const fadeWant = exitingRef.current ? 1 : 0
-            const fadeK = exitingRef.current ? FADE_OUT_K : FADE_IN_K
-            fadeOpacity += (fadeWant - fadeOpacity) * (1 - Math.exp(-fadeK * delta))
-            fadeMaterial.opacity = fadeOpacity
+            if (exitingRef.current) {
+                exitT += (1 - exitT) * (1 - Math.exp(-DISSOLVE_K * delta))
+                const a = 1 - exitT
+                fadeMaterial.opacity = a * EXIT_VEIL
+                // 卡片/星点用 a²，幕布用 a：**幕布是最后消失的那层**。
+                // 同为线性的话，卡片会以 20~30% 的深灰矩形悬在已经亮起来的
+                // 走廊上（逐帧截图 f52/f64 就是这个症状），看着像残影而不是
+                // 化开。让内容先走、底色后走，观感才是一层墨被抹掉。
+                const c = a * a
+                materials.forEach((m) => { m.opacity = c })
+                dotMat.opacity = c * 0.7
+                farMat.opacity = c * 0.5
+                // three 的 WebGLBackground 只要 background 是 Color 就**强制清屏**
+                // （不看 autoClear）⇒ 退场这一趟必须让开，否则走廊被纯色擦掉。
+                if (scene.background) scene.background = null
+            } else {
+                fadeOpacity += (0 - fadeOpacity) * (1 - Math.exp(-FADE_IN_K * delta))
+                fadeMaterial.opacity = fadeOpacity
+            }
 
             const a = 1 - Math.exp(-BILLBOARD_K * delta)
             let closest = 0
@@ -505,27 +562,84 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
         // 出门动画期间松手：滚轮不该和"倒着退出房间"抢目标位置。
         if (warmup || isExiting) return undefined
 
+        /* ── 往后退到隧道口，再退就出门 ────────────────────────────────
+           只认**被 clamp 吃掉的那部分**滚轮量：人在隧道中段往上甩一记，
+           targetZ 会立刻被夹到 zStart，但那不算"已经到头了" —— 相机还在
+           几十个单位外。所以两个条件同时成立才计数：
+             ① 这一下滚轮确实被夹住了（说明已经顶到头）
+             ② 相机真的到了口子上（camZ 距 zStart < 2.5）
+           ② 是防误触的关键：漏了它，从深处往上一甩就会当场被踢出房间。
+           停顿 400ms 清零，免得慢慢蹭也能攒够。 */
+        const EXIT_ARM = 60   // 到这儿换提示文案
+        const EXIT_AT = 300   // 鼠标滚轮 ≈ 3 格 / 触控板一次长划
+        const IDLE_MS = 400
+        let pull = 0
+        let lastAt = 0
+        let fired = false
+
+        const resetPull = () => {
+            pull = 0
+            setTunnelArmed(false)
+        }
+        const addPull = (amount) => {
+            const now = performance.now()
+            if (now - lastAt > IDLE_MS) pull = 0
+            lastAt = now
+            pull += amount
+            setTunnelArmed(pull > EXIT_ARM)
+            if (pull < EXIT_AT) return false
+            resetPull()
+            if (fired) return false
+            fired = true
+            requestExit()
+            return true
+        }
+
         // 事件里现读 controlsRef —— 换语言会让它整体换一个对象（zEnd 跟着条数走），
         // 把旧对象闭进监听器里会拿错 clamp 边界。
+        // 返回 true 表示这一下被夹住了（已经顶到隧道口）。
         const nudge = (dz) => {
             const c = controlsRef.current
-            if (c) c.st.targetZ = c.clamp(c.st.targetZ + dz)
+            if (!c) return false
+            const want = c.st.targetZ + dz
+            c.st.targetZ = c.clamp(want)
+            return Math.abs(want - c.st.targetZ) > 1e-6
+        }
+        const atMouth = () => {
+            const c = controlsRef.current
+            return !!c && c.st.camZ > c.st.zStart - 2.5
         }
 
         const onWheel = (e) => {
             e.preventDefault()
-            nudge(-e.deltaY * 0.008)
+            const back = e.deltaY < 0
+            const clipped = nudge(-e.deltaY * 0.008)
+            if (back) {
+                if (clipped && atMouth()) addPull(-e.deltaY)
+                else if (!clipped) resetPull()
+            } else {
+                resetPull()
+            }
         }
         let touchY = 0
         const onTouchStart = (e) => { touchY = e.touches[0].clientY }
         const onTouchMove = (e) => {
             const dy = e.touches[0].clientY - touchY
             touchY = e.touches[0].clientY
-            nudge(-dy * 0.03)
+            const clipped = nudge(-dy * 0.03)
+            // 手指往下划 = 往后退（视口往上走）
+            if (dy > 0) {
+                if (clipped && atMouth()) addPull(dy * 4)
+                else if (!clipped) resetPull()
+            } else {
+                resetPull()
+            }
         }
         const onKey = (e) => {
-            if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') nudge(TUNNEL_SPACING * 0.8)
+            const back = e.key === 'ArrowUp' || e.key === 'ArrowLeft'
+            if (back) nudge(TUNNEL_SPACING * 0.8)
             if (e.key === 'ArrowDown' || e.key === 'ArrowRight') nudge(-TUNNEL_SPACING * 0.8)
+            resetPull()
         }
 
         window.addEventListener('wheel', onWheel, { passive: false })
@@ -537,12 +651,22 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
             window.removeEventListener('touchstart', onTouchStart)
             window.removeEventListener('touchmove', onTouchMove)
             window.removeEventListener('keydown', onKey)
+            // 卸载/开始退场时把"预备退出"的提示收回去，否则 HUD 会停在那句话上。
+            setTunnelArmed(false)
         }
-    }, [warmup, isExiting])
+    }, [warmup, isExiting, requestExit])
 
     if (warmup) return null
 
-    return <TunnelRenderer sceneRef={sceneRef} cameraRef={cameraRef} controlsRef={controlsRef} fadeRef={fadeRef} />
+    return (
+        <TunnelRenderer
+            sceneRef={sceneRef}
+            cameraRef={cameraRef}
+            controlsRef={controlsRef}
+            fadeRef={fadeRef}
+            exitingRef={exitingRef}
+        />
+    )
 }
 
 export default CareerTunnel

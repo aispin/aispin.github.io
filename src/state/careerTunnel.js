@@ -15,6 +15,11 @@ const state = {
     /** 0..1，量化到 1% */
     progress: 0,
     count: 0,
+    /**
+     * 已经退到隧道口、还在继续往回滚 ⇒ 攒够就出门。
+     * 只用来换一句提示文案（"继续往回滚退出房间"），所以是布尔而不是距离。
+     */
+    armed: false,
 }
 
 /* `useSyncExternalStore` 只认**引用变化**。state 是同一个对象、只改字段，
@@ -51,6 +56,13 @@ export function setTunnelProgress(active, progress) {
     if (state.active === active && state.progress === p) return
     state.active = active
     state.progress = p
+    emit()
+}
+
+/** 「继续往回滚就退出」的预备态。只在跨过阈值时发一次。 */
+export function setTunnelArmed(armed) {
+    if (state.armed === armed) return
+    state.armed = armed
     emit()
 }
 
