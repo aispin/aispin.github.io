@@ -6,7 +6,7 @@ import { useScene } from '../../../context/SceneContext'
 import { usePerformance } from '../../../context/PerformanceContext'
 import { getLocalizedCollection } from '../../../hooks/useContentData'
 import { ensureFontsReady, texturalCanvas } from '../../../utils/texturalArt'
-import { setTunnelArmed, setTunnelCount, setTunnelProgress, tunnelRequest, tunnelCardZ, tunnelTargetZ, TUNNEL_SPACING } from '../../../state/careerTunnel'
+import { setTunnelArmed, setTunnelCount, setTunnelProgress, tunnelRequest, tunnelCardZ, tunnelTargetZ, TUNNEL_SPACING, TUNNEL_CAM_OFFSET } from '../../../state/careerTunnel'
 
 /**
  * 履历房间 —— 「时空隧道」。
@@ -417,7 +417,20 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
             mesh.lookAt(0, 0, z)
             mesh.rotateZ(Math.sin(angle) * 0.15)
             scene.add(mesh)
-            cards.push({ mesh, baseZ: z, phase: i * 1.7, baseY: mesh.position.y })
+            cards.push({
+                mesh,
+                baseZ: z,
+                baseX: mesh.position.x,
+                phase: i * 1.7,
+                baseY: mesh.position.y,
+                /* build 时的完整朝向（含 `rotateZ` 那 8.6° 的侧倾）。
+                   焦点卡的朝向是从**这个**姿态插值到"正对镜头"，所以得存一份。
+                   存欧拉角不够：卡在螺旋上有高度差（y 最多 ±1.76），
+                   `lookAt(0,0,z)` 会把高/低处的卡几乎放平（俯仰 ~78°），而
+                   "偏航 → 俯仰"两轴分别插值凑不出精确的 lookAt（残差 ~2°，
+                   还会把侧倾留到最后）。四元数 slerp 一步到位。 */
+                restQ: mesh.quaternion.clone(),
+            })
         })
 
         // ---- 光点（隧道内）----
@@ -480,6 +493,31 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
         //    demo 写死 0.98/0.02 是逐帧的（掉帧就变慢），这里按帧时间归一：
         //    -ln(0.98) × 60 ≈ 1.212 是 60fps 下等价的连续速率。
         const BILLBOARD_K = 1.212
+        /* 侧角：demo 那个 30%。非焦点的卡保持它，隧道才有螺旋纵深。 */
+        const SIDE_TURN = 0.3
+        /* 焦点半径（世界单位）＝ 0.62 个卡片间距。中点（d=4.25）处权重只剩
+           0.10 ⇒ 两张卡都还在 30% 的侧脸上；靠近的最后 1/4 步里才快速爬到
+           0.65+。取整步会让相邻两张卡同时半转，看起来像整条隧道在扭。 */
+        const FOCUS_RANGE = TUNNEL_SPACING * 0.62
+        /* 焦点卡的额外收敛速率（叠在 BILLBOARD_K 上）。 */
+        const FOCUS_K = 2.4
+        /* 焦点卡**停在相机前方多远**（世界单位）。卡是 3.4×4.8、fov 58°，所以
+           6.2 ⇒ 卡高占屏 ~70%。停靠位只有 4 ⇒ 会占 108%，上下被裁掉。 */
+        const FOCUS_DIST = 6.2
+        /* 焦点卡的水平落位。相机在隧道轴上、卡在半径 3.2 的螺旋上 ⇒ 让卡
+           "原地转正"必然被推到画面右侧并裁掉（水平半视角 44.6°，卡中心就
+           在 28° 上）。所以转正的同时要把它**拉回轴心**，落点略偏左：右侧
+           22% 是信息面板、左侧 10% 是时间刻度，画面可用区的中线在 44%。 */
+        const FOCUS_X = -0.55
+        /* 🔴 「谁在焦点」只有一个量：相机离**这张卡的停靠位**有多远。
+           `tunnelTargetZ(i)` 是 HUD 点刻度时相机要去的 z，也是相机停稳时的 z
+           ⇒ 停稳时 d 恒为 0、权重恒为 1、卡面偏角恒为 0°。
+           之前这里写 `|baseZ - (camZ - 6)|`（6 是拍脑袋的"看向前方 6 格"），
+           相机其实停在卡前 4（TUNNEL_CAM_OFFSET）⇒ 停稳时 d=2、权重只有
+           0.83，焦点卡永远差 10° 转不正；顺带 HUD 的高亮也比中点早 2 格翻页。
+           改成同一个真源之后，"HUD 说第 3 张、转正的是第 4 张"这类漂移在
+           结构上就不可能发生。 */
+        const focusDist = (cardZ, camZ) => Math.abs(camZ - (cardZ + TUNNEL_CAM_OFFSET))
         // 进场：幕布 1→0（k=8 ⇒ 0.45s 时约 3%），卡片始终不透明 —— 星空从
         //       底色里浮出来。
         // 退场：exitT 0→1（k=6.5 ⇒ 0.46s 到 95%）。幕布按 a 降、卡片按 a² 降 ——
@@ -492,6 +530,9 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
            （纯星空）几乎无缝 —— 拉满再降会闪一下。 */
         const EXIT_VEIL = 0.92
         let exitT = 0
+        /* 每帧复用的两个临时对象（逐帧 new 会制造 GC 抖动）。 */
+        const lookDummy = new THREE.Object3D()
+        const qTarget = new THREE.Quaternion()
         frameRef.current = (camZ, delta) => {
             camera.position.set(0, 0, camZ)
             camera.lookAt(0, 0, camZ - 10)
@@ -518,16 +559,45 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
                 fadeMaterial.opacity = fadeOpacity
             }
 
-            const a = 1 - Math.exp(-BILLBOARD_K * delta)
             let closest = 0
             let best = Infinity
             const t = performance.now() * 0.0008
             cards.forEach((c, i) => {
-                const d = Math.abs(c.baseZ - (camZ - 6))
+                const d = focusDist(c.baseZ, camZ)
                 if (d < best) { best = d; closest = i }
-                c.mesh.position.y = c.baseY + Math.sin(t + c.phase) * 0.08
-                const ry = Math.atan2(camera.position.x - c.mesh.position.x, camera.position.z - c.mesh.position.z)
-                c.mesh.rotation.y += (ry * 0.3 - c.mesh.rotation.y) * a
+                const bob = c.baseY + Math.sin(t + c.phase) * 0.08
+
+                /* ── 朝向：滚到哪张，哪张转正 ─────────────────────────────
+                   ① **落位**：焦点卡从螺旋上被"抽"到相机正前方 —— 轴心偏左
+                      (FOCUS_X)、y 归零、z 后退到 FOCUS_DIST。不抽的话，卡在
+                      半径 3.2 的螺旋上原地转正，必然糊在画面右侧被裁掉。
+                   ② **朝向**：一次性 `lookAt(相机)` 拿到精确的四元数（含俯仰；
+                      卡在螺旋上有 ±1.76 的高度差，只转偏航会让焦点卡变成一块
+                      斜躺在地上的巨大平面 —— 第一次改就是这样），再从这个
+                      build 姿态 slerp 过去。
+
+                   插值参数 `SIDE_TURN + (1-SIDE_TURN)·focus`：
+                     focus=0 → 0.30，与 demo 逐帧拉 30% 同效（非焦点卡保持侧脸，
+                               螺旋纵深不塌）；
+                     focus=1 → 1.00，正对镜头、居中、完整可见。
+
+                   ⚠️ 用四元数而不是分别改 rotation.x/rotation.y：欧拉 XYZ 是
+                   `Rx·Ry`，凑不出精确的 lookAt（实测残差 2°），而且 build 时
+                   `rotateZ` 那 8.6° 的侧倾会一直留到最后。
+
+                   ⚠️ 收敛速度也跟着权重走（FOCUS_K）。只调目标角不调速度的话，
+                   焦点卡的转向会拖到 0.8s，读起来是"慢慢扭"而不是"转过来"。 */
+                const x = Math.max(0, 1 - d / FOCUS_RANGE)
+                const focus = x * x * (3 - 2 * x)
+                c.mesh.position.x = c.baseX + (FOCUS_X - c.baseX) * focus
+                c.mesh.position.y = bob + (0 - bob) * focus
+                c.mesh.position.z = c.baseZ - (FOCUS_DIST - TUNNEL_CAM_OFFSET) * focus
+
+                lookDummy.position.copy(c.mesh.position)
+                lookDummy.lookAt(camera.position)
+                qTarget.copy(c.restQ).slerp(lookDummy.quaternion, SIDE_TURN + (1 - SIDE_TURN) * focus)
+                const k = 1 - Math.exp(-(BILLBOARD_K + FOCUS_K * focus) * delta)
+                c.mesh.quaternion.slerp(qTarget, k)
             })
             const progress = (st.zStart - camZ) / (st.zStart - st.zEnd)
             setTunnelProgress(closest, Math.max(0, Math.min(1, progress)))
