@@ -27,7 +27,7 @@
 ## 执行注意（常驻，细节在 memory）
 
 - **分支** `feat/v1.2.0-island-courtyard`，**不推 `main`**（推 `main` = 上线）。
-- **质量门** `env -u NODE_OPTIONS npm run lint` → **0 error / 33 warning**；不跑 React Compiler。
+- **质量门** `env -u NODE_OPTIONS npm run lint` → **0 error / 32 warning**；不跑 React Compiler。
 - **构建前** `mv dist .workbuddy-ai/dist-prev-<ts>`；**推不通改 SSH**，判据 `gh api .../commits/<branch> --jq .sha`。
 - **跑截图前** `pkill -f chrome-headless-shell`。
 - 其余见 `.workbuddy-ai/memory/MEMORY.md` · `hard-rules.md`。
