@@ -3,15 +3,19 @@
  *
  * The entrance used to pull four hand-painted webp bitmaps off disk:
  *
- *   avatar_window.webp  — the character who waves at you from the window
+ *   avatar_window.webp  — the character who waves at you from the window（2026-10-20 删除）
  *   tree_colored.webp   — the big watercolour tree the wind chime hangs from
  *   speech_bubble.webp  — the rubber duck's speech bubble
  *   bug_sketch.webp     — the wandering ladybird you can click
  *
- * All four are now drawn on an offscreen <canvas> and wrapped in a
+ * All four were drawn on an offscreen <canvas> and wrapped in a
  * THREE.CanvasTexture, matching the convention already used by
  * utils/doorArt.js (doors), utils/proceduralTextures.js (floors/trim),
  * utils/cursorArt.js (cursors) and shaders/entranceTextures.js (bricks).
+ *
+ * （`avatar_window.webp` 后来一度"回到位图"当 IP 插画，2026-10-20 又按用户
+ *  要求整个删掉了 —— 见下面「Avatar at the window — REMOVED」。现在门前
+ *  一张磁盘位图都没有。）
  *
  * Why bother: the bitmaps were 481 KB of downloads that had to be fetched
  * before the entrance could finish fading in, they were baked at a fixed
@@ -831,22 +835,22 @@ export function makeWallInkTexture(worldW = 16, worldH = 8) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Avatar at the window — now a bitmap, not canvas art                  */
+/* Avatar at the window — REMOVED (2026-10-20)                          */
 /* ------------------------------------------------------------------ */
 /*
- * The character who slides into the window used to be drawn here:
- * drawWavingCharacter + makeAvatarWindowTexture, ~500 lines of flat vector
- * shapes. Replaced on 2026-10-07 by
- * public/textures/entrance/avatar-window.webp, generated as a PAIR with the
- * corridor IP sprite (public/textures/corridor/avatar_zeo.webp) so the two
- * characters finally read as the same person.
+ * 这里原来记着"窗口里那个招手的小人"的来龙去脉：先是 ~500 行 canvas 矢量
+ * （drawWavingCharacter + makeAvatarWindowTexture），2026-10-07 换成
+ * public/textures/entrance/avatar-window.webp（与走廊 IP sprite
+ * `avatar_zeo.webp` 成对生成，好让两个"同一个人"长得一样），也是全站
+ * "零位图"规矩的唯一例外。
  *
- * This is a deliberate exception to the "zero bitmap" rule. That rule exists
- * so the site never NEEDS an image asset — not to forbid character art.
- * A face assembled from circles and beziers is the one thing that always
- * looks like a placeholder next to the rest of the scene.
+ * 🔴 2026-10-20 用户要求「把窗口里的人物相关代码去掉，包括贴图」⇒ 小人、
+ * 贴图（`avatar-window.webp` 已删）、hover 热区、hover 状态一起移除。
+ * `ENTRANCE_TEXTURES` 因此**彻底为空** —— 门前场景不再有任何磁盘位图，
+ * "零位图"从"有例外"变回"无条件成立"。
  *
- * Loaded with useTexture in EntranceDoors, preloaded via ENTRANCE_TEXTURES.
+ * 走廊里那个 ZEO 小人（`corridor/Avatar.jsx` + `corridor/avatar_zeo.webp`）
+ * **不在此列**，它不在窗口里，没有动。
  */
 
 /* ------------------------------------------------------------------ */

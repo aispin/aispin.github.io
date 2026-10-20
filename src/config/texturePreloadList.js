@@ -20,10 +20,9 @@ export const ENTRANCE_TEXTURES = [
     // (the tree, ladybird, speech bubble and the bug-click ink splash are
     //  procedural canvas art now — utils/entranceArt.js — so nothing to fetch)
     //
-    // The window character is the one exception: it is a generated
-    // illustration, paired with the corridor IP sprite so both characters read
-    // as the same person. See utils/entranceArt.js for why.
-    '/textures/entrance/avatar-window.webp',
+    // 🔴 2026-10-20：最后一个入口位图 `avatar-window.webp`（窗口里招手的小人）
+    // 也删了（用户：「把窗口里的人物相关代码去掉，包括贴图」）⇒ 这张表**彻底空了**，
+    // 门前场景一张图都不从磁盘读。
 ];
 
 // Corridor scene textures

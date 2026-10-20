@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useLayoutEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Text, useTexture } from '@react-three/drei';
+import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import gsap from 'gsap';
 import '../shaders/RevealMaterial'; // Registers alpha-discard reveal shader
@@ -410,10 +410,6 @@ const EntranceDoors = ({
     const [isOpen, setIsOpen] = useState(false);
     const [, setIsHovered] = useState(false);
     const [isAnimating, setIsAnimating] = useState(false);
-    const [, setIsWindowHovered] = useState(false);
-    // 两个窗，各一个小人（WO-10：右窗是原有的，左窗是新增的对称窗）。
-    const windowAvatarRef = useRef();
-    const windowAvatarRefL = useRef();
 
     /**
      * 🔴 退场：门是**从这个"开着"的姿势往回关**的（2026-10-11）。
@@ -497,20 +493,9 @@ const EntranceDoors = ({
     // The tree, ladybird, speech bubble and bug-click ink splash are procedural
     // canvas art — see utils/entranceArt.js.
     //
-    // The window character is the ONE bitmap in the entrance. It was procedural
-    // until 2026-10-07; it is now a generated illustration so it matches the
-    // corridor IP sprite (public/textures/corridor/avatar_zeo.webp) — the two
-    // are the same person and used to look nothing alike. Path is in
-    // ENTRANCE_TEXTURES, so App.jsx has already warmed it behind the loader.
-    // colourSpace is set through useTexture's onLoad callback (drei's supported
-    // hook for exactly this) instead of assigning to the returned texture during
-    // render: mutating a hook's return value in the render body is what
-    // react-hooks/immutability flags, and it would also re-tag the shared,
-    // cached texture on every single render.
-    const avatarWindowTexture = useTexture(
-        '/textures/entrance/avatar-window.webp',
-        (texture) => { texture.colorSpace = THREE.SRGBColorSpace; }
-    );
+    // 窗口里的小人 2026-10-20 按用户要求**整个删掉**（连同 avatar-window.webp）：
+    // 「把窗口里的人物相关代码去掉，包括贴图」。所以现在门上没有一张位图，
+    // 两个窗只剩木框 + 窗帘 + 洞里透出来的室内光。
 
     const bugTexture = makeLadybirdTexture();
     const speechBubbleTexture = makeSpeechBubbleTexture();
@@ -933,50 +918,16 @@ const EntranceDoors = ({
      */
 
     // --- Window hover ---------------------------------------------------
-    // 洞口 1.4 宽（`WINDOW_HOLE` 的半宽 0.7），小人平面 1.5 宽。
-    // 小人的墨迹不居中：它是一个**侧身招手**的姿势，手贴在画布左缘 ——
-    // 墨迹从画布 10.6% 处开始（= 平面中心往左 0.16 世界单位），宽 1.28。
-    // 于是「静止位」要满足：墨迹整体落在洞口**之外**（这样它被前墙挡住，
-    // 看不见）；「探头位」要满足：墨迹整体落在洞口**之内**。
+    // 🔴 2026-10-20：**整块删掉了**。原来这里是一套"小人探头"的参数推导
+    // （洞口 1.4 宽、墨迹 1.28、静止位 = 窗心 + 1.40、探头位 = 窗心），
+    // 外加 `slideAvatar` / `handleWindowEnter` / `handleWindowLeave` 三个
+    // 回调和一块不可见的 hover 热区平面 —— 它们**只**为那两个小人存在。
+    // 用户要求「把窗口里的人物相关代码去掉，包括贴图」之后：
+    // 小人、贴图、热区、hover 状态一起删；窗本身（木框 + 窗帘）不动。
     //
-    //   墨迹横向 = [中心 − 0.59, 中心 + 0.69]
-    //   静止位：中心 − 0.59 ≥ 洞口右缘 + 0.11  ⇒ 中心 = 窗心 + 1.40
-    //   探头位：中心 = 窗心（墨迹 [−0.59, +0.69] ⊂ 洞口 [−0.70, +0.70]）
-    //
-    // ⚠️ 探头位**不能**为了"把人摆正"而右移：墨迹 1.28 对洞口 1.40，
-    // 窗心已经是"再往左 0.02 就会切到左手"的位置。
-    //
-    // ⚠️ 2026-10-11：`WINDOW_X` 搬到 `config/entranceMetrics` 了 —— 窗看的那个
-    // 洞是屋身前墙挖的（`WINDOW_HOLE`），"窗"和"洞"分在两个文件里，
-    // 数字必须只有一个来源。
-    //
-    // 🔴 WO-10：现在有**两个**窗，所以上面这套数要按窗心参数化。
-    // 左窗沿用同一套（静止位在它**右边** 1.40 处、也躲在墙后），
-    // 于是两个窗的小人都是从右侧探头 —— 镜像一套反而要翻转贴图，不值得。
-    const AVATAR_REST_DX = 1.40;
-    const avatarRestX = (windowX) => windowX + AVATAR_REST_DX;
-
-    /** 通用：把某个窗的小人推到 `toX`，并给一点倾斜。 */
-    const slideAvatar = (ref, toX, tilt, duration, ease) => {
-        const node = ref.current;
-        if (!node) return;
-        gsap.to(node.position, { x: toX, duration, ease, overwrite: true });
-        gsap.to(node.rotation, { z: tilt, duration, ease, overwrite: true });
-    };
-
-    const handleWindowEnter = (e, ref, windowX) => {
-        e.stopPropagation();
-        setIsWindowHovered(true);
-        setGuitarCursor('pointer');
-        slideAvatar(ref, windowX, 0.1, 0.5, 'back.out(1.7)');
-    };
-
-    const handleWindowLeave = (e, ref, windowX) => {
-        e.stopPropagation();
-        setIsWindowHovered(false);
-        setGuitarCursor('auto');
-        slideAvatar(ref, avatarRestX(windowX), 0, 0.4, 'power2.in');
-    };
+    // ⚠️ 别再"顺手"把 hover 热区加回来：它当年是为了修"穿过窗格就闪一下"
+    //    才加的，但它的唯一作用就是驱动小人 —— 没有小人，它只会让鼠标在
+    //    窗上变成 pointer，指向一个点不动的空窗户。
 
     // Frame center Y - aligned with doors
     const frameCenterY = doorBottomY + frameHeight / 2;
@@ -1280,79 +1231,29 @@ const EntranceDoors = ({
                 是 2026-10-11 新加的对称窗**（用户：「窗户距离门口太近，调为现有
                 距离的 2 倍。然后再另外一边多加一个对称的窗户。」）。
 
-                两个窗共用同一套构件 —— 木框 / 窗帘 / hover 热区 / 探头小人 ——
-                所以用一份循环生成，而不是把四块 JSX 复制两遍。
-                ⚠️ 小人的静止位与探头位都是**按窗心参数化**的（见上面
-                `avatarRestX` 那段推导），所以左窗不需要翻转贴图。
+                两个窗共用同一套构件 —— 木框 / 窗帘 —— 所以用一份循环生成，
+                而不是把两块 JSX 复制两遍。
+
+                ⚠️ 2026-10-20：原来这里还有第三个构件「探头小人」（贴图
+                `avatar-window.webp` + 一块不可见 hover 热区）。用户要求
+                「把窗口里的人物相关代码去掉，包括贴图」⇒ 小人、贴图、热区、
+                hover 状态全删，窗本身（框 + 帘 + 洞里的室内）原样保留。
 
                 ⚠️ 左窗会被柿子树挡掉一部分：树冠横向覆盖 world x ∈ [−5.24, −1.46]，
                 而左窗占 x ∈ [−5.7, −4.3]。树冠是有空隙的叶簇，窗会从缝里透出来，
                 但"对称"在视觉上会被这棵树打折 —— 这是用户明确要的，先做出来看。 */}
             {[
-                { key: 'right', x: WINDOW_X, avatar: windowAvatarRef },
-                { key: 'left', x: WINDOW_X_LEFT, avatar: windowAvatarRefL },
-            ].map(({ key, x, avatar }) => (
+                { key: 'right', x: WINDOW_X },
+                { key: 'left', x: WINDOW_X_LEFT },
+            ].map(({ key, x }) => (
                 <group key={key}>
-                    {/* AVATAR — parked behind the bricks.
-                        `depthWrite={false}` stops its transparent margin from
-                        punching a depth hole through the curtain behind it, and
-                        z = 0.06 puts the figure in front of the curtain panels
-                        (-0.01) while staying behind the brick facade (0.15) so
-                        the wall hides it at rest.
-
-                        ⚠️ y is NOT decorative. The illustration is a half-body
-                        pose that is CROPPED AT ITS OWN BOTTOM EDGE — the ink runs
-                        to y=1023 of a 1024px canvas (see the note in the texture
-                        pipeline). At 0.04 the ink bottom landed exactly on the
-                        window opening's bottom edge, so a good 0.29 world units of
-                        trouser showed and read as a pair of severed legs sitting
-                        on the sill. The user's report was exactly that:
-                        "断腿露出来了". -0.16 pushes that hard cut behind the
-                        frame's bottom rail and leaves only the hip, which reads as
-                        a person standing at the window.
-                        The head still clears the top rail comfortably at this
-                        height — measured, not guessed: see
-                        .workbuddy-ai/round2-2026-10-08/ avatar-y-*.png. */}
-                    <mesh
-                        ref={avatar}
-                        name={`window-avatar-${key}`}
-                        position={[avatarRestX(x), -0.16, 0.06]}
-                        rotation={[0, 0, 0]}
-                    >
-                        <primitive object={sharedGeometry('plane', 1.5, 1.5)} attach="geometry" />
-                        <meshBasicMaterial color="#e0e0e0"
-                            map={avatarWindowTexture}
-                            transparent={true}
-                            depthWrite={false}
-                        />
-                    </mesh>
-
                     {/* WINDOW - rustic wooden frame */}
                     <WoodenWindowFrame position={[x, 0, 0.25]} />
 
-                    {/* Stable hover target for the window.
-                        The enter/leave handlers used to live on
-                        WoodenWindowFrame's group, whose raycast target is only the
-                        four planks plus the thin cross mullions. Crossing one of
-                        the four open panes dropped the hit, fired onPointerLeave
-                        and yanked the avatar straight back out — the "peeks out
-                        for a split second then runs back" flicker. One invisible
-                        plane covering the whole opening keeps the hover state rock
-                        solid. */}
-                    <mesh
-                        name={`window-hover-${key}`}
-                        position={[x, 0.06, 0.45]}
-                        onPointerEnter={(e) => handleWindowEnter(e, avatar, x)}
-                        onPointerLeave={(e) => handleWindowLeave(e, avatar, x)}
-                    >
-                        <primitive object={sharedGeometry('plane', 1.9, 1.9)} attach="geometry" />
-                        <meshBasicMaterial color="#e0e0e0" transparent opacity={0} depthWrite={false} />
-                    </mesh>
-
                     {/* Curtain + interior, seen through the window opening (behind
-                        the brick plane). Pulled back to z = -0.03 so the character
-                        can stand in front of the fabric panels instead of being
-                        swallowed by them. */}
+                        the brick plane). z = -0.03 是当年为了"让小人站在布帘
+                        前面"定的；小人删了之后这个值保持不变 —— 它同时决定了
+                        帘子在洞口里的纵深，动了会改窗帘的透视。 */}
                     <WindowCurtain position={[x, 0, -0.03]} />
                 </group>
             ))}
