@@ -118,6 +118,9 @@ export function useOrbitCamera({ enabled }) {
         // 接手瞬间"相机现在的朝向 ÷ 轨道想要它有的朝向"。单位四元数 = 已经对齐。
         // 见 `ORIENT_FIX_TAU`。
         orientFix: new Quaternion(),
+        // 残差消散的时间常数。默认 0.12s；**进场滑行期间改成整个滑行时长**，
+        // 让那 0.17° 摊到 1.4s 里（见 `approachDoor`）。
+        orientTau: ORIENT_FIX_TAU,
         // 接手后过了多少秒（见 `WARMUP_SECONDS`）。`adopt` 归零。
         warmup: WARMUP_SECONDS,
     });
@@ -227,6 +230,7 @@ export function useOrbitCamera({ enabled }) {
             const st = s.current;
             // 同 onWheel：拖拽一开始就掐掉进场滑行。
             gsap.killTweensOf(st);
+            st.orientTau = ORIENT_FIX_TAU;
             st.dragging = true;
             st.moved = 0;
             st.lastX = e.clientX;
@@ -276,6 +280,7 @@ export function useOrbitCamera({ enabled }) {
             // 用户一动滚轮就**立刻放弃**进场那段自动滑行，交回给人 —— 否则
             // 两边同时改 targetR，滚轮像是"被拽回去"。
             gsap.killTweensOf(st);
+            st.orientTau = ORIENT_FIX_TAU;
             if (!st.active) adopt();
             st.targetR = clamp(
                 st.targetR * (1 + Math.sign(e.deltaY) * I.ORBIT_ZOOM_STEP),
@@ -351,7 +356,7 @@ export function useOrbitCamera({ enabled }) {
         //    `qNow · qWant⁻¹` 的顺序对应。
         if (!st.orientFix.equals(IDENTITY_Q)) {
             camera.quaternion.premultiply(st.orientFix);
-            st.orientFix.slerp(IDENTITY_Q, 1 - Math.exp(-delta / ORIENT_FIX_TAU));
+            st.orientFix.slerp(IDENTITY_Q, 1 - Math.exp(-delta / st.orientTau));
             // 渐近收敛永远到不了单位元，不吸附的话相机永远"还在写矩阵"
             // （同 `utils/settle.js` 的理由）。
             if (st.orientFix.angleTo(IDENTITY_Q) < 1e-4) st.orientFix.identity();
@@ -432,15 +437,26 @@ export function useOrbitCamera({ enabled }) {
             const st = s.current;
             if (!st.active) adopt();
             gsap.killTweensOf(st);
+            st.orientTau = ORIENT_FIX_TAU;
             if (immediate) {
                 st.targetR = I.ORBIT_MIN_R;
                 return;
             }
+            /* 🔴 残差也按**整段滑行**摊开（`orientTau = APPROACH_SECONDS`）。
+             *
+             * 那 0.17° 如果按默认的 0.12s 化掉，它就是**起手第一件事**：
+             * 2.7px 的位移全挤在前 0.12s 里，用户读到的顺序是"先动一下、
+             * 再往前推"。摊到 1.4s 就变成 1.9px/s —— 与推近同速，看不出来。
+             */
+            st.orientTau = APPROACH_SECONDS;
             gsap.to(st, {
                 targetR: I.ORBIT_MIN_R,
                 duration: APPROACH_SECONDS,
                 ease: 'power2.inOut',
                 overwrite: true,
+                onComplete: () => {
+                    st.orientTau = ORIENT_FIX_TAU;
+                },
             });
         },
     }), [adopt]);
