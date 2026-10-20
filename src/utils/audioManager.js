@@ -2,7 +2,19 @@
  * Simple Global Audio Manager for background music
  */
 
-const BGM_URL = '/sounds/cfl_turningpages-belem-breeze-487596.ogg';
+/**
+ * 背景音乐：**站主本人的原创作品**。
+ *
+ *   《Your Hand in Mine》· 99s · 48kHz 立体声 · Vorbis 127kbps · 1.5 MB
+ *   源：`~/Documents/Studio One/Songs/2026-07-21 Your Hand in Mine/Mixdown/Your Hand in Mine.wav`
+ *
+ * 🔴 换曲**必须换文件名**（2026-10-20 换掉 `cfl_turningpages-belem-breeze-487596.ogg`）：
+ *    旧的 ogg 已删，`public/sw.js` 的运行期缓存按 URL 存 —— 同名覆盖会让老访客
+ *    一直听到缓存里的旧曲。
+ * ⚠️ 编码时压了 **-1.5 dB**：源是 -0.2 dBFS 的热母带，Vorbis 解码过冲到 +1.1 dB，
+ *    浏览器混音时会硬削。压完解码峰值 0.929，听感无差别。
+ */
+const BGM_URL = '/sounds/your-hand-in-mine.ogg';
 
 let bgMusicAudio = null;
 let bgVolume = 0.3; // 记住音量：元素还没建出来时也要能存住

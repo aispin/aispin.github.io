@@ -101,6 +101,14 @@
         border: 1px solid rgba(255, 255, 255, 0.1);
         backdrop-filter: blur(20px) saturate(180%);
         -webkit-backdrop-filter: blur(20px) saturate(180%);
+        /* 整层是 pointer-events: none（免得盖住返回按钮），但**这块要能滚**：
+           不打开它，滚轮事件根本落不到面板上，`.career-hud__desc` 的
+           overflow 就永远滚不动。 */
+        pointer-events: auto;
+        /* 面板本身不进视口外：矮屏（<720）时把高度让给描述区去滚。 */
+        max-height: calc(100vh - 140px);
+        display: flex;
+        flex-direction: column;
     }
 
     &__date {
@@ -129,14 +137,70 @@
         line-height: 1.5;
     }
 
+    /* 工作内容：原来 `max-height: 168px` + `overflow: hidden` ⇒ 一段长履历
+       在"参与"这种词上被**硬切**（用户 2026-10-20 提的），既没省略号也没提示。
+       现在可滚，且滚动条是**自己画的**：
+       🔴 Chromium 155 把 `::-webkit-scrollbar` 也按 overlay 处理
+          （`offsetWidth - clientWidth` 恒为 0、静止时不画），
+          所以轨道 `.career-hud__scroll` + 滑块 `.career-hud__thumb` 都是 DOM，
+          位置由 `CareerHud` 的 `syncThumb()` 每帧推。原生那条直接藏掉。 */
+    &__desc-box {
+        position: relative;
+        display: flex;
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+
     &__desc {
         font-size: 13px;
         line-height: 1.75;
         color: #b6c0d2;
         padding-top: 14px;
         border-top: 1px solid rgba(255, 255, 255, 0.08);
-        max-height: 168px;
-        overflow: hidden;
+        margin-top: 0;
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: 34vh;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        /* 给自画的轨道让位（4px 条 + 6px 间隙），否则滑块会压住最后一列字 */
+        padding-right: 14px;
+        scrollbar-width: none;
+
+        &::-webkit-scrollbar {
+            display: none;
+        }
+    }
+
+    &__scroll {
+        position: absolute;
+        right: 0;
+        /* 跳过 1px 上边框 + 14px padding-top，滑块的活动范围才和文字对齐 */
+        top: 15px;
+        bottom: 0;
+        width: 4px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.07);
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+
+    &__thumb {
+        width: 100%;
+        border-radius: 2px;
+        background: rgba(139, 163, 255, 0.62);
+        cursor: grab;
+        /* 拖动时不要选中文字、也不要触发触屏滚动链 */
+        touch-action: none;
+        transition: background 0.15s ease;
+
+        &:hover {
+            background: rgba(139, 163, 255, 0.8);
+        }
+
+        &:active {
+            cursor: grabbing;
+        }
     }
 
     &__hint {

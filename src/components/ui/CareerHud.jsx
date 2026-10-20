@@ -1,4 +1,4 @@
-import { useMemo, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import { useScene } from '../../context/SceneContext'
 import { useSitePreferences } from '../../context/SitePreferences'
 import { getLocalizedCollection } from '../../hooks/useContentData'
@@ -54,9 +54,67 @@ const CareerHud = () => {
         })
     }, [language])
 
-    if (currentRoom !== 'career' || items.length === 0) return null
+    const cur = items.length ? items[Math.min(active, items.length - 1)] : null
 
-    const cur = items[Math.min(active, items.length - 1)]
+    /* ── 自己画的滚动条 ────────────────────────────────────────────────
+       Chromium 155（这台机器）把 `::-webkit-scrollbar` 也按 **overlay** 处理：
+       `offsetWidth - clientWidth` 恒为 0，不滚的时候一个像素都不画 ——
+       用户要的"带滚动条"就落空了。所以轨道和滑块都自己画，位置从
+       `scrollTop / (scrollHeight - clientHeight)` 推。 */
+    const descRef = useRef(null)
+    const thumbRef = useRef(null)
+    const trackRef = useRef(null)
+
+    const syncThumb = useCallback(() => {
+        const el = descRef.current
+        const th = thumbRef.current
+        const tr = trackRef.current
+        if (!el || !th || !tr) return
+        const range = el.scrollHeight - el.clientHeight
+        const overflow = range > 1
+        tr.style.opacity = overflow ? '1' : '0'
+        tr.style.pointerEvents = overflow ? 'auto' : 'none'
+        if (!overflow) return
+        const trackH = tr.clientHeight
+        const h = Math.min(trackH, Math.max(24, Math.round(trackH * (el.clientHeight / el.scrollHeight))))
+        th.style.height = `${h}px`
+        th.style.transform = `translateY(${(trackH - h) * (el.scrollTop / range)}px)`
+    }, [])
+
+    /* 换人 / 换语言 / 改窗口大小都要重量一次（内容高度全变了）。 */
+    useLayoutEffect(() => { syncThumb() }, [syncThumb, cur?.id])
+
+    useEffect(() => {
+        const onResize = () => syncThumb()
+        window.addEventListener('resize', onResize)
+        return () => window.removeEventListener('resize', onResize)
+    }, [syncThumb])
+
+    /** 拖滑块。用 window 上的 pointermove（不要 setPointerCapture：滑块很窄，
+        指针一歪就丢事件）。 */
+    const onThumbDown = useCallback((e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        const el = descRef.current
+        const th = thumbRef.current
+        const tr = trackRef.current
+        if (!el || !th || !tr) return
+        const startY = e.clientY
+        const startTop = el.scrollTop
+        const maxTop = Math.max(1, tr.clientHeight - th.offsetHeight)
+        const range = Math.max(1, el.scrollHeight - el.clientHeight)
+        const move = (ev) => {
+            el.scrollTop = startTop + ((ev.clientY - startY) / maxTop) * range
+        }
+        const up = () => {
+            window.removeEventListener('pointermove', move)
+            window.removeEventListener('pointerup', up)
+        }
+        window.addEventListener('pointermove', move)
+        window.addEventListener('pointerup', up)
+    }, [])
+
+    if (currentRoom !== 'career' || !cur) return null
 
     return (
         <div
@@ -82,7 +140,27 @@ const CareerHud = () => {
                 <div className="career-hud__date">{cur.range}</div>
                 <div className="career-hud__title">{cur.title}</div>
                 <div className="career-hud__sub">{cur.subtitle}</div>
-                <div className="career-hud__desc">{cur.summary}</div>
+                {/* 工作内容可滚（长履历原来被硬切）。`key` 换人时重挂一次，
+                    否则从第 3 张切到第 5 张会**继承上一张的滚动位置**。
+                    滚动条是**自己画的**（见 CareerHud.scss 的说明：Chromium 的
+                    `::-webkit-scrollbar` 在这台机器上退化成 overlay，不滚就不显形）。 */}
+                <div className="career-hud__desc-box">
+                    <div
+                        className="career-hud__desc"
+                        key={cur.id}
+                        ref={descRef}
+                        onScroll={syncThumb}
+                    >
+                        {cur.summary}
+                    </div>
+                    <div className="career-hud__scroll" ref={trackRef} aria-hidden="true">
+                        <div
+                            className="career-hud__thumb"
+                            ref={thumbRef}
+                            onPointerDown={onThumbDown}
+                        />
+                    </div>
+                </div>
             </div>
 
             <div className={`career-hud__hint${armed ? ' is-armed' : ''}`}>

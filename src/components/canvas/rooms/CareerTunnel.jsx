@@ -6,7 +6,7 @@ import { useScene } from '../../../context/SceneContext'
 import { usePerformance } from '../../../context/PerformanceContext'
 import { getLocalizedCollection } from '../../../hooks/useContentData'
 import { ensureFontsReady, texturalCanvas } from '../../../utils/texturalArt'
-import { setTunnelArmed, setTunnelCount, setTunnelProgress, tunnelRequest, tunnelCardZ, tunnelTargetZ, TUNNEL_SPACING, TUNNEL_CAM_OFFSET } from '../../../state/careerTunnel'
+import { setTunnelArmed, setTunnelCount, setTunnelProgress, tunnelRequest, tunnelCardZ, tunnelTargetZ, TUNNEL_SPACING, TUNNEL_CAM_OFFSET, TUNNEL_MOUTH_Z, TUNNEL_ENTRY_Z } from '../../../state/careerTunnel'
 
 /**
  * 履历房间 —— 「时空隧道」。
@@ -314,9 +314,12 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
     const controlsRef = useRef(null)
     useLayoutEffect(() => {
         const n = Math.max(experiences.length, 1)
-        const zStart = 6
+        // 开房间直接停在**第一张卡的停靠位**（原来是隧道口 6，第一张卡在 11
+        // 单位外、画面大半是空星空）。`zStart` 仍是回退边界，所以要分开：
+        // 初始 camZ ≠ zStart 时，"往回滚退出"的手势才不会被一进来就触发。
+        const zStart = TUNNEL_MOUTH_Z
         const zEnd = tunnelTargetZ(n - 1)
-        const st = { camZ: zStart, targetZ: zStart, zStart, zEnd }
+        const st = { camZ: TUNNEL_ENTRY_Z, targetZ: TUNNEL_ENTRY_Z, zStart, zEnd }
         const clamp = (z) => Math.max(zEnd, Math.min(zStart, z))
         controlsRef.current = {
             st,
@@ -349,7 +352,9 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
         scene.fog = new THREE.FogExp2(FOG_COLOR, 0.028)
 
         const camera = new THREE.PerspectiveCamera(58, 16 / 9, 0.1, 300)
-        camera.position.set(0, 0, controlsRef.current.st.zStart)
+        // 与 controls 的初始机位一致 —— 差一帧也会被幕布挡住，但没必要让它先
+        // 在 6 上渲一帧再跳过来。
+        camera.position.set(0, 0, TUNNEL_ENTRY_Z)
 
         // ---- 幕布（一趟正交覆盖屏）----
         const fadeScene = new THREE.Scene()
@@ -680,7 +685,27 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
             return !!c && c.st.camZ > c.st.zStart - 2.5
         }
 
+        /* 滚轮/手指落在 HUD 那块可滚面板上时，**这一下先归面板**。
+           监听器挂在 window 上（要接住整屏的滚动），而面板自己的
+           `overflow-y: auto` 要靠浏览器原生滚动才生效 —— 只要这里不
+           preventDefault、也不 nudge，面板就自己滚。
+           ⚠️ 只在**面板真的还能往这个方向滚**时让路：6/8 条履历的正文
+           一屏放得下，一律吞掉滚轮会让人以为页面卡住。滚到头顶/底部之后
+           这一下交回隧道。 */
+        const panelTakesWheel = (target, deltaY) => {
+            if (!(target instanceof Element)) return false
+            const panel = target.closest('.career-hud__info')
+            if (!panel) return false
+            const el = panel.querySelector('.career-hud__desc')
+            if (!el) return false
+            const range = el.scrollHeight - el.clientHeight
+            if (range <= 1) return false
+            // deltaY < 0 = 往上滚（看更前面的内容）
+            return deltaY < 0 ? el.scrollTop > 0 : el.scrollTop < range - 1
+        }
+
         const onWheel = (e) => {
+            if (panelTakesWheel(e.target, e.deltaY)) return
             e.preventDefault()
             const back = e.deltaY < 0
             const clipped = nudge(-e.deltaY * 0.008)
@@ -694,6 +719,8 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
         let touchY = 0
         const onTouchStart = (e) => { touchY = e.touches[0].clientY }
         const onTouchMove = (e) => {
+            // 手指在面板里：交给面板原生滚动（同 onWheel 的判据）
+            if (panelTakesWheel(e.target, -(e.touches[0].clientY - touchY))) return
             const dy = e.touches[0].clientY - touchY
             touchY = e.touches[0].clientY
             const clipped = nudge(-dy * 0.03)
