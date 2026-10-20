@@ -257,6 +257,10 @@ function AppContent() {
               <Suspense fallback={null}>
                 <Experience
                   isLoaded={isLoaded}
+                  // 进场自动"滚一格"（把用户送到门前）只在**真跑过 Preloader**
+                  // 的路径上开。`?noloader=1` 下 `isLoaded` 初值就是 true，
+                  // 若让它也推一下，所有以 REST_POSE 为基准的截图/判据都会漂。
+                  enterFlourish={!NO_LOADER && isLoaded}
                   onSceneReady={handleSceneReady}
                   performanceTier={tier}
                 />

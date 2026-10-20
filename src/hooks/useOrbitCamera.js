@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useCallback } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import gsap from 'gsap';
 import { settleLerp, SETTLE_ANGLE } from '../utils/settle';
@@ -250,7 +250,18 @@ export function useOrbitCamera({ enabled }) {
      * @param {number} r
      * @param {boolean} [snap=true]
      */
-    return {
+    /**
+     * 🔴 返回值必须**引用稳定**（`useMemo`）。
+     *
+     * 调用方拿它当 effect 依赖（`Experience` 的"进场自动滚一格"就是），
+     * 而裸的对象字面量每次渲染都是新引用 ⇒ 那个 effect 每渲染一次就重跑，
+     * `clearTimeout` 会把还没到点的定时器一起清掉：**这一下永远推不出去**，
+     * 而且控制台里一个错都没有（实测踩过）。
+     *
+     * 内部全是闭包在操作 ref（`s` / `maxRRef`），所以只需要跟着 `adopt`
+     * （它只依赖 camera）重建。
+     */
+    return useMemo(() => ({
         setPose: (yaw, elev, r, snap = true) => {
             const st = s.current;
             const e = clamp(elev, I.ORBIT_MIN_ELEV, I.ORBIT_MAX_ELEV);
@@ -266,9 +277,29 @@ export function useOrbitCamera({ enabled }) {
             st.active = true;
         },
         isActive: () => s.current.active,
+        /**
+         * 模拟 `notches` 格滚轮（正数 = 靠近，与"往上滚"同向）。
+         *
+         * 进场时自动滚一格用的就是它 —— 走的是**和真滚轮完全相同**的那条
+         * 路径（`adopt()` 从当前机位反算 + 改 `targetR` + 由 settleLerp 平滑），
+         * 所以"自动"和"手滚一格"落点分毫不差，不会出现两套机位。
+         *
+         * ⚠️ 必须先 `adopt()`：没接管过的时候 `st.r` 还是 0，直接改 targetR
+         *    会让相机从原点弹出去。`adopt()` 读的是相机当前真实位置，所以
+         *    这里从"还没动过"的状态调用也是安全的（接手那一帧不跳）。
+         */
+        nudgeZoom: (notches = 1) => {
+            const st = s.current;
+            if (!st.active) adopt();
+            st.targetR = clamp(
+                st.targetR * Math.pow(1 - I.ORBIT_ZOOM_STEP, notches),
+                I.ORBIT_MIN_R,
+                maxRRef.current
+            );
+        },
         /** 轴心（世界坐标）。给 harness 反算"这个机位该在哪"，好自检有没有吸附上。 */
         center: I.ORBIT_CENTER,
-    };
+    }), [adopt]);
 }
 
 export default useOrbitCamera;

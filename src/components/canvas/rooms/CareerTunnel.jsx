@@ -506,14 +506,23 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
         const FOCUS_RANGE = TUNNEL_SPACING * 0.62
         /* 焦点卡的额外收敛速率（叠在 BILLBOARD_K 上）。 */
         const FOCUS_K = 2.4
-        /* 焦点卡**停在相机前方多远**（世界单位）。卡是 3.4×4.8、fov 58°，所以
-           6.2 ⇒ 卡高占屏 ~70%。停靠位只有 4 ⇒ 会占 108%，上下被裁掉。 */
-        const FOCUS_DIST = 6.2
-        /* 焦点卡的水平落位。相机在隧道轴上、卡在半径 3.2 的螺旋上 ⇒ 让卡
-           "原地转正"必然被推到画面右侧并裁掉（水平半视角 44.6°，卡中心就
-           在 28° 上）。所以转正的同时要把它**拉回轴心**，落点略偏左：右侧
-           22% 是信息面板、左侧 10% 是时间刻度，画面可用区的中线在 44%。 */
-        const FOCUS_X = -0.55
+        /* 焦点卡**停在相机前方多远**（世界单位）。卡是 3.4×4.8、fov 58°（竖直）、
+           再叠 18.4° 偏航 ⇒ 5.22 时左缘占屏 75.0%、右缘 92.0%（近边更高），
+           上下各留 4%，与参考图（75.2% / 92.4%）一致。
+           6.2 只有 70%，卡像"缩在画面中间"；4.95 会顶到画框（右缘 98.1%）；
+           退回停靠位本身（4）会占到 108%、上下被裁掉。 */
+        const FOCUS_DIST = 5.22
+        /* 焦点卡的水平落位。相机在隧道轴上、卡在半径 3.2 的螺旋上 ⇒ 原地
+           偏航必然被推到画面右侧并裁掉（水平半视角 44.6°，卡中心就在 28° 上）。
+           所以同时要把它**拉回**；落点偏左：右侧 22% 是信息面板、
+           左侧 10% 是时间刻度 ⇒ 卡心落在画面 30% 处。 */
+        const FOCUS_X = -2.15
+        /* 🔴 停稳时**不转正**，留 18.4° 的侧转。这是用户 2026-10-20 给的定版
+           参考图反解出来的（卡左缘高占屏 75.2%、右缘 92.4%，上下边各斜 8.5°
+           且方向相反 ⇒ 纯偏航、右缘近、近远比 1.23）。
+           完全正对就是一块平板，一点纵深都没有；留这一下才有"斜着立在那儿"
+           的立体感。18.4° 也刚好让卡面上的字还读得出来 —— 再歪就糊了。 */
+        const FOCUS_TILT = 0.3212   // rad ≈ 18.4°
         /* 🔴 「谁在焦点」只有一个量：相机离**这张卡的停靠位**有多远。
            `tunnelTargetZ(i)` 是 HUD 点刻度时相机要去的 z，也是相机停稳时的 z
            ⇒ 停稳时 d 恒为 0、权重恒为 1、卡面偏角恒为 0°。
@@ -538,6 +547,8 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
         /* 每帧复用的两个临时对象（逐帧 new 会制造 GC 抖动）。 */
         const lookDummy = new THREE.Object3D()
         const qTarget = new THREE.Quaternion()
+        const qFace = new THREE.Quaternion()
+        const AXIS_Y = new THREE.Vector3(0, 1, 0)
         frameRef.current = (camZ, delta) => {
             camera.position.set(0, 0, camZ)
             camera.lookAt(0, 0, camZ - 10)
@@ -572,19 +583,21 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
                 if (d < best) { best = d; closest = i }
                 const bob = c.baseY + Math.sin(t + c.phase) * 0.08
 
-                /* ── 朝向：滚到哪张，哪张转正 ─────────────────────────────
-                   ① **落位**：焦点卡从螺旋上被"抽"到相机正前方 —— 轴心偏左
-                      (FOCUS_X)、y 归零、z 后退到 FOCUS_DIST。不抽的话，卡在
+                /* ── 朝向：滚到哪张，哪张转过来 ───────────────────────────
+                   ① **落位**：焦点卡从螺旋上被"抽"到相机前方 —— 落点偏左
+                      (FOCUS_X)、y 归零、z 停在 FOCUS_DIST。不抽的话，卡在
                       半径 3.2 的螺旋上原地转正，必然糊在画面右侧被裁掉。
                    ② **朝向**：一次性 `lookAt(相机)` 拿到精确的四元数（含俯仰；
                       卡在螺旋上有 ±1.76 的高度差，只转偏航会让焦点卡变成一块
                       斜躺在地上的巨大平面 —— 第一次改就是这样），再从这个
                       build 姿态 slerp 过去。
+                   ③ **回撇**：转正之后绕自身 Y 轴退掉 FOCUS_TILT，留一点侧转。
+                      少了这一步卡就是一块贴脸的平板（用户原话「完全正对太板」）。
 
                    插值参数 `SIDE_TURN + (1-SIDE_TURN)·focus`：
                      focus=0 → 0.30，与 demo 逐帧拉 30% 同效（非焦点卡保持侧脸，
                                螺旋纵深不塌）；
-                     focus=1 → 1.00，正对镜头、居中、完整可见。
+                     focus=1 → 1.00，先完全对准镜头，再被 ③ 回撇 18.4°。
 
                    ⚠️ 用四元数而不是分别改 rotation.x/rotation.y：欧拉 XYZ 是
                    `Rx·Ry`，凑不出精确的 lookAt（实测残差 2°），而且 build 时
@@ -601,6 +614,16 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
                 lookDummy.position.copy(c.mesh.position)
                 lookDummy.lookAt(camera.position)
                 qTarget.copy(c.restQ).slerp(lookDummy.quaternion, SIDE_TURN + (1 - SIDE_TURN) * focus)
+                /* 焦点卡的最终朝向 = **相对视轴**偏航 FOCUS_TILT（右缘近）。
+                   🔴 不能用"先 lookAt(相机) 再回撇"：卡被抽到轴外 x=-2.15 之后，
+                   从卡的位置看相机已经有 22.4° 的偏航，lookAt 会先把这 22.4°
+                   补掉，再退 18.4° ⇒ 相对**视轴**只剩 4°，渲出来还是块平板
+                   （实测四元数 y 分量 0.0347 = 4.0°，边高比 1.036）。
+                   相机永远朝 -Z 看（`lookAt(0,0,camZ-10)`，无旋转）⇒ 世界 Y 轴
+                   上的固定偏航就等价于"相对视轴偏航"，与卡在画面里的横向位置
+                   无关。focus→1 时完全交给它，focus→0 时完全交回螺旋姿态。 */
+                qFace.setFromAxisAngle(AXIS_Y, -FOCUS_TILT)
+                qTarget.slerp(qFace, focus)
                 const k = 1 - Math.exp(-(BILLBOARD_K + FOCUS_K * focus) * delta)
                 c.mesh.quaternion.slerp(qTarget, k)
             })

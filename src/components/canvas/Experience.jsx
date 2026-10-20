@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -15,6 +15,7 @@ import useInfiniteCamera from '../../hooks/useInfiniteCamera';
 import useOrbitCamera from '../../hooks/useOrbitCamera';
 import SignSystem from './entrance/SignSystem';
 import { useScene } from '../../context/SceneContext';
+import { reducedMotion } from '../../hooks/useReducedMotion';
 
 // —— 孤岛（v1.2）——
 // 地面 / 竹林取代了原来的 `EmptyCorridor`（它名字叫 corridor，
@@ -48,6 +49,15 @@ const ENTRANCE_DOORS_Z = 22;
 // 的甬路 uniform 就吃过这个亏 —— 对象被反复重建，换季时画面冻在首季）。
 const ENTRANCE_POSITION = [0, 0, ENTRANCE_DOORS_Z];
 
+/* 进场自动"滚一格"的延迟（ms）。
+ *
+ * 用户 2026-10-20：「页面进来后，自动给我往上滚一次，将用户拉到门前。
+ * 目前需要人工去滚动一次鼠标。」—— 也就是把"第一次滚轮"这一步替用户做了。
+ *
+ * 420ms：纸幕淡出约 0.35s，等它彻底撤掉再推。太早会被纸幕盖住（等于没发生），
+ * 太晚就成了"人已经站定了，画面突然自己动"。 */
+const ENTER_ZOOM_DELAY = 420;
+
 /**
  * Experience Component
  * 
@@ -56,7 +66,7 @@ const ENTRANCE_POSITION = [0, 0, ENTRANCE_DOORS_Z];
  * 2. Click doors -> they open + camera flies through
  * 3. Behind doors: infinite corridor with ZEO
  */
-const Experience = ({ onSceneReady, performanceTier }) => {
+const Experience = ({ onSceneReady, performanceTier, enterFlourish = false }) => {
     // Use SceneContext for room state
     const { hasEntered, markEntered, enterRoom, isTeleporting, isInRoom, houseExitRequested, requestHouseExit } = useScene();
 
@@ -195,6 +205,31 @@ const Experience = ({ onSceneReady, performanceTier }) => {
     // ⚠️ 它内部还会再让一次 GSAP（入场 timeline 正在跑时一帧都不写相机），
     //    所以这里不用额外判断"入场是否结束"。
     const orbit = useOrbitCamera({ enabled: cameraMode === CAMERA_MODE.COURTYARD });
+
+    /* ── 进场自动"滚一格"，把用户直接送到门前 ────────────────────────────
+       走的是 `orbit.nudgeZoom(1)` —— 和真滚轮**同一条路径**（adopt + targetR +
+       settleLerp），所以落点和"手动滚一下"完全一致，不存在两套机位。
+
+       四条约束，缺一条就会出怪事：
+       ① `enterFlourish` 只由 App 在**真跑过 Preloader**时置真。`?noloader=1`
+          下 `isLoaded` 初值就是 true，若直接看它，首帧就推 —— 所有靠
+          REST_POSE 的截图/判据会集体漂移。
+       ② 只在 COURTYARD 推。已经进门/传送/退场时相机有别的所有者，推一下
+          会和 GSAP 抢方向盘。
+       ③ 只推一次（ref 闸门）。进出房间会反复回到 COURTYARD，不加闸门就
+          变成"每次回到院子都被拽一下"。
+       ④ 尊重 `prefers-reduced-motion`：这一下是**用户没有发起的运动**，
+          正是那条规则要停掉的东西（见 hooks/useReducedMotion.js 的判据）。
+          停掉只是回到"要自己滚一下"的旧行为，功能不丢。 */
+    const enterZoomed = useRef(false);
+    useEffect(() => {
+        if (!enterFlourish || enterZoomed.current) return;
+        if (cameraMode !== CAMERA_MODE.COURTYARD) return;
+        if (reducedMotion()) return;
+        enterZoomed.current = true;
+        const t = setTimeout(() => orbit.nudgeZoom(1), ENTER_ZOOM_DELAY);
+        return () => clearTimeout(t);
+    }, [enterFlourish, cameraMode, orbit]);
 
     // 把环绕姿态接口交给截图脚本。没有它，每个机位都要整页 reload
     // （4 季 × 5 机位 × 2 视口 = 40 次冷启动，一次冷启动 ~22s）。
