@@ -49,12 +49,12 @@ const ENTRANCE_DOORS_Z = 22;
 // 的甬路 uniform 就吃过这个亏 —— 对象被反复重建，换季时画面冻在首季）。
 const ENTRANCE_POSITION = [0, 0, ENTRANCE_DOORS_Z];
 
-/* 进场自动"滚一格"的延迟（ms）。
+/* 进场自动"滑到门前"的起跑延迟（ms）。
  *
  * 用户 2026-10-20：「页面进来后，自动给我往上滚一次，将用户拉到门前。
  * 目前需要人工去滚动一次鼠标。」—— 也就是把"第一次滚轮"这一步替用户做了。
  *
- * 420ms：纸幕淡出约 0.35s，等它彻底撤掉再推。太早会被纸幕盖住（等于没发生），
+ * 420ms：纸幕淡出约 0.35s，等它彻底撤掉再动。太早会被纸幕盖住（等于没发生），
  * 太晚就成了"人已经站定了，画面突然自己动"。 */
 const ENTER_ZOOM_DELAY = 420;
 
@@ -206,28 +206,33 @@ const Experience = ({ onSceneReady, performanceTier, enterFlourish = false }) =>
     //    所以这里不用额外判断"入场是否结束"。
     const orbit = useOrbitCamera({ enabled: cameraMode === CAMERA_MODE.COURTYARD });
 
-    /* ── 进场自动"滚一格"，把用户直接送到门前 ────────────────────────────
-       走的是 `orbit.nudgeZoom(1)` —— 和真滚轮**同一条路径**（adopt + targetR +
-       settleLerp），所以落点和"手动滚一下"完全一致，不存在两套机位。
+    /* ── 进场自动"滑到门前"，把用户直接送到门口 ──────────────────────────
+       走的是 `orbit.approachDoor()` —— 终点就是**手动一直往前滚最后停住的那个
+       机位**（轨道最近点 `ORBIT_MIN_R`，实测 z=28.147，与用户截图的取景一致），
+       中途用一条 ease-in-out 的 tween 改 `targetR`，所以是"缓冲"过去的。
 
        四条约束，缺一条就会出怪事：
        ① `enterFlourish` 只由 App 在**真跑过 Preloader**时置真。`?noloader=1`
-          下 `isLoaded` 初值就是 true，若直接看它，首帧就推 —— 所有靠
+          下 `isLoaded` 初值就是 true，若直接看它，首帧就滑 —— 所有靠
           REST_POSE 的截图/判据会集体漂移。
-       ② 只在 COURTYARD 推。已经进门/传送/退场时相机有别的所有者，推一下
+       ② 只在 COURTYARD 滑。已经进门/传送/退场时相机有别的所有者，滑一下
           会和 GSAP 抢方向盘。
-       ③ 只推一次（ref 闸门）。进出房间会反复回到 COURTYARD，不加闸门就
-          变成"每次回到院子都被拽一下"。
-       ④ 尊重 `prefers-reduced-motion`：这一下是**用户没有发起的运动**，
-          正是那条规则要停掉的东西（见 hooks/useReducedMotion.js 的判据）。
-          停掉只是回到"要自己滚一下"的旧行为，功能不丢。 */
+       ③ 只滑一次（ref 闸门）。进出房间会反复回到 COURTYARD，不加闸门就
+          变成"每次回到院子都被拽一下"。另外起跑前再看一眼 `isActive()` ——
+          用户在这 420ms 里已经自己滚过/拖过，就别再抢方向盘。
+       ④ `prefers-reduced-motion`：**不做动画，但照样到位**（`immediate`）。
+          这条是站主明确要的功能，停掉滑行已经足够，不该让功能整个消失 ——
+          之前那版直接 `return`，开着"减少动态效果"的机器上就等于没做。 */
     const enterZoomed = useRef(false);
     useEffect(() => {
         if (!enterFlourish || enterZoomed.current) return;
         if (cameraMode !== CAMERA_MODE.COURTYARD) return;
-        if (reducedMotion()) return;
         enterZoomed.current = true;
-        const t = setTimeout(() => orbit.nudgeZoom(1), ENTER_ZOOM_DELAY);
+        const immediate = reducedMotion();
+        const t = setTimeout(() => {
+            if (orbit.isActive()) return;
+            orbit.approachDoor({ immediate });
+        }, ENTER_ZOOM_DELAY);
         return () => clearTimeout(t);
     }, [enterFlourish, cameraMode, orbit]);
 

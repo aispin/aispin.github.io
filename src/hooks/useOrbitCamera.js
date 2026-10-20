@@ -47,6 +47,16 @@ import * as I from '../config/island';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
+/**
+ * 进场"滑到门前"用多久（秒）。
+ *
+ * 用户 2026-10-20 的原话是「缓冲前进到门前」—— 手动那一下之所以像"缓冲"，
+ * 是因为滚轮连续给 targetR 递减、相机一路追着走。这里用一条 ease-in-out
+ * 的 tween 复现同一段位移（34.85 → 18，约 17 个世界单位），1.4s 走完：
+ * 短了像"啪"地一下被吸过去，长了（>2s）会让人以为页面卡了。
+ */
+const APPROACH_SECONDS = 1.4;
+
 function urlNumber(key) {
     if (typeof window === 'undefined') return null;
     const v = new URLSearchParams(window.location.search).get(key);
@@ -121,6 +131,8 @@ export function useOrbitCamera({ enabled }) {
         const onDown = (e) => {
             if (!enabledRef.current) return;
             const st = s.current;
+            // 同 onWheel：拖拽一开始就掐掉进场滑行。
+            gsap.killTweensOf(st);
             st.dragging = true;
             st.moved = 0;
             st.lastX = e.clientX;
@@ -167,6 +179,9 @@ export function useOrbitCamera({ enabled }) {
             if (!enabledRef.current) return;
             e.preventDefault();
             const st = s.current;
+            // 用户一动滚轮就**立刻放弃**进场那段自动滑行，交回给人 —— 否则
+            // 两边同时改 targetR，滚轮像是"被拽回去"。
+            gsap.killTweensOf(st);
             if (!st.active) adopt();
             st.targetR = clamp(
                 st.targetR * (1 + Math.sign(e.deltaY) * I.ORBIT_ZOOM_STEP),
@@ -277,28 +292,37 @@ export function useOrbitCamera({ enabled }) {
             st.active = true;
         },
         isActive: () => s.current.active,
-        /**
-         * 模拟 `notches` 格滚轮（正数 = 靠近，与"往上滚"同向）。
-         *
-         * 进场时自动滚一格用的就是它 —— 走的是**和真滚轮完全相同**的那条
-         * 路径（`adopt()` 从当前机位反算 + 改 `targetR` + 由 settleLerp 平滑），
-         * 所以"自动"和"手滚一格"落点分毫不差，不会出现两套机位。
-         *
-         * ⚠️ 必须先 `adopt()`：没接管过的时候 `st.r` 还是 0，直接改 targetR
-         *    会让相机从原点弹出去。`adopt()` 读的是相机当前真实位置，所以
-         *    这里从"还没动过"的状态调用也是安全的（接手那一帧不跳）。
-         */
-        nudgeZoom: (notches = 1) => {
-            const st = s.current;
-            if (!st.active) adopt();
-            st.targetR = clamp(
-                st.targetR * Math.pow(1 - I.ORBIT_ZOOM_STEP, notches),
-                I.ORBIT_MIN_R,
-                maxRRef.current
-            );
-        },
         /** 轴心（世界坐标）。给 harness 反算"这个机位该在哪"，好自检有没有吸附上。 */
         center: I.ORBIT_CENTER,
+        /**
+         * 从当前机位**缓冲滑到门前**（= 轨道最近点 `ORBIT_MIN_R`）。
+         *
+         * 用户 2026-10-20：「我希望页面加载完，不用鼠标滚动，就自动缓冲前进到门前」
+         * —— 也就是把他手动滚一下之后停住的那个机位，替他走到。
+         *
+         * 目标半径就是 `ORBIT_MIN_R`：它本来就是"能靠多近"的设计下限（防穿墙），
+         * 手动一直往前滚最终也是停在这里（实测 `z = 28.147`，与用户截图的取景
+         * 逐处吻合：门高约占屏 33.7%）。
+         *
+         * ⚠️ 用 tween 改 `targetR`（不是直接赋值）才有"缓冲"的手感：直接赋值
+         *    只剩 `settleLerp` 的指数收敛，起步就是最大速度，读起来是"被吸过去"。
+         *    `immediate` 给 `prefers-reduced-motion` 用 —— 不做动画，直接到位。
+         */
+        approachDoor: ({ immediate = false } = {}) => {
+            const st = s.current;
+            if (!st.active) adopt();
+            gsap.killTweensOf(st);
+            if (immediate) {
+                st.targetR = I.ORBIT_MIN_R;
+                return;
+            }
+            gsap.to(st, {
+                targetR: I.ORBIT_MIN_R,
+                duration: APPROACH_SECONDS,
+                ease: 'power2.inOut',
+                overwrite: true,
+            });
+        },
     }), [adopt]);
 }
 
