@@ -314,9 +314,10 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
     const controlsRef = useRef(null)
     useLayoutEffect(() => {
         const n = Math.max(experiences.length, 1)
-        // 开房间直接停在**第一张卡的停靠位**（原来是隧道口 6，第一张卡在 11
-        // 单位外、画面大半是空星空）。`zStart` 仍是回退边界，所以要分开：
-        // 初始 camZ ≠ zStart 时，"往回滚退出"的手势才不会被一进来就触发。
+        // 开房间直接停在**隧道口**（= demo 的 `zStart` 6）：第一张卡留在螺旋原位
+        // `(3.2, 0, −5)`，11 单位外、偏右、带侧倾 —— 与 demo 首帧一致。
+        // 用户 2026-10-21：「第一张卡片的默认位置，保持和 demo 一致」。
+        // ⚠️ 停在口子上 ⇒ `camZ === zStart`，"往回滚退出"的 `pull` 会立刻开始累计。
         const zStart = TUNNEL_MOUTH_Z
         const zEnd = tunnelTargetZ(n - 1)
         const st = { camZ: TUNNEL_ENTRY_Z, targetZ: TUNNEL_ENTRY_Z, zStart, zEnd }
@@ -435,6 +436,9 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
                    "偏航 → 俯仰"两轴分别插值凑不出精确的 lookAt（残差 ~2°，
                    还会把侧倾留到最后）。四元数 slerp 一步到位。 */
                 restQ: mesh.quaternion.clone(),
+                /* build 姿态的偏航（YXZ 分解）。非焦点卡要按 demo 的规则**绝对**
+                   偏航到 `SIDE_TURN × 朝向相机的偏航`，得先知道它现在是多少。 */
+                restYaw: new THREE.Euler().setFromQuaternion(mesh.quaternion, 'YXZ').y,
             })
         })
 
@@ -498,7 +502,13 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
         //    demo 写死 0.98/0.02 是逐帧的（掉帧就变慢），这里按帧时间归一：
         //    -ln(0.98) × 60 ≈ 1.212 是 60fps 下等价的连续速率。
         const BILLBOARD_K = 1.212
-        /* 侧角：demo 那个 30%。非焦点的卡保持它，隧道才有螺旋纵深。 */
+        /* 侧角：demo 那个 30%。**乘的是"朝向相机的绝对偏航"**，不是"从螺旋姿态
+           转过去 30%"。差别很大 —— demo 每帧写的是
+           `mesh.rotation.y = 0.98·y + 0.02·(0.3·ry)`，不动点就是 `0.3·ry`
+           （ry = `atan2(camX − cardX, camZ − cardZ)`，即"正对相机"的偏航）。
+           也就是说 demo 里所有卡最终都**接近正对镜头**，螺旋的纵深只由位置给。
+           旧实现按"从 restQ 转 30%"算，第一张卡停在 52° 的侧脸上（占屏 10.3%），
+           而 demo 是 11°（占屏 17.6%）。用户 2026-10-21 要求对齐 demo。 */
         const SIDE_TURN = 0.3
         /* 焦点半径（世界单位）＝ 0.62 个卡片间距。中点（d=4.25）处权重只剩
            0.10 ⇒ 两张卡都还在 30% 的侧脸上；靠近的最后 1/4 步里才快速爬到
@@ -535,9 +545,11 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
            （纯星空）几乎无缝 —— 拉满再降会闪一下。 */
         const EXIT_VEIL = 0.92
         let exitT = 0
-        /* 每帧复用的两个临时对象（逐帧 new 会制造 GC 抖动）。 */
+        /* 每帧复用的临时对象（逐帧 new 会制造 GC 抖动）。 */
         const lookDummy = new THREE.Object3D()
         const qTarget = new THREE.Quaternion()
+        const qSide = new THREE.Quaternion()
+        const AXIS_Y = new THREE.Vector3(0, 1, 0)
         frameRef.current = (camZ, delta) => {
             camera.position.set(0, 0, camZ)
             camera.lookAt(0, 0, camZ - 10)
@@ -576,15 +588,13 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
                    ① **落位**：焦点卡从螺旋上被"抽"到相机正前方 —— 轴心偏左
                       (FOCUS_X)、y 归零、z 后退到 FOCUS_DIST。不抽的话，卡在
                       半径 3.2 的螺旋上原地转正，必然糊在画面右侧被裁掉。
-                   ② **朝向**：一次性 `lookAt(相机)` 拿到精确的四元数（含俯仰；
-                      卡在螺旋上有 ±1.76 的高度差，只转偏航会让焦点卡变成一块
-                      斜躺在地上的巨大平面 —— 第一次改就是这样），再从这个
-                      build 姿态 slerp 过去。
-
-                   插值参数 `SIDE_TURN + (1-SIDE_TURN)·focus`：
-                     focus=0 → 0.30，与 demo 逐帧拉 30% 同效（非焦点卡保持侧脸，
-                               螺旋纵深不塌）；
-                     focus=1 → 1.00，正对镜头、居中、完整可见。
+                   ② **侧角**：非焦点卡按 demo 的稳态偏航 —— `SIDE_TURN × ry`
+                      （ry = 朝向相机的绝对偏航），即**绕世界 Y 轴**从 build 姿态
+                      转到那个绝对角。demo 里所有卡都停在这个姿态上，所以螺旋的
+                      纵深完全由位置给，卡片本身几乎是正脸。
+                   ③ **焦点**：焦点卡再从这个侧角 slerp 到 `lookAt(相机)` 的精确
+                      四元数（含俯仰；卡在螺旋上有 ±1.76 的高度差，只转偏航会让
+                      焦点卡变成一块斜躺在地上的巨大平面）。
 
                    ⚠️ 用四元数而不是分别改 rotation.x/rotation.y：欧拉 XYZ 是
                    `Rx·Ry`，凑不出精确的 lookAt（实测残差 2°），而且 build 时
@@ -598,9 +608,16 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
                 c.mesh.position.y = bob + (0 - bob) * focus
                 c.mesh.position.z = c.baseZ - (FOCUS_DIST - TUNNEL_CAM_OFFSET) * focus
 
-                lookDummy.position.copy(c.mesh.position)
-                lookDummy.lookAt(camera.position)
-                qTarget.copy(c.restQ).slerp(lookDummy.quaternion, SIDE_TURN + (1 - SIDE_TURN) * focus)
+                // demo 的稳态：绝对偏航 = 0.3 × "正对相机"的偏航。
+                const ry = Math.atan2(camera.position.x - c.mesh.position.x, camera.position.z - c.mesh.position.z)
+                qSide.setFromAxisAngle(AXIS_Y, SIDE_TURN * ry - c.restYaw)
+                qTarget.copy(qSide).multiply(c.restQ)
+
+                if (focus > 0) {
+                    lookDummy.position.copy(c.mesh.position)
+                    lookDummy.lookAt(camera.position)
+                    qTarget.slerp(lookDummy.quaternion, focus)
+                }
                 const k = 1 - Math.exp(-(BILLBOARD_K + FOCUS_K * focus) * delta)
                 c.mesh.quaternion.slerp(qTarget, k)
             })

@@ -91,15 +91,23 @@ export const tunnelTargetZ = (i) => tunnelCardZ(i) + TUNNEL_CAM_OFFSET
 
    · `TUNNEL_MOUTH_Z` 是**回退边界**（相机能退到的最外沿）。它必须留在第一张
      卡之外，否则"往回滚到口子再滚出去"那个手势没有落脚点。
-   · `TUNNEL_ENTRY_Z` 是**开房间时的默认机位**。用户 2026-10-20：
-     「打开页面时，默认镜头位置往大门靠（用当前第一次鼠标滚动时的位置）」。
-     停在 6 的时候第一张卡在 11 单位外、只占屏幕 1/3，画面大半是空星空；
-     停在第一张卡的**停靠位**上，卡正好转正、居中、占屏 70% —— 就是原来
-     "滚一下之后"看到的那个构图。 */
+   · `TUNNEL_ENTRY_Z` 是**开房间时的默认机位**。
 
-/** 相机能退到的最外沿（隧道口）。 */
+   🔴 用户 2026-10-21：「履历页第一张卡片的默认位置，保持和 demo 一致」
+   （`public/demos/web3d/career/index.html`）。demo 的 `zStart` 就是 6，卡在
+   螺旋原位 `(3.2, 0, −5)` 不动 —— 所以默认机位回到隧道口，两者同一个数。
+
+   反过来说：默认机位一旦推到 `tunnelTargetZ(0)`（−1），第一张卡就只剩 4 单位
+   远、被焦点权重拉到 `x = −0.55` 并转正居中（占屏 70%），与 demo 完全不是
+   一个构图。距离 11 时 `focus = 1 − 11/FOCUS_RANGE` 已经是负的 ⇒ 权重 0 ⇒
+   卡保持 build 时的螺旋姿态（含 `rotateZ` 那 8.6° 侧倾），和 demo 逐帧同构。
+
+   ⚠️ 代价（与 demo 一致，也是改回 −1 之前的老行为）：一进房间就站在口子上，
+   所以"往回滚"立刻开始累计 `pull` ⇒ 用力甩一记会直接出门。 */
+
+/** 相机能退到的最外沿（隧道口）。demo 的 `zStart` 也是 6。 */
 export const TUNNEL_MOUTH_Z = 6
 
-/** 开房间时的默认机位：第一张卡的停靠位。 */
-export const TUNNEL_ENTRY_Z = tunnelTargetZ(0)
+/** 开房间时的默认机位 = 隧道口（与 demo 的默认视角一致）。 */
+export const TUNNEL_ENTRY_Z = TUNNEL_MOUTH_Z
 
