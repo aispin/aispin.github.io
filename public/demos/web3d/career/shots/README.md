@@ -11,7 +11,7 @@
 104.linglong-02.*     京东千人千面内容营销          （京东）      ✅
 106.gitalk.*          Gitalk                        （京东）      ✅
 107.vue-easy-gantt.*  Vue-easy-gantt                （京东）      ✅
-108.aotu.io.*         凹凸实验室                    （京东）
+108.aotu.io.*         凹凸实验室                    （京东）      ✅
 109.tencent-games.*   腾讯游戏营销活动              （腾讯）
 105.tencent-qqvip.*   QQ会员                        （腾讯）
 110.baidu-zhidao.*    百度知道                      （百度）
