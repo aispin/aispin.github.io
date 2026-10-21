@@ -656,6 +656,16 @@ function projectSub(p){
   return [p.role, span].filter(Boolean).join(' · ');
 }
 
+/** 链接文案按 URL 类型走：仓库 / 文档 / 在线 Demo。
+    原来一律写「查看完整文档」，可 gantt / gitalk / 凹凸 其实是 demo 和仓库 ——
+    点开发现不是文档，比没有链接更难受。 */
+function linkLabel(url){
+  const u = String(url || '').toLowerCase();
+  if(/github\.com|gitee\.com|gitlab\.com|bitbucket\.org|codepen\.io|codesandbox\.io/.test(u)) return '查看 GitHub ↗';
+  if(/docs\.qq\.com|docs\.google\.com|notion\.so|yuque\.com|feishu\.cn|larksuite\.com|confluence/.test(u)) return '查看完整文档 ↗';
+  return '查看在线 Demo ↗';
+}
+
 function renderProjects(idx){
   const item = RESUME[idx];
   const list = (item && item.projects) || [];
@@ -776,7 +786,7 @@ function openProject(p){
     a.href = p.url;
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
-    a.textContent = '查看完整文档 ↗';
+    a.textContent = linkLabel(p.url);
     modalContent.appendChild(a);
   }
 

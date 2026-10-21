@@ -69,6 +69,24 @@ export function setTunnelArmed(armed) {
 /** 点时间刻度跳转：由 HUD 写目标，隧道读。 */
 export const tunnelRequest = { z: null }
 
+/* ── 输入锁 ──────────────────────────────────────────────────────────
+   项目详情弹窗打开时，滚轮 / 触摸 / 方向键**属于弹窗自己**（正文要能滚、
+   Esc 要能关），不能再驱动隧道。隧道那四个监听器都挂在 window 上，拿不到
+   React 的开关，所以在这里放一个模块级的布尔。
+
+   🔴 为什么不复用 `panelTakesWheel`：那个函数是按"面板还能不能往这个方向滚"
+   判断的，弹窗一旦滚到底就会把滚轮交回隧道 —— 用户正好会以为"卡住了"。
+   锁是**无条件**的，弹窗一关就解。 */
+let locked = false
+
+export function setTunnelLocked(next) {
+    locked = Boolean(next)
+}
+
+export function isTunnelLocked() {
+    return locked
+}
+
 /* ── 螺旋几何的唯一真源 ──────────────────────────────────────────────
    场景（CareerTunnel）和 HUD（CareerHud 的时间刻度）都要算"第 i 张卡在
    哪"，两边各写一份 8.5 / -5 / +4 迟早会漂 —— 判据方法论里最贵的一课就是

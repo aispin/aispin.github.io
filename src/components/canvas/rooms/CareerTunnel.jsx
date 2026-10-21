@@ -6,7 +6,7 @@ import { useScene } from '../../../context/SceneContext'
 import { usePerformance } from '../../../context/PerformanceContext'
 import { getLocalizedCollection } from '../../../hooks/useContentData'
 import { ensureFontsReady, texturalCanvas } from '../../../utils/texturalArt'
-import { setTunnelArmed, setTunnelCount, setTunnelProgress, tunnelRequest, tunnelCardZ, tunnelTargetZ, TUNNEL_SPACING, TUNNEL_CAM_OFFSET, TUNNEL_MOUTH_Z, TUNNEL_ENTRY_Z } from '../../../state/careerTunnel'
+import { setTunnelArmed, setTunnelCount, setTunnelProgress, isTunnelLocked, tunnelRequest, tunnelCardZ, tunnelTargetZ, TUNNEL_SPACING, TUNNEL_CAM_OFFSET, TUNNEL_MOUTH_Z, TUNNEL_ENTRY_Z } from '../../../state/careerTunnel'
 
 /**
  * 履历房间 —— 「时空隧道」。
@@ -702,27 +702,33 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
             return !!c && c.st.camZ > c.st.zStart - 2.5
         }
 
-        /* 滚轮/手指落在 HUD 那块可滚面板上时，**这一下先归面板**。
-           监听器挂在 window 上（要接住整屏的滚动），而面板自己的
+        /* 滚轮/手指落在 HUD 里某个**还能往这个方向滚**的元素上时，这一下先归它。
+           监听器挂在 window 上（要接住整屏的滚动），而元素自己的
            `overflow-y: auto` 要靠浏览器原生滚动才生效 —— 只要这里不
-           preventDefault、也不 nudge，面板就自己滚。
-           ⚠️ 只在**面板真的还能往这个方向滚**时让路：6/8 条履历的正文
+           preventDefault、也不 nudge，它自己就会滚。
+           ⚠️ 只在**它真的还能往这个方向滚**时让路：6/8 条履历的正文
            一屏放得下，一律吞掉滚轮会让人以为页面卡住。滚到头顶/底部之后
-           这一下交回隧道。 */
-        const panelTakesWheel = (target, deltaY) => {
+           这一下交回隧道。
+           从 target 逐层往上走而不是写死 `.career-hud__info`：右面板的正文、
+           左栏的项目列表都是独立滚动区，写死选择器就得每加一块改一次。 */
+        const scrollableTakesWheel = (target, deltaY) => {
             if (!(target instanceof Element)) return false
-            const panel = target.closest('.career-hud__info')
-            if (!panel) return false
-            const el = panel.querySelector('.career-hud__desc')
-            if (!el) return false
-            const range = el.scrollHeight - el.clientHeight
-            if (range <= 1) return false
-            // deltaY < 0 = 往上滚（看更前面的内容）
-            return deltaY < 0 ? el.scrollTop > 0 : el.scrollTop < range - 1
+            let el = target
+            while (el && el !== document.body && el !== document.documentElement) {
+                const range = el.scrollHeight - el.clientHeight
+                if (range > 1 && getComputedStyle(el).overflowY !== 'visible') {
+                    // deltaY < 0 = 往上滚（看更前面的内容）
+                    return deltaY < 0 ? el.scrollTop > 0 : el.scrollTop < range - 1
+                }
+                el = el.parentElement
+            }
+            return false
         }
 
         const onWheel = (e) => {
-            if (panelTakesWheel(e.target, e.deltaY)) return
+            // 项目详情弹窗开着：滚轮完全归它，隧道一动不动。
+            if (isTunnelLocked()) return
+            if (scrollableTakesWheel(e.target, e.deltaY)) return
             e.preventDefault()
             const back = e.deltaY < 0
             const clipped = nudge(-e.deltaY * 0.008)
@@ -734,10 +740,14 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
             }
         }
         let touchY = 0
-        const onTouchStart = (e) => { touchY = e.touches[0].clientY }
+        const onTouchStart = (e) => {
+            if (isTunnelLocked()) return
+            touchY = e.touches[0].clientY
+        }
         const onTouchMove = (e) => {
-            // 手指在面板里：交给面板原生滚动（同 onWheel 的判据）
-            if (panelTakesWheel(e.target, -(e.touches[0].clientY - touchY))) return
+            if (isTunnelLocked()) return
+            // 手指在可滚区里：交给原生滚动（同 onWheel 的判据）
+            if (scrollableTakesWheel(e.target, -(e.touches[0].clientY - touchY))) return
             const dy = e.touches[0].clientY - touchY
             touchY = e.touches[0].clientY
             const clipped = nudge(-dy * 0.03)
@@ -750,6 +760,8 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
             }
         }
         const onKey = (e) => {
+            // 弹窗开着：方向键 / Esc 都是弹窗的。
+            if (isTunnelLocked()) return
             const back = e.key === 'ArrowUp' || e.key === 'ArrowLeft'
             if (back) nudge(TUNNEL_SPACING * 0.8)
             if (e.key === 'ArrowDown' || e.key === 'ArrowRight') nudge(-TUNNEL_SPACING * 0.8)

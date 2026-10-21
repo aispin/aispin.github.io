@@ -196,21 +196,27 @@ npm run lint
 ```
 site.json         站点标题、作者、SEO
 profile.json      履历（工作经历、教育、技能、联系方式）
-projects.json     工作室项目
 articles.json     文稿
 photography.json  摄影
 videos.json       视频
 music.json        音乐
 aiProjects.json   AI+（由 scripts/refresh-ai-projects.mjs 从 GitHub 同步）
-experiences.json  工作经历
+experiences.json  工作经历（每段内嵌 `projects[]` —— 项目**只**存在这里）
+ventures.json     没有雇主归属的个人项目（AIFIRE.ART）
 events.json       时间线
 labs.json         实验中的念头
 me.json           /me 名片页的编辑性文案（身份、作品选哪些、联系区文案）
 ```
 
 `me.json` 里不重复存事实 —— 姓名/邮箱来自 `profile.json`，作品来自  
-`projects.json`（用 `projectId` 引用），曲目来自 `music.json`。  
+`experiences.json` 各段履历的 `projects[]`（用 `projectId` 引用）加 `ventures.json`，  
+曲目来自 `music.json`。  
 `src/me/meData.js` 负责把这几份接起来，所以改一处不会漏另一处。
+
+> 曾经有一份独立的 `projects.json`（工作室内嵌项目的平铺副本），已删除 ——  
+> 它和 `experiences.json` 的 `projects[]` 是同一批事实，留着必然漂。  
+> 现在项目的唯一真源是 `experiences.json`；只有**不属于任何一段履历**的项目  
+> 才放 `ventures.json`（AIFIRE.ART 起于 2023-11，正好在两段工作之间）。
 
 `aiProjects.json` 可以重新拉取：
 

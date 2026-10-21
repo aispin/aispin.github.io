@@ -1,0 +1,206 @@
+/* 项目详情（全屏）—— 与 public/demos/web3d/career/index.html 的 `.modal*` 同构。
+   ⚠️ z-index 1500：要盖住 HUD(900) 和右上角那排控件(1000/1001)，但要留在
+   GlobalOverlay(2000) 下面 —— 那个是全局抽屉，项目详情不该压在它上面。 */
+
+.career-project {
+    position: fixed;
+    inset: 0;
+    z-index: 1500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 36px;
+    color: #e9edf5;
+
+    &__backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(4, 6, 12, 0.74);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+    }
+
+    &__card {
+        position: relative;
+        width: min(980px, 100%);
+        max-height: 86vh;
+        overflow: auto;
+        /* 滚到底别再往父级传（配合 JS 里的隧道锁，双保险） */
+        overscroll-behavior: contain;
+        background: rgba(15, 19, 29, 0.97);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 20px;
+        box-shadow: 0 34px 90px rgba(0, 0, 0, 0.62);
+        /* 原生滚动条藏掉，自画一条（Chromium 155 把 ::-webkit-scrollbar
+           也按 overlay 处理，不滚就不显形 —— 与 HUD 面板同一个坑）。 */
+        scrollbar-width: none;
+
+        &::-webkit-scrollbar {
+            display: none;
+        }
+    }
+
+    &__close {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        z-index: 3;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        cursor: pointer;
+        background: rgba(8, 10, 16, 0.72);
+        color: #dfe5f0;
+        font-size: 15px;
+        line-height: 1;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+
+        &:hover {
+            background: rgba(139, 163, 255, 0.28);
+        }
+    }
+
+    /* 🔴 用**高度**封顶，不要 `aspect-ratio` + `max-height`：后者会让宽高比
+       反过来决定宽度（980 的卡里只画出 604 的图，右边留一条暗带）。
+       真实高度由组件按图片宽高比算（300~540），这里只是兜底。 */
+    &__hero {
+        position: relative;
+        width: 100%;
+        height: min(420px, 50vh);
+        display: grid;
+        place-items: center;
+        background: linear-gradient(135deg, #141a29, #222b42);
+        color: #4b5568;
+        font-size: 12.5px;
+        letter-spacing: 0.1em;
+        overflow: hidden;
+        transition: height 0.22s ease;
+
+        img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        /* 截图还没到位：收成一条窄横幅，正文自然上移 */
+        &.is-empty {
+            height: min(150px, 20vh);
+        }
+
+        /* 竖图（手机 / 小程序截图）不能用 cover —— 宽框里只会剩中间一条。
+           contain 完整显示，左右空出来的地方用同一张图放大模糊垫底。 */
+        &.is-fit {
+            height: min(520px, 60vh);
+            background: #0a0d16;
+
+            &::before {
+                content: '';
+                position: absolute;
+                inset: -40px;
+                z-index: 0;
+                background-image: var(--shot);
+                background-size: cover;
+                background-position: center;
+                filter: blur(26px) saturate(140%) brightness(0.5);
+                opacity: 0.6;
+            }
+
+            /* 🔴 必须 absolute 钉死在框上：`height: 100%` 在 grid 的自动行里会
+               退回 auto，竖图就把行撑到 1739px（978×1920 等比），contain 按
+               **元素**算 ⇒ 又变成裁切。 */
+            img {
+                position: absolute;
+                inset: 0;
+                z-index: 1;
+                object-fit: contain;
+            }
+        }
+    }
+
+    &__body {
+        padding: 26px 32px 34px;
+    }
+
+    &__date {
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #8ba3ff;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+    }
+
+    &__title {
+        font-size: 26px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin: 8px 0 6px;
+        line-height: 1.2;
+    }
+
+    &__sub {
+        font-size: 12.5px;
+        color: #8792a6;
+        line-height: 1.6;
+    }
+
+    &__sec {
+        margin-top: 20px;
+
+        h4 {
+            font-size: 10.5px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: #8ba3ff;
+            font-weight: 700;
+            margin: 0 0 8px;
+        }
+
+        p {
+            font-size: 13.5px;
+            line-height: 1.85;
+            color: #b6c0d2;
+            margin: 0;
+        }
+
+        ul {
+            margin: 0;
+            padding-left: 18px;
+        }
+
+        li {
+            font-size: 13.5px;
+            line-height: 1.85;
+            color: #b6c0d2;
+            margin-bottom: 5px;
+        }
+    }
+
+    &__link {
+        display: inline-block;
+        margin-top: 22px;
+        font-size: 12.5px;
+        font-weight: 700;
+        color: #8ba3ff;
+        text-decoration: none;
+        border-bottom: 1px solid rgba(139, 163, 255, 0.4);
+        padding-bottom: 2px;
+
+        &:hover {
+            border-bottom-color: #8ba3ff;
+        }
+    }
+
+    @media (max-width: 900px) {
+        padding: 14px;
+
+        &__body {
+            padding: 20px 18px 26px;
+        }
+
+        &__title {
+            font-size: 21px;
+        }
+    }
+}
