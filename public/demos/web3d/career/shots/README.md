@@ -7,9 +7,9 @@
 100.qingyuan-01.*     地铁轨道交通查询机系统        （轻远科技）  ✅
 101.waima-01.*        歪马送酒微信小程序            （美团）      ✅
 102.waima-02.*        歪马送酒中后台系统（供应链）  （美团）      ✅
-103.linglong-01.*     京东羚珑营销内容设计平台      （京东）
+103.linglong-01.*     京东羚珑营销内容设计平台      （京东）      ✅
 104.linglong-02.*     京东千人千面内容营销          （京东）      ✅
-106.gitalk.*          Gitalk                        （京东）
+106.gitalk.*          Gitalk                        （京东）      ✅
 107.vue-easy-gantt.*  Vue-easy-gantt                （京东）
 108.aotu.io.*         凹凸实验室                    （京东）
 109.tencent-games.*   腾讯游戏营销活动              （腾讯）

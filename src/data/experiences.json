@@ -199,7 +199,7 @@
         "role": "项目发起人",
         "id": "106.gitalk",
         "locale": "zh",
-        "image": "shots/106.gitalk.png"
+        "image": "shots/106.gitalk.jpg"
       },
       {
         "name": "Vue-easy-gantt",
@@ -245,7 +245,7 @@
         "role": "研发负责人",
         "id": "103.linglong-01",
         "locale": "zh",
-        "image": "shots/103.linglong-01.png"
+        "image": "shots/103.linglong-01.jpg"
       },
       {
         "name": "凹凸实验室",
@@ -645,7 +645,7 @@
         "role": "Project Initiator",
         "id": "106.gitalk",
         "locale": "en",
-        "image": "shots/106.gitalk.png"
+        "image": "shots/106.gitalk.jpg"
       },
       {
         "name": "Vue-easy-gantt",
@@ -691,7 +691,7 @@
         "role": "R&D Manager",
         "id": "103.linglong-01",
         "locale": "en",
-        "image": "shots/103.linglong-01.png"
+        "image": "shots/103.linglong-01.jpg"
       },
       {
         "name": "O2 Labs",
