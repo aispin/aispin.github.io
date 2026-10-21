@@ -202,21 +202,23 @@ videos.json       视频
 music.json        音乐
 aiProjects.json   AI+（由 scripts/refresh-ai-projects.mjs 从 GitHub 同步）
 experiences.json  工作经历（每段内嵌 `projects[]` —— 项目**只**存在这里）
-ventures.json     没有雇主归属的个人项目（AIFIRE.ART）
 events.json       时间线
 labs.json         实验中的念头
 me.json           /me 名片页的编辑性文案（身份、作品选哪些、联系区文案）
 ```
 
 `me.json` 里不重复存事实 —— 姓名/邮箱来自 `profile.json`，作品来自  
-`experiences.json` 各段履历的 `projects[]`（用 `projectId` 引用）加 `ventures.json`，  
-曲目来自 `music.json`。  
+`experiences.json` 各段履历的 `projects[]`（用 `projectId` 引用），曲目来自 `music.json`。  
 `src/me/meData.js` 负责把这几份接起来，所以改一处不会漏另一处。
 
-> 曾经有一份独立的 `projects.json`（工作室内嵌项目的平铺副本），已删除 ——  
-> 它和 `experiences.json` 的 `projects[]` 是同一批事实，留着必然漂。  
-> 现在项目的唯一真源是 `experiences.json`；只有**不属于任何一段履历**的项目  
-> 才放 `ventures.json`（AIFIRE.ART 起于 2023-11，正好在两段工作之间）。
+> 曾经有一份独立的 `projects.json`（项目平铺副本），已删除 —— 它和
+> `experiences.json` 的 `projects[]` 是同一批事实，留着必然漂。
+> 现在项目的唯一真源是 `experiences.json`。
+
+项目截图在 **`public/assets/career/`**（站内 `/career` 房间与
+`public/demos/web3d/career/` 的 demo 共用一份，不复制）。文件名 = 项目 `id`，
+两边各有一个 `SHOT_BASE` 前缀：站内 `/assets/career/`（`src/utils/projectLink.js`），
+demo `../../../assets/career/`。详见该目录的 `README.md`。
 
 `aiProjects.json` 可以重新拉取：
 

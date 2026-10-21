@@ -9,17 +9,19 @@
  * 截图资源在哪。
  *
  * 🔴 站内的 `src/data/experiences.json` 和 demo 的 `experiences.json` 是**同一份
- * 内容**（`image` 都写成 `shots/xxx.jpg`，相对路径），只有取图的前缀不同：
- * demo 的页面就在 `public/demos/web3d/career/` 下，相对路径天然可用；站内页面在
- * 根路径，必须补上前缀。
+ * 内容**（`image` 只写文件名，如 `107.vue-easy-gantt.jpg`），只有取图的前缀不同：
+ * 站内页面在根路径，用绝对路径 `/assets/career/`；demo 的页面在
+ * `public/demos/web3d/career/` 下，退三级回到根（`../../../assets/career/`）。
  *
- * 一份图 1.7MB，两边共用、不复制 —— 所以这个常量是**唯一**的耦合点。
+ * 一份图 1.7MB，两边共用、不复制 —— 所以这两个常量是**唯一**的耦合点。
+ * 放 `public/` 而不是 `src/assets/`：demo 是 `public/` 里的纯静态 HTML，
+ * 它按 URL 取图，`src/assets/` 那种走 bundler 的路径它够不着。
  */
-export const SHOT_BASE = '/demos/web3d/career/'
+export const SHOT_BASE = '/assets/career/'
 
 /** `image` → 可直接给 <img src> 的地址。 */
 export function shotUrl(image, id) {
-    const name = image || (id ? `shots/${id}.png` : '')
+    const name = image || (id ? `${id}.jpg` : '')
     if (!name) return ''
     if (/^(https?:)?\/\//.test(name) || name.startsWith('/')) return name
     return SHOT_BASE + name

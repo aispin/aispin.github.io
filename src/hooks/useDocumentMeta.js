@@ -92,6 +92,9 @@ export function useDocumentMeta() {
     const { currentRoom, teleportTo, hasEntered } = useScene();
     const isHandlingPopState = useRef(false);
     const lastPushedRoom = useRef(undefined); // Track what we last pushed to avoid duplicates
+    /* 首帧地址栏是不是一个深链（`/career` 之类）。只读一次，之后不再变 ——
+       用来决定首帧要不要"按住"地址栏，见下面 replaceState 那段。 */
+    const deepLinkRef = useRef(getInitialRoomFromUrl());
 
     // Update document meta and URL when room changes
     useEffect(() => {
@@ -128,12 +131,21 @@ export function useDocumentMeta() {
             // Preserve query string (debug flags, UTM, OAuth callbacks...)
             const qs = window.location.search || '';
             // Use replaceState for the very first load, pushState for subsequent navigations
-            if (lastPushedRoom.current === undefined) {
-                window.history.replaceState({ room: currentRoom }, '', meta.path + qs);
-            } else {
-                window.history.pushState({ room: currentRoom }, '', meta.path + qs);
+            const isFirst = lastPushedRoom.current === undefined;
+            /* 🔴 首帧「按住」地址栏：深链（`/career`）加载时 currentRoom 还是 null，
+               这里原来会立刻 replaceState 成 `/` —— 地址栏闪一下 `/career` → `/`，
+               等自动传送落地再变回 `/career`，中间那一下既难看、传送失败时还会
+               把用户留在错误地址上。按住期间**不动** lastPushedRoom，等真正的房间
+               落地时仍走 replaceState（同一个 URL，不会多出一条历史记录）。 */
+            const holdDeepLink = isFirst && deepLinkRef.current && currentRoom === null;
+            if (!holdDeepLink) {
+                if (isFirst) {
+                    window.history.replaceState({ room: currentRoom }, '', meta.path + qs);
+                } else {
+                    window.history.pushState({ room: currentRoom }, '', meta.path + qs);
+                }
+                lastPushedRoom.current = currentRoom;
             }
-            lastPushedRoom.current = currentRoom;
         }
 
         isHandlingPopState.current = false;

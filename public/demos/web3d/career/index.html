@@ -408,10 +408,16 @@ function wrapText(ctx, text, x, y, maxW, lh, maxLines){
    本目录下的 `experiences.json` 是它的一份拷贝 —— 站点那边改了记得重拷：
        cp src/data/experiences.json public/demos/web3d/career/experiences.json
 
-   每个项目带一个 `image` 字段（`shots/<项目 id>.png`）。截图还没给，所以加载
-   失败时会退化成渐变占位块 —— 把图按这个文件名丢进 `shots/` 就自动生效。
+   每个项目带一个 `image` 字段（只写文件名，如 `107.vue-easy-gantt.jpg`），
+   图在仓库根的 `public/assets/career/`。加载失败时会退化成渐变占位块 ——
+   把图按这个名字丢进 `public/assets/career/` 就自动生效。
    ============================================================================ */
 let RESUME = [];
+
+/* 截图目录。站内用绝对路径 `/assets/career/`，这里在 `public/demos/web3d/career/`
+   下，退三级回到根 —— 与 `src/utils/projectLink.js` 的 SHOT_BASE 是同一份资源。 */
+const SHOT_BASE = '../../../assets/career/';
+const shotUrl = (p) => SHOT_BASE + (p.image || `${p.id}.jpg`);
 
 const fmtMonth = (d) => (d ? `${d.slice(0, 4)}.${d.slice(5, 7)}` : '');
 
@@ -690,7 +696,7 @@ function renderProjects(idx){
     // 截图还没到位：先显示占位文字，**加载成功才把 img 插进来** ——
     // 直接 append 一个坏 src 的 img 会渲染成一块空白方块（布局还会被撑）。
     thumb.textContent = '截图待补';
-    loadShot(p.image || `shots/${p.id}.png`, (img) => {
+    loadShot(shotUrl(p), (img) => {
       img.alt = p.name;
       thumb.textContent = '';
       if(isPortrait(img)) thumb.classList.add('is-fit');
@@ -754,7 +760,7 @@ function openProject(p){
   modalHero.className = 'modal-hero is-empty';
   modalHero.style.removeProperty('--shot');
   modalHero.style.removeProperty('height');
-  loadShot(p.image || `shots/${p.id}.png`, (img) => {
+  loadShot(shotUrl(p), (img) => {
     img.alt = p.name;
     modalHero.textContent = '';
     modalHero.className = 'modal-hero';

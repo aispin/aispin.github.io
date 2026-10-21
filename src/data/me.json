@@ -2,8 +2,8 @@
   "_comment": [
     "/me 页面的编辑性文案。所有会变的内容都放这里，代码里不留硬编码字符串。",
     "纯数据（姓名、邮箱、作品、曲目）不重复写在这里 —— meData.js 会去 profile.json /",
-    "projects.json / music.json 里取，避免同一个事实存两份、改一处漏一处。",
-    "items[].projectId 对应 experiences.json 里各段履历的 projects[].id（或 ventures.json 的 id）。"
+    "experiences.json / music.json 里取，避免同一个事实存两份、改一处漏一处。",
+    "items[].projectId 对应 experiences.json 里各段履历的 projects[].id。"
   ],
 
   "brand": "ZEO",
@@ -74,8 +74,7 @@
       "en": "Some finished, some still going, some that will never be done."
     },
     "items": [
-      { "projectId": "200.aifire", "kind": { "zh": "产品", "en": "Product" }, "visual": "orbit", "span": "lg" },
-      { "projectId": "106.gitalk", "kind": { "zh": "开源", "en": "Open source" }, "visual": "chart", "span": "sm" },
+      { "projectId": "106.gitalk", "kind": { "zh": "开源", "en": "Open source" }, "visual": "chart", "span": "lg" },
       { "projectId": "103.linglong-01", "kind": { "zh": "平台", "en": "Platform" }, "visual": "rings", "span": "sm" }
     ]
   },

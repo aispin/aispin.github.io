@@ -44,7 +44,7 @@
         "opensource": false,
         "id": "100.qingyuan-01",
         "locale": "zh",
-        "image": "shots/100.qingyuan-01.jpg"
+        "image": "100.qingyuan-01.jpg"
       }
     ]
   },
@@ -103,7 +103,7 @@
         "opensource": false,
         "id": "102.waima-02",
         "locale": "zh",
-        "image": "shots/102.waima-02.jpg"
+        "image": "102.waima-02.jpg"
       },
       {
         "name": "歪马送酒微信小程序",
@@ -137,7 +137,7 @@
         "opensource": false,
         "id": "101.waima-01",
         "locale": "zh",
-        "image": "shots/101.waima-01.jpg"
+        "image": "101.waima-01.jpg"
       }
     ]
   },
@@ -187,7 +187,7 @@
         "role": "研发负责人",
         "id": "104.linglong-02",
         "locale": "zh",
-        "image": "shots/104.linglong-02.jpg"
+        "image": "104.linglong-02.jpg"
       },
       {
         "name": "Gitalk",
@@ -199,7 +199,7 @@
         "role": "项目发起人",
         "id": "106.gitalk",
         "locale": "zh",
-        "image": "shots/106.gitalk.jpg"
+        "image": "106.gitalk.jpg"
       },
       {
         "name": "Vue-easy-gantt",
@@ -212,7 +212,7 @@
         "role": "项目所有者",
         "id": "107.vue-easy-gantt",
         "locale": "zh",
-        "image": "shots/107.vue-easy-gantt.jpg"
+        "image": "107.vue-easy-gantt.jpg"
       },
       {
         "name": "京东羚珑营销内容设计平台",
@@ -245,7 +245,7 @@
         "role": "研发负责人",
         "id": "103.linglong-01",
         "locale": "zh",
-        "image": "shots/103.linglong-01.jpg"
+        "image": "103.linglong-01.jpg"
       },
       {
         "name": "凹凸实验室",
@@ -256,7 +256,7 @@
         "role": "联合创始人",
         "id": "108.aotu.io",
         "locale": "zh",
-        "image": "shots/108.aotu.io.jpg"
+        "image": "108.aotu.io.jpg"
       }
     ]
   },
@@ -294,7 +294,7 @@
         "opensource": false,
         "id": "109.tencent-games",
         "locale": "zh",
-        "image": "shots/109.tencent-games.jpg"
+        "image": "109.tencent-games.jpg"
       },
       {
         "name": "QQ会员",
@@ -311,7 +311,7 @@
         "opensource": false,
         "id": "105.tencent-qqvip",
         "locale": "zh",
-        "image": "shots/105.tencent-qqvip.jpg"
+        "image": "105.tencent-qqvip.jpg"
       }
     ]
   },
@@ -343,7 +343,7 @@
         "opensource": false,
         "id": "110.baidu-zhidao",
         "locale": "zh",
-        "image": "shots/110.baidu-zhidao.jpg"
+        "image": "110.baidu-zhidao.jpg"
       }
     ]
   },
@@ -375,7 +375,7 @@
         "opensource": false,
         "id": "111.sohu-dashiye",
         "locale": "zh",
-        "image": "shots/111.sohu-dashiye.jpg"
+        "image": "111.sohu-dashiye.jpg"
       }
     ]
   },
@@ -407,7 +407,7 @@
         "opensource": false,
         "id": "112.m18",
         "locale": "zh",
-        "image": "shots/112.m18.jpg"
+        "image": "112.m18.jpg"
       }
     ]
   },
@@ -439,7 +439,7 @@
         "opensource": false,
         "id": "113.cognizant",
         "locale": "zh",
-        "image": "shots/113.cognizant.jpg"
+        "image": "113.cognizant.jpg"
       }
     ]
   },
@@ -488,7 +488,7 @@
         "opensource": false,
         "id": "100.qingyuan-01",
         "locale": "en",
-        "image": "shots/100.qingyuan-01.jpg"
+        "image": "100.qingyuan-01.jpg"
       }
     ]
   },
@@ -548,7 +548,7 @@
         "opensource": false,
         "id": "102.waima-02",
         "locale": "en",
-        "image": "shots/102.waima-02.jpg"
+        "image": "102.waima-02.jpg"
       },
       {
         "name": "Waima WeChat Mini Program",
@@ -582,7 +582,7 @@
         "opensource": false,
         "id": "101.waima-01",
         "locale": "en",
-        "image": "shots/101.waima-01.jpg"
+        "image": "101.waima-01.jpg"
       }
     ]
   },
@@ -633,7 +633,7 @@
         "role": "R&D Manager",
         "id": "104.linglong-02",
         "locale": "en",
-        "image": "shots/104.linglong-02.jpg"
+        "image": "104.linglong-02.jpg"
       },
       {
         "name": "Gitalk",
@@ -645,7 +645,7 @@
         "role": "Project Initiator",
         "id": "106.gitalk",
         "locale": "en",
-        "image": "shots/106.gitalk.jpg"
+        "image": "106.gitalk.jpg"
       },
       {
         "name": "Vue-easy-gantt",
@@ -658,7 +658,7 @@
         "role": "Project Owner",
         "id": "107.vue-easy-gantt",
         "locale": "en",
-        "image": "shots/107.vue-easy-gantt.jpg"
+        "image": "107.vue-easy-gantt.jpg"
       },
       {
         "name": "JD Linglong Online Design Platform",
@@ -691,7 +691,7 @@
         "role": "R&D Manager",
         "id": "103.linglong-01",
         "locale": "en",
-        "image": "shots/103.linglong-01.jpg"
+        "image": "103.linglong-01.jpg"
       },
       {
         "name": "O2 Labs",
@@ -702,7 +702,7 @@
         "role": "Co-Founder",
         "id": "108.aotu.io",
         "locale": "en",
-        "image": "shots/108.aotu.io.jpg"
+        "image": "108.aotu.io.jpg"
       }
     ]
   },
@@ -739,7 +739,7 @@
         "opensource": false,
         "id": "109.tencent-games",
         "locale": "en",
-        "image": "shots/109.tencent-games.jpg"
+        "image": "109.tencent-games.jpg"
       },
       {
         "name": "QQ VIP",
@@ -756,7 +756,7 @@
         "opensource": false,
         "id": "105.tencent-qqvip",
         "locale": "en",
-        "image": "shots/105.tencent-qqvip.jpg"
+        "image": "105.tencent-qqvip.jpg"
       }
     ]
   },
@@ -788,7 +788,7 @@
         "opensource": false,
         "id": "110.baidu-zhidao",
         "locale": "en",
-        "image": "shots/110.baidu-zhidao.jpg"
+        "image": "110.baidu-zhidao.jpg"
       }
     ]
   },
@@ -820,7 +820,7 @@
         "opensource": false,
         "id": "111.sohu-dashiye",
         "locale": "en",
-        "image": "shots/111.sohu-dashiye.jpg"
+        "image": "111.sohu-dashiye.jpg"
       }
     ]
   },
@@ -852,7 +852,7 @@
         "opensource": false,
         "id": "112.m18",
         "locale": "en",
-        "image": "shots/112.m18.jpg"
+        "image": "112.m18.jpg"
       }
     ]
   },
@@ -884,7 +884,7 @@
         "opensource": false,
         "id": "113.cognizant",
         "locale": "en",
-        "image": "shots/113.cognizant.jpg"
+        "image": "113.cognizant.jpg"
       }
     ]
   }

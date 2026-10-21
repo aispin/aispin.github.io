@@ -3,8 +3,8 @@
  *
  * 为什么是「装配」而不是「定义」：页面上没有一个事实是写死在这里的。
  * 编辑性文案来自 src/data/me.json，身份来自 profile.json，作品来自
- * experiences.json（各段履历内嵌的 projects[]）+ ventures.json，曲目来自
- * music.json。这里只负责把这几份数据接起来，保证同一个事实在仓库里只存一份。
+ * experiences.json（各段履历内嵌的 projects[]），曲目来自 music.json。
+ * 这里只负责把这几份数据接起来，保证同一个事实在仓库里只存一份。
  *
  * ⚠️ 这里**不能** import src/hooks/useContentData.js —— 那个模块为了给
  * R3F 房间预加载贴图，顶层就 import 了 @react-three/drei 和 three。
@@ -15,22 +15,18 @@ import me from '../data/me.json'
 import profile from '../data/profile.json'
 import site from '../data/site.json'
 import experiences from '../data/experiences.json'
-import ventures from '../data/ventures.json'
 import music from '../data/music.json'
 import aiProjects from '../data/aiProjects.json'
 
 /**
- * 全部项目 = 各段履历内嵌的 `projects[]` + 不属于任何雇主的个人项目。
+ * 全部项目 = 各段履历内嵌的 `projects[]`。
  *
- * 🔴 项目只存在 `experiences.json` 里（原来是独立一份 projects.json，同一个
- * 事实存两处、改一处漏一处）。`ventures.json` 只放**没有雇主归属**的那几个
- * —— AIFIRE.ART 起于 2023-11，正好落在美团(→2023-11-01)与轻远(2024-02-)之间，
- * 挂到哪段履历都是错的。
+ * 🔴 项目**只**存在 `experiences.json` 里（原来是独立一份 projects.json，同一个
+ * 事实存两处、改一处漏一处）。原来还有一份 `ventures.json` 放"没有雇主归属"的
+ * 个人项目（AIFIRE.ART）—— 那个项目已经停了，文件随之删除。以后真有这类项目，
+ * 再建一份同样结构的文件、在这里 spread 进来即可。
  */
-const projects = [
-    ...experiences.flatMap((e) => (Array.isArray(e.projects) ? e.projects : [])),
-    ...ventures,
-]
+const projects = experiences.flatMap((e) => (Array.isArray(e.projects) ? e.projects : []))
 
 /** 取双语字段：`{ zh, en }` → 当前语言；普通字符串原样返回。 */
 export function pick(value, lang) {

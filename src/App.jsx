@@ -1,4 +1,4 @@
-import { useState, Suspense, useEffect, useCallback, lazy } from 'react';
+import { useState, Suspense, useEffect, useCallback, useRef, lazy } from 'react';
 import { Canvas, useLoader } from '@react-three/fiber';
 import { Preload, useTexture, Text, PerformanceMonitor } from '@react-three/drei';
 import * as THREE from 'three';
@@ -106,16 +106,25 @@ const GlobalAudioEnabler = () => {
 function DocumentMetaBridge() {
   useDocumentMeta();
 
-  const { initialRoom, markDeeplinkHandled, isDeeplinkHandled, hasEntered, teleportTo } = useScene();
+  const { initialRoom, markDeeplinkHandled, hasEntered, markEntered, teleportTo } = useScene();
 
-  // Deep linking: if user lands on e.g. /gallery, auto-teleport after scene loads
+  /* 深链：`/career` 这类地址**直接进房间**，不再要求先自己走进大门。
+     原来的条件是 `initialRoom && hasEntered` —— 别人点开分享出去的链接，会停在
+     院子里，还得自己找到那扇门、走进去、再点一次；分享出去等于没分享。
+     现在没进过屋就替他 `markEntered()`，再走正常的纸片转场进房间。
+
+     🔴 去重用 `firedRef`，**不能**靠 effect 里 `clearTimeout` 清理：
+     `markEntered()` 会让 `hasEntered` 变 true ⇒ 这个 effect 必然再跑一次，
+     而重跑时的 cleanup 会把还没到点的 timer 清掉，深链就静默失效了。 */
+  const firedRef = useRef(false);
   useEffect(() => {
-    if (initialRoom && hasEntered && !isDeeplinkHandled()) {
-      markDeeplinkHandled();
-      // Small delay to let the corridor render first
-      setTimeout(() => teleportTo(initialRoom), 300);
-    }
-  }, [initialRoom, hasEntered, teleportTo, markDeeplinkHandled, isDeeplinkHandled]);
+    if (!initialRoom || firedRef.current) return;
+    firedRef.current = true;
+    markDeeplinkHandled();
+    if (!hasEntered) markEntered();
+    // 等走廊挂载 + 相机切到 CORRIDOR 再转场，否则 DoorSection 还没注册。
+    setTimeout(() => teleportTo(initialRoom), 450);
+  }, [initialRoom, hasEntered, markEntered, teleportTo, markDeeplinkHandled]);
 
   return null;
 }
