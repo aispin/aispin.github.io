@@ -1,25 +1,31 @@
 # 项目截图
 
-把每个项目的截图放到这里，文件名 = `experiences.json` 里该项目的 `image` 字段：
+把截图放到这个目录，**文件名 = `id`**（`experiences.json` 里每个项目的 `id`）。
+扩展名 `.png` / `.jpg` / `.jpeg` 都行，页面会依次尝试，找不到就显示「截图待补」占位块。
 
 ```
-shots/100.qingyuan-01.png     地铁轨道交通查询机系统          （轻远科技）
-shots/101.waima-01.png        歪马送酒微信小程序              （美团）
-shots/102.waima-02.png        歪马送酒中后台系统（供应链）    （美团）
-shots/103.linglong-01.png     京东羚珑营销内容设计平台        （京东）
-shots/104.linglong-02.png     京东千人千面内容营销            （京东）
-shots/106.gitalk.png          Gitalk                          （京东）
-shots/107.vue-easy-gantt.png  Vue-easy-gantt                  （京东）
-shots/108.aotu.io.png         凹凸实验室                      （京东）
-shots/109.tencent-games.png   腾讯游戏营销活动                （腾讯）
-shots/105.tencent-qqvip.png   QQ会员                          （腾讯）
-shots/110.baidu-zhidao.png    百度知道                        （百度）
-shots/111.sohu-dashiye.png    搜狐大视野                      （搜狐）
-shots/112.m18.png             麦网 M18.COM                    （麦网）
-shots/113.cognizant.png       海外软件项目                    （高知特中国）
+100.qingyuan-01.*     地铁轨道交通查询机系统        （轻远科技）  ✅
+101.waima-01.*        歪马送酒微信小程序            （美团）      ✅
+102.waima-02.*        歪马送酒中后台系统（供应链）  （美团）      ✅
+103.linglong-01.*     京东羚珑营销内容设计平台      （京东）
+104.linglong-02.*     京东千人千面内容营销          （京东）      ✅
+106.gitalk.*          Gitalk                        （京东）
+107.vue-easy-gantt.*  Vue-easy-gantt                （京东）
+108.aotu.io.*         凹凸实验室                    （京东）
+109.tencent-games.*   腾讯游戏营销活动              （腾讯）
+105.tencent-qqvip.*   QQ会员                        （腾讯）
+110.baidu-zhidao.*    百度知道                      （百度）
+111.sohu-dashiye.*    搜狐大视野                    （搜狐）
+112.m18.*             麦网 M18.COM                  （麦网）
+113.cognizant.*       海外软件项目                  （高知特中国）
 ```
 
-- 左侧列表用 56×40 的缩略图（`object-fit: cover`），详情页用 16:9 大图。
-- 建议一张图同时满足两处：**宽 ≥ 1600px、16:9 或更宽**，主体别贴边。
-- 文件不存在时不会报错，只会显示「截图待补」的渐变占位块。
+## 画幅怎么处理
+
+- **横图**（≥ 1.25:1）：详情头图按 `cover` 铺满 978×340，左右满宽、上下各裁一点
+  ⇒ 主体别贴上下边缘。
+- **竖图**（手机 / 小程序截图）：自动切成 `contain` + 同图放大模糊垫底，头图拔高到
+  520px，**整张完整显示**，不会被裁成一条。
+- 左栏缩略图是 56×40：横图 `cover`，竖图 `contain`（保留手机形状）。
+- 详情头图建议 **宽 ≥ 1600px**（横图 1600×600 左右最贴框，几乎不裁）。
 - 中英文共用同一套文件名（`locale` 不同、`id` 相同），截图只需放一份。

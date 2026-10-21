@@ -44,7 +44,7 @@
         "opensource": false,
         "id": "100.qingyuan-01",
         "locale": "zh",
-        "image": "shots/100.qingyuan-01.png"
+        "image": "shots/100.qingyuan-01.jpeg"
       }
     ]
   },
@@ -103,7 +103,7 @@
         "opensource": false,
         "id": "102.waima-02",
         "locale": "zh",
-        "image": "shots/102.waima-02.png"
+        "image": "shots/102.waima-02.jpg"
       },
       {
         "name": "歪马送酒微信小程序",
@@ -137,7 +137,7 @@
         "opensource": false,
         "id": "101.waima-01",
         "locale": "zh",
-        "image": "shots/101.waima-01.png"
+        "image": "shots/101.waima-01.jpeg"
       }
     ]
   },
@@ -187,7 +187,7 @@
         "role": "研发负责人",
         "id": "104.linglong-02",
         "locale": "zh",
-        "image": "shots/104.linglong-02.png"
+        "image": "shots/104.linglong-02.jpeg"
       },
       {
         "name": "Gitalk",
@@ -488,7 +488,7 @@
         "opensource": false,
         "id": "100.qingyuan-01",
         "locale": "en",
-        "image": "shots/100.qingyuan-01.png"
+        "image": "shots/100.qingyuan-01.jpeg"
       }
     ]
   },
@@ -548,7 +548,7 @@
         "opensource": false,
         "id": "102.waima-02",
         "locale": "en",
-        "image": "shots/102.waima-02.png"
+        "image": "shots/102.waima-02.jpg"
       },
       {
         "name": "Waima WeChat Mini Program",
@@ -582,7 +582,7 @@
         "opensource": false,
         "id": "101.waima-01",
         "locale": "en",
-        "image": "shots/101.waima-01.png"
+        "image": "shots/101.waima-01.jpeg"
       }
     ]
   },
@@ -633,7 +633,7 @@
         "role": "R&D Manager",
         "id": "104.linglong-02",
         "locale": "en",
-        "image": "shots/104.linglong-02.png"
+        "image": "shots/104.linglong-02.jpeg"
       },
       {
         "name": "Gitalk",

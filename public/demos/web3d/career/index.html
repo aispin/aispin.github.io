@@ -153,6 +153,8 @@
     font-size:8.5px;color:#4f5a70;letter-spacing:.04em;text-align:center;line-height:1.3;
   }
   .proj-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  /* 竖图缩略图同理：留完整形状，别裁成一条 */
+  .proj-thumb.is-fit img{object-fit:contain}
   .proj-meta{min-width:0;display:flex;flex-direction:column;gap:3px;justify-content:center}
   .proj-name{
     font-size:12.5px;font-weight:700;line-height:1.3;color:#e9edf5;
@@ -199,6 +201,23 @@
      图片一加载完就摘掉这个类（见 openProject）。 */
   .modal-hero.is-empty{height:min(150px,20vh)}
   .modal-hero img{width:100%;height:100%;object-fit:cover;display:block}
+  /* 竖图（手机 / 小程序截图）不能用 cover —— 2.88:1 的框里只会剩中间一条。
+     改成 contain 完整显示，左右空出来的地方用同一张图放大模糊垫底；
+     同时把框子拔高，否则 0.56:1 的截图在 340px 里只有 190px 宽。 */
+  .modal-hero.is-fit{
+    position:relative;height:min(520px,60vh);overflow:hidden;background:#0a0d16;
+  }
+  .modal-hero.is-fit::before{
+    content:'';position:absolute;inset:-40px;z-index:0;
+    background-image:var(--shot);background-size:cover;background-position:center;
+    filter:blur(26px) saturate(140%) brightness(.5);opacity:.6;
+  }
+  /* 🔴 必须 absolute 钉死在框上：`height:100%` 在 grid 的自动行里会退回 auto，
+     竖图就把行撑到 1739px（978×1920 等比），contain 按**元素**算 ⇒ 又变成裁切。 */
+  .modal-hero.is-fit img{
+    position:absolute;inset:0;z-index:1;
+    width:100%;height:100%;object-fit:contain;
+  }
   .modal-body{padding:26px 32px 34px}
   .modal-date{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700}
   .modal-title{font-size:26px;font-weight:800;letter-spacing:-.02em;margin:8px 0 6px;line-height:1.2}
@@ -596,9 +615,38 @@ let activeIdx = -1;
 
 /* ── 左侧项目列表 ──────────────────────────────────────────────────────
    跟着"当前这张履历"走：滚到哪一段，左边就换成那一段的项目。
-   没项目的履历（腾讯/百度/搜狐/麦网/高知特）给一句说明，不是空白。 */
+   数据里没挂项目的履历给一句说明，不留空白。 */
 const projectsListEl = document.getElementById('projects-list');
 const projectsCountEl = document.getElementById('projects-count');
+
+/** 截图可能存成 .png / .jpg / .jpeg —— 依次试，全失败才留占位。
+ *  🔴 只有 onload 才 append：坏 src 的 <img> 会渲染成一块空白方块并撑布局。 */
+function loadShot(src, onOk){
+  const alts = [src];
+  const m = /\.(png|jpe?g|webp)$/i.exec(src);
+  if(m){
+    const base = src.slice(0, m.index);
+    ['.png', '.jpg', '.jpeg'].forEach((ext) => {
+      const s = base + ext;
+      if(s !== src) alts.push(s);
+    });
+  }
+  const img = new Image();
+  img.alt = '';
+  let i = 0;
+  img.onload = () => onOk(img);
+  img.onerror = () => {
+    i += 1;
+    if(i < alts.length) img.src = alts[i];
+    else img.onerror = null;
+  };
+  img.src = alts[0];
+}
+
+/** 竖图（手机 / 小程序截图）用 contain，横图用 cover。 */
+function isPortrait(img){
+  return img.naturalWidth / Math.max(1, img.naturalHeight) < 1.25;
+}
 
 function projectSub(p){
   const span = [fmtMonth(p.startDate), p.endDate ? fmtMonth(p.endDate) : '至今'].join(' — ');
@@ -629,10 +677,12 @@ function renderProjects(idx){
     // 截图还没到位：先显示占位文字，**加载成功才把 img 插进来** ——
     // 直接 append 一个坏 src 的 img 会渲染成一块空白方块（布局还会被撑）。
     thumb.textContent = '截图待补';
-    const img = new Image();
-    img.alt = p.name;
-    img.onload = () => { thumb.textContent = ''; thumb.appendChild(img); };
-    img.src = p.image || `shots/${p.id}.png`;
+    loadShot(p.image || `shots/${p.id}.png`, (img) => {
+      img.alt = p.name;
+      thumb.textContent = '';
+      if(isPortrait(img)) thumb.classList.add('is-fit');
+      thumb.appendChild(img);
+    });
 
     const meta = document.createElement('div');
     meta.className = 'proj-meta';
@@ -688,15 +738,19 @@ function openProject(p){
 
   modalHero.innerHTML = '';
   modalHero.textContent = '项目截图待补';
-  modalHero.classList.add('is-empty');
-  const img = new Image();
-  img.alt = p.name;
-  img.onload = () => {
+  modalHero.className = 'modal-hero is-empty';
+  modalHero.style.removeProperty('--shot');
+  loadShot(p.image || `shots/${p.id}.png`, (img) => {
+    img.alt = p.name;
     modalHero.textContent = '';
-    modalHero.classList.remove('is-empty');
+    modalHero.className = 'modal-hero';
+    if(isPortrait(img)){
+      modalHero.classList.add('is-fit');
+      // 左右垫底的模糊层用同一张图（CSS 变量，避免再发一次请求）
+      modalHero.style.setProperty('--shot', `url("${img.currentSrc || img.src}")`);
+    }
     modalHero.appendChild(img);
-  };
-  img.src = p.image || `shots/${p.id}.png`;
+  });
 
   modalContent.innerHTML = '';
   if(p.description) modalContent.appendChild(section('背景', p.description));
