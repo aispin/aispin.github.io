@@ -73,6 +73,39 @@
     "locale": "zh",
     "projects": [
       {
+        "name": "歪马送酒中后台系统（供应链）",
+        "url": "https://docs.qq.com/doc/DQmhTaUJsaXpBWEti",
+        "description": "支撑美团歪马送酒业务 C 端（歪马送酒微信小程序）营销运营开展的中后台系统，涵盖 「供应商管理（SRM）、商品管理、采购管理（PMS）、仓储管理（WMS）、运输管理（TMS）、订单管理（OMS）、配送履约管理、门店管理、财务结算」 等子系统。当前除了 「运输管理」 为外采，及「财务结算」使用美团基建能力外，其他系统能力均为歪马自建。",
+        "role": "前端负责人",
+        "challenges": [
+          "歪马送酒作为美团自营零售的先锋业务，其所建设的系统能力，是否适用于未来其他自营零售业务？",
+          "当前建设的供应链系统能力，与美团其他业务（如医药）的供应链系统能力能否做整合统一？",
+          "供应链系统能力的通用化及整合统一建设涉及跨业务、跨事业线、跨团队，复杂度高，模糊度高。"
+        ],
+        "tasks": [
+          "以 WMS 通用化建设作为试点，探索零售供应链系统能力整合统一的解决方案；",
+          "完成包含仓内管理和出入库等 WMS 基础管理能力的通用化建设，通过低成本复用，满足新业务在小型仓的 WMS 管理诉求。"
+        ],
+        "actions": [
+          "组织先行：成立零售供应链统一建设的虚拟组织，明确目标、执行计划、各细分方向的负责人；",
+          "调研对标：联同干事团队进行「外部行业调研」及「内部业务系统摸排」，梳理及借鉴学习行业解决方案，完成零售供应链统一建设整体方案的设计；",
+          "试点推行：结合业务需求，协同前后端团队推进 WMS 基建工作开展，推进 PC 端 WMS 基础管理能力的通用化建设，在 23 年底实现 WMS 基础管理能力通用化率达 100%。"
+        ],
+        "results": [
+          "完成对行业领先的富勒公司 WMS 系统、盒马生鲜供应链系统的调研，以及内部医药业务供应链系统能力的摸排梳理，共识了零售供应链统一建设的目标、实施路径以及关键里程碑，前端相应完成了 WMS 模块通用化目标及整体方案的架构设计及关键里程碑设计；",
+          "协同设计团队完成了零售供应链设计体系及前端物料的建设，提升了系统平台的设计标准和用户体验（样式标准度达 85%，计算公式：设计变量使用量 / （设计变量使用量 + 硬编码样式数量））；",
+          "提升 PC 端需求研发提效率提升至 23%+（22 年17.79%），提升 App 端需求研发效率 15%+（分子：代码中使用组件的数量 * 单个组件的开发时长；分母：需求开发时长+分子）；",
+          "完成可配置可拓展的 3 大业务流程模板的建设及投产：「任务流程模板」、「单据流程模板」及「主数据流程模板」，为 WMS 基础管理能力的通用化建设做好了底层的技术铺垫。"
+        ],
+        "status": "Active",
+        "startDate": "2022-07-01",
+        "endDate": "2023-11-01",
+        "opensource": false,
+        "id": "102.waima-02",
+        "locale": "zh",
+        "image": "shots/102.waima-02.png"
+      },
+      {
         "name": "歪马送酒微信小程序",
         "url": "https://docs.qq.com/doc/DQnl3VUVXaW9xc3dM",
         "description": "支撑美团自营歪马送酒业务线上营销运营的微信小程序，基于美团自研的小程序多端框架进行开发，产品功能主要由 6 个核心页面「首页」、「酒单页」、「商详页」、「购物车」、「个人中心」及「搜索页」，以及 3 大常驻营销页面「限时抢购」、「歪马精选」、「会员中心」构成。23 年 DAU 万级，用户总量数百万级。",
@@ -105,39 +138,6 @@
         "id": "101.waima-01",
         "locale": "zh",
         "image": "shots/101.waima-01.png"
-      },
-      {
-        "name": "歪马送酒中后台系统（供应链）",
-        "url": "https://docs.qq.com/doc/DQmhTaUJsaXpBWEti",
-        "description": "支撑美团歪马送酒业务 C 端（歪马送酒微信小程序）营销运营开展的中后台系统，涵盖 「供应商管理（SRM）、商品管理、采购管理（PMS）、仓储管理（WMS）、运输管理（TMS）、订单管理（OMS）、配送履约管理、门店管理、财务结算」 等子系统。当前除了 「运输管理」 为外采，及「财务结算」使用美团基建能力外，其他系统能力均为歪马自建。",
-        "role": "前端负责人",
-        "challenges": [
-          "歪马送酒作为美团自营零售的先锋业务，其所建设的系统能力，是否适用于未来其他自营零售业务？",
-          "当前建设的供应链系统能力，与美团其他业务（如医药）的供应链系统能力能否做整合统一？",
-          "供应链系统能力的通用化及整合统一建设涉及跨业务、跨事业线、跨团队，复杂度高，模糊度高。"
-        ],
-        "tasks": [
-          "以 WMS 通用化建设作为试点，探索零售供应链系统能力整合统一的解决方案；",
-          "完成包含仓内管理和出入库等 WMS 基础管理能力的通用化建设，通过低成本复用，满足新业务在小型仓的 WMS 管理诉求。"
-        ],
-        "actions": [
-          "组织先行：成立零售供应链统一建设的虚拟组织，明确目标、执行计划、各细分方向的负责人；",
-          "调研对标：联同干事团队进行「外部行业调研」及「内部业务系统摸排」，梳理及借鉴学习行业解决方案，完成零售供应链统一建设整体方案的设计；",
-          "试点推行：结合业务需求，协同前后端团队推进 WMS 基建工作开展，推进 PC 端 WMS 基础管理能力的通用化建设，在 23 年底实现 WMS 基础管理能力通用化率达 100%。"
-        ],
-        "results": [
-          "完成对行业领先的富勒公司 WMS 系统、盒马生鲜供应链系统的调研，以及内部医药业务供应链系统能力的摸排梳理，共识了零售供应链统一建设的目标、实施路径以及关键里程碑，前端相应完成了 WMS 模块通用化目标及整体方案的架构设计及关键里程碑设计；",
-          "协同设计团队完成了零售供应链设计体系及前端物料的建设，提升了系统平台的设计标准和用户体验（样式标准度达 85%，计算公式：设计变量使用量 / （设计变量使用量 + 硬编码样式数量））；",
-          "提升 PC 端需求研发提效率提升至 23%+（22 年17.79%），提升 App 端需求研发效率 15%+（分子：代码中使用组件的数量 * 单个组件的开发时长；分母：需求开发时长+分子）；",
-          "完成可配置可拓展的 3 大业务流程模板的建设及投产：「任务流程模板」、「单据流程模板」及「主数据流程模板」，为 WMS 基础管理能力的通用化建设做好了底层的技术铺垫。"
-        ],
-        "status": "Active",
-        "startDate": "2022-07-01",
-        "endDate": "2023-11-01",
-        "opensource": false,
-        "id": "102.waima-02",
-        "locale": "zh",
-        "image": "shots/102.waima-02.png"
       }
     ]
   },
@@ -278,7 +278,42 @@
     ],
     "id": "13.2011.tencent",
     "locale": "zh",
-    "projects": []
+    "projects": [
+      {
+        "name": "腾讯游戏营销活动",
+        "url": "https://docs.qq.com/doc/DQkRja1JxSmtFVGtQ",
+        "description": "腾讯游戏（game.qq.com）官网及各游戏产品的营销活动专题，以强视觉、强动效的专题页为主，需要在极短周期内上线并扛住大促级流量。负责活动专题的前端实现与动效还原。",
+        "role": "高级前端开发工程师",
+        "challenges": [],
+        "tasks": [],
+        "actions": [],
+        "results": [],
+        "status": "Archived",
+        "startDate": "2011-04-18",
+        "endDate": "2015-09-24",
+        "opensource": false,
+        "id": "109.tencent-games",
+        "locale": "zh",
+        "image": "shots/109.tencent-games.png"
+      },
+      {
+        "name": "QQ会员",
+        "url": "https://docs.qq.com/doc/DQkRja1JxSmtFVGtQ",
+        "description": "QQ 会员（vip.qq.com）是腾讯最早的增值服务官网之一，承载会员特权展示、开通与各类运营活动页面。负责会员站前端页面的开发与活动专题搭建，覆盖 PC 与早期移动端。",
+        "role": "高级前端开发工程师",
+        "challenges": [],
+        "tasks": [],
+        "actions": [],
+        "results": [],
+        "status": "Archived",
+        "startDate": "2011-04-18",
+        "endDate": "2015-09-24",
+        "opensource": false,
+        "id": "105.tencent-qqvip",
+        "locale": "zh",
+        "image": "shots/105.tencent-qqvip.png"
+      }
+    ]
   },
   {
     "startDate": "2010-12-22",
@@ -292,7 +327,25 @@
     ],
     "id": "14.2010.baidu",
     "locale": "zh",
-    "projects": []
+    "projects": [
+      {
+        "name": "百度知道",
+        "url": "https://docs.qq.com/doc/DQnNWVWp6bkpSQXh0",
+        "description": "百度知道（zhidao.baidu.com）是百度旗下的问答社区。负责提问、回答、分类等核心页面的前端开发与性能优化。",
+        "role": "前端开发工程师",
+        "challenges": [],
+        "tasks": [],
+        "actions": [],
+        "results": [],
+        "status": "Archived",
+        "startDate": "2010-12-22",
+        "endDate": "2011-04-18",
+        "opensource": false,
+        "id": "110.baidu-zhidao",
+        "locale": "zh",
+        "image": "shots/110.baidu-zhidao.png"
+      }
+    ]
   },
   {
     "startDate": "2010-07-01",
@@ -306,7 +359,25 @@
     ],
     "id": "15.2010.sohu",
     "locale": "zh",
-    "projects": []
+    "projects": [
+      {
+        "name": "搜狐大视野",
+        "url": "https://docs.qq.com/doc/DQnhuaWd5TEN1UmN6",
+        "description": "搜狐大视野（原 pic.sohu.com，2011 年改版为 tv.sohu.com/s2011/sohushipindashiye/）是搜狐的视觉图片/视频专题栏目，以大幅影像叙事为主。负责专题页前端开发与版式实现。",
+        "role": "前端开发工程师",
+        "challenges": [],
+        "tasks": [],
+        "actions": [],
+        "results": [],
+        "status": "Archived",
+        "startDate": "2010-07-01",
+        "endDate": "2010-12-22",
+        "opensource": false,
+        "id": "111.sohu-dashiye",
+        "locale": "zh",
+        "image": "shots/111.sohu-dashiye.png"
+      }
+    ]
   },
   {
     "startDate": "2006-04-25",
@@ -320,7 +391,25 @@
     ],
     "id": "16.2006.m18",
     "locale": "zh",
-    "projects": []
+    "projects": [
+      {
+        "name": "麦网 M18.COM",
+        "url": "https://docs.qq.com/doc/DQnVUYkZiV1RnTkty",
+        "description": "麦网（M18.COM）是面向服装服饰的 B2C 电商平台。参与商品、购物车、订单等核心链路的前后端开发，以及早期电商平台的性能与可用性建设。",
+        "role": "软件开发工程师",
+        "challenges": [],
+        "tasks": [],
+        "actions": [],
+        "results": [],
+        "status": "Archived",
+        "startDate": "2006-04-25",
+        "endDate": "2010-07-01",
+        "opensource": false,
+        "id": "112.m18",
+        "locale": "zh",
+        "image": "shots/112.m18.png"
+      }
+    ]
   },
   {
     "startDate": "2005-09-01",
@@ -334,7 +423,25 @@
     ],
     "id": "17.2005.cognizant",
     "locale": "zh",
-    "projects": []
+    "projects": [
+      {
+        "name": "海外软件项目",
+        "url": "https://www.cognizant.com/cn/zh",
+        "description": "高知特（Cognizant）是全球 IT 咨询与外包服务公司。作为实习生参与面向海外客户的软件项目开发，熟悉了规范化交付流程与英文协作环境。",
+        "role": "软件开发实习生",
+        "challenges": [],
+        "tasks": [],
+        "actions": [],
+        "results": [],
+        "status": "Archived",
+        "startDate": "2005-09-01",
+        "endDate": "2006-04-25",
+        "opensource": false,
+        "id": "113.cognizant",
+        "locale": "zh",
+        "image": "shots/113.cognizant.png"
+      }
+    ]
   },
   {
     "startDate": "2024-02-01",
@@ -411,6 +518,39 @@
     "locale": "en",
     "projects": [
       {
+        "name": "Waima Backstage System",
+        "url": "https://docs.qq.com/doc/DQmhTaUJsaXpBWEti",
+        "description": "This is a back-end system that supports the marketing and operation of the C-end (Waima WeChat Mini Program) of Meituan Waima business. It includes sub-systems such as 'Supplier Management (SRM), Product Management, Procurement Management (PMS), Warehouse Management (WMS), Transportation Management (TMS), Order Management (OMS), Delivery Fulfillment Management, Store Management, and Financial Settlement'. Currently, except for 'Transportation Management' which is outsourced, and 'Financial Settlement' which uses Meituan's infrastructure capabilities, all other system capabilities are self-built by Waima.",
+        "role": "R&D Manager",
+        "challenges": [
+          "Is the system capability built by Waima applicable to future self-operated retail businesses of Meituan?",
+          "Can the supply chain system capability currently being built be integrated and unified with other Meituan businesses (such as pharmaceuticals)?",
+          "The generalization and integration of supply chain system capabilities involve cross-business, cross-business line, and cross-team complexities, with high ambiguity."
+        ],
+        "tasks": [
+          "Exploring a unified solution for integrating and consolidating the capabilities of the retail supply chain system, with WMS generalization as a pilot;",
+          "Completing the generalization of WMS basic management capabilities, including warehouse management and inbound/outbound operations, to meet the WMS management needs of new businesses in small warehouses through low-cost reuse."
+        ],
+        "actions": [
+          "Organize in advance: Establish a virtual organization for the unified construction of the retail supply chain, clarify goals, execution plans, and responsible persons for each segment;",
+          "Benchmarking research: Conduct 'external industry research' and 'internal business system survey' together with the team, sort out and learn from industry solutions, and design the overall plan for the unified construction of the retail supply chain;",
+          "Pilot implementation: Combine business requirements, coordinate the front-end and back-end teams to promote the construction of WMS infrastructure, and promote the generalization of PC-side WMS basic management capabilities. By the end of 2023, achieve a 100% generalization rate of WMS basic management capabilities."
+        ],
+        "results": [
+          "Completed research on the leading WMS system of Flex Company, the supply chain system of Hema Fresh, and the capabilities of the internal pharmaceutical supply chain system. Consensus was reached on the goals, implementation path, and key milestones of the unified construction of the retail supply chain. The front-end team has completed the architectural design of the WMS module's generalization goals and overall plan, as well as the design of key milestones;",
+          "The collaborative design team has completed the construction of the retail supply chain design system and front-end materials, improving the design standards and user experience of the system platform (style standardization rate reached 85%, calculation formula: usage of design variables / (usage of design variables + hard-coded style quantity));",
+          "Improved the efficiency of PC-side requirement development to 23%+ (17.79% in 2022), and improved the efficiency of App-side requirement development to 15%+ (Numerator: number of components used in the code * development duration of a single component; Denominator: requirement development duration + numerator);",
+          "Completed the construction and deployment of 3 configurable and extensible business process templates: 'Task Process Template', 'Document Process Template', and 'Master Data Process Template', laying a solid technical foundation for the generalization of WMS basic management capabilities."
+        ],
+        "status": "Active",
+        "startDate": "2022-07-01",
+        "endDate": "2023-11-01",
+        "opensource": false,
+        "id": "102.waima-02",
+        "locale": "en",
+        "image": "shots/102.waima-02.png"
+      },
+      {
         "name": "Waima WeChat Mini Program",
         "url": "https://docs.qq.com/doc/DQnl3VUVXaW9xc3dM",
         "description": "The WeChat Mini Program supports the online marketing and operation of Meituan's self-operated Waima business. Developed based on Meituan's self-developed multi-end framework for Mini Programs, the product features 6 core pages: 'Home', 'Product Details', 'Product Details Page', 'Shopping Cart', 'Personal Center', and 'Search Page', as well as 3 major permanent marketing pages: 'Limited Time Sale', 'Waima Selection', and 'Member Center'.",
@@ -443,39 +583,6 @@
         "id": "101.waima-01",
         "locale": "en",
         "image": "shots/101.waima-01.png"
-      },
-      {
-        "name": "Waima Backstage System",
-        "url": "https://docs.qq.com/doc/DQmhTaUJsaXpBWEti",
-        "description": "This is a back-end system that supports the marketing and operation of the C-end (Waima WeChat Mini Program) of Meituan Waima business. It includes sub-systems such as 'Supplier Management (SRM), Product Management, Procurement Management (PMS), Warehouse Management (WMS), Transportation Management (TMS), Order Management (OMS), Delivery Fulfillment Management, Store Management, and Financial Settlement'. Currently, except for 'Transportation Management' which is outsourced, and 'Financial Settlement' which uses Meituan's infrastructure capabilities, all other system capabilities are self-built by Waima.",
-        "role": "R&D Manager",
-        "challenges": [
-          "Is the system capability built by Waima applicable to future self-operated retail businesses of Meituan?",
-          "Can the supply chain system capability currently being built be integrated and unified with other Meituan businesses (such as pharmaceuticals)?",
-          "The generalization and integration of supply chain system capabilities involve cross-business, cross-business line, and cross-team complexities, with high ambiguity."
-        ],
-        "tasks": [
-          "Exploring a unified solution for integrating and consolidating the capabilities of the retail supply chain system, with WMS generalization as a pilot;",
-          "Completing the generalization of WMS basic management capabilities, including warehouse management and inbound/outbound operations, to meet the WMS management needs of new businesses in small warehouses through low-cost reuse."
-        ],
-        "actions": [
-          "Organize in advance: Establish a virtual organization for the unified construction of the retail supply chain, clarify goals, execution plans, and responsible persons for each segment;",
-          "Benchmarking research: Conduct 'external industry research' and 'internal business system survey' together with the team, sort out and learn from industry solutions, and design the overall plan for the unified construction of the retail supply chain;",
-          "Pilot implementation: Combine business requirements, coordinate the front-end and back-end teams to promote the construction of WMS infrastructure, and promote the generalization of PC-side WMS basic management capabilities. By the end of 2023, achieve a 100% generalization rate of WMS basic management capabilities."
-        ],
-        "results": [
-          "Completed research on the leading WMS system of Flex Company, the supply chain system of Hema Fresh, and the capabilities of the internal pharmaceutical supply chain system. Consensus was reached on the goals, implementation path, and key milestones of the unified construction of the retail supply chain. The front-end team has completed the architectural design of the WMS module's generalization goals and overall plan, as well as the design of key milestones;",
-          "The collaborative design team has completed the construction of the retail supply chain design system and front-end materials, improving the design standards and user experience of the system platform (style standardization rate reached 85%, calculation formula: usage of design variables / (usage of design variables + hard-coded style quantity));",
-          "Improved the efficiency of PC-side requirement development to 23%+ (17.79% in 2022), and improved the efficiency of App-side requirement development to 15%+ (Numerator: number of components used in the code * development duration of a single component; Denominator: requirement development duration + numerator);",
-          "Completed the construction and deployment of 3 configurable and extensible business process templates: 'Task Process Template', 'Document Process Template', and 'Master Data Process Template', laying a solid technical foundation for the generalization of WMS basic management capabilities."
-        ],
-        "status": "Active",
-        "startDate": "2022-07-01",
-        "endDate": "2023-11-01",
-        "opensource": false,
-        "id": "102.waima-02",
-        "locale": "en",
-        "image": "shots/102.waima-02.png"
       }
     ]
   },
@@ -616,7 +723,42 @@
     ],
     "id": "13.2011.tencent",
     "locale": "en",
-    "projects": []
+    "projects": [
+      {
+        "name": "Tencent Games Marketing Campaigns",
+        "url": "https://docs.qq.com/doc/DQkRja1JxSmtFVGtQ",
+        "description": "The Tencent Games portal (game.qq.com) and marketing campaign microsites for individual game titles — heavy on visuals and motion, shipped on very short cycles and expected to survive peak traffic. Owned frontend implementation and motion fidelity.",
+        "role": "Senior Frontend Developer",
+        "challenges": [],
+        "tasks": [],
+        "actions": [],
+        "results": [],
+        "status": "Archived",
+        "startDate": "2011-04-18",
+        "endDate": "2015-09-24",
+        "opensource": false,
+        "id": "109.tencent-games",
+        "locale": "en",
+        "image": "shots/109.tencent-games.png"
+      },
+      {
+        "name": "QQ VIP",
+        "url": "https://docs.qq.com/doc/DQkRja1JxSmtFVGtQ",
+        "description": "QQ VIP (vip.qq.com) is one of Tencent's earliest value-added service sites, hosting membership benefits, sign-up flows and campaign pages. Built frontend pages and campaign microsites across desktop and early mobile.",
+        "role": "Senior Frontend Developer",
+        "challenges": [],
+        "tasks": [],
+        "actions": [],
+        "results": [],
+        "status": "Archived",
+        "startDate": "2011-04-18",
+        "endDate": "2015-09-24",
+        "opensource": false,
+        "id": "105.tencent-qqvip",
+        "locale": "en",
+        "image": "shots/105.tencent-qqvip.png"
+      }
+    ]
   },
   {
     "startDate": "2010-12-22",
@@ -630,7 +772,25 @@
     ],
     "id": "14.2010.baidu",
     "locale": "en",
-    "projects": []
+    "projects": [
+      {
+        "name": "Baidu Zhidao",
+        "url": "https://docs.qq.com/doc/DQnNWVWp6bkpSQXh0",
+        "description": "Baidu Zhidao (zhidao.baidu.com) is Baidu's Q&A community. Built and optimised the frontend for the question, answer and category pages.",
+        "role": "Frontend Developer",
+        "challenges": [],
+        "tasks": [],
+        "actions": [],
+        "results": [],
+        "status": "Archived",
+        "startDate": "2010-12-22",
+        "endDate": "2011-04-18",
+        "opensource": false,
+        "id": "110.baidu-zhidao",
+        "locale": "en",
+        "image": "shots/110.baidu-zhidao.png"
+      }
+    ]
   },
   {
     "startDate": "2010-07-01",
@@ -644,7 +804,25 @@
     ],
     "id": "15.2010.sohu",
     "locale": "en",
-    "projects": []
+    "projects": [
+      {
+        "name": "Sohu Vision",
+        "url": "https://docs.qq.com/doc/DQnhuaWd5TEN1UmN6",
+        "description": "Sohu Vision (originally pic.sohu.com, relaunched in 2011 as tv.sohu.com/s2011/sohushipindashiye/) was Sohu's visual photo/video feature column built around large-format imagery. Owned the frontend and layout implementation.",
+        "role": "Frontend Developer",
+        "challenges": [],
+        "tasks": [],
+        "actions": [],
+        "results": [],
+        "status": "Archived",
+        "startDate": "2010-07-01",
+        "endDate": "2010-12-22",
+        "opensource": false,
+        "id": "111.sohu-dashiye",
+        "locale": "en",
+        "image": "shots/111.sohu-dashiye.png"
+      }
+    ]
   },
   {
     "startDate": "2006-04-25",
@@ -658,7 +836,25 @@
     ],
     "id": "16.2006.m18",
     "locale": "en",
-    "projects": []
+    "projects": [
+      {
+        "name": "M18.COM",
+        "url": "https://docs.qq.com/doc/DQnVUYkZiV1RnTkty",
+        "description": "M18.COM was a B2C e-commerce platform for apparel. Worked across the product, cart and order flows, plus early performance and availability work for the platform.",
+        "role": "Software Developer",
+        "challenges": [],
+        "tasks": [],
+        "actions": [],
+        "results": [],
+        "status": "Archived",
+        "startDate": "2006-04-25",
+        "endDate": "2010-07-01",
+        "opensource": false,
+        "id": "112.m18",
+        "locale": "en",
+        "image": "shots/112.m18.png"
+      }
+    ]
   },
   {
     "startDate": "2005-09-01",
@@ -672,6 +868,24 @@
     ],
     "id": "17.2005.cognizant",
     "locale": "en",
-    "projects": []
+    "projects": [
+      {
+        "name": "Overseas Software Projects",
+        "url": "https://www.cognizant.com/cn/zh",
+        "description": "Cognizant is a global IT consulting and outsourcing company. As an intern I contributed to software projects delivered for overseas clients, learning a formal delivery process and an English-first collaboration environment.",
+        "role": "Software Development Intern",
+        "challenges": [],
+        "tasks": [],
+        "actions": [],
+        "results": [],
+        "status": "Archived",
+        "startDate": "2005-09-01",
+        "endDate": "2006-04-25",
+        "opensource": false,
+        "id": "113.cognizant",
+        "locale": "en",
+        "image": "shots/113.cognizant.png"
+      }
+    ]
   }
 ]
