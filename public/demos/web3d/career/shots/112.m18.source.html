@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:1600px;height:556px;overflow:hidden}
+  body{
+    background:#0b0d13;
+    font-family:"PingFang SC","Hiragino Sans GB","Helvetica Neue",Arial,sans-serif;
+    position:relative;
+  }
+  /* 底：径向光 + 斜向条纹，别让纯黑死板 */
+  .bg{
+    position:absolute;inset:0;
+    background:
+      radial-gradient(120% 90% at 78% 12%, rgba(255,59,92,.20), transparent 58%),
+      radial-gradient(100% 80% at 12% 92%, rgba(60,110,255,.20), transparent 60%),
+      linear-gradient(135deg,#0a0c12 0%,#12151f 52%,#0a0c12 100%);
+  }
+  /* 文字背景：整幅平铺 M18.COM，只做纹理 */
+  .tile{
+    position:absolute;inset:-80px;
+    display:flex;flex-direction:column;justify-content:center;gap:14px;
+    transform:rotate(-6deg);
+    font-size:96px;font-weight:800;letter-spacing:-.03em;white-space:nowrap;
+    color:#fff;opacity:.055;line-height:1;
+    user-select:none;
+  }
+  .tile span{display:block}
+  .tile span:nth-child(even){opacity:.7;transform:translateX(-140px)}
+  /* 前景 */
+  .fg{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center;
+  }
+  .label{
+    font-size:13px;letter-spacing:.34em;text-transform:uppercase;
+    color:#8b93a7;font-weight:600;
+  }
+  .wordmark{
+    font-size:124px;line-height:.92;font-weight:800;letter-spacing:-.045em;
+    color:#fff;display:flex;align-items:baseline;gap:20px;
+  }
+  .wordmark em{
+    font-style:normal;font-size:34px;font-weight:700;letter-spacing:.1em;
+    color:#ff3b5c;transform:translateY(-14px);
+  }
+  .rule{width:120px;height:3px;background:#ff3b5c;border-radius:2px;margin:2px 0}
+  .meta{
+    font-size:17px;line-height:1.6;color:#aab2c4;letter-spacing:.02em;
+  }
+  .meta b{color:#e8ecf4;font-weight:600}
+  .badge{
+    position:absolute;left:50%;bottom:52px;transform:translateX(-50%);text-align:center;
+    font-size:12px;letter-spacing:.26em;color:#6c7488;text-transform:uppercase;
+  }
+  .dot{
+    position:absolute;right:120px;top:96px;width:9px;height:9px;border-radius:50%;
+    background:#ff3b5c;box-shadow:0 0 22px rgba(255,59,92,.85);
+  }
+</style>
+</head>
+<body>
+  <div class="bg"></div>
+  <div class="tile">
+    <span>M18.COM M18.COM M18.COM M18.COM M18.COM M18.COM M18.COM</span>
+    <span>M18.COM M18.COM M18.COM M18.COM M18.COM M18.COM M18.COM</span>
+    <span>M18.COM M18.COM M18.COM M18.COM M18.COM M18.COM M18.COM</span>
+    <span>M18.COM M18.COM M18.COM M18.COM M18.COM M18.COM M18.COM</span>
+    <span>M18.COM M18.COM M18.COM M18.COM M18.COM M18.COM M18.COM</span>
+  </div>
+  <div class="dot"></div>
+  <div class="fg">
+    <div class="label">Apparel B2C · 2006 — 2010</div>
+    <div class="wordmark">M18.COM <em>麦网</em></div>
+    <div class="rule"></div>
+    <div class="meta">服装服饰 B2C 电商平台 · 商品 / 购物车 / 订单核心链路<br><b>软件开发工程师</b> · 研发部</div>
+  </div>
+  <div class="badge">Site offline · 仅存记忆</div>
+</body>
+</html>

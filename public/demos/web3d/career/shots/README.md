@@ -12,13 +12,16 @@
 106.gitalk.*          Gitalk                        （京东）      ✅
 107.vue-easy-gantt.*  Vue-easy-gantt                （京东）      ✅
 108.aotu.io.*         凹凸实验室                    （京东）      ✅
-109.tencent-games.*   腾讯游戏营销活动              （腾讯）
-105.tencent-qqvip.*   QQ会员                        （腾讯）
-110.baidu-zhidao.*    百度知道                      （百度）
-111.sohu-dashiye.*    搜狐大视野                    （搜狐）
-112.m18.*             麦网 M18.COM                  （麦网）
-113.cognizant.*       海外软件项目                  （高知特中国）
+109.tencent-games.*   腾讯游戏营销活动              （腾讯）      ✅
+105.tencent-qqvip.*   QQ会员                        （腾讯）      ✅
+110.baidu-zhidao.*    百度知道                      （百度）      ✅
+111.sohu-dashiye.*    搜狐大视野                    （搜狐）      ✅
+112.m18.*             麦网 M18.COM                  （麦网）      ✅ 站点已下线，程序化文字卡
+113.cognizant.*       海外软件项目                  （高知特中国）✅
 ```
+
+14 个全齐。其中 `112.m18` 因为站点下线，是用 HTML/CSS 排的文字背景卡，
+不是截图 —— 源文件就是同目录的 `112.m18.source.html`，改文案后重开它截图即可。
 
 ## 画幅怎么处理
 
