@@ -134,7 +134,7 @@
   },
   {
     "name": "Vue-easy-gantt",
-    "url": "https://mamboer.github.io/vue-easy-gantt/",
+    "url": "https://aispin.github.io/vue-easy-gantt",
     "description": "A simple Vue.js gantt chart plugin for presenting weekly tasks.",
     "status": "Active",
     "opensource": true,
@@ -417,7 +417,7 @@
   },
   {
     "name": "Vue-easy-gantt",
-    "url": "https://mamboer.github.io/vue-easy-gantt/",
+    "url": "https://aispin.github.io/vue-easy-gantt",
     "description": "一个简单的 Vue.js 甘特图插件，用于展示每周任务。",
     "status": "Active",
     "opensource": true,
