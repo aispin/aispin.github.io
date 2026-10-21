@@ -30,5 +30,28 @@
 - **竖图**（手机 / 小程序截图）：自动切成 `contain` + 同图放大模糊垫底，头图拔高到
   520px，**整张完整显示**，不会被裁成一条。
 - 左栏缩略图是 56×40：横图 `cover`，竖图 `contain`（保留手机形状）。
-- 详情头图建议 **宽 ≥ 1600px**（横图 1600×600 左右最贴框，几乎不裁）。
 - 中英文共用同一套文件名（`locale` 不同、`id` 相同），截图只需放一份。
+
+## 体积规范（一律 JPEG）
+
+14 张总共 **1.4MB**，单张最大 212KB。新加图请按同一套参数压：
+
+| 项 | 值 | 理由 |
+|---|---|---|
+| 格式 | JPEG，`progressive` + `optimize` | 渐进式先出糊再变清，体感更快 |
+| 质量 | **q80**，`subsampling=4:2:0` | 截图文字在 q80 仍锐利；4:4:4 要多花 30% 体积 |
+| 横图宽度 | **≤ 1600** | 头图框 978 宽 ⇒ 1.6x，1x 屏锐利、2x 屏略软但可接受 |
+| 竖图宽度 | **≤ 900** | 竖图最大只显示 293×520 ⇒ 900 宽 ≈ 1.7x |
+
+一条命令搞定（macOS 自带 `sips` 也能凑合，但 PIL 能控 subsampling）：
+
+```bash
+python3 - <<'PY'
+from PIL import Image
+im = Image.open('xxx.png').convert('RGB')
+w, h = im.size
+m = 900 if w / h < 1.25 else 1600
+if w > m: im = im.resize((m, round(h * m / w)), Image.LANCZOS)
+im.save('xxx.jpg', 'JPEG', quality=80, optimize=True, progressive=True, subsampling='4:2:0')
+PY
+```
