@@ -1,5 +1,35 @@
 [
   {
+    "id": "iskill-workbuddy-deepseek",
+    "title": "iskill-workbuddy-deepseek",
+    "name": "iskill-workbuddy-deepseek",
+    "description": "在 WorkBuddy 内置浏览器里用免费的 DeepSeek 网页版做讨论，一句话把对话交给 agent 执行 —— 不用外部 Chrome，不用切应用。",
+    "repository": "https://github.com/aispin/iskill-workbuddy-deepseek",
+    "url": "https://github.com/aispin/iskill-workbuddy-deepseek",
+    "demoUrl": "https://aispin.github.io/iskill-workbuddy-deepseek/",
+    "stars": 1,
+    "topics": [],
+    "updatedAt": "2026-10-25T23:23:39Z",
+    "language": "JavaScript",
+    "defaultBranch": "main",
+    "category": "skill"
+  },
+  {
+    "id": "iskill-headroom-workbuddy2api",
+    "title": "iskill-headroom-workbuddy2api",
+    "name": "iskill-headroom-workbuddy2api",
+    "description": "把 WorkBuddy 桌面端内置模型接成 OpenAI 兼容 API（hub 负责能用、headroom 负责耐用）；跨平台双击启动器 + 本机控制台",
+    "repository": "https://github.com/aispin/iskill-headroom-workbuddy2api",
+    "url": "https://github.com/aispin/iskill-headroom-workbuddy2api",
+    "demoUrl": "https://aispin.github.io/iskill-headroom-workbuddy2api/",
+    "stars": 0,
+    "topics": [],
+    "updatedAt": "2026-10-21T16:31:19Z",
+    "language": "Python",
+    "defaultBranch": "main",
+    "category": "skill"
+  },
+  {
     "id": "ai-matrix-team",
     "title": "ai-matrix-team",
     "name": "ai-matrix-team",
@@ -16,25 +46,10 @@
       "skills",
       "token"
     ],
-    "updatedAt": "2026-10-13T08:37:54Z",
+    "updatedAt": "2026-10-21T13:21:39Z",
     "language": "JavaScript",
     "defaultBranch": "main",
     "category": "application"
-  },
-  {
-    "id": "iskill-headroom-workbuddy2api",
-    "title": "iskill-headroom-workbuddy2api",
-    "name": "iskill-headroom-workbuddy2api",
-    "description": "把 WorkBuddy 桌面端内置模型接成 OpenAI 兼容 API（hub 负责能用、headroom 负责耐用）；跨平台双击启动器 + 本机控制台",
-    "repository": "https://github.com/aispin/iskill-headroom-workbuddy2api",
-    "url": "https://github.com/aispin/iskill-headroom-workbuddy2api",
-    "demoUrl": "https://aispin.github.io/iskill-headroom-workbuddy2api/",
-    "stars": 0,
-    "topics": [],
-    "updatedAt": "2026-10-11T09:07:07Z",
-    "language": "Python",
-    "defaultBranch": "main",
-    "category": "skill"
   },
   {
     "id": "iskill-generate-sponsors",
@@ -47,21 +62,6 @@
     "stars": 0,
     "topics": [],
     "updatedAt": "2026-10-09T08:17:13Z",
-    "language": "JavaScript",
-    "defaultBranch": "main",
-    "category": "skill"
-  },
-  {
-    "id": "iskill-workbuddy-deepseek",
-    "title": "iskill-workbuddy-deepseek",
-    "name": "iskill-workbuddy-deepseek",
-    "description": "在 WorkBuddy 内置浏览器里用免费的 DeepSeek 网页版做讨论，一句话把对话交给 agent 执行 —— 不用外部 Chrome，不用切应用。",
-    "repository": "https://github.com/aispin/iskill-workbuddy-deepseek",
-    "url": "https://github.com/aispin/iskill-workbuddy-deepseek",
-    "demoUrl": "https://aispin.github.io/iskill-workbuddy-deepseek/",
-    "stars": 0,
-    "topics": [],
-    "updatedAt": "2026-10-09T06:05:11Z",
     "language": "JavaScript",
     "defaultBranch": "main",
     "category": "skill"
