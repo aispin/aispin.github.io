@@ -1,5 +1,20 @@
 [
   {
+    "id": "iskill-headroom-workbuddy2api",
+    "title": "iskill-headroom-workbuddy2api",
+    "name": "iskill-headroom-workbuddy2api",
+    "description": "把 WorkBuddy 桌面端内置模型接成 OpenAI 兼容 API（hub 负责能用、headroom 负责耐用）；跨平台双击启动器 + 本机控制台",
+    "repository": "https://github.com/aispin/iskill-headroom-workbuddy2api",
+    "url": "https://github.com/aispin/iskill-headroom-workbuddy2api",
+    "demoUrl": "https://aispin.github.io/iskill-headroom-workbuddy2api/",
+    "stars": 0,
+    "topics": [],
+    "updatedAt": "2026-10-29T05:24:24Z",
+    "language": "Python",
+    "defaultBranch": "main",
+    "category": "skill"
+  },
+  {
     "id": "iskill-workbuddy-deepseek",
     "title": "iskill-workbuddy-deepseek",
     "name": "iskill-workbuddy-deepseek",
@@ -11,21 +26,6 @@
     "topics": [],
     "updatedAt": "2026-10-25T23:23:39Z",
     "language": "JavaScript",
-    "defaultBranch": "main",
-    "category": "skill"
-  },
-  {
-    "id": "iskill-headroom-workbuddy2api",
-    "title": "iskill-headroom-workbuddy2api",
-    "name": "iskill-headroom-workbuddy2api",
-    "description": "把 WorkBuddy 桌面端内置模型接成 OpenAI 兼容 API（hub 负责能用、headroom 负责耐用）；跨平台双击启动器 + 本机控制台",
-    "repository": "https://github.com/aispin/iskill-headroom-workbuddy2api",
-    "url": "https://github.com/aispin/iskill-headroom-workbuddy2api",
-    "demoUrl": "https://aispin.github.io/iskill-headroom-workbuddy2api/",
-    "stars": 0,
-    "topics": [],
-    "updatedAt": "2026-10-21T16:31:19Z",
-    "language": "Python",
     "defaultBranch": "main",
     "category": "skill"
   },
