@@ -142,7 +142,21 @@ const useInfiniteCamera = ({
         let bestStrength = 0;
         let bestDir = 0;
 
-        const START_DIST = 15;
+        /**
+         * 🔴 `START_DIST` 必须 **< 14.35**（2026-11-04）。
+         *
+         * 进屋落点是 `INTERIOR_FRONT_Z − ENTRANCE_LANDING_INSET = 22.15 − 3.65 = 18.5`，
+         * 第一扇门 `DOOR_POSITIONS[0]` 在世界 z = 22.15 − 18 = 4.15 ⇒ 落点到它
+         * **14.35**。原来写 15，落点正好卡在渐入带的边缘（strength 0.093）⇒
+         * 一进屋相机就自己往左偏 **1.60° ≈ 24.3px**，再用 ~530ms 慢慢转过去，
+         * 用户读成"晃一下才定格"（实测 `probe-enter-settle.mjs`：
+         * 落点静止 187ms → 530ms 内 ry 0→0.02788 → 定格；`reduce` 对照下 ry 恒 0）。
+         *
+         * 13 让落点直接出带（14.35 > 13 ⇒ strength 0），进屋零转动；走廊里门
+         * 仍在 13 处开始转头（原 15），渐入带从 7 收到 5，转头略快一点。
+         * 改大这个数就会把那 1.6° 请回来 —— 判据是进屋后 `ry` span 必须为 0。
+         */
+        const START_DIST = 13;
         const PEAK_DIST = 8;
         const END_DIST = -2;
 
