@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-12T10:05:07.754Z",
-  "count": 10,
+  "generatedAt": "2026-11-04T04:03:17.128Z",
+  "count": 15,
   "demos": [
     {
       "id": "door",
@@ -13,11 +13,36 @@
       "variants": []
     },
     {
+      "id": "comment-ui",
+      "title": "Gitalk · 轻量评论区",
+      "description": "把 GitHub Issue 变成你的评论区。零后端、零数据库，评论与 Issue 实时同步，接入成本低到几乎无感。",
+      "url": "/demos/comment-ui/",
+      "dir": "public/demos/comment-ui",
+      "entry": "index.html",
+      "readme": true,
+      "variants": [
+        {
+          "name": "index01",
+          "url": "/demos/comment-ui/index01.html"
+        }
+      ]
+    },
+    {
       "id": "creature-kit",
       "title": "CreatureKit 2.1 - 关节过渡与物种配色",
       "description": "- 入口：index.html",
       "url": "/demos/creature-kit/",
       "dir": "public/demos/creature-kit",
+      "entry": "index.html",
+      "readme": true,
+      "variants": []
+    },
+    {
+      "id": "landing",
+      "title": "Gitalk — 评论区，从此是一片星系",
+      "description": "每一条评论都是一颗星。Gitalk 把 GitHub Issue 变成你的评论区 —— 零后端、零数据库，一段脚本即可拥有完整评论体验。",
+      "url": "/demos/landing/",
+      "dir": "public/demos/landing",
       "entry": "index.html",
       "readme": true,
       "variants": []
@@ -64,6 +89,16 @@
       ]
     },
     {
+      "id": "textural",
+      "title": "Textural — 把文字变成卡片背景",
+      "description": "Textural 是一个 4KB 的零依赖库，把任意文字渲染成柔和、不抢镜的卡片背景。",
+      "url": "/demos/textural/",
+      "dir": "public/demos/textural",
+      "entry": "index.html",
+      "readme": true,
+      "variants": []
+    },
+    {
       "id": "web3d/3d-ip-landing",
       "title": "Hugo — 独立开发者 · 创意设计师 · 音乐人",
       "description": "在代码、像素和声音之间游走。做一些安静的、需要耐心的东西。",
@@ -84,11 +119,40 @@
       "variants": []
     },
     {
+      "id": "web3d/career",
+      "title": "履历 · 时空隧道 · Textural",
+      "description": "- 入口：index.html",
+      "url": "/demos/web3d/career/",
+      "dir": "public/demos/web3d/career",
+      "entry": "index.html",
+      "readme": true,
+      "variants": [
+        {
+          "name": "index01",
+          "url": "/demos/web3d/career/index01.html"
+        },
+        {
+          "name": "index02",
+          "url": "/demos/web3d/career/index02.html"
+        }
+      ]
+    },
+    {
       "id": "web3d/life-meaning",
       "title": "人生的意义 · v0.0.1 · AI Matrix",
       "description": "- 入口：index.html",
       "url": "/demos/web3d/life-meaning/",
       "dir": "public/demos/web3d/life-meaning",
+      "entry": "index.html",
+      "readme": true,
+      "variants": []
+    },
+    {
+      "id": "web3d/monster-kit",
+      "title": "MonsterKit v1.0 · 载具图鉴",
+      "description": "8 VEHICLES · 怪物可以住在任何地方",
+      "url": "/demos/web3d/monster-kit/",
+      "dir": "public/demos/web3d/monster-kit",
       "entry": "index.html",
       "readme": true,
       "variants": []

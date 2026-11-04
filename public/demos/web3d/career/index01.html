@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>履历 · 3D 轨道轮播 · Textural</title>
+<style>
+  :root{
+    --bg:#06070c;
+    --fg:#e9edf5;
+    --dim:#8792a6;
+    --mute:#5a6478;
+    --line:rgba(255,255,255,.09);
+    --accent:#8ba3ff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:
+      radial-gradient(1400px 900px at 50% -10%, #1a2035 0%, #06070c 55%),
+      radial-gradient(800px 600px at 80% 110%, #2a1f3a 0%, transparent 60%),
+      var(--bg);
+    color:var(--fg);
+    font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ====================================================================
+     3D 舞台
+     ==================================================================== */
+  .stage{
+    position:fixed;inset:0;
+    perspective:1600px;
+    perspective-origin:50% 46%;
+    cursor:grab;
+    user-select:none;
+  }
+  .stage:active{cursor:grabbing}
+  .orbit{
+    position:absolute;inset:0;
+    transform-style:preserve-3d;
+  }
+
+  /* 地面光晕 */
+  .floor{
+    position:absolute;
+    left:50%;top:52%;
+    width:900px;height:900px;
+    margin-left:-450px;margin-top:-450px;
+    border-radius:50%;
+    background:
+      radial-gradient(circle, rgba(139,163,255,.14) 0%, transparent 55%);
+    pointer-events:none;
+    z-index:-1;
+  }
+
+  /* ====================================================================
+     卡片
+     ==================================================================== */
+  .card{
+    position:absolute;
+    left:50%;top:50%;
+    width:340px;
+    height:480px;
+    margin-left:-170px;
+    margin-top:-240px;
+    border-radius:22px;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,.1);
+    box-shadow:
+      0 30px 90px rgba(0,0,0,.55),
+      inset 0 1px 0 rgba(255,255,255,.08);
+    background-size:cover;
+    background-position:center;
+    transform-style:preserve-3d;
+    will-change:transform,opacity;
+    backface-visibility:hidden;
+    transition:box-shadow .4s ease;
+    cursor:pointer;
+  }
+  .card::after{
+    content:"";
+    position:absolute;inset:0;
+    background:linear-gradient(180deg,transparent 35%,rgba(0,0,0,.62) 100%);
+    pointer-events:none;
+  }
+  .card.focused{
+    box-shadow:
+      0 40px 120px rgba(80,110,255,.4),
+      0 0 0 1px rgba(139,163,255,.35),
+      inset 0 1px 0 rgba(255,255,255,.12);
+  }
+  .card-content{
+    position:absolute;inset:0;
+    padding:34px 30px 32px;
+    display:flex;flex-direction:column;justify-content:flex-end;
+    z-index:2;
+    color:#fff;
+  }
+  .card-date{
+    font-size:11.5px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    font-weight:700;
+    opacity:.7;
+    margin-bottom:14px;
+    font-variant-numeric:tabular-nums;
+    display:flex;align-items:center;gap:8px;
+  }
+  .card-date::before{
+    content:"";
+    width:20px;height:1px;
+    background:currentColor;
+    opacity:.5;
+  }
+  .card-title{
+    font-size:30px;
+    font-weight:800;
+    letter-spacing:-.025em;
+    line-height:1.1;
+    margin-bottom:10px;
+  }
+  .card-sub{
+    font-size:13px;
+    font-weight:600;
+    opacity:.75;
+    margin-bottom:16px;
+    line-height:1.55;
+  }
+  .card-desc{
+    font-size:13.5px;
+    line-height:1.72;
+    opacity:.72;
+    display:-webkit-box;
+    -webkit-line-clamp:4;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+  }
+  .card-index{
+    position:absolute;
+    top:22px;left:26px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:11px;
+    letter-spacing:.15em;
+    font-weight:700;
+    opacity:.4;
+    z-index:2;
+  }
+
+  /* ====================================================================
+     HUD
+     ==================================================================== */
+  .hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+  .hud > *{pointer-events:auto}
+
+  .brand{
+    position:absolute;top:32px;left:40px;
+    display:flex;align-items:center;gap:12px;
+    font-weight:800;letter-spacing:-.01em;
+    font-size:15px;
+  }
+  .brand-mark{
+    width:32px;height:32px;
+    border-radius:10px;
+    background:linear-gradient(135deg,#4f6bff,#a678ff);
+    display:grid;place-items:center;
+    font-size:14px;font-weight:900;
+    box-shadow:0 8px 28px rgba(79,107,255,.45);
+  }
+  .brand small{
+    display:block;
+    font-size:10.5px;
+    font-weight:600;
+    color:var(--dim);
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    margin-top:3px;
+  }
+
+  .year-label{
+    position:absolute;
+    top:50%;
+    left:40px;
+    transform:translateY(-50%);
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:11px;
+    color:var(--mute);
+    letter-spacing:.2em;
+    writing-mode:vertical-rl;
+    opacity:.6;
+  }
+
+  .progress{
+    position:absolute;
+    bottom:110px;left:50%;
+    transform:translateX(-50%);
+    display:flex;gap:7px;
+  }
+  .progress button{
+    width:26px;height:3px;
+    padding:0;border:0;
+    border-radius:2px;
+    background:rgba(255,255,255,.15);
+    cursor:pointer;
+    transition:all .4s cubic-bezier(.2,.8,.3,1);
+  }
+  .progress button:hover{background:rgba(255,255,255,.3)}
+  .progress button.on{
+    width:44px;
+    background:linear-gradient(90deg,#4f6bff,#a678ff);
+    box-shadow:0 0 12px rgba(120,150,255,.5);
+  }
+
+  .nav{
+    position:absolute;
+    bottom:40px;left:50%;
+    transform:translateX(-50%);
+    display:flex;gap:6px;
+    padding:6px;
+    background:rgba(18,22,34,.72);
+    backdrop-filter:blur(20px) saturate(180%);
+    -webkit-backdrop-filter:blur(20px) saturate(180%);
+    border:1px solid rgba(255,255,255,.1);
+    border-radius:14px;
+  }
+  .nav button{
+    width:40px;height:40px;
+    border:0;background:transparent;
+    color:var(--dim);
+    border-radius:10px;
+    cursor:pointer;
+    display:grid;place-items:center;
+    transition:all .2s;
+  }
+  .nav button:hover{background:rgba(255,255,255,.08);color:#fff}
+  .nav button.on{background:rgba(139,163,255,.15);color:var(--accent)}
+  .nav button svg{
+    width:16px;height:16px;
+    fill:none;stroke:currentColor;
+    stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+  }
+
+  .hint{
+    position:absolute;
+    bottom:44px;right:40px;
+    font-size:11.5px;
+    color:var(--mute);
+    letter-spacing:.05em;
+    display:flex;align-items:center;gap:8px;
+  }
+  .hint kbd{
+    padding:2px 7px;
+    border-radius:5px;
+    background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.1);
+    font-family:inherit;font-size:10.5px;font-weight:600;
+  }
+
+  @media (max-width:768px){
+    .card{width:260px;height:380px;margin-left:-130px;margin-top:-190px;border-radius:18px}
+    .card-content{padding:26px 22px 24px}
+    .card-title{font-size:23px}
+    .card-desc{font-size:12.5px;-webkit-line-clamp:3}
+    .brand{top:22px;left:22px}
+    .year-label{display:none}
+    .hint{display:none}
+    .nav{bottom:24px}
+    .progress{bottom:92px}
+  }
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+  <div class="floor"></div>
+  <div class="orbit" id="orbit"></div>
+</div>
+
+<div class="hud">
+  <div class="brand">
+    <div class="brand-mark">Z</div>
+    <div>
+      Zhiyuan Li
+      <small>Frontend Engineer</small>
+    </div>
+  </div>
+
+  <div class="year-label">TIMELINE · 2014 — 2025</div>
+
+  <div class="progress" id="progress"></div>
+
+  <div class="nav">
+    <button id="prev" aria-label="Previous">
+      <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <button id="auto" class="on" aria-label="Toggle auto-rotate">
+      <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+    </button>
+    <button id="next" aria-label="Next">
+      <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+    </button>
+  </div>
+
+  <div class="hint">
+    拖动旋转 · <kbd>←</kbd><kbd>→</kbd> 切换
+  </div>
+</div>
+
+<script>
+/* ============================================================================
+   Textural · 静态卡片背景渲染器（2D Canvas 版本，性能优先）
+   ============================================================================ */
+function hash32(str){
+  let h = 2166136261 >>> 0;
+  for(let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h,16777619) >>> 0; }
+  return h >>> 0;
+}
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), 1 | t);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function renderTextural(w, h, cfg){
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const pw = Math.round(w * dpr);
+  const ph = Math.round(h * dpr);
+
+  const base = document.createElement('canvas');
+  base.width = pw; base.height = ph;
+  const bctx = base.getContext('2d');
+
+  const textLayer = document.createElement('canvas');
+  textLayer.width = pw; textLayer.height = ph;
+  const tctx = textLayer.getContext('2d');
+
+  const seed = hash32((cfg.text || '') + '|' + (cfg.mode || 'tile'));
+  const rnd = mulberry32(seed);
+  const hue = cfg.hue != null ? cfg.hue : seed % 360;
+  const dark = cfg.theme !== 'light';
+
+  // ---- 底色渐变 ----
+  const baseL = dark ? 6 : 96;
+  const baseS = dark ? 18 : 26;
+  bctx.fillStyle = `hsl(${hue}, ${baseS}%, ${baseL}%)`;
+  bctx.fillRect(0, 0, pw, ph);
+
+  // ---- 色团 ----
+  for(let i = 0; i < 5; i++){
+    const cx = rnd() * pw;
+    const cy = rnd() * ph;
+    const r = Math.max(pw, ph) * (0.35 + rnd() * 0.5);
+    const hh = hue + (rnd() - 0.5) * 90;
+    const l = dark ? 10 + rnd() * 12 : 80 + rnd() * 12;
+    const s = dark ? 52 : 62;
+    const a = dark ? 0.55 : 0.5;
+
+    const g = bctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, `hsla(${hh}, ${s}%, ${l}%, ${a})`);
+    g.addColorStop(1, `hsla(${hh}, ${s}%, ${l}%, 0)`);
+    bctx.fillStyle = g;
+    bctx.fillRect(0, 0, pw, ph);
+  }
+
+  // ---- 文字纹理 ----
+  const raw = String(cfg.text || '').slice(0, 12);
+  const minSide = Math.min(pw, ph);
+  const fs = minSide / 8 * (cfg.scale || 1);
+  const alpha = (dark ? 0.075 : 0.055) * (cfg.intensity != null ? cfg.intensity / 0.6 : 1);
+
+  tctx.fillStyle = dark
+    ? `hsla(${hue}, 30%, 92%, ${alpha})`
+    : `hsla(${hue}, 42%, 22%, ${alpha})`;
+  tctx.textAlign = 'center';
+  tctx.textBaseline = 'middle';
+  tctx.font = `700 ${fs}px system-ui, "PingFang SC", sans-serif`;
+
+  if(cfg.mode === 'hero'){
+    const big = minSide * 1.15 / Math.max(raw.length, 1);
+    tctx.font = `700 ${big}px system-ui, "PingFang SC", sans-serif`;
+    tctx.globalAlpha = 1.4;
+    tctx.fillText(raw, pw / 2, ph / 2);
+  } else {
+    const tw = Math.max(tctx.measureText(raw).width, fs * 0.6);
+    const gx = tw * 2.1;
+    const gy = fs * 2.8;
+
+    tctx.save();
+    tctx.translate(pw / 2, ph / 2);
+    tctx.rotate((rnd() * 2 - 1) * 0.16);
+
+    const cols = Math.ceil(pw / gx) + 6;
+    const rows = Math.ceil(ph / gy) + 6;
+
+    for(let j = -rows; j <= rows; j++){
+      for(let i = -cols; i <= cols; i++){
+        const offset = (Math.abs(j) % 2) * gx * 0.5;
+        const x = i * gx + offset;
+        const y = j * gy;
+        let dy = 0;
+        if(cfg.mode === 'flow') dy = Math.sin(i * 0.6 + j * 0.4) * gy * 0.15;
+        tctx.fillText(raw, x, y + dy);
+      }
+    }
+    tctx.restore();
+  }
+
+  // ---- 高斯模糊合成 ----
+  const blurPx = minSide * 0.035 * (cfg.blur != null ? cfg.blur : 0.3);
+  if(blurPx > 0.5 && 'filter' in bctx){
+    bctx.filter = `blur(${blurPx.toFixed(1)}px)`;
+    bctx.drawImage(textLayer, 0, 0);
+    bctx.filter = 'none';
+  } else {
+    bctx.drawImage(textLayer, 0, 0);
+  }
+
+  return base.toDataURL('image/webp', 0.85);
+}
+
+/* ============================================================================
+   履历数据
+   ============================================================================ */
+const RESUME = [
+  {
+    start: '2021.06', end: '至今',
+    title: '字节跳动',
+    subtitle: '抖音体验技术团队 · 高级前端工程师',
+    summary: '负责抖音创作者工具的前端架构。主导 Web 端视频编辑器的性能优化，首屏从 2.3s 降至 0.8s，内存占用减少 40%。',
+    text: '创', hue: 218, mode: 'tile', blur: 0.35, scale: 1.1, intensity: 0.7
+  },
+  {
+    start: '2019.03', end: '2021.05',
+    title: '阿里巴巴',
+    subtitle: '淘系技术部 · 前端工程师',
+    summary: '参与淘宝直播核心功能开发。搭建可视化搭建平台，让运营自主配置活动页面的效率提升 5 倍。',
+    text: '淘', hue: 12, mode: 'flow', blur: 0.45, scale: 1.0, intensity: 0.65
+  },
+  {
+    start: '2018.07', end: '2019.02',
+    title: '腾讯',
+    subtitle: '微信支付 · 前端实习生',
+    summary: '微信支付商户平台重构项目。第一次真正理解什么叫生产环境的复杂度，以及可靠性的意义。',
+    text: '微', hue: 152, mode: 'tile', blur: 0.5, scale: 1.05, intensity: 0.6
+  },
+  {
+    start: '2014.09', end: '2018.06',
+    title: '浙江大学',
+    subtitle: '计算机科学与技术 · 本科',
+    summary: '主修计算机图形学与可视化。毕设是 WebGL 粒子系统的实时渲染优化，GPA 3.8/4.0。',
+    text: '浙', hue: 285, mode: 'hero', blur: 0.4, scale: 1.2, intensity: 0.7
+  }
+];
+
+/* ============================================================================
+   构建卡片
+   ============================================================================ */
+const orbit = document.getElementById('orbit');
+const progressEl = document.getElementById('progress');
+const cards = [];
+
+RESUME.forEach((item, i) => {
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.style.backgroundImage = `url("${renderTextural(340, 480, {
+    text: item.text,
+    hue: item.hue,
+    mode: item.mode,
+    blur: item.blur,
+    scale: item.scale,
+    intensity: item.intensity,
+    theme: 'dark'
+  })}")`;
+
+  el.innerHTML = `
+    <div class="card-index">${String(RESUME.length - i).padStart(2, '0')} / ${String(RESUME.length).padStart(2, '0')}</div>
+    <div class="card-content">
+      <div class="card-date">${item.start} — ${item.end}</div>
+      <div class="card-title">${item.title}</div>
+      <div class="card-sub">${item.subtitle}</div>
+      <div class="card-desc">${item.summary}</div>
+    </div>
+  `;
+
+  orbit.appendChild(el);
+  cards.push({ el, idx: i });
+
+  // 进度点
+  const dot = document.createElement('button');
+  dot.dataset.idx = i;
+  dot.addEventListener('click', () => goTo(i));
+  progressEl.appendChild(dot);
+
+  // 点击卡片 → 聚焦
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    if(!dragging) goTo(i);
+  });
+});
+
+/* ============================================================================
+   3D 布局
+   ============================================================================ */
+const RADIUS = window.innerWidth < 768 ? 320 : 460;
+const ANGLE_STEP = 360 / cards.length;
+
+let rotation = 0;
+let targetRotation = 0;
+let autoRotate = true;
+let dragging = false;
+let dragStartX = 0;
+let dragStartRot = 0;
+let idleTimer = null;
+let activeIdx = 0;
+
+function updateLayout(){
+  cards.forEach((card, i) => {
+    const a = i * ANGLE_STEP + rotation;
+    const rad = a * Math.PI / 180;
+
+    const x = Math.sin(rad) * RADIUS;
+    const z = Math.cos(rad) * RADIUS;
+    const y = -Math.abs(Math.sin(rad)) * 8;
+
+    // billboard + 轻微朝外倾斜
+    const ry = Math.sin(rad) * 22;
+
+    // 不透明度随朝向衰减
+    const facing = Math.cos(rad);
+    const opacity = facing > 0 ? Math.pow(facing, 0.65) : 0;
+
+    card.el.style.transform = `translate3d(${x}px, ${y}px, ${z}px) rotateY(${ry}deg)`;
+    card.el.style.opacity = opacity;
+    card.el.style.pointerEvents = opacity > 0.55 ? 'auto' : 'none';
+
+    const isFocused = i === activeIdx && opacity > 0.7;
+    card.el.classList.toggle('focused', isFocused);
+  });
+
+  // 更新进度点
+  Array.from(progressEl.children).forEach((dot, i) => {
+    dot.classList.toggle('on', i === activeIdx);
+  });
+}
+
+function tick(){
+  if(autoRotate && !dragging){
+    targetRotation += 0.045;
+  }
+  // 缓动
+  rotation += (targetRotation - rotation) * 0.09;
+
+  // 判断当前聚焦的卡片
+  let best = 0;
+  let bestDist = Infinity;
+  cards.forEach((_, i) => {
+    const a = ((i * ANGLE_STEP + rotation) % 360 + 360) % 360;
+    const dist = Math.min(a, 360 - a);
+    if(dist < bestDist){ bestDist = dist; best = i; }
+  });
+  if(best !== activeIdx){
+    activeIdx = best;
+    Array.from(progressEl.children).forEach((d, i) => d.classList.toggle('on', i === activeIdx));
+  }
+
+  updateLayout();
+  requestAnimationFrame(tick);
+}
+
+/* ============================================================================
+   交互
+   ============================================================================ */
+const stage = document.getElementById('stage');
+
+stage.addEventListener('pointerdown', e => {
+  if(e.target.closest('.hud')) return;
+  dragging = true;
+  dragStartX = e.clientX;
+  dragStartRot = targetRotation;
+  autoRotate = false;
+  clearTimeout(idleTimer);
+  document.getElementById('auto').classList.remove('on');
+  stage.style.cursor = 'grabbing';
+});
+
+window.addEventListener('pointermove', e => {
+  if(!dragging) return;
+  const dx = e.clientX - dragStartX;
+  targetRotation = dragStartRot + dx * 0.32;
+});
+
+window.addEventListener('pointerup', () => {
+  if(!dragging) return;
+  dragging = false;
+  stage.style.cursor = '';
+  snapToNearest();
+  idleTimer = setTimeout(() => {
+    autoRotate = true;
+    document.getElementById('auto').classList.add('on');
+  }, 3500);
+});
+
+function snapToNearest(){
+  let bestDelta = Infinity;
+  let bestTarget = targetRotation;
+  for(let i = 0; i < cards.length; i++){
+    const target = -i * ANGLE_STEP;
+    let diff = target - targetRotation;
+    while(diff > 180) diff -= 360;
+    while(diff < -180) diff += 360;
+    if(Math.abs(diff) < Math.abs(bestDelta)){
+      bestDelta = diff;
+      bestTarget = targetRotation + diff;
+    }
+  }
+  targetRotation = bestTarget;
+}
+
+function goTo(idx){
+  const target = -idx * ANGLE_STEP;
+  let diff = target - targetRotation;
+  while(diff > 180) diff -= 360;
+  while(diff < -180) diff += 360;
+  targetRotation = targetRotation + diff;
+  autoRotate = false;
+  document.getElementById('auto').classList.remove('on');
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    autoRotate = true;
+    document.getElementById('auto').classList.add('on');
+  }, 4500);
+}
+
+document.getElementById('prev').addEventListener('click', () => {
+  goTo((activeIdx - 1 + cards.length) % cards.length);
+});
+document.getElementById('next').addEventListener('click', () => {
+  goTo((activeIdx + 1) % cards.length);
+});
+document.getElementById('auto').addEventListener('click', () => {
+  autoRotate = !autoRotate;
+  document.getElementById('auto').classList.toggle('on', autoRotate);
+  clearTimeout(idleTimer);
+});
+
+window.addEventListener('keydown', e => {
+  if(e.key === 'ArrowLeft') goTo((activeIdx - 1 + cards.length) % cards.length);
+  if(e.key === 'ArrowRight') goTo((activeIdx + 1) % cards.length);
+});
+
+window.addEventListener('resize', () => {
+  // 简单处理：重新加载页面以获得正确的半径
+  if(
+    (window.innerWidth < 768 && RADIUS > 400) ||
+    (window.innerWidth >= 768 && RADIUS < 400)
+  ){
+    location.reload();
+  }
+});
+
+/* 启动 */
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>履历 · 引力场 · Textural</title>
+<style>
+  :root{ --fg:#e9edf5; --dim:#8792a6; --mute:#5a6478; --accent:#8ba3ff; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:
+      radial-gradient(1400px 900px at 50% 20%, #141a2e 0%, #06070c 60%),
+      radial-gradient(900px 700px at 85% 90%, #241a33 0%, transparent 55%),
+      #06070c;
+    color:var(--fg);overflow:hidden;
+    font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    cursor:crosshair;
+  }
+
+  /* 光晕背景 */
+  .aurora{
+    position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:
+      radial-gradient(600px 600px at 20% 30%, rgba(80,110,255,.1), transparent 60%),
+      radial-gradient(700px 700px at 80% 70%, rgba(166,120,255,.08), transparent 60%);
+    filter:blur(40px);
+    animation:drift 20s ease-in-out infinite alternate;
+  }
+  @keyframes drift{
+    0%  { transform:translate(0,0) scale(1); }
+    100%{ transform:translate(40px,-30px) scale(1.05); }
+  }
+
+  /* ====================================================================
+     3D 舞台
+     ==================================================================== */
+  .stage{
+    position:fixed;inset:0;z-index:1;
+    perspective:1500px;
+    perspective-origin:50% 50%;
+  }
+  .scene{
+    position:absolute;inset:0;
+    transform-style:preserve-3d;
+    will-change:transform;
+  }
+
+  /* ====================================================================
+     卡片
+     ==================================================================== */
+  .gcard{
+    position:absolute;
+    left:50%;top:50%;
+    width:280px;height:400px;
+    margin-left:-140px;margin-top:-200px;
+    border-radius:20px;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,.1);
+    box-shadow:
+      0 24px 70px rgba(0,0,0,.55),
+      inset 0 1px 0 rgba(255,255,255,.08);
+    background-size:cover;background-position:center;
+    transform-style:preserve-3d;
+    will-change:transform,opacity;
+    backface-visibility:hidden;
+    cursor:pointer;
+    transition:box-shadow .4s;
+  }
+  .gcard::after{
+    content:"";position:absolute;inset:0;
+    background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.7) 100%);
+    pointer-events:none;
+  }
+  .gcard.hovered{
+    box-shadow:
+      0 40px 100px rgba(80,110,255,.4),
+      0 0 0 1px rgba(139,163,255,.4),
+      inset 0 1px 0 rgba(255,255,255,.12);
+  }
+  .gcard-content{
+    position:absolute;inset:0;
+    padding:26px 24px 24px;
+    display:flex;flex-direction:column;justify-content:space-between;
+    z-index:2;color:#fff;pointer-events:none;
+  }
+  .gcard-date{
+    font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+    font-weight:700;opacity:.72;font-variant-numeric:tabular-nums;
+  }
+  .gcard-title{
+    font-size:23px;font-weight:800;letter-spacing:-.025em;
+    line-height:1.12;margin-bottom:7px;
+  }
+  .gcard-sub{
+    font-size:11.5px;font-weight:600;opacity:.72;line-height:1.5;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+    overflow:hidden;
+  }
+  .gcard-desc{
+    font-size:11.5px;line-height:1.65;opacity:.66;
+    margin-top:auto;padding-top:12px;
+    border-top:1px solid rgba(255,255,255,.12);
+    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;
+    overflow:hidden;
+  }
+
+  /* 序号小徽标 */
+  .gcard-badge{
+    position:absolute;top:16px;right:16px;
+    width:26px;height:26px;border-radius:8px;
+    background:rgba(0,0,0,.4);
+    backdrop-filter:blur(8px);
+    border:1px solid rgba(255,255,255,.14);
+    display:grid;place-items:center;
+    font-family:ui-monospace,monospace;
+    font-size:10.5px;font-weight:700;
+    color:rgba(255,255,255,.75);
+    z-index:3;
+  }
+
+  /* 连接线（用细 div 表示履历的时间延续） */
+  .link{
+    position:absolute;left:50%;top:50%;
+    height:1px;
+    background:linear-gradient(90deg, transparent, rgba(139,163,255,.5), transparent);
+    transform-origin:0 50%;
+    pointer-events:none;
+    opacity:.4;
+    z-index:0;
+  }
+
+  /* ====================================================================
+     HUD
+     ==================================================================== */
+  .hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+  .hud > *{pointer-events:auto}
+
+  .brand{
+    position:absolute;top:32px;left:40px;
+    display:flex;align-items:center;gap:12px;
+    font-weight:800;font-size:15px;letter-spacing:-.01em;
+  }
+  .brand-mark{
+    width:32px;height:32px;border-radius:10px;
+    background:linear-gradient(135deg,#4f6bff,#a678ff);
+    display:grid;place-items:center;font-size:14px;font-weight:900;
+    box-shadow:0 8px 28px rgba(79,107,255,.45);
+  }
+  .brand small{
+    display:block;font-size:10.5px;font-weight:600;color:var(--dim);
+    letter-spacing:.12em;text-transform:uppercase;margin-top:3px;
+  }
+
+  .title-hint{
+    position:absolute;top:40px;left:50%;transform:translateX(-50%);
+    text-align:center;
+    font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    font-weight:700;color:var(--mute);
+  }
+  .title-hint b{
+    display:block;font-size:13px;color:var(--accent);
+    letter-spacing:.05em;margin-bottom:4px;text-transform:none;
+  }
+
+  /* 控制按钮 */
+  .controls{
+    position:absolute;bottom:40px;left:50%;transform:translateX(-50%);
+    display:flex;gap:6px;padding:6px;
+    background:rgba(18,22,34,.72);
+    backdrop-filter:blur(20px) saturate(180%);
+    -webkit-backdrop-filter:blur(20px) saturate(180%);
+    border:1px solid rgba(255,255,255,.1);
+    border-radius:14px;
+  }
+  .controls button{
+    padding:10px 18px;border:0;border-radius:10px;
+    background:transparent;color:var(--dim);
+    cursor:pointer;font-size:13px;font-weight:600;
+    transition:all .2s;font-family:inherit;
+    display:flex;align-items:center;gap:8px;
+  }
+  .controls button:hover{background:rgba(255,255,255,.08);color:#fff}
+  .controls button.on{
+    background:linear-gradient(135deg,#4f6bff,#a678ff);
+    color:#fff;
+    box-shadow:0 6px 20px rgba(79,107,255,.4);
+  }
+  .controls button svg{
+    width:14px;height:14px;
+    fill:none;stroke:currentColor;stroke-width:2;
+    stroke-linecap:round;stroke-linejoin:round;
+  }
+
+  .footer-hint{
+    position:absolute;bottom:44px;right:40px;
+    font-size:11.5px;color:var(--mute);letter-spacing:.05em;
+    display:flex;align-items:center;gap:8px;
+  }
+  .footer-hint kbd{
+    padding:2px 7px;border-radius:5px;
+    background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.1);
+    font-family:inherit;font-size:10.5px;font-weight:600;
+  }
+
+  @media (max-width:900px){
+    .gcard{width:220px;height:320px;margin-left:-110px;margin-top:-160px}
+    .gcard-title{font-size:19px}
+    .gcard-content{padding:20px 18px 18px}
+    .brand{top:22px;left:22px}
+    .title-hint{top:26px;font-size:9.5px}
+    .footer-hint{display:none}
+    .controls{bottom:24px;padding:5px}
+    .controls button{padding:8px 12px;font-size:12px}
+  }
+</style>
+</head>
+<body>
+
+<div class="aurora"></div>
+
+<div class="stage" id="stage">
+  <div class="scene" id="scene"></div>
+</div>
+
+<div class="hud">
+  <div class="brand">
+    <div class="brand-mark">Z</div>
+    <div>Zhiyuan Li<small>Gravity Field</small></div>
+  </div>
+
+  <div class="title-hint">
+    <b>履历 · 引力场</b>
+    Drift through the timeline
+  </div>
+
+  <div class="controls">
+    <button id="btn-float" class="on">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="4" cy="6" r="2"/><circle cx="20" cy="6" r="2"/><circle cx="4" cy="18" r="2"/><circle cx="20" cy="18" r="2"/><path d="M6.5 7.5l3.5 3M17.5 7.5l-3.5 3M6.5 16.5l3.5-3M17.5 16.5l-3.5-3"/></svg>
+      自由漂浮
+    </button>
+    <button id="btn-arrange">
+      <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      整理时间轴
+    </button>
+  </div>
+
+  <div class="footer-hint">
+    移动鼠标 <kbd>→</kbd> 引力扰动
+  </div>
+</div>
+
+<script>
+/* ============================================================================
+   Textural 简化版
+   ============================================================================ */
+function hash32(s){
+  let h = 2166136261 >>> 0;
+  for(let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h,16777619) >>> 0; }
+  return h >>> 0;
+}
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), 1 | t);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function texturalDataURL(w, h, cfg){
+  const base = document.createElement('canvas');
+  base.width = w; base.height = h;
+  const ctx = base.getContext('2d');
+  const txt = document.createElement('canvas');
+  txt.width = w; txt.height = h;
+  const tctx = txt.getContext('2d');
+
+  const seed = hash32((cfg.text || '') + cfg.mode);
+  const rnd = mulberry32(seed);
+  const hue = cfg.hue ?? (seed % 360);
+
+  ctx.fillStyle = `hsl(${hue}, 20%, 6%)`;
+  ctx.fillRect(0, 0, w, h);
+
+  for(let i = 0; i < 5; i++){
+    const cx = rnd() * w, cy = rnd() * h;
+    const r = Math.max(w, h) * (0.35 + rnd() * 0.5);
+    const hh = hue + (rnd() - 0.5) * 90;
+    const l = 10 + rnd() * 12;
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, `hsla(${hh}, 52%, ${l}%, .55)`);
+    g.addColorStop(1, `hsla(${hh}, 52%, ${l}%, 0)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  const raw = String(cfg.text || '').slice(0, 12);
+  const minSide = Math.min(w, h);
+  const fs = minSide / 8 * (cfg.scale || 1);
+  const alpha = 0.075 * (cfg.intensity ?? 0.6) / 0.6;
+
+  tctx.fillStyle = `hsla(${hue}, 30%, 92%, ${alpha})`;
+  tctx.textAlign = 'center'; tctx.textBaseline = 'middle';
+  tctx.font = `700 ${fs}px system-ui, "PingFang SC", sans-serif`;
+
+  if(cfg.mode === 'hero'){
+    const big = minSide * 1.15 / Math.max(raw.length, 1);
+    tctx.font = `700 ${big}px system-ui, "PingFang SC", sans-serif`;
+    tctx.fillText(raw, w / 2, h / 2);
+  } else {
+    const tw = Math.max(tctx.measureText(raw).width, fs * 0.6);
+    const gx = tw * 2.1, gy = fs * 2.8;
+    tctx.save(); tctx.translate(w / 2, h / 2);
+    tctx.rotate((rnd() * 2 - 1) * 0.16);
+    const cols = Math.ceil(w / gx) + 6, rows = Math.ceil(h / gy) + 6;
+    for(let j = -rows; j <= rows; j++){
+      for(let i = -cols; i <= cols; i++){
+        const offset = (Math.abs(j) % 2) * gx * 0.5;
+        const x = i * gx + offset, y = j * gy;
+        const dy = cfg.mode === 'flow' ? Math.sin(i * 0.6 + j * 0.4) * gy * 0.15 : 0;
+        tctx.fillText(raw, x, y + dy);
+      }
+    }
+    tctx.restore();
+  }
+
+  const blurPx = minSide * 0.035 * (cfg.blur ?? 0.3);
+  if(blurPx > 0.5 && 'filter' in ctx){
+    ctx.filter = `blur(${blurPx.toFixed(1)}px)`;
+    ctx.drawImage(txt, 0, 0);
+    ctx.filter = 'none';
+  } else {
+    ctx.drawImage(txt, 0, 0);
+  }
+  return base.toDataURL('image/webp', 0.85);
+}
+
+/* ============================================================================
+   履历数据
+   ============================================================================ */
+const RESUME = [
+  { start:'2021.06', end:'至今', title:'字节跳动',
+    subtitle:'抖音体验技术团队 · 高级前端工程师',
+    summary:'负责抖音创作者工具的前端架构。主导 Web 端视频编辑器的性能优化，首屏从 2.3s 降至 0.8s，内存占用减少 40%。',
+    text:'创', hue:218, mode:'tile', blur:0.35, scale:1.1, intensity:0.7 },
+  { start:'2019.03', end:'2021.05', title:'阿里巴巴',
+    subtitle:'淘系技术部 · 前端工程师',
+    summary:'参与淘宝直播核心功能开发。搭建可视化搭建平台，让运营自主配置活动页面的效率提升 5 倍。',
+    text:'淘', hue:12, mode:'flow', blur:0.45, scale:1.0, intensity:0.65 },
+  { start:'2018.07', end:'2019.02', title:'腾讯',
+    subtitle:'微信支付 · 前端实习生',
+    summary:'微信支付商户平台重构项目。第一次真正理解什么叫生产环境的复杂度，以及可靠性的意义。',
+    text:'微', hue:152, mode:'tile', blur:0.5, scale:1.05, intensity:0.6 },
+  { start:'2014.09', end:'2018.06', title:'浙江大学',
+    subtitle:'计算机科学与技术 · 本科',
+    summary:'主修计算机图形学与可视化。毕设是 WebGL 粒子系统的实时渲染优化，GPA 3.8/4.0。',
+    text:'浙', hue:285, mode:'hero', blur:0.4, scale:1.2, intensity:0.7 }
+];
+
+/* ============================================================================
+   构建卡片
+   ============================================================================ */
+const sceneEl = document.getElementById('scene');
+const cards = [];
+
+RESUME.forEach((item, i) => {
+  const el = document.createElement('div');
+  el.className = 'gcard';
+  el.style.backgroundImage = `url("${texturalDataURL(560, 800, item)}")`;
+  el.innerHTML = `
+    <div class="gcard-badge">${String(RESUME.length - i).padStart(2,'0')}</div>
+    <div class="gcard-content">
+      <div>
+        <div class="gcard-date">${item.start} — ${item.end}</div>
+      </div>
+      <div>
+        <div class="gcard-title">${item.title}</div>
+        <div class="gcard-sub">${item.subtitle}</div>
+        <div class="gcard-desc">${item.summary}</div>
+      </div>
+    </div>
+  `;
+  sceneEl.appendChild(el);
+
+  // 生成目标状态
+  const seed = mulberry32(hash32(item.title));
+
+  // 自由漂浮位置：分布在 3D 空间里的一个椭球
+  const theta = (seed() - 0.5) * Math.PI * 0.8;   // 水平角
+  const phi   = (seed() - 0.5) * Math.PI * 0.5;   // 垂直角
+  const radius = 340 + seed() * 200;
+
+  const floatPos = {
+    x: Math.sin(theta) * Math.cos(phi) * radius,
+    y: Math.sin(phi) * radius * 0.7,
+    z: (seed() - 0.5) * 400 - 60,
+    rx: (seed() - 0.5) * 20,
+    ry: (seed() - 0.5) * 30 + 10,
+    rz: (seed() - 0.5) * 18
+  };
+
+  // 整理：沿水平轴排成一排
+  const spacing = 300;
+  const totalW = (RESUME.length - 1) * spacing;
+  const arrangePos = {
+    x: i * spacing - totalW / 2,
+    y: 0,
+    z: 0,
+    rx: 0,
+    ry: 0,
+    rz: 0
+  };
+
+  cards.push({
+    el, data: item,
+    float: floatPos,
+    arrange: arrangePos,
+    // 当前状态
+    cur: { ...floatPos },
+    // 目标状态
+    tgt: { ...floatPos },
+    // 漂浮相位
+    phase: seed() * Math.PI * 2,
+    // 鼠标位移引起的额外偏移
+    offset: { x:0, y:0 },
+    hovered: false
+  });
+
+  // 鼠标悬浮
+  el.addEventListener('mouseenter', () => {
+    cards.find(c => c.el === el).hovered = true;
+    el.classList.add('hovered');
+  });
+  el.addEventListener('mouseleave', () => {
+    cards.find(c => c.el === el).hovered = false;
+    el.classList.remove('hovered');
+  });
+
+  // 点击：把这张卡片提到最前
+  el.addEventListener('click', () => {
+    const card = cards.find(c => c.el === el);
+    card.tgt.z = -200;
+    card.tgt.x = 0;
+    card.tgt.y = 0;
+    card.tgt.rx = 0;
+    card.tgt.ry = 0;
+    card.tgt.rz = 0;
+    setTimeout(() => {
+      if(mode === 'float'){
+        Object.assign(card.tgt, card.float);
+      } else {
+        Object.assign(card.tgt, card.arrange);
+      }
+    }, 1400);
+  });
+});
+
+/* ============================================================================
+   状态与交互
+   ============================================================================ */
+const scene = document.getElementById('scene');
+let mode = 'float';     // 'float' | 'arrange'
+
+const btnFloat = document.getElementById('btn-float');
+const btnArrange = document.getElementById('btn-arrange');
+
+function setMode(m){
+  mode = m;
+  btnFloat.classList.toggle('on', m === 'float');
+  btnArrange.classList.toggle('on', m === 'arrange');
+
+  cards.forEach(c => {
+    Object.assign(c.tgt, m === 'float' ? c.float : c.arrange);
+  });
+}
+
+btnFloat.addEventListener('click', () => setMode('float'));
+btnArrange.addEventListener('click', () => setMode('arrange'));
+
+/* ============================================================================
+   鼠标视差 + 引力
+   ============================================================================ */
+let mouseX = 0, mouseY = 0;           // -1 .. 1
+let targetRotX = 0, targetRotY = 0;
+let curRotX = 0, curRotY = 0;
+
+window.addEventListener('mousemove', e => {
+  mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+  mouseY = (e.clientY / window.innerHeight) * 2 - 1;
+  targetRotX = -mouseY * 8;
+  targetRotY =  mouseX * 12;
+});
+
+window.addEventListener('mouseleave', () => {
+  targetRotX = 0; targetRotY = 0;
+});
+
+/* ============================================================================
+   渲染循环
+   ============================================================================ */
+function lerp(a, b, t){ return a + (b - a) * t; }
+
+function tick(){
+  const now = performance.now() / 1000;
+
+  // 场景整体旋转（视差）
+  curRotX = lerp(curRotX, targetRotX, 0.05);
+  curRotY = lerp(curRotY, targetRotY, 0.05);
+  scene.style.transform = `rotateX(${curRotX}deg) rotateY(${curRotY}deg)`;
+
+  // 更新每张卡片
+  cards.forEach((c, i) => {
+    // 自由漂浮时，增加基于时间的浮动
+    let fx = 0, fy = 0, fz = 0;
+    if(mode === 'float'){
+      fx = Math.sin(now * 0.5 + c.phase) * 22;
+      fy = Math.cos(now * 0.42 + c.phase * 1.3) * 18;
+      fz = Math.sin(now * 0.35 + c.phase * 0.7) * 30;
+    }
+
+    // 引力：鼠标在屏幕上的位置映射到场景空间，对卡片产生排斥
+    if(mode === 'float'){
+      const cardScreenX = c.cur.x / 8;
+      const cardScreenY = c.cur.y / 8;
+      const dx = cardScreenX - mouseX * 100;
+      const dy = cardScreenY - mouseY * 60;
+      const dist = Math.hypot(dx, dy);
+      if(dist < 90 && dist > 0.1){
+        const force = (1 - dist / 90) * 60;
+        c.offset.x += (dx / dist) * force * 0.15;
+        c.offset.y += (dy / dist) * force * 0.15;
+      }
+      c.offset.x *= 0.92;
+      c.offset.y *= 0.92;
+    } else {
+      c.offset.x *= 0.88;
+      c.offset.y *= 0.88;
+    }
+
+    // 缓动到目标
+    c.cur.x = lerp(c.cur.x, c.tgt.x + fx + c.offset.x, 0.08);
+    c.cur.y = lerp(c.cur.y, c.tgt.y + fy + c.offset.y, 0.08);
+    c.cur.z = lerp(c.cur.z, c.tgt.z + fz, 0.08);
+    c.cur.rx = lerp(c.cur.rx, c.tgt.rx, 0.08);
+    c.cur.ry = lerp(c.cur.ry, c.tgt.ry, 0.08);
+    c.cur.rz = lerp(c.cur.rz, c.tgt.rz, 0.08);
+
+    // 悬浮时稍微放大并往相机方向推
+    const hoverBoost = c.hovered ? 40 : 0;
+    const hoverScale = c.hovered ? 1.06 : 1;
+
+    c.el.style.transform =
+      `translate3d(${c.cur.x}px, ${c.cur.y}px, ${c.cur.z + hoverBoost}px)
+       rotateX(${c.cur.rx}deg)
+       rotateY(${c.cur.ry}deg)
+       rotateZ(${c.cur.rz}deg)
+       scale(${hoverScale})`;
+
+    // 根据 z 轴调整亮度和透明度
+    const depth = (c.cur.z + 200) / 600;   // 0 .. 1
+    const opacity = Math.max(0.45, Math.min(1, 1 - Math.max(0, c.cur.z) / 500));
+    c.el.style.opacity = opacity;
+    c.el.style.zIndex = Math.round(1000 - c.cur.z);
+  });
+
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+/* 让自由漂浮的卡片自动缓慢漂动 */
+setInterval(() => {
+  if(mode !== 'float') return;
+  cards.forEach(c => {
+    // 偶尔微调漂浮目标，产生缓慢游动感
+    if(Math.random() < 0.3){
+      c.float.x += (Math.random() - 0.5) * 30;
+      c.float.y += (Math.random() - 0.5) * 20;
+      c.float.z += (Math.random() - 0.5) * 40;
+      c.float.x = Math.max(-380, Math.min(380, c.float.x));
+      c.float.y = Math.max(-180, Math.min(180, c.float.y));
+      c.float.z = Math.max(-260, Math.min(240, c.float.z));
+      Object.assign(c.tgt, c.float);
+    }
+  });
+}, 3500);
+</script>
+</body>
+</html>

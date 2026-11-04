@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>评论组件 · 蓝色主色预览</title>
+<style>
+  * { box-sizing: border-box; }
+
+  :root {
+    --primary-base: #1E4FFF;
+    --primary: var(--primary-base);
+
+    --bg: #F5F7FB;
+    --surface: #FFFFFF;
+    --surface-soft: #F8FAFC;
+    --text: #0F172A;
+    --text-2: #64748B;
+    --text-3: #94A3B8;
+    --border: #E7ECF3;
+    --shadow: 0 1px 2px rgba(15,23,42,.04), 0 10px 30px -18px rgba(15,23,42,.35);
+
+    --primary-hover: color-mix(in srgb, var(--primary) 82%, #000);
+    --primary-soft:  color-mix(in srgb, var(--primary) 8%, #fff);
+    --primary-border: color-mix(in srgb, var(--primary) 22%, #fff);
+    --reply-line: color-mix(in srgb, var(--primary) 22%, transparent);
+  }
+
+  [data-theme="dark"] {
+    --primary: color-mix(in srgb, var(--primary-base) 72%, #fff);
+
+    --bg: #0B1220;
+    --surface: #111827;
+    --surface-soft: #0F172A;
+    --text: #E5E7EB;
+    --text-2: #94A3B8;
+    --text-3: #64748B;
+    --border: #1F2A3D;
+    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 10px 30px -18px rgba(0,0,0,.9);
+
+    --primary-hover: color-mix(in srgb, var(--primary) 85%, #fff);
+    --primary-soft:  color-mix(in srgb, var(--primary) 16%, #0B1220);
+    --primary-border: color-mix(in srgb, var(--primary) 34%, #0B1220);
+    --reply-line: color-mix(in srgb, var(--primary) 32%, transparent);
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    transition: background .25s ease, color .25s ease;
+  }
+
+  .wrap { max-width: 720px; margin: 0 auto; padding: 34px 20px 80px; }
+
+  /* ---------- 顶部 ---------- */
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  h1 { margin: 0; font-size: 22px; letter-spacing: -.02em; }
+  h1 .count { font-size: 13px; font-weight: 500; color: var(--text-3); margin-left: 6px; }
+
+  .icon-btn {
+    width: 36px; height: 36px; border-radius: 10px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text-2); font-size: 15px;
+    display: grid; place-items: center; transition: .18s;
+  }
+  .icon-btn:hover { border-color: var(--primary-border); color: var(--primary); }
+
+  /* ---------- 色板 ---------- */
+  .palette-bar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px; margin-bottom: 18px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 13px; font-size: 12px; color: var(--text-2);
+  }
+  .swatches { display: flex; gap: 9px; }
+  .swatch {
+    width: 22px; height: 22px; padding: 0; border-radius: 50%;
+    border: 1px solid rgba(0,0,0,.08); cursor: pointer;
+    transition: transform .16s ease, outline-color .16s;
+    outline: 2px solid transparent; outline-offset: 3px;
+  }
+  .swatch:hover { transform: scale(1.14); }
+  .swatch.on { outline-color: var(--text); }
+  .palette-name { margin-left: auto; font-weight: 600; color: var(--text); font-size: 12.5px; }
+
+  /* ---------- 卡片 ---------- */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; box-shadow: var(--shadow);
+    transition: background .25s, border-color .25s;
+  }
+
+  /* ---------- 输入区 ---------- */
+  .composer { display: flex; gap: 12px; padding: 16px; margin-bottom: 16px; }
+  .composer-main { flex: 1; min-width: 0; }
+
+  textarea {
+    width: 100%; font: inherit; font-size: 14px; line-height: 1.55;
+    color: var(--text); background: var(--surface-soft);
+    border: 1px solid var(--border); border-radius: 11px;
+    padding: 10px 12px; resize: vertical; min-height: 44px;
+    transition: border-color .16s, box-shadow .16s, background .16s;
+  }
+  textarea::placeholder { color: var(--text-3); }
+  textarea:focus {
+    outline: none; background: var(--surface);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-soft);
+  }
+
+  .composer-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+
+  .btn {
+    font: inherit; font-size: 13px; font-weight: 600;
+    padding: 7px 15px; border-radius: 9px; cursor: pointer;
+    border: 1px solid transparent; transition: .16s;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-hover); }
+  .btn-ghost { background: transparent; color: var(--text-2); border-color: var(--border); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--text-3); }
+
+  /* ---------- 评论列表 ---------- */
+  .list { padding: 6px 16px; }
+  .list > .comment + .comment { border-top: 1px solid var(--border); }
+
+  .comment { display: flex; gap: 12px; padding: 14px 0; }
+
+  .avatar {
+    width: 36px; height: 36px; border-radius: 50%; flex: none;
+    display: grid; place-items: center;
+    color: #fff; font-size: 14px; font-weight: 600; user-select: none;
+  }
+  .av-1 { background: linear-gradient(135deg, #1E4FFF, #7A93FF); }
+  .av-2 { background: linear-gradient(135deg, #0A84FF, #4FC3F7); }
+  .av-3 { background: linear-gradient(135deg, #6D28D9, #A78BFA); }
+  .av-4 { background: linear-gradient(135deg, #0F766E, #2DD4BF); }
+  .av-5 { background: linear-gradient(135deg, #B45309, #FBBF24); }
+
+  .body { flex: 1; min-width: 0; }
+
+  .meta { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+  .name { font-size: 13.5px; font-weight: 600; }
+  .time { font-size: 12px; color: var(--text-3); }
+
+  .text { margin: 0 0 6px; font-size: 14px; line-height: 1.62; word-break: break-word; }
+
+  .mention {
+    color: var(--primary); font-weight: 600;
+    background: var(--primary-soft); border-radius: 4px; padding: 0 4px;
+  }
+
+  .actions { display: flex; gap: 2px; margin-left: -8px; }
+  .act {
+    display: inline-flex; align-items: center; gap: 5px;
+    font: inherit; font-size: 12.5px; color: var(--text-2);
+    background: none; border: 0; padding: 4px 8px;
+    border-radius: 7px; cursor: pointer; transition: .16s;
+  }
+  .act:hover { background: var(--primary-soft); color: var(--primary); }
+  .act.liked { color: var(--primary); font-weight: 600; }
+  .act.liked svg { fill: currentColor; }
+
+  /* 嵌套 */
+  .children {
+    margin-top: 2px; margin-left: 4px; padding-left: 16px;
+    border-left: 2px solid var(--reply-line);
+  }
+
+  /* 回复框 */
+  .reply-box { margin: 10px 0 6px; }
+  .reply-box textarea { min-height: 40px; font-size: 13.5px; }
+  .reply-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+
+  @media (max-width: 480px) {
+    .wrap { padding: 22px 14px 60px; }
+    .children { margin-left: 0; padding-left: 12px; }
+    .comment { gap: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>评论<span class="count">128</span></h1>
+    <button class="icon-btn" id="themeBtn" title="切换主题">🌙</button>
+  </header>
+
+  <div class="palette-bar">
+    <span>主色</span>
+    <div class="swatches" id="swatches"></div>
+    <span class="palette-name" id="paletteName">电光克莱因蓝</span>
+  </div>
+
+  <div class="card composer">
+    <div class="avatar av-5">我</div>
+    <div class="composer-main">
+      <textarea id="composerInput" rows="2" placeholder="说点什么…支持 @提及"></textarea>
+      <div class="composer-actions">
+        <button class="btn btn-ghost" id="clearBtn">清空</button>
+        <button class="btn btn-primary" id="sendBtn">发布</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card list" id="list"></div>
+</div>
+
+<script>
+/* ---------------- 图标 ---------------- */
+const ICON_LIKE = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none"
+  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M7 10v12"/>
+  <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0
+  1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/>
+</svg>`;
+
+/* ---------------- 数据 ---------------- */
+const DATA = [
+  {
+    name: '林晚', av: 'av-1', time: '2小时前', likes: 24,
+    text: '这个组件的嵌套回复线处理得很克制，不会像有些实现那样一深就乱。想问下移动端最深支持到几层？',
+    replies: [{
+      name: '陈默', av: 'av-2', time: '1小时前', likes: 8,
+      text: '<span class="mention">@林晚</span> 视觉上无限嵌套，但超过 4 层会固定缩进。实测 320px 宽度下第 5 层还能正常阅读。',
+      replies: [{
+        name: '林晚', av: 'av-1', time: '48分钟前', likes: 3,
+        text: '收到，那基本够用了 👍'
+      }]
+    }]
+  },
+  {
+    name: '苏打水', av: 'av-3', time: '3小时前', likes: 12,
+    text: '暗色模式下这个蓝有点飘，建议把 surface 的对比再拉开一点。',
+    replies: [{
+      name: '阿哲', av: 'av-4', time: '2小时前', likes: 5,
+      text: '同意，暗色下我会把主色往白里混 25% 左右，白字对比度依然能过 AA。'
+    }]
+  },
+  {
+    name: '陈默', av: 'av-2', time: '5小时前', likes: 6,
+    text: '已经用上了，<span class="mention">@提及</span> 的高亮色跟主色联动这点很舒服。'
+  }
+];
+
+/* ---------------- 渲染 ---------------- */
+const escapeHtml = s => s.replace(/[&<>"']/g, m =>
+  ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m]));
+
+function renderComment(c) {
+  const kids = c.replies && c.replies.length
+    ? `<div class="children">${c.replies.map(renderComment).join('')}</div>` : '';
+  return `
+  <article class="comment">
+    <div class="avatar ${c.av}">${c.name[0]}</div>
+    <div class="body">
+      <div class="meta"><span class="name">${c.name}</span><span class="time">${c.time}</span></div>
+      <p class="text">${c.text}</p>
+      <div class="actions">
+        <button class="act act-like" data-count="${c.likes}">${ICON_LIKE}<span>${c.likes}</span></button>
+        <button class="act act-reply">回复</button>
+      </div>
+      ${kids}
+    </div>
+  </article>`;
+}
+
+const listEl = document.getElementById('list');
+listEl.innerHTML = DATA.map(renderComment).join('');
+
+/* ---------------- 色板 ---------------- */
+const PALETTES = [
+  { name: '经典克莱因蓝', color: '#002FA7' },
+  { name: '电光克莱因蓝', color: '#1E4FFF' },
+  { name: '群青紫蓝',     color: '#3D5AFE' },
+  { name: '湖蓝',         color: '#0A84FF' },
+  { name: '雾灰蓝',       color: '#4A6FA5' },
+  { name: '深海蓝',       color: '#001B66' }
+];
+
+const swatchBox = document.getElementById('swatches');
+const paletteName = document.getElementById('paletteName');
+
+PALETTES.forEach((p, i) => {
+  const b = document.createElement('button');
+  b.className = 'swatch' + (i === 1 ? ' on' : '');
+  b.style.background = p.color;
+  b.title = `${p.name} ${p.color}`;
+  b.addEventListener('click', () => {
+    document.documentElement.style.setProperty('--primary-base', p.color);
+    paletteName.textContent = p.name;
+    swatchBox.querySelectorAll('.swatch').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+  });
+  swatchBox.appendChild(b);
+});
+
+/* ---------------- 主题 ---------------- */
+const themeBtn = document.getElementById('themeBtn');
+themeBtn.addEventListener('click', () => {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  document.documentElement.dataset.theme = dark ? 'light' : 'dark';
+  themeBtn.textContent = dark ? '🌙' : '☀️';
+});
+
+/* ---------------- 交互（事件委托） ---------------- */
+document.addEventListener('click', e => {
+  /* 点赞 */
+  const likeBtn = e.target.closest('.act-like');
+  if (likeBtn) {
+    const liked = likeBtn.classList.toggle('liked');
+    let n = Number(likeBtn.dataset.count) + (liked ? 1 : -1);
+    likeBtn.dataset.count = n;
+    likeBtn.querySelector('span').textContent = n;
+    return;
+  }
+
+  /* 展开回复框 */
+  const replyBtn = e.target.closest('.act-reply');
+  if (replyBtn) {
+    const body = replyBtn.closest('.body');
+    const existing = body.querySelector(':scope > .reply-box');
+    document.querySelectorAll('.reply-box').forEach(b => b.remove());
+    if (existing) return;
+
+    const box = document.createElement('div');
+    box.className = 'reply-box';
+    box.innerHTML = `
+      <textarea rows="2" placeholder="回复 ${body.querySelector('.name').textContent}…"></textarea>
+      <div class="reply-actions">
+        <button class="btn btn-ghost reply-cancel">取消</button>
+        <button class="btn btn-primary reply-submit">发布</button>
+      </div>`;
+    body.querySelector(':scope > .actions').after(box);
+    box.querySelector('textarea').focus();
+    return;
+  }
+
+  /* 取消 */
+  if (e.target.closest('.reply-cancel')) {
+    e.target.closest('.reply-box').remove();
+    return;
+  }
+
+  /* 提交回复 */
+  const submit = e.target.closest('.reply-submit');
+  if (submit) {
+    const box = submit.closest('.reply-box');
+    const ta = box.querySelector('textarea');
+    const text = ta.value.trim();
+    if (!text) { ta.focus(); return; }
+
+    const body = box.closest('.body');
+    let children = body.querySelector(':scope > .children');
+    if (!children) {
+      children = document.createElement('div');
+      children.className = 'children';
+      body.appendChild(children);
+    }
+    children.insertAdjacentHTML('beforeend', renderComment({
+      name: '我', av: 'av-5', time: '刚刚', likes: 0, text: escapeHtml(text)
+    }));
+    box.remove();
+  }
+});
+
+/* ---------------- 顶部发布 ---------------- */
+const input = document.getElementById('composerInput');
+
+document.getElementById('sendBtn').addEventListener('click', () => {
+  const text = input.value.trim();
+  if (!text) { input.focus(); return; }
+  listEl.insertAdjacentHTML('afterbegin', renderComment({
+    name: '我', av: 'av-5', time: '刚刚', likes: 0, text: escapeHtml(text)
+  }));
+  input.value = '';
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  input.value = '';
+  input.focus();
+});
+</script>
+</body>
+</html>

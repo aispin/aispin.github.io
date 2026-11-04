@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MonsterKit v1.0 · 载具图鉴</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+
+  body {
+    min-height: 100vh;
+    padding: 48px 22px 88px;
+    background: radial-gradient(circle at 50% -12%, #2f2558 0%, #171029 52%, #0a0712 100%);
+    font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #e6e1ff;
+  }
+
+  header { text-align: center; margin-bottom: 52px; }
+
+  .brand {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 6px 8px 6px 18px; border-radius: 999px;
+    background: rgba(139, 92, 246, .12);
+    border: 1px solid rgba(139, 92, 246, .3);
+    font-size: 12px; font-weight: 800; letter-spacing: .2em;
+    color: #c4b5fd; margin-bottom: 20px;
+  }
+  .brand .ver {
+    padding: 3px 10px; border-radius: 999px;
+    background: linear-gradient(135deg, #8b5cf6, #d946ef);
+    color: #fff; font-size: 10px; letter-spacing: .1em;
+  }
+
+  h1 {
+    font-size: clamp(26px, 4vw, 40px); font-weight: 800;
+    letter-spacing: .1em;
+    background: linear-gradient(90deg, #a78bfa, #67e8f9, #f0abfc, #fde68a);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent; margin-bottom: 14px;
+  }
+
+  .sub { font-size: 12.5px; letter-spacing: .22em; color: #6b5f99; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(228px, 1fr));
+    gap: 22px; max-width: 1180px; margin: 0 auto;
+  }
+
+  .card {
+    background: rgba(255, 255, 255, .035);
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 24px; padding: 14px 12px 16px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .06);
+    transition: transform .35s cubic-bezier(.22,.68,.36,1),
+                box-shadow .35s ease, border-color .35s ease;
+    cursor: pointer; user-select: none;
+  }
+  .card:hover {
+    transform: translateY(-7px);
+    border-color: rgba(255, 255, 255, .2);
+    box-shadow: 0 36px 84px rgba(0, 0, 0, .64), inset 0 1px 0 rgba(255, 255, 255, .1);
+  }
+  .card:active { transform: translateY(-3px) scale(.99); }
+
+  svg { display: block; width: 100%; height: auto; }
+
+  .info { text-align: center; margin-top: 4px; }
+  .info h2 {
+    font-size: 14px; font-weight: 800; letter-spacing: .14em;
+    color: #b4a6ee; margin-bottom: 4px;
+  }
+  .info p { font-size: 10.5px; letter-spacing: .08em; color: #5f5486; }
+  .info .swap {
+    display: inline-block; margin-top: 8px;
+    font-size: 9.5px; letter-spacing: .14em; color: #4a4170;
+    border-top: 1px solid rgba(255,255,255,.06);
+    padding-top: 7px; transition: color .25s;
+  }
+  .card:hover .info .swap { color: #8b7ec8; }
+
+  .float { transform-box: view-box; animation: float 3s ease-in-out infinite; }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-5px); }
+  }
+
+  .shadow {
+    transform-box: fill-box; transform-origin: center;
+    animation: shadowPulse 3s ease-in-out infinite;
+  }
+  @keyframes shadowPulse {
+    0%, 100% { transform: scale(1);   opacity: .30; }
+    50%      { transform: scale(.86); opacity: .17; }
+  }
+
+  .sway { transform-box: view-box; animation: sway 2.6s ease-in-out infinite; }
+  @keyframes sway {
+    0%, 100% { transform: rotate(-7deg); }
+    50%      { transform: rotate(7deg); }
+  }
+
+  .blink {
+    transform-box: fill-box; transform-origin: center;
+    animation: blink 3.6s infinite;
+  }
+  @keyframes blink {
+    0%, 91%, 100% { transform: scaleY(1); }
+    94.5%         { transform: scaleY(.07); }
+  }
+
+  .pulse { animation: pulse 2.2s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+
+  .card:nth-child(2n) .float { animation-delay: -.7s; }
+  .card:nth-child(3n) .float { animation-delay: -1.4s; }
+  .card:nth-child(5n) .float { animation-delay: -2.1s; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">MONSTERKIT <span class="ver">v1.0</span></div>
+  <h1>载具图鉴</h1>
+  <p class="sub">8 VEHICLES · 怪物可以住在任何地方</p>
+</header>
+
+<main class="grid" id="grid"></main>
+
+<script>
+/* =========================================================
+   工具：锯齿破口
+   ========================================================= */
+function zigPath(right, left, y, count) {
+  let d = '';
+  for (let i = 1; i <= count; i++) {
+    const t   = i / (count + 1);
+    const x   = right + (left - right) * t;
+    const up  = i % 2 === 1;
+    const amp = 15 + (i % 3) * 3;
+    d += ` L ${x.toFixed(1)} ${up ? y - amp : y + 6}`;
+  }
+  return d;
+}
+
+function coneLattice() {
+  let s = '';
+  for (let i = -4; i <= 10; i++) {
+    const x = 60 + i * 22;
+    s += `<line x1="${x}" y1="140" x2="${x + 130}" y2="300"/>`;
+    s += `<line x1="${x + 130}" y1="140" x2="${x}" y2="300"/>`;
+  }
+  return s;
+}
+
+/* =========================================================
+   载具库
+   ---------------------------------------------------------
+   分层约定（决定怪物和容器的前后关系）：
+   - renderBack(u)   在怪物之前绘制（杯子内部、后沿、手柄…）
+   - render(u)       在怪物之后绘制（前壁、前沿、高光…）
+   ========================================================= */
+const VEHICLES = {
+
+  /* ---------- 1. 蛋壳 ---------- */
+  egg: {
+    name: '蛋壳', en: 'EGG SHELL', shadowY: 274,
+    gradients: u => `
+      <linearGradient id="shell-${u}" x1="0" y1="0" x2="0.25" y2="1">
+        <stop offset="0%" stop-color="#fffbf2"/>
+        <stop offset="45%" stop-color="#f5e6cd"/>
+        <stop offset="100%" stop-color="#dcc09a"/>
+      </linearGradient>`,
+    render: u => `
+      <path d="M 72 168 C 62 225 100 268 150 268 C 200 268 238 225 228 168${zigPath(228, 72, 168, 15)} Z"
+            fill="url(#shell-${u})" stroke="#d3b68e" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M 94 202 Q 86 232 108 254" fill="none" stroke="#fff"
+            stroke-width="7" stroke-linecap="round" opacity=".5"/>`
+  },
+
+  /* ---------- 2. 西瓜 ---------- */
+  melon: {
+    name: '西瓜', en: 'WATERMELON', shadowY: 278,
+    gradients: u => `
+      <linearGradient id="rind-${u}" x1="0" y1="0" x2="0.3" y2="1">
+        <stop offset="0%" stop-color="#4ade80"/>
+        <stop offset="50%" stop-color="#16a34a"/>
+        <stop offset="100%" stop-color="#14532d"/>
+      </linearGradient>
+      <radialGradient id="flesh-${u}" cx="0.5" cy="0.15" r="0.95">
+        <stop offset="0%" stop-color="#fca5a5"/>
+        <stop offset="60%" stop-color="#ef4444"/>
+        <stop offset="100%" stop-color="#b91c1c"/>
+      </radialGradient>`,
+    render: u => `
+      <path d="M 64 172 C 64 236 104 272 150 272 C 196 272 236 236 236 172 Z"
+            fill="url(#rind-${u})" stroke="#14532d" stroke-width="3"/>
+      <path d="M 76 172 C 76 228 110 260 150 260 C 190 260 224 228 224 172 Z" fill="#f0fdf4"/>
+      <path d="M 86 172 C 86 220 114 248 150 248 C 186 248 214 220 214 172 Z" fill="url(#flesh-${u})"/>
+      <ellipse cx="118" cy="208" rx="4" ry="6" fill="#1c1917" transform="rotate(-20 118 208)"/>
+      <ellipse cx="182" cy="208" rx="4" ry="6" fill="#1c1917" transform="rotate(20 182 208)"/>
+      <ellipse cx="150" cy="226" rx="4" ry="6" fill="#1c1917"/>
+      <ellipse cx="132" cy="234" rx="3.5" ry="5" fill="#1c1917" transform="rotate(-10 132 234)"/>
+      <ellipse cx="168" cy="234" rx="3.5" ry="5" fill="#1c1917" transform="rotate(10 168 234)"/>
+      <path d="M 92 194 Q 84 222 104 246" fill="none" stroke="#fff"
+            stroke-width="6" stroke-linecap="round" opacity=".28"/>`
+  },
+
+  /* ---------- 3. 冰淇淋筒 ---------- */
+  cone: {
+    name: '冰淇淋筒', en: 'ICE CREAM CONE', shadowY: 294,
+    gradients: u => `
+      <linearGradient id="cone-${u}" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#fcd34d"/>
+        <stop offset="45%" stop-color="#f59e0b"/>
+        <stop offset="100%" stop-color="#b45309"/>
+      </linearGradient>
+      <clipPath id="coneclip-${u}">
+        <path d="M 86 164 Q 150 174 214 164 L 152 284 Q 150 290 148 284 Z"/>
+      </clipPath>`,
+    render: u => `
+      <path d="M 86 164 Q 150 174 214 164 L 152 284 Q 150 290 148 284 Z"
+            fill="url(#cone-${u})" stroke="#92400e" stroke-width="2.5" stroke-linejoin="round"/>
+      <g clip-path="url(#coneclip-${u})" stroke="#92400e" stroke-width="1.5" opacity=".4">
+        ${coneLattice()}
+      </g>
+      <path d="M 86 164 Q 150 174 214 164" fill="none" stroke="#78350f"
+            stroke-width="4" stroke-linecap="round"/>`
+  },
+
+  /* ---------- 4. 马克杯（后沿在怪物之前 / 前沿在怪物之后） ---------- */
+  mug: {
+    name: '马克杯', en: 'MUG', shadowY: 274,
+    gradients: u => `
+      <linearGradient id="mug-${u}" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#5eead4"/>
+        <stop offset="45%" stop-color="#14b8a6"/>
+        <stop offset="100%" stop-color="#0f766e"/>
+      </linearGradient>`,
+
+    /* ---- 怪物之前：手柄 + 内部深色 + 后沿弧 ---- */
+    renderBack: u => `
+      <!-- 手柄 -->
+      <path d="M 216 188 Q 256 188 256 214 Q 256 240 216 240"
+            fill="none" stroke="#0d9488" stroke-width="16" stroke-linecap="round"/>
+      <path d="M 216 188 Q 256 188 256 214 Q 256 240 216 240"
+            fill="none" stroke="#5eead4" stroke-width="5" stroke-linecap="round" opacity=".35"/>
+
+      <!-- 杯口内部（深色椭圆） -->
+      <ellipse cx="150" cy="158" rx="68" ry="13" fill="#0b3b37"/>
+
+      <!-- 后沿弧（从左边点沿椭圆上半圈到右边点） -->
+      <path d="M 82 158 A 68 13 0 0 1 218 158"
+            fill="none" stroke="#0d9488" stroke-width="4"/>`,
+
+    /* ---- 怪物之后：前壁 + 前沿弧 + 高光 ---- */
+    render: u => `
+      <!-- 前壁：上边缘沿椭圆下半圈，向下延伸到底部 -->
+      <path d="M 82 158 L 82 240 Q 82 264 106 264 L 194 264 Q 218 264 218 240 L 218 158
+               A 68 13 0 0 1 82 158 Z"
+            fill="url(#mug-${u})"/>
+
+      <!-- 前沿弧（从左边点沿椭圆下半圈到右边点） -->
+      <path d="M 82 158 A 68 13 0 0 0 218 158"
+            fill="none" stroke="#0d9488" stroke-width="4"/>
+      <path d="M 82 158 A 68 13 0 0 0 218 158"
+            fill="none" stroke="#5eead4" stroke-width="1.5" opacity=".45"/>
+
+      <!-- 前壁高光 -->
+      <path d="M 100 188 Q 96 218 104 244" fill="none" stroke="#fff"
+            stroke-width="7" stroke-linecap="round" opacity=".22"/>`
+  },
+
+  /* ---------- 5. 花盆 ---------- */
+  pot: {
+    name: '花盆', en: 'FLOWER POT', shadowY: 280,
+    gradients: u => `
+      <linearGradient id="pot-${u}" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#fdba74"/>
+        <stop offset="45%" stop-color="#ea580c"/>
+        <stop offset="100%" stop-color="#9a3412"/>
+      </linearGradient>
+      <linearGradient id="rim-${u}" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#fb923c"/>
+        <stop offset="45%" stop-color="#f97316"/>
+        <stop offset="100%" stop-color="#c2410c"/>
+      </linearGradient>`,
+    render: u => `
+      <path d="M 84 184 L 216 184 L 202 266 Q 200 276 190 276 L 110 276 Q 100 276 98 266 Z"
+            fill="url(#pot-${u})"/>
+      <rect x="72" y="162" width="156" height="22" rx="7" fill="url(#rim-${u})"/>
+      <path d="M 84 184 L 216 184" stroke="#9a3412" stroke-width="2" opacity=".3"/>
+      <path d="M 100 196 Q 98 230 106 262" fill="none" stroke="#fff"
+            stroke-width="7" stroke-linecap="round" opacity=".18"/>`
+  },
+
+  /* ---------- 6. 纸杯蛋糕 ---------- */
+  cupcake: {
+    name: '纸杯蛋糕', en: 'CUPCAKE', shadowY: 280,
+    gradients: u => `
+      <linearGradient id="cup-${u}" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#f9a8d4"/>
+        <stop offset="45%" stop-color="#ec4899"/>
+        <stop offset="100%" stop-color="#9d174d"/>
+      </linearGradient>`,
+    render: u => `
+      <path d="M 88 170 L 212 170 L 198 264 Q 196 274 186 274 L 114 274 Q 104 274 102 264 Z"
+            fill="url(#cup-${u})"/>
+      <g opacity=".18" stroke="#000" stroke-width="1.5" fill="none">
+        <path d="M 106 174 L 110 270"/>
+        <path d="M 124 172 L 126 272"/>
+        <path d="M 142 171 L 142 273"/>
+        <path d="M 158 171 L 158 273"/>
+        <path d="M 176 172 L 174 272"/>
+        <path d="M 194 174 L 190 270"/>
+      </g>
+      <rect x="86" y="164" width="128" height="10" rx="5" fill="url(#cup-${u})"/>
+      <path d="M 104 186 Q 102 226 110 262" fill="none" stroke="#fff"
+            stroke-width="6" stroke-linecap="round" opacity=".25"/>`
+  },
+
+  /* ---------- 7. 木桶 ---------- */
+  barrel: {
+    name: '木桶', en: 'BARREL', shadowY: 280,
+    gradients: u => `
+      <linearGradient id="barrel-${u}" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#d97706"/>
+        <stop offset="40%" stop-color="#b45309"/>
+        <stop offset="100%" stop-color="#78350f"/>
+      </linearGradient>`,
+    render: u => `
+      <path d="M 80 166 Q 68 222 80 274 L 220 274 Q 232 222 220 166 Z"
+            fill="url(#barrel-${u})" stroke="#78350f" stroke-width="2.5"/>
+      <g stroke="#78350f" stroke-width="1.6" fill="none" opacity=".45">
+        <path d="M 110 168 Q 106 222 110 274"/>
+        <path d="M 150 167 Q 150 222 150 274"/>
+        <path d="M 190 168 Q 194 222 190 274"/>
+      </g>
+      <path d="M 74 200 Q 150 212 226 200" fill="none"
+            stroke="#64748b" stroke-width="9" stroke-linecap="round"/>
+      <path d="M 74 200 Q 150 212 226 200" fill="none"
+            stroke="#94a3b8" stroke-width="4" stroke-linecap="round" opacity=".5"/>
+      <path d="M 78 248 Q 150 260 222 248" fill="none"
+            stroke="#64748b" stroke-width="9" stroke-linecap="round"/>
+      <path d="M 78 248 Q 150 260 222 248" fill="none"
+            stroke="#94a3b8" stroke-width="4" stroke-linecap="round" opacity=".5"/>`
+  },
+
+  /* ---------- 8. 茶杯（后沿在怪物之前 / 前沿在怪物之后） ---------- */
+  teacup: {
+    name: '茶杯', en: 'TEACUP', shadowY: 286,
+    gradients: u => `
+      <linearGradient id="teacup-${u}" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#f8fafc"/>
+        <stop offset="45%" stop-color="#cbd5e1"/>
+        <stop offset="100%" stop-color="#94a3b8"/>
+      </linearGradient>
+      <radialGradient id="saucer-${u}" cx="0.5" cy="0.3" r="0.9">
+        <stop offset="0%" stop-color="#f8fafc"/>
+        <stop offset="100%" stop-color="#94a3b8"/>
+      </radialGradient>`,
+
+    /* ---- 怪物之前：碟子 + 手柄 + 内部深色 + 后沿弧 ---- */
+    renderBack: u => `
+      <!-- 碟子 -->
+      <ellipse cx="150" cy="266" rx="88" ry="11" fill="url(#saucer-${u})"/>
+      <ellipse cx="150" cy="263" rx="88" ry="11" fill="#e2e8f0" opacity=".55"/>
+
+      <!-- 手柄 -->
+      <path d="M 214 182 Q 246 182 246 204 Q 246 226 214 226"
+            fill="none" stroke="#cbd5e1" stroke-width="12" stroke-linecap="round"/>
+
+      <!-- 杯口内部 -->
+      <ellipse cx="150" cy="160" rx="64" ry="12" fill="#334155"/>
+
+      <!-- 后沿弧 -->
+      <path d="M 86 160 A 64 12 0 0 1 214 160"
+            fill="none" stroke="#94a3b8" stroke-width="3.5"/>`,
+
+    /* ---- 怪物之后：前壁 + 前沿弧 + 高光 ---- */
+    render: u => `
+      <path d="M 86 160 L 86 232 Q 86 254 110 254 L 190 254 Q 214 254 214 232 L 214 160
+               A 64 12 0 0 1 86 160 Z"
+            fill="url(#teacup-${u})"/>
+
+      <path d="M 86 160 A 64 12 0 0 0 214 160"
+            fill="none" stroke="#94a3b8" stroke-width="3.5"/>
+      <path d="M 86 160 A 64 12 0 0 0 214 160"
+            fill="none" stroke="#f8fafc" stroke-width="1.5" opacity=".45"/>
+
+      <path d="M 100 188 Q 98 212 106 236" fill="none" stroke="#fff"
+            stroke-width="6" stroke-linecap="round" opacity=".3"/>`
+  }
+};
+
+/* =========================================================
+   怪物库
+   ========================================================= */
+const MONSTERS = {
+
+  purple: {
+    name: '紫色蛋蛋怪', glow: '#8b5cf6',
+    body: ['#c9a8ff', '#8b5cf6', '#5b21b6'],
+    blush: '#ff8fb1', floatDur: 3,
+    extras: () => `
+      <g class="sway" style="transform-origin:130px 92px; animation-duration:2.4s">
+        <path d="M130 92 Q108 52 124 26" fill="none" stroke="#7c4ded" stroke-width="11" stroke-linecap="round"/>
+        <circle cx="124" cy="26" r="9" fill="#a78bfa"/>
+      </g>
+      <g class="sway" style="transform-origin:170px 92px; animation-duration:2.4s; animation-delay:-1.2s">
+        <path d="M170 92 Q192 52 176 26" fill="none" stroke="#7c4ded" stroke-width="11" stroke-linecap="round"/>
+        <circle cx="176" cy="26" r="9" fill="#a78bfa"/>
+      </g>`,
+    face: () => `
+      <g class="blink" style="animation-duration:3.4s">
+        <ellipse cx="127" cy="120" rx="17" ry="18" fill="#fff"/>
+        <circle cx="127" cy="120" r="8" fill="#251a3d"/>
+        <circle cx="124" cy="116" r="3" fill="#fff" opacity=".9"/>
+      </g>
+      <g class="blink" style="animation-duration:3.4s">
+        <ellipse cx="173" cy="120" rx="17" ry="18" fill="#fff"/>
+        <circle cx="173" cy="120" r="8" fill="#251a3d"/>
+        <circle cx="170" cy="116" r="3" fill="#fff" opacity=".9"/>
+      </g>
+      <path d="M143 143 Q150 153 157 143" fill="none" stroke="#2a1c47"
+            stroke-width="4" stroke-linecap="round"/>`
+  },
+
+  slime: {
+    name: '独眼史莱姆', glow: '#34d399',
+    body: ['#a7f3d0', '#34d399', '#047857'],
+    blush: '#fda4af', floatDur: 3.2,
+    extras: () => `
+      <g class="sway" style="transform-origin:128px 96px; animation-duration:2.8s">
+        <path d="M128 96 Q112 62 122 38" fill="none" stroke="#10b981" stroke-width="7" stroke-linecap="round"/>
+        <circle cx="122" cy="38" r="7" fill="#6ee7b7"/>
+      </g>
+      <g class="sway" style="transform-origin:172px 96px; animation-duration:2.8s; animation-delay:-1.4s">
+        <path d="M172 96 Q188 62 178 38" fill="none" stroke="#10b981" stroke-width="7" stroke-linecap="round"/>
+        <circle cx="178" cy="38" r="7" fill="#6ee7b7"/>
+      </g>`,
+    face: () => `
+      <g class="blink" style="animation-duration:3.8s">
+        <ellipse cx="150" cy="122" rx="27" ry="28" fill="#fff"/>
+        <circle cx="150" cy="124" r="12" fill="#0f172a"/>
+        <circle cx="145" cy="118" r="4.5" fill="#fff" opacity=".95"/>
+        <circle cx="155" cy="130" r="2" fill="#fff" opacity=".55"/>
+      </g>
+      <path d="M139 158 Q150 168 161 158" fill="none" stroke="#065f46"
+            stroke-width="4.5" stroke-linecap="round"/>`
+  },
+
+  devil: {
+    name: '小恶魔', glow: '#ef4444',
+    body: ['#fda4af', '#ef4444', '#991b1b'],
+    floatDur: 2.6,
+    extras: () => `
+      <path d="M116 88 Q104 50 120 28" fill="none" stroke="#450a0a" stroke-width="13" stroke-linecap="round"/>
+      <path d="M184 88 Q196 50 180 28" fill="none" stroke="#450a0a" stroke-width="13" stroke-linecap="round"/>
+      <circle cx="120" cy="28" r="6" fill="#b91c1c"/>
+      <circle cx="180" cy="28" r="6" fill="#b91c1c"/>`,
+    face: () => `
+      <path d="M110 101 L144 111" stroke="#450a0a" stroke-width="6" stroke-linecap="round"/>
+      <path d="M190 101 L156 111" stroke="#450a0a" stroke-width="6" stroke-linecap="round"/>
+      <g class="blink" style="animation-duration:2.9s">
+        <ellipse cx="128" cy="128" rx="14" ry="13" fill="#fff"/>
+        <circle cx="130" cy="129" r="6.5" fill="#1c0a0a"/>
+      </g>
+      <g class="blink" style="animation-duration:2.9s">
+        <ellipse cx="172" cy="128" rx="14" ry="13" fill="#fff"/>
+        <circle cx="170" cy="129" r="6.5" fill="#1c0a0a"/>
+      </g>
+      <path d="M130 148 L138 158 L146 148 L154 158 L162 148 L170 156"
+            fill="none" stroke="#450a0a" stroke-width="4"
+            stroke-linecap="round" stroke-linejoin="round"/>`
+  },
+
+  ghost: {
+    name: '幽灵', glow: '#a5b4fc',
+    body: ['rgba(255,255,255,0.95)', 'rgba(224,231,255,0.78)', 'rgba(199,210,254,0.40)'],
+    blush: '#a5b4fc', blushY: 142, floatDur: 4, highlight: false,
+    shape: u => `
+      <path d="M150 56 C198 56 216 98 216 134 L216 164
+               Q205 182 194 164 Q183 182 172 164 Q161 182 150 164
+               Q139 182 128 164 Q117 182 106 164 Q95 182 84 164
+               L84 134 C84 98 102 56 150 56 Z"
+            fill="url(#body-${u})" stroke="rgba(255,255,255,0.6)" stroke-width="2"/>`,
+    face: () => `
+      <g class="blink" style="animation-duration:5s">
+        <ellipse cx="126" cy="124" rx="13" ry="17" fill="#312e81"/>
+        <circle cx="122" cy="118" r="3.5" fill="#fff" opacity=".9"/>
+      </g>
+      <g class="blink" style="animation-duration:5s">
+        <ellipse cx="174" cy="124" rx="13" ry="17" fill="#312e81"/>
+        <circle cx="170" cy="118" r="3.5" fill="#fff" opacity=".9"/>
+      </g>
+      <ellipse cx="150" cy="148" rx="7" ry="9" fill="#312e81" opacity=".85"/>`
+  },
+
+  robot: {
+    name: '小机器人', glow: '#22d3ee',
+    body: ['#e2e8f0', '#94a3b8', '#475569'],
+    floatDur: 3.8, highlight: false,
+    extras: () => `
+      <path d="M150 66 L150 34" stroke="#64748b" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="150" cy="26" r="9" fill="#f87171" class="pulse"/>`,
+    face: () => `
+      <rect x="104" y="84" width="92" height="68" rx="18" fill="#0f172a"/>
+      <g class="blink" style="animation-duration:4s">
+        <rect x="118" y="102" width="18" height="18" rx="5" fill="#22d3ee" class="pulse"/>
+      </g>
+      <g class="blink" style="animation-duration:4s">
+        <rect x="164" y="102" width="18" height="18" rx="5" fill="#22d3ee" class="pulse"/>
+      </g>
+      <path d="M136 136 L144 136 L144 144 L152 144 L152 136 L160 136"
+            fill="none" stroke="#22d3ee" stroke-width="3"
+            stroke-linecap="round" stroke-linejoin="round"/>`
+  },
+
+  sprout: {
+    name: '花苞精灵', glow: '#4ade80',
+    body: ['#bbf7d0', '#4ade80', '#15803d'],
+    blush: '#f9a8d4', blushY: 140, floatDur: 3.4,
+    extraGradients: u => `
+      <linearGradient id="petal-${u}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#fbcfe8"/>
+        <stop offset="100%" stop-color="#ec4899"/>
+      </linearGradient>`,
+    extras: u => `
+      <g class="sway" style="transform-origin:150px 78px; animation-duration:3.4s">
+        <ellipse cx="122" cy="56" rx="15" ry="21" fill="url(#petal-${u})" transform="rotate(-30 122 56)"/>
+        <ellipse cx="178" cy="56" rx="15" ry="21" fill="url(#petal-${u})" transform="rotate(30 178 56)"/>
+        <ellipse cx="150" cy="44" rx="16" ry="23" fill="url(#petal-${u})"/>
+      </g>
+      <g class="sway" style="transform-origin:112px 152px; animation-duration:3s; animation-delay:-0.8s">
+        <path d="M112 152 Q70 132 58 162 Q78 182 110 168 Z" fill="#22c55e"/>
+      </g>
+      <g class="sway" style="transform-origin:188px 152px; animation-duration:3s; animation-delay:-1.6s">
+        <path d="M188 152 Q230 132 242 162 Q222 182 190 168 Z" fill="#22c55e"/>
+      </g>`,
+    face: () => `
+      <path d="M116 126 Q128 114 140 126" fill="none" stroke="#14532d"
+            stroke-width="4.5" stroke-linecap="round"/>
+      <path d="M160 126 Q172 114 184 126" fill="none" stroke="#14532d"
+            stroke-width="4.5" stroke-linecap="round"/>
+      <path d="M142 142 Q150 150 158 142" fill="none" stroke="#14532d"
+            stroke-width="3.5" stroke-linecap="round"/>`
+  },
+
+  cat: {
+    name: '黑猫', glow: '#a78bfa',
+    body: ['#4c1d95', '#2e1065', '#0b0a1a'],
+    floatDur: 2.8, hiOpacity: 0.16,
+    extras: u => `
+      <g class="sway" style="transform-origin:208px 150px; animation-duration:2.2s">
+        <path d="M206 150 Q248 140 246 100 Q244 78 230 74"
+              fill="none" stroke="#2e1065" stroke-width="12" stroke-linecap="round"/>
+      </g>
+      <path d="M108 86 L96 42 L136 68 Z" fill="url(#body-${u})"/>
+      <path d="M110 80 L104 54 L128 70 Z" fill="#f9a8d4" opacity=".7"/>
+      <path d="M192 86 L204 42 L164 68 Z" fill="url(#body-${u})"/>
+      <path d="M190 80 L196 54 L172 70 Z" fill="#f9a8d4" opacity=".7"/>`,
+    face: () => `
+      <g class="blink" style="animation-duration:3s">
+        <ellipse cx="126" cy="118" rx="15" ry="17" fill="#a3e635"/>
+        <ellipse cx="126" cy="118" rx="4" ry="14" fill="#0b0a1a"/>
+        <circle cx="122" cy="112" r="3" fill="#fff" opacity=".9"/>
+      </g>
+      <g class="blink" style="animation-duration:3s">
+        <ellipse cx="174" cy="118" rx="15" ry="17" fill="#a3e635"/>
+        <ellipse cx="174" cy="118" rx="4" ry="14" fill="#0b0a1a"/>
+        <circle cx="170" cy="112" r="3" fill="#fff" opacity=".9"/>
+      </g>
+      <path d="M146 136 L154 136 L150 142 Z" fill="#f472b6"/>
+      <path d="M150 142 Q142 150 134 147" fill="none" stroke="#c4b5fd"
+            stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M150 142 Q158 150 166 147" fill="none" stroke="#c4b5fd"
+            stroke-width="2.5" stroke-linecap="round"/>`
+  },
+
+  unicorn: {
+    name: '独角兽', glow: '#c084fc',
+    body: ['#f5d0fe', '#c084fc', '#7e22ce'],
+    blush: '#f9a8d4', blushY: 144, floatDur: 3.2,
+    extraGradients: u => `
+      <linearGradient id="horn-${u}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#fef9c3"/>
+        <stop offset="100%" stop-color="#f59e0b"/>
+      </linearGradient>`,
+    extras: u => `
+      <path d="M150 42 L140 84 L160 84 Z" fill="url(#horn-${u})"/>
+      <path d="M143 66 L157 66" stroke="#a16207" stroke-width="1.5" opacity=".45"/>
+      <path d="M141 76 L159 76" stroke="#a16207" stroke-width="1.5" opacity=".45"/>
+      <path d="M110 82 L98 46 L134 66 Z" fill="#e879f9"/>
+      <path d="M190 82 L202 46 L166 66 Z" fill="#e879f9"/>`,
+    face: () => `
+      <g class="blink" style="animation-duration:4.4s">
+        <ellipse cx="126" cy="122" rx="15" ry="16" fill="#fff"/>
+        <circle cx="127" cy="123" r="7.5" fill="#4c1d95"/>
+        <circle cx="124" cy="119" r="2.6" fill="#fff"/>
+      </g>
+      <g class="blink" style="animation-duration:4.4s">
+        <ellipse cx="174" cy="122" rx="15" ry="16" fill="#fff"/>
+        <circle cx="173" cy="123" r="7.5" fill="#4c1d95"/>
+        <circle cx="170" cy="119" r="2.6" fill="#fff"/>
+      </g>
+      <path d="M150 96 l2.5 5 l5.5 0.8 l-4 3.8 l1 5.4 l-5 -2.7 l-5 2.7 l1 -5.4 l-4 -3.8 l5.5 -0.8 Z"
+            fill="#fde68a" opacity=".95"/>
+      <path d="M142 146 Q150 154 158 146" fill="none" stroke="#581c87"
+            stroke-width="3.5" stroke-linecap="round"/>`
+  }
+};
+
+/* =========================================================
+   配对表
+   ========================================================= */
+const PAIRS = [
+  ['egg',     'purple'],
+  ['melon',   'slime'],
+  ['cone',    'devil'],
+  ['mug',     'robot'],
+  ['pot',     'sprout'],
+  ['cupcake', 'unicorn'],
+  ['barrel',  'cat'],
+  ['teacup',  'ghost']
+];
+
+const MONSTER_IDS = Object.keys(MONSTERS);
+
+/* =========================================================
+   渲染
+   ========================================================= */
+function bodyGradients(u, m) {
+  const [a, b, c] = m.body;
+  return `
+    <radialGradient id="body-${u}" cx="0.34" cy="0.26" r="0.9">
+      <stop offset="0%"   stop-color="${a}"/>
+      <stop offset="50%"  stop-color="${b}"/>
+      <stop offset="100%" stop-color="${c}"/>
+    </radialGradient>
+    <radialGradient id="glow-${u}" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%"   stop-color="${m.glow}" stop-opacity="0.26"/>
+      <stop offset="100%" stop-color="${m.glow}" stop-opacity="0"/>
+    </radialGradient>`;
+}
+
+function monsterSVG(m, u) {
+  const shape = m.shape
+    ? m.shape(u)
+    : `<ellipse cx="150" cy="128" rx="62" ry="58" fill="url(#body-${u})"/>`;
+
+  const hi = m.highlight === false ? '' : `
+    <ellipse cx="122" cy="104" rx="20" ry="12" fill="#fff"
+             opacity="${m.hiOpacity ?? 0.22}" transform="rotate(-25 122 104)"/>`;
+
+  const blush = m.blush ? `
+    <ellipse cx="104" cy="${m.blushY ?? 148}" rx="11" ry="6" fill="${m.blush}" opacity=".45"/>
+    <ellipse cx="196" cy="${m.blushY ?? 148}" rx="11" ry="6" fill="${m.blush}" opacity=".45"/>` : '';
+
+  return `
+    <g class="float" style="animation-duration:${m.floatDur || 3}s">
+      ${m.extras ? m.extras(u) : ''}
+      ${shape}
+      ${hi}
+      ${blush}
+      ${m.face(u)}
+    </g>`;
+}
+
+function buildCard(vehicleId, monsterId, index) {
+  const v = VEHICLES[vehicleId];
+  const m = MONSTERS[monsterId];
+  const u = `k${index}`;
+  const dur = m.floatDur || 3;
+
+  /* 分层绘制：back → 怪物 → front */
+  const back = v.renderBack ? v.renderBack(u) : '';
+
+  return `
+  <div class="card" data-vehicle="${vehicleId}" data-monster="${monsterId}" data-index="${index}">
+    <svg viewBox="0 0 300 340" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        ${bodyGradients(u, m)}
+        ${v.gradients ? v.gradients(u) : ''}
+        ${m.extraGradients ? m.extraGradients(u) : ''}
+      </defs>
+
+      <ellipse cx="150" cy="220" rx="130" ry="86" fill="url(#glow-${u})"/>
+
+      <ellipse class="shadow" style="animation-duration:${dur}s"
+               cx="150" cy="${v.shadowY}" rx="62" ry="10"
+               fill="#000" opacity=".3"/>
+
+      ${back}
+
+      ${monsterSVG(m, u)}
+
+      ${v.render(u)}
+    </svg>
+
+    <div class="info">
+      <h2>${v.name}</h2>
+      <p>${v.en} · ${m.name}</p>
+      <span class="swap">点击切换怪物</span>
+    </div>
+  </div>`;
+}
+
+/* ---------- 注入页面 ---------- */
+const grid = document.getElementById('grid');
+grid.innerHTML = PAIRS.map(([v, m], i) => buildCard(v, m, i)).join('');
+
+/* =========================================================
+   交互：点击切换怪物
+   ========================================================= */
+grid.addEventListener('click', e => {
+  const card = e.target.closest('.card');
+  if (!card) return;
+
+  const vehicleId = card.dataset.vehicle;
+  const index     = Number(card.dataset.index);
+  const cur       = card.dataset.monster;
+  const next      = MONSTER_IDS[(MONSTER_IDS.indexOf(cur) + 1) % MONSTER_IDS.length];
+
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = buildCard(vehicleId, next, index).trim();
+  const fresh = wrapper.firstElementChild;
+
+  fresh.style.transition = 'none';
+  card.replaceWith(fresh);
+  requestAnimationFrame(() => { fresh.style.transition = ''; });
+});
+</script>
+
+</body>
+</html>

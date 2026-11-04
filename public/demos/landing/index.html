@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Gitalk — 评论区，从此是一片星系</title>
+<style>
+  :root{
+    --bg:#05060b;
+    --fg:#e9eefb;
+    --dim:#8b96b0;
+    --mint:#5eead4;
+    --indigo:#818cf8;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    background:var(--bg);
+    color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  #gl{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0}
+  .ambient{
+    position:fixed;inset:0;z-index:1;pointer-events:none;
+    background:
+      radial-gradient(58% 48% at 72% 40%, rgba(56,189,248,.13), transparent 70%),
+      radial-gradient(48% 42% at 18% 84%, rgba(129,140,248,.13), transparent 70%),
+      radial-gradient(40% 40% at 50% 50%, rgba(94,234,212,.05), transparent 70%);
+  }
+  .grain{
+    position:fixed;inset:0;z-index:2;pointer-events:none;opacity:.35;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+    mix-blend-mode:overlay;
+  }
+
+  /* ---------- NAV ---------- */
+  .nav{
+    position:fixed;top:0;left:0;right:0;z-index:12;
+    display:flex;justify-content:space-between;align-items:center;
+    padding:22px 36px;pointer-events:none;
+  }
+  .brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:.3px;font-size:16px;pointer-events:auto}
+  .brand span{background:linear-gradient(100deg,#fff,#a5b4fc);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .links{pointer-events:auto;display:flex;gap:28px}
+  .links a{color:var(--dim);font-size:14px;text-decoration:none;transition:color .3s}
+  .links a:hover{color:#fff}
+
+  /* ---------- HERO ---------- */
+  .hero{
+    position:fixed;left:38px;bottom:118px;z-index:11;
+    max-width:430px;pointer-events:none;
+  }
+  .hero > *{pointer-events:auto}
+  .eyebrow{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:11.5px;letter-spacing:.16em;color:var(--mint);
+    opacity:.85;margin-bottom:20px;
+  }
+  .hero h1{
+    font-size:clamp(34px,4vw,56px);
+    line-height:1.06;letter-spacing:-.035em;font-weight:700;
+  }
+  .hero h1 em{
+    font-style:normal;
+    background:linear-gradient(100deg,#5eead4,#818cf8 52%,#f472b6);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .hero p{
+    margin-top:18px;color:var(--dim);font-size:14.5px;line-height:1.8;max-width:370px;
+  }
+  .chips{display:flex;gap:8px;margin-top:22px;flex-wrap:wrap}
+  .chips span{
+    font-size:12px;color:#b9c4dc;
+    padding:6px 12px;border-radius:999px;
+    background:rgba(255,255,255,.045);
+    border:1px solid rgba(255,255,255,.09);
+    backdrop-filter:blur(10px);
+  }
+  .cta{display:flex;gap:12px;margin-top:28px}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;
+    height:44px;padding:0 22px;border-radius:12px;
+    font-size:14px;font-weight:600;text-decoration:none;
+    transition:transform .25s cubic-bezier(.2,.9,.3,1.4), box-shadow .3s, background .3s;
+  }
+  .btn.primary{
+    color:#04121a;
+    background:linear-gradient(100deg,#5eead4,#818cf8);
+    box-shadow:0 10px 34px rgba(94,234,212,.28);
+    font-family:ui-monospace,monospace;
+  }
+  .btn.primary:hover{transform:translateY(-2px);box-shadow:0 16px 44px rgba(94,234,212,.42)}
+  .btn.ghost{
+    color:#cfd8ea;background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.12);
+  }
+  .btn.ghost:hover{background:rgba(255,255,255,.1);transform:translateY(-2px)}
+
+  /* ---------- HINT ---------- */
+  .hint{
+    position:fixed;left:50%;transform:translateX(-50%);bottom:98px;z-index:9;
+    font-family:ui-monospace,monospace;font-size:11.5px;letter-spacing:.08em;
+    color:rgba(255,255,255,.32);pointer-events:none;
+    transition:opacity .5s;
+  }
+
+  /* ---------- COMPOSER ---------- */
+  .composer{
+    position:fixed;left:50%;transform:translateX(-50%);bottom:26px;z-index:12;
+    display:flex;align-items:center;gap:12px;
+    width:min(560px,calc(100vw - 40px));
+    padding:9px 9px 9px 14px;
+    border-radius:16px;
+    background:rgba(255,255,255,.045);
+    border:1px solid rgba(255,255,255,.1);
+    backdrop-filter:blur(18px) saturate(1.4);
+    box-shadow:0 22px 60px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  .composer .me{
+    width:32px;height:32px;flex:0 0 32px;border-radius:50%;
+    display:grid;place-items:center;font-size:12px;font-weight:700;color:#04121a;
+    background:linear-gradient(140deg,#5eead4,#818cf8);
+  }
+  .composer input{
+    flex:1;height:36px;background:transparent;border:0;outline:0;
+    color:var(--fg);font-size:14px;font-family:inherit;
+  }
+  .composer input::placeholder{color:rgba(255,255,255,.3)}
+  .composer button{
+    height:36px;padding:0 18px;border-radius:10px;border:0;cursor:pointer;
+    font-size:13px;font-weight:600;color:#04121a;
+    background:linear-gradient(100deg,#5eead4,#818cf8);
+    transition:filter .25s, transform .2s;
+  }
+  .composer button:hover{filter:brightness(1.12)}
+  .composer button:active{transform:scale(.96)}
+
+  /* ---------- CARD ---------- */
+  .card{
+    position:fixed;z-index:20;width:320px;
+    padding:16px 16px 14px;border-radius:16px;
+    background:rgba(11,15,26,.86);
+    border:1px solid rgba(255,255,255,.12);
+    backdrop-filter:blur(22px) saturate(1.5);
+    box-shadow:0 26px 70px rgba(0,0,0,.62), inset 0 1px 0 rgba(255,255,255,.07);
+    opacity:0;pointer-events:none;
+    transform:scale(.94) translateY(10px);
+    transition:opacity .32s ease, transform .38s cubic-bezier(.2,.9,.3,1.35);
+  }
+  .card.show{opacity:1;pointer-events:auto;transform:scale(1) translateY(0)}
+  .c-head{display:flex;align-items:center;gap:10px}
+  .c-avatar{
+    width:34px;height:34px;flex:0 0 34px;border-radius:50%;
+    display:grid;place-items:center;font-size:13px;font-weight:700;color:#06090f;
+    background:var(--c,#5eead4);
+    box-shadow:0 0 20px -4px var(--c,#5eead4);
+  }
+  .c-meta{flex:1;min-width:0;line-height:1.35}
+  .c-meta b{font-size:13.5px;display:block}
+  .c-meta span{font-size:11px;color:var(--dim);font-family:ui-monospace,monospace}
+  .c-close{
+    width:26px;height:26px;border-radius:8px;border:0;cursor:pointer;
+    background:rgba(255,255,255,.06);color:#94a3b8;font-size:12px;
+    transition:background .2s,color .2s;
+  }
+  .c-close:hover{background:rgba(255,255,255,.14);color:#fff}
+  .c-body{
+    margin-top:12px;font-size:13.5px;line-height:1.72;color:#cdd6e8;
+    max-height:180px;overflow:auto;
+  }
+  .c-body code{
+    font-family:ui-monospace,monospace;font-size:12px;
+    background:rgba(255,255,255,.08);padding:1px 5px;border-radius:4px;
+  }
+  .c-foot{
+    display:flex;align-items:center;gap:8px;margin-top:14px;
+    padding-top:12px;border-top:1px solid rgba(255,255,255,.07);
+  }
+  .pill{
+    font-size:11.5px;color:#9fb0cc;padding:4px 10px;border-radius:999px;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);
+  }
+  .c-src{
+    margin-left:auto;font-family:ui-monospace,monospace;
+    font-size:10.5px;color:rgba(255,255,255,.28);
+  }
+
+  /* ---------- FLY DOT ---------- */
+  #flyLayer{position:fixed;inset:0;pointer-events:none;z-index:30}
+  .fly{
+    position:fixed;left:0;top:0;width:10px;height:10px;
+    margin:-5px 0 0 -5px;border-radius:50%;
+    background:radial-gradient(circle,#fff,#5eead4 42%,rgba(94,234,212,0) 72%);
+    box-shadow:0 0 26px 7px rgba(94,234,212,.7);
+  }
+
+  @media (max-width:900px){
+    .nav{padding:16px 20px}
+    .links{display:none}
+    .hero{left:20px;right:20px;bottom:auto;top:74px;max-width:none}
+    .hero h1{font-size:30px}
+    .hero p{font-size:13px;max-width:none;margin-top:12px}
+    .chips{margin-top:14px}
+    .cta{margin-top:18px}
+    .btn{height:40px;padding:0 16px;font-size:13px}
+    .hint{bottom:92px;font-size:10.5px}
+    .composer{bottom:16px}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="gl"></canvas>
+<div class="ambient"></div>
+<div class="grain"></div>
+
+<nav class="nav">
+  <div class="brand">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <defs>
+        <linearGradient id="lg" x1="0" y1="0" x2="24" y2="24">
+          <stop stop-color="#5eead4"/><stop offset="1" stop-color="#818cf8"/>
+        </linearGradient>
+      </defs>
+      <path d="M12 2.2 20.6 7v10L12 21.8 3.4 17V7L12 2.2Z" stroke="url(#lg)" stroke-width="1.4" stroke-linejoin="round"/>
+      <circle cx="12" cy="12" r="2.6" fill="url(#lg)"/>
+      <circle cx="12" cy="12" r="6" stroke="url(#lg)" stroke-width=".8" opacity=".45"/>
+    </svg>
+    <span>Gitalk</span>
+  </div>
+  <div class="links">
+    <a href="#">演示</a>
+    <a href="#">文档</a>
+    <a href="#">GitHub ↗</a>
+  </div>
+</nav>
+
+<main class="hero">
+  <div class="eyebrow">// GITHUB ISSUE POWERED COMMENTS</div>
+  <h1>把 Issues 变成<br><em>一片星系</em></h1>
+  <p>每一条评论都是一颗星。Gitalk 把 GitHub Issue 变成你的评论区 —— 零后端、零数据库，一段脚本即可拥有完整评论体验。</p>
+  <div class="chips">
+    <span>⚡ 零后端</span>
+    <span>✍️ Markdown</span>
+    <span>🌗 主题自适应</span>
+    <span>🌍 多语言</span>
+  </div>
+  <div class="cta">
+    <a class="btn primary" href="#">npm i gitalk</a>
+    <a class="btn ghost" href="#">GitHub →</a>
+  </div>
+</main>
+
+<div class="hint" id="hint">拖动鼠标 · 点击任意星点展开评论</div>
+
+<div class="composer">
+  <div class="me">你</div>
+  <input id="input" maxlength="140" placeholder="写点什么 —— 按下 Enter，它会变成一颗新星" />
+  <button id="send">发送</button>
+</div>
+
+<div class="card" id="card"></div>
+<div id="flyLayer"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  const canvas = document.getElementById('gl');
+  const hint   = document.getElementById('hint');
+  const card   = document.getElementById('card');
+  const input  = document.getElementById('input');
+  const sendBtn= document.getElementById('send');
+  const flyLayer = document.getElementById('flyLayer');
+
+  /* ============ 兜底 ============ */
+  if (!window.THREE) {
+    canvas.style.display = 'none';
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      '<div style="position:fixed;inset:0;display:grid;place-items:center;color:#7c8aa5;font-size:14px;z-index:99">3D 资源加载失败，请检查网络后刷新</div>'
+    );
+    return;
+  }
+
+  const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
+  const rand  = (a, b) => a + Math.random() * (b - a);
+
+  /* =========================================================
+     1. 数据
+     ========================================================= */
+  const PALETTE = ['#5eead4', '#818cf8', '#38bdf8', '#a78bfa', '#22d3ee', '#f472b6', '#34d399'];
+
+  const SEED = [
+    { u:'antfu',        t:'把 GitHub Issue 当评论存储 —— 没有服务器，没有数据库，连后台都不用维护。这个思路太干净了。', time:'2 分钟前', issue:128, likes:24 },
+    { u:'yyx990803',    t:'一行 <code>&lt;script&gt;</code> 接入，评论与 Issue 实时同步，维护成本接近于零。',                time:'14 分钟前', issue:127, likes:41 },
+    { u:'sindresorhus', t:'Markdown、代码高亮、表情反应都支持，还自带暗色主题。',                                            time:'38 分钟前', issue:126, likes:12 },
+    { u:'octocat',      t:'终于可以给静态博客加评论了，而且不用注册任何第三方账号 🎉',                                        time:'1 小时前',  issue:125, likes:33 },
+    { u:'sxyazi',       t:'主题变量可以完全自定义，和现有站点无缝融合。',                                                     time:'3 小时前',  issue:124, likes:8  },
+    { u:'posva',        t:'支持多语言、懒加载，还能限制只展示前 N 条评论。',                                                   time:'昨天',      issue:123, likes:19 },
+    { u:'egoist',       t:'构建体积很小，性能几乎无感。',                                                                     time:'昨天',      issue:122, likes:6  },
+    { u:'patak-dev',    t:'用 Issue 做评论还有个好处：所有讨论都在一个地方，不用来回切换上下文。',                              time:'2 天前',    issue:121, likes:27 }
+  ];
+
+  /* =========================================================
+     2. Three.js 基础
+     ========================================================= */
+  const renderer = new THREE.WebGLRenderer({
+    canvas, antialias: true, alpha: true, powerPreference: 'high-performance'
+  });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
+
+  const scene  = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 200);
+  camera.position.set(0, 0.9, 9);
+  camera.lookAt(0, 0, 0);
+
+  const group = new THREE.Group();
+  scene.add(group);
+
+  /* =========================================================
+     3. 节点缓冲
+     ========================================================= */
+  const MAX = 64;
+  const nodes = [];
+  let   count = 0;
+
+  const aPos   = new Float32Array(MAX * 3);
+  const aSize  = new Float32Array(MAX);
+  const aColor = new Float32Array(MAX * 3);
+  const aPhase = new Float32Array(MAX);
+  const aIndex = new Float32Array(MAX);
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(aPos, 3));
+  geo.setAttribute('aSize',    new THREE.BufferAttribute(aSize, 1));
+  geo.setAttribute('aColor',   new THREE.BufferAttribute(aColor, 3));
+  geo.setAttribute('aPhase',   new THREE.BufferAttribute(aPhase, 1));
+  geo.setAttribute('aIndex',   new THREE.BufferAttribute(aIndex, 1));
+  geo.setDrawRange(0, 0);
+
+  /* =========================================================
+     4. Shader 材质
+     ========================================================= */
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime:   { value: 0 },
+      uHover:  { value: -1 },
+      uSelect: { value: -1 },
+      uScale:  { value: 1000 }
+    },
+    vertexShader: /* glsl */`
+      uniform float uTime;
+      uniform float uHover;
+      uniform float uSelect;
+      uniform float uScale;
+
+      attribute float aSize;
+      attribute float aPhase;
+      attribute float aIndex;
+      attribute vec3  aColor;
+
+      varying vec3  vColor;
+      varying float vGlow;
+
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+
+        float pulse = 0.82 + 0.18 * sin(uTime * 1.7 + aPhase);
+        float isHover  = step(abs(aIndex - uHover),  0.5);
+        float isSelect = step(abs(aIndex - uSelect), 0.5);
+
+        float boost = 1.0 + isHover * 0.85 + isSelect * 1.5;
+
+        gl_PointSize = min(aSize * pulse * boost * uScale / max(0.5, -mv.z), 160.0);
+        gl_Position  = projectionMatrix * mv;
+
+        vColor = aColor;
+        vGlow  = pulse * (1.0 + isHover * 1.1 + isSelect * 2.0);
+      }
+    `,
+    fragmentShader: /* glsl */`
+      varying vec3  vColor;
+      varying float vGlow;
+
+      void main() {
+        vec2 uv = gl_PointCoord - 0.5;
+        float d = length(uv);
+        if (d > 0.5) discard;
+
+        float core = smoothstep(0.5, 0.0, d);
+        float a    = pow(core, 2.6) * vGlow;
+
+        vec3 col = vColor * (0.55 + core * 1.7) + vec3(pow(core, 7.0)) * 0.9;
+
+        gl_FragColor = vec4(col, a);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+
+  const points = new THREE.Points(geo, mat);
+  points.frustumCulled = false;
+  group.add(points);
+
+  /* =========================================================
+     5. 轨道环
+     ========================================================= */
+  [1.35, 2.6, 3.9].forEach((rr, i) => {
+    const pts = [];
+    for (let k = 0; k <= 160; k++) {
+      const a = (k / 160) * Math.PI * 2;
+      pts.push(new THREE.Vector3(Math.cos(a) * rr, Math.sin(a * 3 + i) * 0.06, Math.sin(a) * rr));
+    }
+    const g = new THREE.BufferGeometry().setFromPoints(pts);
+    const m = new THREE.LineBasicMaterial({
+      color: 0x4f6bd8, transparent: true,
+      opacity: 0.10 - i * 0.02,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    group.add(new THREE.Line(g, m));
+  });
+
+  /* =========================================================
+     6. 节点操作
+     ========================================================= */
+  const GA = Math.PI * (3 - Math.sqrt(5)); // 黄金角
+
+  function addNode(data, pos) {
+    if (count >= MAX) return -1;
+    const c = new THREE.Color(PALETTE[count % PALETTE.length]);
+
+    nodes.push({
+      pos: pos,
+      size: rand(0.16, 0.30),
+      cr: c.r, cg: c.g, cb: c.b,
+      hex: '#' + c.getHexString(),
+      phase: Math.random() * Math.PI * 2,
+      data: data
+    });
+    count++;
+    return count - 1;
+  }
+
+  let linkLines = null;
+
+  function rebuildLinks() {
+    if (linkLines) {
+      group.remove(linkLines);
+      linkLines.geometry.dispose();
+      linkLines.material.dispose();
+      linkLines = null;
+    }
+    if (count < 2) return;
+
+    const pairs = [];
+    for (let i = 0; i < count; i++) {
+      for (let j = i + 1; j < count; j++) {
+        pairs.push({ i, j, d: nodes[i].pos.distanceTo(nodes[j].pos) });
+      }
+    }
+    pairs.sort((a, b) => a.d - b.d);
+
+    const take = pairs.slice(0, Math.min(30, pairs.length));
+    const pts = [];
+    for (const p of take) {
+      pts.push(nodes[p.i].pos, nodes[p.j].pos);
+    }
+
+    const g = new THREE.BufferGeometry().setFromPoints(pts);
+    const m = new THREE.LineBasicMaterial({
+      color: 0x6b8cff, transparent: true, opacity: 0.16,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    linkLines = new THREE.LineSegments(g, m);
+    linkLines.frustumCulled = false;
+    group.add(linkLines);
+  }
+
+  function syncNodes() {
+    for (let i = 0; i < count; i++) {
+      const n = nodes[i];
+      aPos[i * 3]     = n.pos.x;
+      aPos[i * 3 + 1] = n.pos.y;
+      aPos[i * 3 + 2] = n.pos.z;
+      aSize[i]        = n.size;
+      aColor[i * 3]     = n.cr;
+      aColor[i * 3 + 1] = n.cg;
+      aColor[i * 3 + 2] = n.cb;
+      aPhase[i]       = n.phase;
+      aIndex[i]       = i;
+    }
+    geo.attributes.position.needsUpdate = true;
+    geo.attributes.aSize.needsUpdate    = true;
+    geo.attributes.aColor.needsUpdate   = true;
+    geo.attributes.aPhase.needsUpdate   = true;
+    geo.attributes.aIndex.needsUpdate   = true;
+    geo.setDrawRange(0, count);
+    rebuildLinks();
+  }
+
+  /* 种子节点：黄金角螺旋 + 均匀面积分布 */
+  SEED.forEach((d, i) => {
+    const r = 1.05 + Math.sqrt((i + 0.5) / SEED.length) * 3.05;
+    const a = i * GA * 2.0 + 0.6;
+    const y = Math.sin(i * 2.3) * 0.75 * (1.0 - (i / SEED.length) * 0.55);
+    addNode(d, new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r));
+  });
+  syncNodes();
+
+  /* =========================================================
+     7. 布局 / 尺寸
+     ========================================================= */
+  function updatePointScale() {
+    const h = renderer.domElement.height; // 设备像素
+    mat.uniforms.uScale.value = h / (2 * Math.tan((camera.fov * Math.PI / 180) / 2));
+  }
+
+  function layout() {
+    const wide = window.innerWidth > 900;
+    if (wide) {
+      group.position.set(2.1, -0.05, 0);
+      const ar = window.innerWidth / window.innerHeight;
+      group.scale.setScalar(clamp(ar / 1.75, 0.72, 1.0) * 0.98);
+    } else {
+      group.position.set(0, 1.15, 0);
+      group.scale.setScalar(0.62);
+    }
+  }
+
+  function onResize() {
+    renderer.setSize(window.innerWidth, window.innerHeight, false);
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    updatePointScale();
+    layout();
+  }
+
+  layout();
+  updatePointScale();
+  window.addEventListener('resize', onResize);
+
+  /* =========================================================
+     8. 屏幕投影 & 拾取
+     ========================================================= */
+  const screenPos = [];
+  const tmpV = new THREE.Vector3();
+
+  function updateScreenPositions() {
+    group.updateMatrixWorld();
+    for (let i = 0; i < count; i++) {
+      tmpV.copy(nodes[i].pos).applyMatrix4(group.matrixWorld).project(camera);
+      screenPos[i] = {
+        x: (tmpV.x * 0.5 + 0.5) * window.innerWidth,
+        y: (-tmpV.y * 0.5 + 0.5) * window.innerHeight
+      };
+    }
+  }
+
+  const mouseScreen = { x: -9999, y: -9999 };
+  window.addEventListener('pointermove', (e) => {
+    mouseScreen.x = e.clientX;
+    mouseScreen.y = e.clientY;
+    mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouseNDC.y = (e.clientY / window.innerHeight) * 2 - 1;
+  });
+  window.addEventListener('pointerleave', () => { mouseScreen.x = -9999; mouseScreen.y = -9999; });
+
+  const mouseNDC = { x: 0, y: 0 };
+  const smooth   = { x: 0, y: 0 };
+
+  /* =========================================================
+     9. 卡片
+     ========================================================= */
+  let hovered  = -1;
+  let selected = -1;
+
+  function cardHTML(n) {
+    const d = n.data;
+    return (
+      '<div class="c-head">' +
+        '<div class="c-avatar" style="--c:' + n.hex + '">' + escapeHTML(d.u[0].toUpperCase()) + '</div>' +
+        '<div class="c-meta"><b>' + escapeHTML(d.u) + '</b>' +
+          '<span>#' + d.issue + ' · ' + escapeHTML(d.time) + '</span></div>' +
+        '<button class="c-close" aria-label="关闭">✕</button>' +
+      '</div>' +
+      '<div class="c-body">' + d.t + '</div>' +
+      '<div class="c-foot">' +
+        '<span class="pill">👍 ' + d.likes + '</span>' +
+        '<span class="pill">💬 回复</span>' +
+        '<span class="c-src">via GitHub Issue</span>' +
+      '</div>'
+    );
+  }
+
+  function escapeHTML(s) {
+    return String(s).replace(/[&<>"']/g, (c) => (
+      { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]
+    ));
+  }
+
+  function positionCard(i) {
+    const s = screenPos[i];
+    if (!s) return;
+
+    const w = card.offsetWidth || 320;
+    const h = card.offsetHeight || 180;
+
+    let left = s.x + 36;
+    if (left + w > window.innerWidth - 16) left = s.x - 36 - w;
+    left = clamp(left, 16, window.innerWidth - w - 16);
+
+    let top = s.y - h * 0.5;
+    top = clamp(top, 16, window.innerHeight - h - 16);
+
+    card.style.left = left + 'px';
+    card.style.top  = top + 'px';
+  }
+
+  function openCard(i) {
+    if (i < 0 || i >= count) return;
+    selected = i;
+    mat.uniforms.uSelect.value = i;
+
+    card.innerHTML = cardHTML(nodes[i]);
+    positionCard(i);
+    card.classList.add('show');
+    requestAnimationFrame(() => positionCard(i));
+  }
+
+  function closeCard() {
+    selected = -1;
+    mat.uniforms.uSelect.value = -1;
+    card.classList.remove('show');
+  }
+
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('.c-close')) closeCard();
+  });
+
+  window.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('a, button, input, .composer, .card')) return;
+    if (hovered >= 0) openCard(hovered);
+    else closeCard();
+  });
+
+  /* =========================================================
+     10. 输入 → 新星
+     ========================================================= */
+  function flyTo(x, y) {
+    const r = input.getBoundingClientRect();
+    const x0 = r.left + r.width / 2;
+    const y0 = r.top + r.height / 2;
+
+    const el = document.createElement('div');
+    el.className = 'fly';
+    flyLayer.appendChild(el);
+
+    el.animate([
+      { transform: 'translate(' + x0 + 'px,' + y0 + 'px) scale(1)', opacity: 1 },
+      { transform: 'translate(' + ((x0 + x) / 2) + 'px,' + (Math.min(y0, y) - 130) + 'px) scale(1.8)', opacity: 1, offset: 0.5 },
+      { transform: 'translate(' + x + 'px,' + y + 'px) scale(0.15)', opacity: 0.85 }
+    ], {
+      duration: 780,
+      easing: 'cubic-bezier(.45,0,.25,1)'
+    }).onfinish = () => el.remove();
+  }
+
+  function submit(text) {
+    if (count >= MAX) return;
+
+    const a = Math.random() * Math.PI * 2;
+    const r = 3.2 + Math.random() * 0.9;
+    const pos = new THREE.Vector3(
+      Math.cos(a) * r,
+      rand(-0.7, 0.7),
+      Math.sin(a) * r
+    );
+
+    const i = addNode({
+      u: '你',
+      t: escapeHTML(text),
+      time: '刚刚',
+      issue: 999,
+      likes: 0
+    }, pos);
+
+    if (i < 0) return;
+
+    syncNodes();
+    updateScreenPositions();
+
+    const target = screenPos[i];
+    if (target) flyTo(target.x, target.y);
+
+    setTimeout(() => openCard(i), 640);
+    hint.style.opacity = '0';
+  }
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && input.value.trim()) {
+      submit(input.value.trim());
+      input.value = '';
+    }
+  });
+  sendBtn.addEventListener('click', () => {
+    if (input.value.trim()) {
+      submit(input.value.trim());
+      input.value = '';
+    }
+  });
+
+  /* =========================================================
+     11. 主循环
+     ========================================================= */
+  let spin = 0;
+
+  function animate(t) {
+    requestAnimationFrame(animate);
+
+    const time = t * 0.001;
+    mat.uniforms.uTime.value = time;
+
+    // 阻尼跟随鼠标
+    smooth.x += (mouseNDC.x - smooth.x) * 0.055;
+    smooth.y += (mouseNDC.y - smooth.y) * 0.055;
+
+    // 缓慢自旋 + 鼠标视差
+    spin += 0.0013;
+    group.rotation.y = spin + smooth.x * 0.62;
+    group.rotation.x = -smooth.y * 0.34;
+
+    updateScreenPositions();
+
+    // hover 拾取
+    let best = -1, bestD = 46;
+    for (let i = 0; i < count; i++) {
+      const s = screenPos[i];
+      if (!s) continue;
+      const d = Math.hypot(s.x - mouseScreen.x, s.y - mouseScreen.y);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+
+    if (best !== hovered) {
+      hovered = best;
+      mat.uniforms.uHover.value = hovered;
+      canvas.style.cursor = hovered >= 0 ? 'pointer' : 'default';
+      if (hovered >= 0) hint.style.opacity = '0';
+    }
+
+    // 卡片跟随选中节点
+    if (selected >= 0 && card.classList.contains('show')) {
+      positionCard(selected);
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  requestAnimationFrame(animate);
+
+  // 首次自动点亮一颗星
+  setTimeout(() => { if (count > 1) openCard(1); }, 1100);
+  setTimeout(() => { if (selected === 1) closeCard(); }, 5200);
+
+})();
+</script>
+</body>
+</html>
