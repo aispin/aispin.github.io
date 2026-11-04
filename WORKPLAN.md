@@ -12,6 +12,10 @@
 >
 > ⚠️ 2026-10-12 用户反馈：**「你把快照滚动当流水帐去用了」** ——
 > 顶部「📊 滚动快照」段已删。**状态写进每条 WO 自己，不再另开历史段。**
+>
+> 2026-11-04 用户再次要求：**只保留待办的 WO 与未决的 DR**。
+> 「已答复的 DR」整段（DR-W/Q/R/S/T/U/V、DR-1~4、DR-E、DR-P）已归档到
+> `.workbuddy-ai/memory/2026-11-04.md` 末尾，本文件不再保留。
 
 ## 规范
 
@@ -28,27 +32,23 @@
 
 - **分支** `feat/v1.2.0-island-courtyard`，**不推 `main`**（推 `main` = 上线）。
 - **质量门** `env -u NODE_OPTIONS npm run lint` → **0 error / 32 warning**；不跑 React Compiler。
-- **构建前** `mv dist .workbuddy-ai/dist-prev-<ts>`；**推不通改 SSH**，判据 `gh api .../commits/<branch> --jq .sha`。
-- **跑截图前** `pkill -f chrome-headless-shell`。
+- **构建前** `mv dist .workbuddy-ai/dist-prev-<ts>`；**https push 不通就换 SSH**
+  （`git push git@github.com:aispin/aispin.github.io.git <branch>`），
+  判据 `gh api .../commits/<branch> --jq .sha`。
+- **端口**：dev 5199 / `dist` 4199，实际只 listen **`127.0.0.1`**（不是 `[::1]`）；
+  curl 加 `--noproxy '*'`。
+- **跑截图前** `pkill -f "chrome-headless-shel[l]"`（带字符类，否则杀掉自己所在的 shell）。
 - 其余见 `.workbuddy-ai/memory/MEMORY.md` · `hard-rules.md`。
 
 ---
 
 # 📋 待办 WO
 
-> 上一轮（云朵第四轮 / 第五轮）的 WO-32a~f、WO-33a~f 全部已提交出表，历史在 git。
-> 「档案馆 → 履历 /career」的 WO-C1~C4 与 DR-1~4 已全部落地并提交，出表（见下方
-> 「已答复的 DR」）。设计底数、实测开销、踩坑结论都在
-> `.workbuddy-ai/memory/2026-10-17.md`。
+> **空。**
 >
-> 验收时量出来的两条：**WO-C5**（预热期 `compileAsync` 竞态）已修完提交；
-> **WO-32j**（云身值噪声）已改完提交。
-> **DR-E** 已答（C，k=0.30），见下方「已答复的 DR」。
->
-> 2026-10-20：**`career` 已换成「时空隧道」**（还原 `public/demos/web3d/career/index.html`，
-> 接管渲染 + DOM HUD）。原来那套 4×2 贴卡墙对 career 作废，其余 5 个 ContentRoom
-> 房间不受影响。结论与实测在 `.workbuddy-ai/memory/2026-10-20.md`。
-> **WO 目前是空的。**
+> 上一轮「进大门镜头晃动 + 退出大门先拉远再跳回」已修完提交并推送
+> （`a1bd3ab`），判据与逐帧数据在 `.workbuddy-ai/memory/2026-11-04.md` §70。
+> 更早的 WO-32 / WO-33 / WO-C1~C5、以及 `career` 时空隧道那一整批，历史都在 git。
 
 ---
 
@@ -73,85 +73,18 @@
 
 ---
 
-### DR-P · 「零位图」要留一个**有限放宽**的口子吗（备查，当前**不启用**）
+### DR-G · 未提交的「Levin Wong → ZEO」批量改名要不要一并落地？
 
-- **你要求的**：「DR-O 按 1 做优化，**新增加一个 DR 做有限放宽的说明**」。
-- **背景**：DR-K 已查明 ez-tree demo 的逼真来自**位图贴图 + glb 资产**，
-  而本项目硬规矩是 **零 jpg/png（只用 webp）、全站只允许 2 张位图**。
-  DR-O 选了 (i)「不放宽，继续程序化」，WO-19 已按这条做完（`f7fc1ac`）。
-- **这个 DR 记录的是"万一将来顶不上去"时的退路**（**现在不动**）：
-  - **可放宽的最小集合**：**2 张 webp** —— ① 树皮 **normal** 一张
-    （比 color 有效得多：树皮的"糙"主要读自法线，不是颜色）；
-    ② 叶片 **形状 alpha** 一张（叶缘不规整 + 叶脉，一次解决很多片叶的观感）。
-  - **不放进来的**：color 贴图（我们能程序化出色）、每物种一套 4 张、
-    `grass.glb` 这类模型资产（那会连带改 `public/` 与体积预算）。
-  - **放开的代价**（真要启用时要同步改的地方）：README「美术」段的零位图声明、
-    `.workbuddy-ai/memory/hard-rules.md` 里的相关条目、以及
-    `texturePreloadList.js` 的预载清单。
-  - **触发条件**（写清楚，免得变成"随手就放宽"）：WO-19 已交付（`f7fc1ac`）；
-    若你验收时仍觉得**树皮**或**叶片**明显"不像"，再回来启用；启用前先量一次
-    "程序化版本 vs 贴图版本"的同机位对照。
-- **当前状态**：**不启用**。此条只作决策留痕。
-
----
-
-## 已答复的 DR（出表留痕）
-
-> **DR-W**（首屏把相机往后拉、代价认不认）→ **你要的，就按量出来的做**。
-> 已交付 `2e4a6dd`（WO-33a）：休息机位 z=28 → **45**。
-> 这里放的是量出来的 z（`wo33-probe.mjs` 把飞机与屋壳的 8 个角投到 NDC）：
-> 38 屋脊出框（NDC y 1.021）、40 飞机左翼出框（x −1.215）、42 两者都进框但飞机只余
-> 0.053、**45** 飞机左翼尖 NDC −0.948（4:3 视口下刚好卡住）—— 取 45。
-> 真源已收进 `src/config/restPose.js`（原来 28 散在 `App.jsx` 与 `useInfiniteCamera`
-> 两处，第一帧在旧机位、第二帧瞬移）。
->
-> **DR-Q**（飞行视图上不上单趟电影后期）→ **选 (A) 只限飞行视图**。已折进 WO-29。
->
-> **DR-R**（樱花要不要也停风摆）→ **选 (A) 一起停**。已交付 `c1b3566`（WO-28a）。
-> 顺带把 `probe-tree-crown.mjs` 的 C5 **反向**、补了 C6（落樱的 `uTime` 必须留）。
->
-> **DR-S**（云朵走哪条路）→ **选 (A) billboard + GLSL fbm**。已折进 WO-30。
-> ⚠️ 明确**不做**真 raymarch —— 全屏开销与本项目三级降级冲突。
->
-> **DR-T**（第二棵柿子树的落点 / 两棵要不要一样）→ **选「紧邻、接受两冠融合」**。
-> 已交付 `c513c51`（WO-27）。
-> 🔴 这次我自己的选项里**有两个数字是错的**（「冠半径 2.55」实为 ≈3.2 ——
-> 2.55 是 `CROWN_PAD` 常量；「紧邻点 x ≈ −0.6」其实在甬路上）。量过之后重问了一次，
-> 你确认"就要紧邻"。⇒ **教训：选项里给坐标之前必须先量。**
->
-> **DR-U**（樱花怎么和柿子树分开）→ **选三刀全上**。已折进 WO-28b。
->
-> **DR-V**（云："抄哪一层"）→ **选 (d)+(a)+(b)：路线 C**——
-> SDF 烘焙法线（不走 metaball 几何）+ 现在就修 WO-32a/b 两个纯 bug。
-> 已交付 `ee10d13`（WO-32a~d，含分色/凹谷/金边/统一墨线/实例排序）。
-> 墨线**保留**（没有走 (c) 水粉换语言）；WO-32e/f 留白板。
->
-> **DR-1**（旧 `/about` 怎么处理）→ **直接启用别名**（= 选项 A）。
-> `PATH_TO_ROOM` 保留 `'/about' → 'career'`；首帧 `useDocumentMeta` 用
-> `replaceState` 把地址栏纠正成 `/career`。**没有 301**：站点只部署在
-> GitHub Pages，那个选项（Cloudflare）已随全部 Cloudflare 内容一起删掉。
->
-> **DR-2**（内部 `roomId` 改不改）→ **选 (A) 一起改**。`route === roomId`
-> 的不变量保住，10 个文件同步。
->
-> **DR-3**（墙面配色）→ **选 (A) 只借技法、配色改暖**；另加一条你补的要求：
-> **暗黑模式下要变成 demo 的深色**，其余房间你之后逐个过。
-> ⇒ 现在 `ContentRoom` 的卡面有亮/暗两套，`career` 用文字肌理，其余房间仍是
-> 原来的纸卡（暗色下也会跟着换深色底）。
->
-> **DR-4**（文本肌理落墙还是落卡）→ **照 demo 做**。demo 的 `drawCard` 是
-> "`texturalCanvas` 打底 + 内容画在上面"，即**每张卡一张肌理**，墙保持素色。
-> 所以走的是 (B)，而不是我推荐的 (A)。
->
-> **DR-E**（暗色正文对比度被夜幕封顶）→ **选 (C)，k ≈ 0.30**。
-> `NIGHT_VEIL_RAW` + `liftVeil()`（`config/theme.js`）：逐通道等价于乘
-> `veil·(1−k)+k` ⇒ 白天 `lift(1)=1` **逐位恒等**（实测亮色定妆照 maxdiff=0、
-> 0/1440000 像素变化），只抬夜里。
-> 🔴 两处连带必须一起动，否则会静默跑偏：
-> ① 天空/雾是**反算**出来的（`unmultiplyVeil`），改了 veil 屏幕色不变 —— 别以为夜空会跟着亮；
-> ② 灯（灯笼/窗）的过驱系数 `seasonGlowFor()` 的**分子改用未抬的 veil 亮度**
->    （`VEIL_GLOW_ANCHOR`），否则秋夜窗整体亮 35% 直接削顶成白。
->    实测四季 `veil·glow` 逐位守恒（差 0.0e+0）。
-> 卡片侧再把暗色底压回原亮度（`TEXTURAL_CARD_DARK` base 0.16→0.11、
-> blob 0.24–0.42/0.55 → 0.16–0.30/0.45）：**地面看起来和以前一样**，正文
-> 2.73 → **4.50 : 1**（AA）、副标题 3.37 → **5.84 : 1**。
+- **背景**：工作区里还躺着 4 个文件的改动，与本轮镜头修复无关：
+  `src/data/profile.json`、`src/data/articles.json`、`public/demos/demos.json`、
+  `public/demos/index.html`。内容是 `alias: mamboer → ZEO`、
+  `nameEn: Levin Wong → ZEO AI`、`wechat: mamboer → aiblaze`、
+  文章 `author.url: github.com/mamboer → aispin.github.io`。
+- **为什么问**：这批改动是上一个中断会话里做的，**没有验收判据**，也不知道
+  是否改全（例如 `email` 仍是 `mamboer@gmail.com`）。直接提交会把"改到一半"
+  的状态固化。
+- **选项**：
+  - **(A) 我扫一遍全仓，把旧名残留列出来，你确认后一次改净**（推荐）。
+  - **(B) 按现状提交**，只当它是笔名切换，残留以后再说。
+  - **(C) 全部丢弃**（`git checkout --` 这 4 个文件），维持 `Levin Wong`。
+- **当前状态**：等你选。**默认不动，改动留在工作区。**
