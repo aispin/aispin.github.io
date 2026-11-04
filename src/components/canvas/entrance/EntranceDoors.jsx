@@ -19,6 +19,7 @@ import FoxtailGrass from './FoxtailGrass';
 import PersimmonTree from './PersimmonTree';
 import SakuraTree from './SakuraTree';
 import { SCENE_FONTS } from '../../../config/theme';
+import { REST_LOOK_AHEAD, REST_LOOK_Y } from '../../../config/restPose';
 // 季节：门联与院子共用同一张月份表（config/seasons.js），所以门口挂秋联时
 // 院子就是秋天 —— 这条一致性是免费的。
 import { useSeason } from '../../../hooks/useSeason';
@@ -755,6 +756,28 @@ const EntranceDoors = ({
             x: 0,
             z: I.INTERIOR_FRONT_Z - ENTRANCE_LANDING_INSET,
             y: 0.2, // Match hook's base Y position
+            duration: 2.4,
+            ease: 'power2.inOut'
+        }, 0.3);
+
+        /* 朝向**也要**跟位置一起走到「走廊相机接手时的那个俯仰」。
+         * ============================================================
+         * 只补位置的话，`rotation` 停在点门前那一刻（轨道相机 adopt 出来的
+         * `-0.0014`），而走廊相机每帧写的是
+         * `lookAt(y = REST_LOOK_Y, z − REST_LOOK_AHEAD)` ⇒
+         * `atan((0.13 − 0.2) / 10) = −0.0070`。差 **0.32° ≈ 4.4px**。
+         *
+         * 这 0.32° 会在 `scrollEnabled` 翻真后被 `blendInFrames`（30 帧）
+         * 慢慢补上 —— 用户 2026-11-04 读成「进屋时镜头上抬了一下」。
+         * 跟着位置一起补，进屋时两边逐位相等，blendIn 就无事可做。
+         *
+         * ⚠️ 用 `atan2` 而不是写死 `-0.007`：它必须跟着 `REST_LOOK_Y` /
+         *    `REST_POSE.y` 走。改任一个常量，这里自动跟上。
+         * ⚠️ 补间的是 `camera.rotation.x`（Euler）—— three 的 Euler 有
+         *    onChange 同步 quaternion，`lookAt` 那边读到的是一致的。
+         */
+        tl.to(camera.rotation, {
+            x: Math.atan2(REST_LOOK_Y - 0.2, REST_LOOK_AHEAD),
             duration: 2.4,
             ease: 'power2.inOut'
         }, 0.3);
