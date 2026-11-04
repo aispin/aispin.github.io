@@ -412,8 +412,95 @@ export function useOrbitCamera({ enabled }) {
             st.active = true;
         },
         isActive: () => s.current.active,
+        /**
+         * 交出控制权 —— **推门那一刻**调（`EntranceDoors.handleClick` 的 `onStart`）。
+         * ================================================================
+         * 用户 2026-10-21：「进房间镜头晃动」（指的是**进大门**）。
+         *
+         * 症状是"进门那一瞬间镜头猛地晃一下"，实测（`probe-door-camera.mjs`）：
+         *
+         *   z 轨迹 … 18.52 18.51 18.50 18.50 **28.15** 28.15 …
+         *
+         * 相机飞进屋、停在 18.50，**下一帧就被拽回 28.15**，再下一帧又被走廊
+         * 相机写回 18.50 —— 9.65 个单位的"弹出又弹回"。
+         *
+         * 根因是**一帧的时序空档**，不是取景：
+         *   ① 入场飞行是 `gsap.to(camera.position, …)`，本 hook 靠
+         *      `gsap.isTweening(camera.position)` 让位；
+         *   ② 补间跑完的那一帧 `isTweening` 立刻变假，而
+         *      `EntranceDoors` 的 `onComplete → markEntered()` 是一次 React
+         *      状态更新，**要下一帧才传到这个 hook 的 `enabled`**；
+         *   ③ 于是在那**一帧**里：`enabled` 还是 true（COURTYARD）、
+         *      `isTweening` 已经是 false ⇒ 帧循环照常写相机，而它手里
+         *      半径还是进门前的 18 ⇒ `z = 10.15 + 18 = 28.15`。
+         *   ④ 更糟的是走廊那边的 `useInfiniteCamera` 正好在这一帧做交接
+         *      （`targetZ/currentZ = camera.position.z`）—— 它读到的是
+         *      **被拽回去的 28.15**，于是把人钉在屋外：`everInside` 判成
+         *      false，"退到门前自动退出"整条路径也一起失效。
+         *
+         * 修法：不跟时序赛跑，**推门就交钥匙**。`active = false` 之后帧循环
+         * 第一句 `if (!enabled || !st.active) return;` 直接挡住，那一帧
+         * 谁都不写相机 ⇒ 走廊接手时读到的是 18.50（正确）。
+         *
+         * 为什么不用"记一个 introDone 标志"或"再等一帧"：那两条都是**猜时序**，
+         * 换个渲染顺序就复发（本仓库已经在 `cameraMode.js` 里记过这个教训）。
+         *
+         * 为什么 `active = false` 是**自愈**的、不需要配对解锁：
+         * 任何一次用户输入（拖拽 / 滚轮 / `?orbit` / `approachDoor`）都会走
+         * `adopt()`，而它第一件事就是 `st.active = true` 并从当前机位反算
+         * 姿态 —— 所以"交出去"这个状态最多持续到用户下一次自己动镜头。
+         * 这比"外部再调一次 restore()"稳：飞行要是因为别的原因没跑完，
+         * 没人会记得来解锁。
+         */
+        standDown: () => {
+            s.current.active = false;
+        },
         /** 轴心（世界坐标）。给 harness 反算"这个机位该在哪"，好自检有没有吸附上。 */
         center: I.ORBIT_CENTER,
+        /**
+         * 轨道相机**下一帧会写出的那个机位**（位置 + 四元数）。
+         * ----------------------------------------------------------
+         * 给 `HouseExit` 用：退场滑行的**终点**必须逐位等于它。
+         *
+         * 为什么（用户 2026-10-21：「退出大门先拉远再跳回」）
+         * 退场滑行原来固定滑到 `REST_POSE`（z = 45）。而轨道相机的状态里
+         * 半径还留着进场时的 `r = ORBIT_MIN_R`（18）—— 于是 `markExited()`
+         * 一翻 `hasEntered`，轨道接手的第一帧就把相机从 45 拽回
+         * `10.15 + 18 = 28.15`：**16.85 个单位的瞬移**。用户读到的顺序是
+         * "先拉到很远，然后突然跳到门前"。
+         *
+         * 现在滑行终点由这里给出，滑到哪儿轨道就"本来就在哪儿"，接手是
+         * **零位移**（`probe-door-camera.mjs` 判的就是这一条）。
+         *
+         * 🔴 三件事必须与帧循环**逐字对应**，少一件就不叫"逐位相等"：
+         *   ① 用 `st.r/elev/yaw`（当前值，不是 `targetR/targetElev`）——
+         *      帧循环这一帧写的就是它们；
+         *   ② y 的 `ORBIT_MIN_Y` 硬地板；
+         *   ③ 朝向 = `lookAt(ORBIT_CENTER)` **再左乘 `orientFix`**（帧循环最后
+         *      那一步）。正常游玩时 `orientFix` 早就是单位元了，但"正常时"
+         *      不是判据 —— 判据是任何时候都成立。
+         */
+        poseNow: () => {
+            const st = s.current;
+            // 从没被接管过（harness 直接 `__aispin.enter()` / 改 URL 进走廊）：
+            // 没有"进门前那个机位"可言，调用方该退回休息机位。
+            if (!(st.r > 0)) return null;
+            const ce = Math.cos(st.elev);
+            const se = Math.sin(st.elev);
+            const x = I.ORBIT_CENTER[0] + st.r * ce * Math.sin(st.yaw);
+            const z = I.ORBIT_CENTER[2] + st.r * ce * Math.cos(st.yaw);
+            let y = I.ORBIT_CENTER[1] + st.r * se;
+            if (y < I.ORBIT_MIN_Y) y = I.ORBIT_MIN_Y;
+            const quaternion = new Quaternion().setFromRotationMatrix(
+                new Matrix4().lookAt(
+                    new Vector3(x, y, z),
+                    new Vector3(I.ORBIT_CENTER[0], I.ORBIT_CENTER[1], I.ORBIT_CENTER[2]),
+                    new Vector3(0, 1, 0)
+                )
+            );
+            if (!st.orientFix.equals(IDENTITY_Q)) quaternion.premultiply(st.orientFix);
+            return { x, y, z, quaternion };
+        },
         /**
          * 从当前机位**缓冲滑到门前**（= 轨道最近点 `ORBIT_MIN_R`）。
          *

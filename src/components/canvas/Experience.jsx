@@ -165,11 +165,8 @@ const Experience = ({ onSceneReady, performanceTier, enterFlourish = false }) =>
     // The scrollEnabled/parallaxEnabled props already handle disabling scroll when in room.
 
 
-    // 推门那一刻：走廊开始渲染（见上面 corridorVisible 的说明）。
-    const handleEntranceStart = useCallback(() => {
-        setDoorOpening(true);
-    }, []);
-
+    // 推门那一刻（`onStart`）的处理在下面 —— 它要调 `orbit.standDown()`，
+    // 而 `orbit` 定义在更下面（TDZ：依赖数组在 `useCallback` 调用那一刻就求值）。
     // Handle entrance complete
     const handleEntranceComplete = useCallback(() => {
         setDoorOpening(false); // 与 markEntered() 同批提交 ⇒ 可见性不断档
@@ -205,6 +202,29 @@ const Experience = ({ onSceneReady, performanceTier, enterFlourish = false }) =>
     // ⚠️ 它内部还会再让一次 GSAP（入场 timeline 正在跑时一帧都不写相机），
     //    所以这里不用额外判断"入场是否结束"。
     const orbit = useOrbitCamera({ enabled: cameraMode === CAMERA_MODE.COURTYARD });
+
+    /* 退场滑行的终点：问轨道相机"你下一帧会摆在哪"。
+       `poseNow()` 逐位对应帧循环的输出（位置 / 朝向 / y 硬地板 / 交接残差），
+       所以滑到那儿、`markExited()` 之后轨道接手是**零位移**。
+       ⚠️ 判"有没有机位"用的是 `poseNow()` 自己的返回值（`r === 0` ⇒ null），
+          **不是** `isActive()` —— 推门时 `standDown()` 已经把 `active` 关掉了，
+          但那不代表"没有进门前那个机位"，恰恰相反：那个机位正是它记着的。 */
+    const getExitTarget = useCallback(() => orbit.poseNow(), [orbit]);
+
+    /* 推门那一刻：① 走廊开始渲染（见上面 corridorVisible 的说明）；
+       ② 环绕相机**交出控制权**。
+       ---------------------------------------------------------------
+       🔴 ② 是用户 2026-10-21 报的「进大门镜头晃动」的修法。
+       入场飞行的补间跑完那一帧 `gsap.isTweening(camera.position)` 已经变假，
+       而 `markEntered()` 的状态还要**下一帧**才传到 `useOrbitCamera` 的
+       `enabled` —— 中间那一帧环绕相机照常写相机，把它从屋里的 18.50 拽回
+       门前的 28.15，下一帧走廊相机再写回 18.50。逐帧证据与完整推导见
+       `useOrbitCamera.standDown`。
+       ⚠️ 必须定义在 `orbit` 之后（依赖数组在调用那一刻求值，TDZ）。 */
+    const handleEntranceStart = useCallback(() => {
+        setDoorOpening(true);
+        orbit.standDown();
+    }, [orbit]);
 
     /* ── 进场自动"滑到门前"，把用户直接送到门口 ──────────────────────────
        走的是 `orbit.approachDoor()` —— 终点就是**手动一直往前滚最后停住的那个
@@ -426,8 +446,14 @@ const Experience = ({ onSceneReady, performanceTier, enterFlourish = false }) =>
             {/* === TELEPORT ROOM (renders room directly during teleportation) === */}
             <TeleportRoom />
 
-            {/* === HOUSE EXIT (glides the camera back out of the front door) === */}
-            <HouseExit />
+            {/* === HOUSE EXIT (glides the camera back out of the front door) ===
+                终点是"进门前那个机位"，由轨道相机现算 —— 见 HouseExit 里的长注释。
+                🔴 `getExitTarget` **必须** `useCallback`：它是 HouseExit 那个
+                   effect 的依赖，内联箭头函数每次渲染都换引用 ⇒ effect 重跑
+                   ⇒ cleanup 把滑行中的补间 kill 掉（退出按钮看起来"死"）。
+                   `orbit` 本身是 `useMemo([adopt])`，引用稳定，所以这个回调
+                   也稳定。 */}
+            <HouseExit getTarget={getExitTarget} />
         </>
     );
 };
