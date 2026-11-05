@@ -76,8 +76,14 @@
         line-height: 1;
         border: 1px solid rgba(255, 255, 255, 0.16);
 
-        &:hover {
-            background: rgba(139, 163, 255, 0.42);
+        /* 悬停：**深字浅底**，不要"浅色半透明底 + 浅色 ×"。
+           后者在白色项目图上等于消失（用户实测：× 和背景差不多）。
+           实心 #8ba3ff 不透明，底色再白也压得住；字反过来用深色。 */
+        &:hover,
+        &:focus-visible {
+            background: #8ba3ff;
+            color: #0a0d14;
+            border-color: rgba(255, 255, 255, 0.55);
         }
     }
 

@@ -196,7 +196,10 @@
     color:#dfe5f0;font-size:15px;line-height:1;
     border:1px solid rgba(255,255,255,.16);
   }
-  .modal-close:hover{background:rgba(139,163,255,.42)}
+  /* 悬停用「深字浅底」：浅色半透明底 + 浅色 ✕ 压在白色项目图上会看不见。 */
+  .modal-close:hover,.modal-close:focus-visible{
+    background:#8ba3ff;color:#0a0d14;border-color:rgba(255,255,255,.55);
+  }
   .modal-hero{
     /* 🔴 用**高度**封顶，不要 `aspect-ratio` + `max-height` —— 后者会让
        宽高比反过来决定宽度（980 的卡里只画出 604 的图，右边留一块暗带）。
