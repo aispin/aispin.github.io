@@ -44,7 +44,25 @@
 
 # 📋 待办 WO
 
-> **空。**
+### WO-STUDIO-1 · 创意实验房间换成「实验环」（静态原型已交付，等确认）
+
+- **需求原文**：「现在创意实验的排版很简陋，我希望酷炫的 web3d（svg, canvas,
+  webgl, glsl shader 等技术），并且每个 demo 可以通过 iframe 浮层去体验效果。
+  先在 demos 目录实现静态 demo 效果，我确认后再整合到 3d 房间。」
+- **已做（`f6fb21b`）**：`public/demos/lab.html` —— 全屏 GLSL 星云 +
+  25 块玻璃展板绕成一圈（圆柱投影 x = f·tanθ）+ iframe 浮层。
+  桌面一屏 4 块、手机 1 块，滚动/拖动转动，点焦点板开浮层。
+- **待你确认**：视觉方向（深空星云 + 玻璃展板 + 类别色弧）与交互
+  （转动环 + 浮层体验）是否对。
+- **确认后才做**：把这套搬进 3D 房间 —— `rooms/StudioLab.jsx`（接管渲染，
+  同 `CareerTunnel` 的骨架）、`ui/StudioHud.jsx`、`state/studioLab.js`，
+  并把 `studio` 从 `CONTENT_ROOM_IDS` 里摘掉、`RoomWarmup` 的预热副本换房间。
+  ⚠️ 半成品已经写好并暂存在 `.workbuddy-ai/wip/studio-lab/`（未接线、
+  未提交），整合时以 `lab.html` 定稿的视觉为准重写，别直接拿来用。
+
+---
+
+> **其余待办：空。**
 >
 > 上一轮 5 项已全部提交并推送（`c51d8ff` 关闭按钮 hover · `c2a76b0` 深链幕帘开两次 ·
 > `aff01df` events→experiences highlights · `5be5aa2` labs→真 demo + 改名「创意实验」），
