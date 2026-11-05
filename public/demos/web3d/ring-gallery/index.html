@@ -1392,19 +1392,40 @@ function jumpTo(index) {
     state.target = nearestIndex(index, state.target, state.items.length);
 }
 
+/* 滚轮：**一次手势只走一格**。
+   🔴 原来只看累计位移 —— 触控板一次滑动会连发几十个事件，每个都可能超过
+      阈值，于是一划翻 2~3 格。把阈值调大没用：惯性滚动的总量远大于任何
+      固定阈值。改成"手势锁"：触发一次就锁住，直到 wheel **静默** IDLE
+      毫秒才解锁；惯性期间事件不断，锁就一直续期。
+   ⚠️ 只拦 wheel，pointer / click 一概不碰 —— 点击交互不受影响。 */
+const WHEEL_STEP = 30;      // 攒够这么多才算"开始滚"
+const WHEEL_IDLE = 240;     // 静默这么久 ⇒ 这一次手势结束
+
 let wheelAcc = 0;
+let wheelLocked = false;
 let wheelTimer = 0;
 
 window.addEventListener('wheel', (e) => {
     if (viewerOpen) return;
     e.preventDefault();
-    // 触控板一次长划会连发很多 deltaY，攒够阈值才走一格，否则会连跳好几块
-    wheelAcc += e.deltaY;
+
+    // 还在滚（含松手后的惯性）就续期，锁不放开
     clearTimeout(wheelTimer);
-    wheelTimer = setTimeout(() => { wheelAcc = 0; }, 140);
-    if (Math.abs(wheelAcc) > 42) {
+    wheelTimer = setTimeout(() => {
+        wheelLocked = false;
+        wheelAcc = 0;
+    }, WHEEL_IDLE);
+
+    if (wheelLocked) return;
+
+    // deltaMode：0 = 像素，1 = 行，2 = 页。Firefox 用行，不换算阈值就形同虚设
+    const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerHeight : 1;
+    wheelAcc += e.deltaY * unit;
+
+    if (Math.abs(wheelAcc) >= WHEEL_STEP) {
         nudge(wheelAcc > 0 ? 1 : -1);
         wheelAcc = 0;
+        wheelLocked = true;
     }
 }, { passive: false });
 
