@@ -35,6 +35,7 @@ const COPY = {
         now: '至今',
         projects: '项目',
         empty: '这段履历没有收录独立项目。',
+        highlights: '年度亮点',
     },
     en: {
         hint: 'Scroll to travel through time',
@@ -42,6 +43,7 @@ const COPY = {
         now: 'Present',
         projects: 'Projects',
         empty: 'No standalone projects recorded for this role.',
+        highlights: 'Highlights',
     },
 }
 
@@ -67,6 +69,13 @@ const CareerHud = () => {
                 /* 项目已经挂在履历上了（`experiences.json` 的 `projects[]`），
                    这里不再单独读一份 projects.json —— 同一个事实只存一处。 */
                 projects: Array.isArray(item.projects) ? item.projects : [],
+                /* 年度亮点：原来是一份独立的 `events.json`（12 条，中英各 6），
+                   全仓没有任何代码读它 —— 死数据。内容是真实的年度成果
+                   （TGIdeas 峰会、凹凸极客沙龙、AT-UI/ELF 开源、掘金小册、
+                   闪耀技术培训），`responsibilities` 里一句都没有，所以没有
+                   合并成"重复内容"的风险。2026-11-05 按 `company + 日期落在
+                   哪段履历里` 归并进来，原文件已删。 */
+                highlights: Array.isArray(item.highlights) ? item.highlights : [],
             }
         })
     }, [language])
@@ -209,7 +218,33 @@ const CareerHud = () => {
                             ref={descRef}
                             onScroll={syncThumb}
                         >
-                            {cur.summary}
+                            {/* 年度亮点放在**正文之前**：京东那段职责有 850px 的
+                                溢出量，放后面等于藏起来了（用户不会为了看亮点去
+                                滚这个面板）。标题/时间/职位在滚动区外面，上下文
+                                已经在上面了，亮点打头读起来是"这段里做成了什么"。
+                                日期倒序（最近的一年在上）。 */}
+                            {cur.highlights.length > 0 && (
+                                <div className="career-hud__hl">
+                                    <div className="career-hud__hl-head">
+                                        {COPY[language].highlights}
+                                    </div>
+                                    {cur.highlights.map((h) => (
+                                        <div className="career-hud__hl-item" key={h.date}>
+                                            <span className="career-hud__hl-date">
+                                                {h.date.slice(0, 7).replace('-', '.')}
+                                            </span>
+                                            <ul>
+                                                {(h.items || []).map((t, i) => (
+                                                    <li key={i}>{t}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <p className="career-hud__summary">{cur.summary}</p>
+
                         </div>
                         <div className="career-hud__scroll" ref={trackRef} aria-hidden="true">
                             <div

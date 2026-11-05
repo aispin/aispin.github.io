@@ -320,6 +320,62 @@
         }
     }
 
+    /* ── 年度亮点（合并自已删除的 `events.json`） ────────────────────────
+       放在正文**之前**，中间一条分隔线。日期做成左边一条窄栏，条目缩进。 */
+    &__hl {
+        margin: 0 0 14px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    &__summary {
+        margin: 0;
+    }
+
+    &__hl-head {
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #8ba3ff;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+
+    &__hl-item {
+        display: grid;
+        grid-template-columns: 52px 1fr;
+        gap: 8px;
+        margin-bottom: 10px;
+
+        &:last-child {
+            margin-bottom: 0;
+        }
+
+        ul {
+            margin: 0;
+            padding-left: 14px;
+        }
+
+        li {
+            font-size: 12px;
+            line-height: 1.7;
+            color: #a9b4c8;
+            margin-bottom: 4px;
+
+            &:last-child {
+                margin-bottom: 0;
+            }
+        }
+    }
+
+    &__hl-date {
+        font-size: 10.5px;
+        line-height: 1.9;
+        color: #6f7d95;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.02em;
+    }
+
     &__scroll {
         position: absolute;
         right: 0;
