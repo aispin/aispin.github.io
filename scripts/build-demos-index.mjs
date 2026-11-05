@@ -4,7 +4,7 @@
  *
  * 产出（都在 demos 根目录，均标注「自动生成，别手改」）：
  *   public/demos/demos.json    结构化数据
- *   public/demos/index.html    可浏览的列表页
+ *   public/demos/index.html    demos 落地页 = 环形画廊（见 renderLanding）
  *
  * 顺带**补 README**：某个 demo 目录没有 README.md 时，用从 index.html 抓到的
  * 标题/描述自动生成一份，省得每次丢完原型还要手写。
@@ -31,6 +31,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const DEMOS_DIR = join(ROOT, 'public', 'demos')
 const SKIP_DIRS = new Set(['node_modules', '.git'])
+
+/**
+ * 环形画廊的**真源**。`/demos/` 的落地页就是它，构建时原样复制到
+ * `public/demos/index.html`（见 renderLanding）。
+ */
+const GALLERY_ENTRY = join(DEMOS_DIR, 'web3d', 'ring-gallery', 'index.html')
 
 /* ---------------------------------------------------------------- 扫描 */
 
@@ -208,7 +214,7 @@ export function buildDemosIndex({ quiet = false } = {}) {
   }
 
   writeFileSync(join(DEMOS_DIR, 'demos.json'), JSON.stringify(payload, null, 2) + '\n', 'utf8')
-  writeFileSync(join(DEMOS_DIR, 'index.html'), renderIndex(demos), 'utf8')
+  writeFileSync(join(DEMOS_DIR, 'index.html'), renderLanding(demos), 'utf8')
 
   if (!quiet) {
     console.log(`demos 索引: ${demos.length} 个 demo（补了 ${written} 份 README）`)
@@ -223,6 +229,25 @@ export function buildDemosIndex({ quiet = false } = {}) {
 }
 
 /* --------------------------------------------------------- 列表页模板 */
+
+/**
+ * `/demos/` 的落地页 = 环形画廊本身。
+ *
+ * 真源只有一个：`web3d/ring-gallery/index.html`（那个可复用的环形画廊模式）。
+ * 这里不维护第二份源码，构建时把它**原样**写出去 —— 页面自己按地址栏算
+ * `demos.json` 的相对路径、以及自我排除用的 id，所以换个目录也能跑，
+ * 不需要在这里做任何字符串替换（只插一行"别手改"的注释）。
+ *
+ * 没有画廊源码时退回老的卡片列表（`renderIndex`），至少别让 /demos/ 空着。
+ */
+export function renderLanding(list) {
+  if (!existsSync(GALLERY_ENTRY)) return renderIndex(list)
+
+  return readFileSync(GALLERY_ENTRY, 'utf8').replace(
+    '<meta charset="utf-8" />',
+    '<meta charset="utf-8" />\n<!-- 自动生成：从 web3d/ring-gallery/index.html 复制，改那边，别改这里 -->',
+  )
+}
 
 export function renderIndex(list) {
   const cards = list.map((d) => {

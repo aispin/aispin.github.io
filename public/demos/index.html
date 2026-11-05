@@ -2,248 +2,1668 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- 自动生成：从 web3d/ring-gallery/index.html 复制，改那边，别改这里 -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="robots" content="noindex" />
-<title>Demos · AISPIN</title>
-<!-- 由 scripts/build-demos-index.mjs 自动生成，不要手改 -->
+<title>实验环 · RING GALLERY</title>
+<meta name="description" content="环形画廊：一圈悬浮展板，圆柱投影转动，点开在 iframe 浮层里直接体验。一个可复用的落地页模式。" />
 <style>
-  :root {
-    --paper: #f6efe3; --ink: #4a3b2e; --ink-soft: #8b7a67;
-    --line: #ddd0bb; --card: #fffaf1; --accent: #a8563a;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --paper: #211d19; --ink: #e9e0d2; --ink-soft: #a2937f;
-            --line: #3b342c; --card: #2a251f; --accent: #e08a63; }
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; padding: 48px 24px 72px;
-    background: var(--paper); color: var(--ink);
-    font: 15px/1.7 'Maple Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+/* ==========================================================================
+   实验环 · RING GALLERY
+   --------------------------------------------------------------------------
+   **一个可复用的落地页模式**，不是某个房间的专用页面。它解决的是这一类
+   需求：「有 N 个互不相干的东西要展示，每个都值得点进去玩一下」。
+
+   三层结构，任何一层都可以单独换掉：
+
+     1. 环境层：全屏 GLSL（星云 + 星点 + 环心冷光 + 暗角），鼠标轻微视差。
+        换配色只改 FRAG 里的三个 vec3。
+     2. 展板层：N 块玻璃展板绕成一圈，滚动/拖动转动，正前方那块被抽出来。
+        换内容只改 `buildLab()` 的输入 —— 现在读的是 demos.json。
+     3. 体验层：点开展板 → iframe 浮层里直接跑，不跳走（Esc / 点遮罩关闭）。
+        换成"弹窗里放视频 / 放代码"也只是换 overlay 的内容。
+
+   当前的用法有两个落点，**同一份源码**：
+     /demos/                      构建时由 scripts/build-demos-index.mjs 原样复制过去，
+                                  所以 demos 的落地页就是这个环，不再是那张卡片列表
+     /demos/web3d/ring-gallery/   本目录（真源）
+   页面对环境的依赖全部按地址栏现算（`demos.json` 的相对路径、自我排除用的 id），
+   所以复制到任何目录都能跑。把 GROUPS 和 demos.json 换掉，就是另一个画廊。
+
+   ── 为什么不用 CSS 3D（perspective + rotateY + translateZ）
+   试过了，几何上做不到：要让正前方的展板保持 ~250px 的可读尺寸，
+   透视距离 P 必须远大于环半径 R；而 P 一大，水平视角就只剩 20° 上下，
+   一屏只看得见 2 块板，环根本不成其为环。P 一旦接近 R，靠近相机的
+   那些板又会被透视放大到糊满屏幕。
+
+   所以这里**自己算圆柱投影**：x = f·tanθ，所有板到相机的距离都等于
+   环半径（相机就在圆心），于是尺寸一致、只在两端按 |θ| 衰减。这正是
+   3D 房间里那台 PerspectiveCamera 看到的东西，数字可以直接搬过去。
+   ========================================================================== */
+
+:root {
+    --bg: #05070c;
+    --ink: #e9edf5;
+    --dim: #8792a6;
+    --mute: #5a6478;
+    --accent: #8ba3ff;
+    --font: 'Maple Mono', 'MapleUI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', ui-monospace, monospace;
+    --pw: 240px;
+    --ph: 158px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    height: 100%;
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
     -webkit-font-smoothing: antialiased;
-  }
-  .wrap { max-width: 860px; margin: 0 auto; }
-  header { margin-bottom: 36px; }
-  h1 { margin: 0 0 8px; font-size: 26px; letter-spacing: .04em; }
-  header p { margin: 0; color: var(--ink-soft); }
-  header .meta { margin-top: 10px; font-size: 12px; color: var(--ink-soft); }
-  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
-  .card {
-    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
-    padding: 18px 20px; transition: transform .16s ease, border-color .16s ease;
-  }
-  .card:hover { transform: translateY(-2px); border-color: var(--accent); }
-  .main { display: block; text-decoration: none; color: inherit; }
-  .card h2 { margin: 0 0 6px; font-size: 17px; }
-  .card p { margin: 0 0 10px; color: var(--ink-soft); font-size: 13.5px; }
-  .card code { font-size: 12px; color: var(--accent); }
-  .variants { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); display: flex; flex-wrap: wrap; gap: 8px; }
-  .variants a {
-    font-size: 12px; text-decoration: none; color: var(--ink-soft);
-    border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px;
-  }
-  .variants a:hover { color: var(--accent); border-color: var(--accent); }
-  footer { margin-top: 44px; color: var(--ink-soft); font-size: 12px; }
-  a { color: var(--accent); }
+    overflow: hidden;
+}
+
+body {
+    /* WebGL 起不来时的兜底底色（也负责首帧不闪白） */
+    background: radial-gradient(120% 90% at 50% 10%, #0d1424 0%, #070a12 46%, #05070c 100%);
+}
+
+/* ── 环境层 ──────────────────────────────────────────────────────────── */
+
+#bg {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    z-index: 0;
+}
+
+/* 环下方的一道地光：给"站在一个平台上"一点暗示 */
+.platform {
+    position: fixed;
+    left: 50%;
+    bottom: 12%;
+    width: min(1200px, 94vw);
+    height: 280px;
+    transform: translateX(-50%);
+    z-index: 1;
+    pointer-events: none;
+    background: radial-gradient(58% 100% at 50% 100%,
+        rgba(120, 150, 255, 0.15) 0%,
+        rgba(90, 120, 220, 0.05) 44%,
+        rgba(0, 0, 0, 0) 74%);
+}
+
+/* 环的"轨道"：一条横贯屏幕的极淡光线，落在展板下沿。
+   圆柱投影里地板上的圆环投影出来就是一条水平线 —— 有了它，展板才像
+   **挂在什么东西上**，而不是浮在虚空里。位置由 JS 按板高写 --stripY。 */
+.strip {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: var(--rowY, 47%);
+    height: 1px;
+    z-index: 1;
+    transform: translateY(var(--stripY, 88px));
+    pointer-events: none;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(139, 163, 255, 0.06) 16%,
+        rgba(160, 185, 255, 0.17) 50%,
+        rgba(139, 163, 255, 0.06) 84%,
+        transparent 100%);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+}
+
+/* 轨道下面一层很宽的柔光，把"地台"垫起来 */
+.strip::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: -46px;
+    width: min(900px, 74vw);
+    height: 92px;
+    transform: translateX(-50%);
+    background: radial-gradient(50% 50% at 50% 50%,
+        rgba(120, 150, 255, 0.10) 0%,
+        rgba(120, 150, 255, 0.03) 46%,
+        transparent 74%);
+}
+
+/* ── 展板层 ──────────────────────────────────────────────────────────── */
+
+.stage {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    overflow: hidden;
+    cursor: grab;
+    touch-action: pan-y;
+    /* 两端的板子要淡出，不能硬切在屏幕边上 —— 硬切会露出"这里只是
+       一排卡片"的真相，淡出才像环转到身后去了。 */
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 22%, #000 78%, transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0%, #000 22%, #000 78%, transparent 100%);
+}
+
+.stage.is-dragging { cursor: grabbing; }
+
+.panel {
+    position: absolute;
+    left: 50%;
+    top: var(--rowY, 47%);
+    width: var(--pw);
+    height: var(--ph);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    /* 🔴 不能 overflow:hidden。焦点板下沿那个倒三角画在盒子**外面**，
+       藏进里面就被裁掉了。裁剪交给内层的 .panel__clip。 */
+    overflow: visible;
+    /* 位置每帧由 JS 写，不加 transition —— 加了会和逐帧插值打架 */
+    will-change: transform, opacity;
+    --c: #8ba3ff;
+}
+
+/* 真正的那块玻璃。所有装饰都裁在它里面，面板本身只负责定位和变换。 */
+.panel__clip {
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    background: linear-gradient(180deg, rgba(18, 22, 34, 0.94) 0%, rgba(10, 13, 21, 0.96) 100%);
+    /* 所有板都有一层浅影：没有它，板子看起来是"贴"在背景上的贴纸 */
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.38);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* 右上角那团类别色 */
+.panel__glow {
+    position: absolute;
+    inset: -32% -32% auto auto;
+    width: 80%;
+    height: 112%;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--c) 46%, transparent), transparent 100%);
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* 左侧色条：远看时类别主要靠它分辨 */
+.panel__bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--c);
+    opacity: 0.85;
+    pointer-events: none;
+}
+
+.panel.is-focus .panel__clip {
+    border-color: color-mix(in srgb, var(--c) 58%, transparent);
+    box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--c) 24%, transparent),
+        0 30px 80px rgba(0, 0, 0, 0.6),
+        0 0 70px color-mix(in srgb, var(--c) 20%, transparent);
+}
+
+/* 焦点板下沿的倒三角。
+   它的唯一职责是回答"下面那段字跟谁有关"—— 没有它，底部的说明就是
+   一张独立的卡；有了它 + 下面那根竖线，两者才读成"板 + 注解"。 */
+.panel__caret {
+    position: absolute;
+    left: 50%;
+    bottom: -10px;
+    width: 20px;
+    height: 10px;
+    transform: translateX(-50%);
+    background: var(--c);
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    filter: drop-shadow(0 0 10px color-mix(in srgb, var(--c) 55%, transparent));
+}
+
+.panel.is-focus .panel__caret { opacity: 0.92; }
+
+.panel__idx {
+    position: absolute;
+    left: 13px;
+    top: 10px;
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    color: color-mix(in srgb, var(--c) 84%, white);
+    font-variant-numeric: tabular-nums;
+}
+
+.panel__motif {
+    position: absolute;
+    right: 6px;
+    top: 4px;
+    width: 64%;
+    height: 64%;
+    opacity: 0.55;
+    pointer-events: none;
+}
+
+.panel__title {
+    position: absolute;
+    left: 13px;
+    right: 13px;
+    bottom: 26px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.32;
+    color: #f2f5fb;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.panel__cat {
+    position: absolute;
+    left: 13px;
+    bottom: 9px;
+    font-size: 8.5px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--c) 72%, #8792a6);
+}
+
+/* 焦点板上扫过的一道高光：让它"活着"，也标出哪块能直接点 */
+.panel__sweep {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(105deg,
+        transparent 38%,
+        color-mix(in srgb, var(--c) 18%, transparent) 50%,
+        transparent 62%);
+    background-size: 260% 100%;
+}
+
+.panel.is-focus .panel__sweep {
+    opacity: 1;
+    animation: sweep 4.8s linear infinite;
+}
+
+@keyframes sweep {
+    from { background-position: 180% 0; }
+    to   { background-position: -80% 0; }
+}
+
+/* ── HUD ─────────────────────────────────────────────────────────────── */
+
+/* 回索引。左上角是空的（左栏竖直居中），放这里不抢任何东西。 */
+.back {
+    position: fixed;
+    left: 22px;
+    top: 20px;
+    z-index: 9;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    letter-spacing: 0.05em;
+    text-decoration: none;
+    color: var(--mute);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: color 0.18s ease, border-color 0.18s ease;
+}
+
+.back:hover,
+.back:focus-visible {
+    color: var(--dim);
+    border-color: rgba(255, 255, 255, 0.22);
+}
+
+.hud {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    color: var(--ink);
+}
+
+.hud__head {
+    position: absolute;
+    top: 46px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    user-select: none;
+}
+
+.hud__eyebrow {
+    font-size: 30px;
+    font-weight: 600;
+    letter-spacing: 0.26em;
+    text-indent: 0.26em;
+    line-height: 1.15;
+    color: #f2f5fb;
+    white-space: nowrap;
+    text-shadow: 0 0 40px rgba(139, 163, 255, 0.28);
+}
+
+.hud__tagline {
+    margin: 10px 0 0;
+    font-size: 12.5px;
+    letter-spacing: 0.06em;
+    color: rgba(135, 146, 166, 0.85);
+    white-space: nowrap;
+}
+
+.hud__count {
+    margin-top: 5px;
+    font-size: 10.5px;
+    letter-spacing: 0.22em;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+}
+
+/* 左侧类别竖栏 */
+.hud__rail {
+    position: absolute;
+    left: 30px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    pointer-events: auto;
+}
+
+/* 左栏背后的局部压暗。环上最边上的板（±28.8°）正好落在这一带，
+   光靠 stage 的遮罩要抹掉它就得把遮罩拉到 26%，那样连 ±14.4° 的邻居
+   也一起淡掉了。所以改成"只压暗这一小块"，内容不丢，字也读得清。 */
+.hud__rail::before {
+    content: '';
+    position: absolute;
+    inset: -54px -74px -54px -46px;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(64% 60% at 16% 50%,
+        rgba(5, 7, 12, 0.96) 0%,
+        rgba(5, 7, 12, 0.78) 52%,
+        rgba(5, 7, 12, 0) 82%);
+    /* 磨砂：把压在后面的那块展板的文字糊成一片柔光，而不是跟类别名
+       抢着读。光靠压暗是压不干净的 —— 板子本身是亮的。 */
+    backdrop-filter: blur(9px);
+    -webkit-backdrop-filter: blur(9px);
+}
+
+.hud__rail-head {
+    font-size: 9.5px;
+    letter-spacing: 0.3em;
+    color: var(--mute);
+    margin-bottom: 8px;
+    padding-left: 14px;
+}
+
+.chip {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 6px 12px 6px 0;
+    background: none;
+    border: 0;
+    font: inherit;
+    font-size: 12px;
+    color: var(--dim);
+    cursor: pointer;
+    text-align: left;
+    transition: color 0.18s ease;
+    --c: #8ba3ff;
+}
+
+.chip::before {
+    content: '';
+    position: absolute;
+    left: -12px;
+    top: 50%;
+    width: 12px;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.14);
+    transition: background 0.18s ease, width 0.18s ease;
+}
+
+.chip:hover { color: #dfe6f4; }
+.chip:hover::before { background: rgba(255, 255, 255, 0.34); }
+.chip.is-active { color: #f2f5fb; }
+.chip.is-active::before { background: var(--c); width: 18px; }
+
+.chip__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--c);
+    opacity: 0.42;
+    flex: 0 0 auto;
+    transition: opacity 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.chip.is-active .chip__dot {
+    opacity: 1;
+    transform: scale(1.35);
+    box-shadow: 0 0 10px var(--c);
+}
+
+.chip__n {
+    margin-left: auto;
+    padding-left: 10px;
+    font-size: 10px;
+    color: var(--mute);
+    font-variant-numeric: tabular-nums;
+}
+
+.chip.is-active .chip__n { color: var(--c); }
+
+/* ── 焦点板的注解 ──────────────────────────────────────────────────────
+   它**不是一张卡**，是上面那块板的说明：一根竖线从倒三角垂下来，文字居中
+   收在线的末端。所以没有边框、没有底色、没有按钮 —— 加上任何一样，它就
+   又变回"另一张独立的卡"，关联感立刻没了。
+
+   交互也一起收掉了：点上面那块板就能进预览，这里再放一个按钮是重复的。 */
+
+.hud__stem {
+    position: absolute;
+    left: 50%;
+    width: 1px;
+    transform: translateX(-50%);
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--accent) 58%, transparent) 0%,
+        color-mix(in srgb, var(--accent) 14%, transparent) 82%,
+        transparent 100%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+
+.hud__stem.is-on { opacity: 1; }
+
+.hud__detail {
+    position: absolute;
+    left: 50%;
+    /* 上下留白**大致相等**才像设计：板下沿到文字约 150，文字到屏底也约 140。
+       贴着屏底（bottom:44）读起来是页脚；紧贴板下（bottom:300）又把底部的
+       地光全压空了。 */
+    bottom: 140px;
+    transform: translateX(-50%);
+    width: min(560px, calc(100vw - 84px));
+    text-align: center;
+    /* 没有可点的东西了 ⇒ 别挡住底下那层拖拽 */
+    pointer-events: none;
+}
+
+/* 星云是动的，纯文字直接压上去会时清时糊。垫一团**没有边界**的暗光：
+   看不出边缘，只是让字更稳 —— 不是面板，别给它描边。 */
+.hud__detail::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 132%;
+    height: 280%;
+    transform: translate(-50%, -50%);
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(50% 50% at 50% 50%,
+        rgba(5, 7, 12, 0.88) 0%,
+        rgba(5, 7, 12, 0.54) 44%,
+        rgba(5, 7, 12, 0) 76%);
+}
+
+.hud__meta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    margin-bottom: 8px;
+}
+
+.hud__idx {
+    font-size: 11.5px;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+}
+
+/* 编号与类别之间那截短线：比一个「/」干净，也比空格更像"两段元信息" */
+.hud__sep {
+    width: 14px;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.hud__cat {
+    font-size: 10px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--mute);
+}
+
+.hud__title {
+    margin: 0 0 7px;
+    font-size: 19px;
+    font-weight: 600;
+    line-height: 1.32;
+    letter-spacing: 0.01em;
+    color: #f4f7fd;
+    text-shadow: 0 2px 22px rgba(3, 5, 9, 0.92);
+}
+
+.hud__desc {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.72;
+    color: rgba(186, 197, 215, 0.96);
+    text-shadow: 0 1px 14px rgba(3, 5, 9, 0.88);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* `.hud__desc` 是 `display:-webkit-box`，作者样式会压过 UA 的 `[hidden]`，
+   所以这里得显式兜一下 —— 否则 hidden 属性形同虚设。 */
+.hud__detail [hidden] { display: none !important; }
+
+.hud__hint {
+    position: absolute;
+    right: 30px;
+    bottom: 30px;
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    color: rgba(135, 146, 166, 0.7);
+    user-select: none;
+    white-space: nowrap;
+}
+
+/* ── iframe 浮层 ─────────────────────────────────────────────────────── */
+
+.viewer {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: grid;
+    place-items: center;
+    padding: 4vh 3vw;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.26s ease;
+}
+
+.viewer.is-open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.viewer__scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(3, 5, 9, 0.84);
+    backdrop-filter: blur(10px);
+}
+
+.viewer__card {
+    position: relative;
+    width: min(1180px, 94vw);
+    height: min(760px, 88vh);
+    display: flex;
+    flex-direction: column;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #0a0d14;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 40px 120px rgba(0, 0, 0, 0.72);
+    transform: translateY(14px) scale(0.985);
+    transition: transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.viewer.is-open .viewer__card { transform: none; }
+
+.viewer__bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    flex: 0 0 auto;
+}
+
+.viewer__dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 10px var(--accent);
+    flex: 0 0 auto;
+}
+
+.viewer__title {
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.viewer__cat {
+    font-size: 9.5px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--mute);
+    white-space: nowrap;
+}
+
+.viewer__spacer { flex: 1; }
+
+.viewer__act {
+    font-size: 11.5px;
+    color: var(--dim);
+    text-decoration: none;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    transition: color 0.18s ease, border-color 0.18s ease;
+    white-space: nowrap;
+}
+
+.viewer__act:hover { color: #f2f5fb; border-color: rgba(255, 255, 255, 0.3); }
+
+.viewer__close {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--dim);
+    font: inherit;
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+/* 关闭键压在任意内容上，所以用"深字浅底"，不做半透明 */
+.viewer__close:hover,
+.viewer__close:focus-visible {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #080a10;
+}
+
+.viewer__body {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    background: #05070c;
+}
+
+.viewer__frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.viewer.is-ready .viewer__frame { opacity: 1; }
+
+.viewer__loading {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    gap: 12px;
+    color: var(--mute);
+    font-size: 11.5px;
+    letter-spacing: 0.16em;
+    transition: opacity 0.3s ease;
+}
+
+.viewer.is-ready .viewer__loading { opacity: 0; pointer-events: none; }
+
+.spinner {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.14);
+    border-top-color: var(--accent);
+    animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 数据取不到时的兜底 */
+.empty {
+    position: fixed;
+    inset: 0;
+    z-index: 6;
+    display: none;
+    place-items: center;
+    text-align: center;
+    padding: 0 24px;
+    color: var(--dim);
+    font-size: 13px;
+    line-height: 1.9;
+}
+
+.empty.is-on { display: grid; }
+
+/* ── 窄视口 ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 860px) {
+    /* 窄视口一屏只放一块板，而且它宽到 76% ⇒ 竖排左栏一定压在板上。
+       改成标题下面一排横向类别。 */
+    .hud__rail {
+        left: 50%;
+        top: 128px;
+        transform: translateX(-50%);
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 2px 10px;
+        width: calc(100vw - 24px);
+    }
+
+    .hud__rail::before { display: none; }
+    .hud__rail-head { display: none; }
+    .chip { font-size: 10.5px; padding: 4px 0; gap: 7px; }
+    .chip::before { display: none; }
+    .chip__n { display: none; }
+
+    /* 只有一块板可见，不需要两端的淡出 */
+    .stage {
+        -webkit-mask-image: none;
+        mask-image: none;
+    }
+    /* 手机上一屏只有一块板，说明文字就贴在它下面，别推到屏幕最底 */
+    .hud__detail { bottom: 108px; width: calc(100vw - 44px); }
+    .hud__title { font-size: 17px; margin-bottom: 6px; }
+    .hud__desc { font-size: 11.5px; line-height: 1.65; -webkit-line-clamp: 3; line-clamp: 3; }
+    .hud__hint { display: none; }
+    .hud__tagline { display: none; }
+    .viewer { padding: 2vh 2vw; }
+    .viewer__card { width: 96vw; height: 90vh; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .panel.is-focus .panel__sweep { animation: none; }
+    .viewer, .viewer__card { transition: none; }
+    .spinner { animation: none; }
+}
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <h1>Demos</h1>
-      <p>随手放的原型与试验页面。</p>
-      <div class="meta">共 26 个 · 索引由构建脚本自动生成 · <a href="/demos/demos.json">demos.json</a> · <a href="/">← 回主页</a></div>
+
+<a class="back" href="/">← 首页</a>
+
+<canvas id="bg" aria-hidden="true"></canvas>
+<div class="platform" aria-hidden="true"></div>
+<div class="strip" aria-hidden="true"></div>
+<div class="stage" id="stage"></div>
+
+<div class="hud">
+    <header class="hud__head">
+        <div class="hud__eyebrow">创意实验</div>
+        <p class="hud__tagline">做过的实验，与还能跑起来的小东西</p>
+        <div class="hud__count" id="count">— / —</div>
     </header>
-    <ul>
-      <li class="card">
-        <a class="main" href="/demos/door.html">
-          <h2>大展宏图 · 门神</h2>
-          <p>（还没有描述）</p>
-          <code>/demos/door.html</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/comment-ui/">
-          <h2>Gitalk · 轻量评论区</h2>
-          <p>把 GitHub Issue 变成你的评论区。零后端、零数据库，评论与 Issue 实时同步，接入成本低到几乎无感。</p>
-          <code>/demos/comment-ui/</code>
-        </a>
-        <div class="variants"><a href="/demos/comment-ui/index01.html">index01</a></div>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/creature-kit/">
-          <h2>CreatureKit 2.1 - 关节过渡与物种配色</h2>
-          <p>- 入口：index.html</p>
-          <code>/demos/creature-kit/</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/css-art/rocket/">
-          <h2>火箭 · Rocket</h2>
-          <p>鼠标移上去就点火：机身从上下浮动改成高频抖动，背后的速度线同时提速。</p>
-          <code>/demos/css-art/rocket/</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/css-art/shapes/">
-          <h2>纯 CSS 形状 · Shapes</h2>
-          <p>只用 border 和 transform 拼出来的四个几何图形：三角、五角星、沙漏、平行四边形。</p>
-          <code>/demos/css-art/shapes/</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/interactive/encrypted-text/">
-          <h2>加密文字 · Encrypted Text</h2>
-          <p>整片随机字符，只在你鼠标周围开一个圆形孔洞能看清 —— 用 radial-gradient 遮罩 + requestAnimationFrame 重刷。</p>
-          <code>/demos/interactive/encrypted-text/</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/interactive/hacker-button/">
-          <h2>黑客按钮 · Hacker Button</h2>
-          <p>点击后文字被随机字符逐位解码：从左往右一位位定下来，剩下的继续乱跳。</p>
-          <code>/demos/interactive/hacker-button/</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/interactive/number-counter/">
-          <h2>数字滚动 · Animated Number Counter</h2>
-          <p>不写一行补间循环：把 --num 注册成 &lt;integer&gt;，用 Web Animations 补间它，再由 counter() 渲染成数字。</p>
-          <code>/demos/interactive/number-counter/</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/interactive/speech-recognition/">
-          <h2>语音识别 · Speech Recognition</h2>
-          <p>浏览器原生 Web Speech API：中文 / English 两档，按住说话、实时出字幕。</p>
-          <code>/demos/interactive/speech-recognition/</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/landing/">
-          <h2>Gitalk — 评论区，从此是一片星系</h2>
-          <p>每一条评论都是一颗星。Gitalk 把 GitHub Issue 变成你的评论区 —— 零后端、零数据库，一段脚本即可拥有完整评论体验。</p>
-          <code>/demos/landing/</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/my-3d-site/couplets-preview.html">
-          <h2>门联文案 · 24 节气 + 传统节日</h2>
-          <p>3D 院子里那副门联的全部文案底稿：42 副七言对联 —— 4 副四季日常联 + 1 副彩蛋 + 24 节气 + 10 个传统节日 + 3 个法定假期，外加日期解析规则与 2026–2027 年的实际命中日期。</p>
-          <code>/demos/my-3d-site/couplets-preview.html</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/skill-ui/examples/01-landing.html">
-          <h2>Lumen — API 可观测性平台</h2>
-          <p>Lumen 把日志、指标、链路追踪合并到一个视图里。上线 5 分钟接入，定位一次线上故障平均只需要 47 秒。</p>
-          <code>/demos/skill-ui/examples/01-landing.html</code>
-        </a>
-        <div class="variants"><a href="/demos/skill-ui/examples/02-dashboard.html">02-dashboard</a><a href="/demos/skill-ui/examples/03-desktop-app.html">03-desktop-app</a><a href="/demos/skill-ui/examples/04-settings.html">04-settings</a><a href="/demos/skill-ui/examples/05-state-gallery.html">05-state-gallery</a><a href="/demos/skill-ui/examples/06-3d-personal-ip.html">06-3d-personal-ip</a></div>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/text-effects/3d-text/">
-          <h2>3D 立体字 · 3D Text</h2>
-          <p>纯 CSS 立体字：26 层 1px 递增的 text-shadow 堆出厚度，不用任何 3D 变换。</p>
-          <code>/demos/text-effects/3d-text/</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/text-effects/neon/">
-          <h2>霓虹文字 · Neon Text</h2>
-          <p>纯 CSS 霓虹灯管字：-webkit-text-stroke 描边 + 多层 text-shadow 发光，背后一圈脉冲光晕。</p>
-          <code>/demos/text-effects/neon/</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/text-effects/neon-gradient/">
-          <h2>渐变霓虹文字 · Gradient Neon Text</h2>
-          <p>纯 CSS：用 border-box 渐变描边 + 多层 text-shadow 做渐变霓虹字，外圈光环反向旋转。</p>
-          <code>/demos/text-effects/neon-gradient/</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/text-effects/text-rotator/">
-          <h2>滚动文字 · Text Rotator</h2>
-          <p>纯 CSS 文字轮播：一个定高的窗口 + 一条 6 行的列表，用 cubic-bezier 做停顿式上滚。</p>
-          <code>/demos/text-effects/text-rotator/</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/textural/">
-          <h2>Textural — 把文字变成卡片背景</h2>
-          <p>Textural 是一个 4KB 的零依赖库，把任意文字渲染成柔和、不抢镜的卡片背景。</p>
-          <code>/demos/textural/</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/web3d/3d-ip-landing/">
-          <h2>Hugo — 独立开发者 · 创意设计师 · 音乐人</h2>
-          <p>在代码、像素和声音之间游走。做一些安静的、需要耐心的东西。</p>
-          <code>/demos/web3d/3d-ip-landing/</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/web3d/ai-concepts/">
-          <h2>AI Agent 全景图 · 星球与星系</h2>
-          <p> 「概念即星球，边界即星系 —— Agent 是 Harness 与 Model 组成的恒星系统，一次提示词的旅程，就是从用户星系出发，穿过 Agent 系统，带着工具的回声返回。」 </p>
-          <code>/demos/web3d/ai-concepts/</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/web3d/career/">
-          <h2>履历 · 时空隧道 · Textural</h2>
-          <p>- 入口：index.html</p>
-          <code>/demos/web3d/career/</code>
-        </a>
-        <div class="variants"><a href="/demos/web3d/career/index01.html">index01</a><a href="/demos/web3d/career/index02.html">index02</a></div>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/web3d/life-meaning/">
-          <h2>人生的意义 · v0.0.1 · AI Matrix</h2>
-          <p>- 入口：index.html</p>
-          <code>/demos/web3d/life-meaning/</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/web3d/monster-kit/">
-          <h2>MonsterKit v1.0 · 载具图鉴</h2>
-          <p>8 VEHICLES · 怪物可以住在任何地方</p>
-          <code>/demos/web3d/monster-kit/</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/web3d/old-house/">
-          <h2>黄昏小院 1.8 · 层级重构</h2>
-          <p>一个黄昏小院，几乎把 Web 3D 的所有难点都集齐了：</p>
-          <code>/demos/web3d/old-house/</code>
-        </a>
-        <div class="variants"><a href="/demos/web3d/old-house/index-a.html">index-a</a><a href="/demos/web3d/old-house/index-b.html">index-b</a><a href="/demos/web3d/old-house/tree.html">tree</a></div>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/web3d/rainy-night/">
-          <h2>雨夜古镇 v0.0.1 — AI Matrix</h2>
-          <p>- 入口：index.html</p>
-          <code>/demos/web3d/rainy-night/</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/web3d/ring-gallery/">
-          <h2>实验环 · RING GALLERY</h2>
-          <p>环形画廊：一圈悬浮展板，圆柱投影转动，点开在 iframe 浮层里直接体验。一个可复用的落地页模式。</p>
-          <code>/demos/web3d/ring-gallery/</code>
-        </a>
-      </li>
-      <li class="card">
-        <a class="main" href="/demos/web3d/tree/">
-          <h2>3D 柿子树 · Three.js</h2>
-          <p>- 入口：index.html</p>
-          <code>/demos/web3d/tree/</code>
-        </a>
-        <div class="variants"><a href="/demos/web3d/tree/index01.html">index01</a></div>
-      </li>
-    </ul>
-    <footer>Generated by <code>scripts/build-demos-index.mjs</code></footer>
-  </div>
+
+    <nav class="hud__rail" id="rail" aria-label="类别">
+        <div class="hud__rail-head">类别</div>
+    </nav>
+
+    <!-- 从焦点板垂下来的那根线，长度由 JS 按两端的实际位置算 -->
+    <div class="hud__stem" id="stem" aria-hidden="true"></div>
+
+    <section class="hud__detail" id="detail" aria-live="polite">
+        <div class="hud__meta">
+            <span class="hud__idx" id="cardIdx">—</span>
+            <span class="hud__sep" aria-hidden="true"></span>
+            <span class="hud__cat" id="cardCat"></span>
+        </div>
+        <h2 class="hud__title" id="cardTitle">载入中…</h2>
+        <p class="hud__desc" id="cardDesc"></p>
+    </section>
+
+    <div class="hud__hint">滚动 / 拖动 转动 · 点击展板进入</div>
+</div>
+
+<div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-labelledby="viewerTitle">
+    <div class="viewer__scrim" data-close></div>
+    <div class="viewer__card">
+        <div class="viewer__bar">
+            <span class="viewer__dot" id="viewerDot"></span>
+            <span class="viewer__title" id="viewerTitle">—</span>
+            <span class="viewer__cat" id="viewerCat"></span>
+            <span class="viewer__spacer"></span>
+            <a class="viewer__act" id="viewerNewTab" href="#" target="_blank" rel="noreferrer">新标签打开 ↗</a>
+            <button type="button" class="viewer__close" id="viewerClose" aria-label="关闭">×</button>
+        </div>
+        <div class="viewer__body">
+            <iframe class="viewer__frame" id="viewerFrame" title="实验预览" referrerpolicy="no-referrer"></iframe>
+            <div class="viewer__loading">
+                <div class="spinner"></div>
+                <div>载入中…</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="empty" id="empty">
+    <div>
+        取不到 <code>demos.json</code>。<br />
+        这一页要通过 http 打开（<code>npm run dev</code> 之后访问
+        <code>/demos/</code> 或 <code>/demos/web3d/ring-gallery/</code>），<br />
+        直接双击本地文件是不行的。
+    </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ==========================================================================
+   0. 类别表
+   --------------------------------------------------------------------------
+   顺序 = 环上的顺序 = 左栏的顺序。前三个是这一轮做的"实验"，进门先看到它们。
+   `misc` 收 public/demos/ 根目录下那些没有子目录的老页面。
+   ========================================================================== */
+
+const GROUPS = [
+    { id: 'text-effects', zh: '文字特效', en: 'TYPE FX',     accent: '#5ee7ff' },
+    { id: 'interactive',  zh: '交互实验', en: 'INTERACTION', accent: '#a98bff' },
+    { id: 'css-art',      zh: '纯 CSS',   en: 'CSS ART',     accent: '#ff9f5a' },
+    { id: 'web3d',        zh: '3D 场景',  en: '3D SCENES',   accent: '#8ba3ff' },
+    { id: 'skill-ui',     zh: '界面',     en: 'UI',          accent: '#5ce3a8' },
+    { id: 'misc',         zh: '其它',     en: 'MISC',        accent: '#e8d9a8' },
+];
+
+const GROUP_BY_ID = new Map(GROUPS.map((g) => [g.id, g]));
+
+/**
+ * 这一页在 demos.json 里的 id —— 环上别把自己列进去。
+ *
+ * 从地址栏推，而不是写死一个 id：
+ *   /demos/web3d/ring-gallery/            → web3d/ring-gallery
+ *   /demos/web3d/ring-gallery/index.html  → web3d/ring-gallery
+ *   /demos/  ·  /demos/index.html         → 推不出来（这里是 demos 根）
+ *
+ * 根目录那一份是构建时从本目录**复制**过去的，内容一样，所以推不出来时
+ * 退回本目录的 id。改目录名的话这两处要一起改（构建脚本读的就是这个路径）。
+ */
+const SELF_ID = (() => {
+    const id = location.pathname
+        .replace(/^.*?\/demos\//, '')
+        .replace(/index\.html$/, '')
+        .replace(/\/$/, '');
+    return id || 'web3d/ring-gallery';
+})();
+
+/**
+ * `demos.json` 在 demos 根目录。按"这一页在 demos 下第几层"算相对路径：
+ * 整页复制到任何深度都能用，也不用"先猜一个再兜底"——兜底会白留一个 404。
+ */
+function demosJsonUrl() {
+    const after = location.pathname.replace(/^.*?\/demos\//, '');
+    const segs = after.split('/').filter(Boolean);
+    if (segs.length && /\.html?$/i.test(segs[segs.length - 1])) segs.pop();
+    return '../'.repeat(segs.length) + 'demos.json';
+}
+
+/** 这个值在 measure() 里按视口算：见下面。 */
+let MAX_ANGLE = 31 * Math.PI / 180;
+
+/* ── 焦距怎么定：由**展位间距**反算，而不是写死一个视角 ──────────────
+   固定 FOV 在窄视口上会崩：手机 390px 宽时 f = 195/tan31° = 324，
+   相邻展位在屏幕上只隔 f·tan14.4° = 83px，而板宽最小也得 150px ⇒
+   五块板叠在一起，还把左栏压没了。
+
+   改成"先定板宽和缝，再反算 f"就与视口无关了：
+       spacing = pw × 1.16      （16% 的缝）
+       f       = spacing / tan(step)
+       MAX_ANGLE = atan(半屏宽 × 0.92 / f)
+   于是"一屏看见几块"是自然结果：桌面 4 块，手机 1 块。 */
+const GAP_RATIO = 1.16;
+
+function groupIdOf(id) {
+    const cut = id.indexOf('/');
+    if (cut < 0) return 'misc';
+    const head = id.slice(0, cut);
+    return GROUP_BY_ID.has(head) ? head : 'misc';
+}
+
+/* ==========================================================================
+   1. 每个类别的图样（内联 SVG，画在标题后面）
+   ========================================================================== */
+
+const MOTIFS = {
+    'text-effects': `
+        <svg viewBox="0 0 120 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <text x="104" y="56" text-anchor="end" font-family="monospace" font-size="46" font-weight="700" fill="currentColor" opacity=".13">Aa</text>
+            <text x="104" y="56" text-anchor="end" font-family="monospace" font-size="28" font-weight="700" fill="currentColor" opacity=".2">Aa</text>
+            <text x="104" y="56" text-anchor="end" font-family="monospace" font-size="16" font-weight="700" fill="currentColor" opacity=".3">Aa</text>
+        </svg>`,
+    interactive: `
+        <svg viewBox="0 0 120 80" fill="none" stroke="currentColor" stroke-width="1" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="86" cy="42" r="9" opacity=".34"/>
+            <circle cx="86" cy="42" r="18" opacity=".22"/>
+            <circle cx="86" cy="42" r="27" opacity=".14"/>
+            <path d="M82 36 L97 43 L89 45 Z" fill="currentColor" stroke="none" opacity=".55"/>
+        </svg>`,
+    'css-art': `
+        <svg viewBox="0 0 120 80" fill="none" stroke="currentColor" stroke-width="1" xmlns="http://www.w3.org/2000/svg">
+            <path d="M86 20 L100 46 L72 46 Z" opacity=".3"/>
+            <circle cx="86" cy="40" r="13" opacity=".22"/>
+            <rect x="79" y="33" width="14" height="14" opacity=".3"/>
+        </svg>`,
+    web3d: `
+        <svg viewBox="0 0 120 80" fill="none" stroke="currentColor" stroke-width=".9" xmlns="http://www.w3.org/2000/svg">
+            <g opacity=".26">
+                <path d="M90 38 L60 78 M90 38 L76 78 M90 38 L90 78 M90 38 L104 78 M90 38 L120 78"/>
+                <path d="M62 78 H120 M62 72 H120 M64 66 H120 M68 60 H120 M74 54 H120"/>
+            </g>
+        </svg>`,
+    'skill-ui': `
+        <svg viewBox="0 0 120 80" fill="none" stroke="currentColor" stroke-width="1" xmlns="http://www.w3.org/2000/svg">
+            <g opacity=".26">
+                <rect x="68" y="14" width="42" height="48" rx="2"/>
+                <path d="M68 24 H110"/>
+                <rect x="73" y="32" width="28" height="4" fill="currentColor" stroke="none"/>
+                <rect x="73" y="42" width="18" height="4" fill="currentColor" stroke="none"/>
+            </g>
+        </svg>`,
+    misc: `
+        <svg viewBox="0 0 120 80" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+            <g opacity=".2">
+                <circle cx="76" cy="18" r="1.6"/><circle cx="88" cy="26" r="1.2"/>
+                <circle cx="100" cy="16" r="1.4"/><circle cx="82" cy="38" r="1.1"/>
+                <circle cx="96" cy="42" r="1.6"/><circle cx="108" cy="32" r="1.2"/>
+                <circle cx="78" cy="54" r="1.3"/><circle cx="92" cy="58" r="1.5"/>
+                <circle cx="106" cy="52" r="1.1"/><circle cx="86" cy="70" r="1.2"/>
+            </g>
+        </svg>`,
+};
+
+/* ==========================================================================
+   2. 环境层：全屏 GLSL
+   --------------------------------------------------------------------------
+   一张全屏三角形 + 五倍频 fbm。没有 three，没有库，就一次 drawArrays。
+   目的是给玻璃展板一个有纵深的背景，而不是一块纯黑。
+   ========================================================================== */
+
+const VERT = `
+attribute vec2 aPos;
+void main() { gl_Position = vec4(aPos, 0.0, 1.0); }
+`;
+
+const FRAG = `
+precision highp float;
+uniform vec2 uRes;
+uniform float uTime;
+uniform vec2 uMouse;
+
+float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+float noise(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x),
+               mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float fbm(vec2 p) {
+    float v = 0.0, a = 0.5;
+    for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.03; a *= 0.5; }
+    return v;
+}
+
+void main() {
+    vec2 p = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
+    float t = uTime * 0.045;
+
+    // 星云：两层 fbm 互相推，慢速漂移
+    vec2 q = p * 1.35 + uMouse * 0.22;
+    float n1 = fbm(q + vec2(t, -t * 0.65));
+    float n2 = fbm(q * 2.05 - vec2(t * 0.8, t * 0.35));
+
+    vec3 col = vec3(0.020, 0.027, 0.047);
+    vec3 indigo = vec3(0.10, 0.16, 0.44);
+    vec3 violet = vec3(0.30, 0.12, 0.46);
+
+    col = mix(col, indigo, smoothstep(0.34, 0.96, n1) * 0.62);
+    col = mix(col, violet, smoothstep(0.46, 1.02, n2) * 0.34);
+
+    // 环心后方一团冷光：把视线往画面中间拉
+    float core = 1.0 - smoothstep(0.0, 0.74, length(p - vec2(0.0, -0.02)));
+    col += vec3(0.16, 0.22, 0.42) * core * core * 0.32;
+
+    // 暗角
+    col *= 1.0 - smoothstep(0.30, 1.32, length(p)) * 0.88;
+
+    // 星点：按 2px 网格撒，闪烁相位由 hash 决定
+    vec2 cell = floor(gl_FragCoord.xy / 2.0);
+    float s = hash(cell);
+    float twinkle = 0.55 + 0.45 * sin(uTime * 1.7 + s * 62.83);
+    col += vec3(0.72, 0.80, 1.0) * smoothstep(0.9972, 1.0, s) * twinkle * 1.15;
+
+    // 极轻的抖动，避免大面积渐变出现色带
+    col += (hash(gl_FragCoord.xy + uTime) - 0.5) * 0.006;
+
+    gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+function startShader() {
+    const canvas = document.getElementById('bg');
+    const gl = canvas.getContext('webgl', { antialias: false, alpha: false, powerPreference: 'low-power' });
+    if (!gl) return;   // 起不来就吃 body 的 CSS 渐变兜底
+
+    const compile = (type, src) => {
+        const sh = gl.createShader(type);
+        gl.shaderSource(sh, src);
+        gl.compileShader(sh);
+        if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+            console.warn('[ring-gallery] shader', gl.getShaderInfoLog(sh));
+            return null;
+        }
+        return sh;
+    };
+
+    const vs = compile(gl.VERTEX_SHADER, VERT);
+    const fs = compile(gl.FRAGMENT_SHADER, FRAG);
+    if (!vs || !fs) return;
+
+    const prog = gl.createProgram();
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+    gl.useProgram(prog);
+
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const aPos = gl.getAttribLocation(prog, 'aPos');
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+    const uRes = gl.getUniformLocation(prog, 'uRes');
+    const uTime = gl.getUniformLocation(prog, 'uTime');
+    const uMouse = gl.getUniformLocation(prog, 'uMouse');
+
+    const mouse = { x: 0, y: 0, tx: 0, ty: 0 };
+    window.addEventListener('pointermove', (e) => {
+        mouse.tx = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.ty = -((e.clientY / window.innerHeight) * 2 - 1);
+    }, { passive: true });
+
+    const resize = () => {
+        // 上限 1.5：这是纯背景，2x 屏上多出来的像素只是多烧 4 倍填充率
+        const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+        canvas.width = Math.floor(window.innerWidth * dpr);
+        canvas.height = Math.floor(window.innerHeight * dpr);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.uniform2f(uRes, canvas.width, canvas.height);
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let elapsed = 0;
+    let prev = performance.now();
+    let raf = 0;
+
+    const frame = (now) => {
+        raf = requestAnimationFrame(frame);
+        const dt = Math.min(0.1, (now - prev) / 1000);
+        prev = now;
+        if (!reduce) elapsed += dt;
+
+        mouse.x += (mouse.tx - mouse.x) * 0.05;
+        mouse.y += (mouse.ty - mouse.y) * 0.05;
+        gl.uniform1f(uTime, elapsed);
+        gl.uniform2f(uMouse, mouse.x, mouse.y);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+    };
+    raf = requestAnimationFrame(frame);
+
+    // 切回来时把时间基准挪到现在，否则会一次性跳掉几秒（星云"闪"一下）
+    document.addEventListener('visibilitychange', () => { prev = performance.now(); });
+    window.addEventListener('pagehide', () => cancelAnimationFrame(raf));
+}
+
+/* ==========================================================================
+   3. 展板层（圆柱投影）
+   ========================================================================== */
+
+const stage = document.getElementById('stage');
+const railEl = document.getElementById('rail');
+const countEl = document.getElementById('count');
+const cardIdx = document.getElementById('cardIdx');
+const cardCat = document.getElementById('cardCat');
+const cardTitle = document.getElementById('cardTitle');
+const cardDesc = document.getElementById('cardDesc');
+const detailEl = document.getElementById('detail');
+const stemEl = document.getElementById('stem');
+const hudEl = document.querySelector('.hud');
+
+const state = {
+    items: [],
+    groups: [],
+    /** 小数索引：转动中从 3 连续走到 4 */
+    cur: 0,
+    target: 0,
+    pw: 240,
+    ph: 158,
+    /** 焦距（px）。板到相机的距离恒等于它，所以板的视觉宽度 = 板宽。 */
+    focal: 1000,
+    step: 0,
+    panels: [],
+    chips: [],
+    /** 上一次真正写进 HUD 的展位。每帧写 DOM 会拖慢转动，只在换人时写。 */
+    shown: -1,
+};
+
+/* 🔴 环是**首尾相接**的，target 故意不夹边界。
+   夹了的话「停在第 1 块时点最后一块」会被夹回 0 —— 表现就是点了没反应。
+   索引随便涨，`render()` 里每块板的角度都对 2π 取模，转满一圈就是新的一圈；
+   转久了再把 cur/target 一起减掉 n（见 renormalize）。 */
+
+/** 折成离当前最近的等价索引 —— 从第 3 个跳到第 22 个不该倒着转 19 格。 */
+function nearestIndex(target, current, count) {
+    const n = Math.max(count, 1);
+    const j = ((target % n) + n) % n;
+    return j + n * Math.round((current - j) / n);
+}
+
+function measure() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const narrow = vw < 860;
+
+    // 窄视口一屏只放一块，所以板子可以宽到 76%；宽屏按比例收，再用高度封顶
+    const pw = Math.round(Math.max(150, Math.min(
+        narrow ? 300 : 280,
+        Math.min(narrow ? vw * 0.76 : vw * 0.175, vh * (narrow ? 0.34 : 0.32)),
+    )));
+    const ph = Math.round(pw * 0.66);
+
+    const n = Math.max(state.items.length, 1);
+    const step = (Math.PI * 2) / n;
+    const spacing = pw * GAP_RATIO;
+
+    state.pw = pw;
+    state.ph = ph;
+    state.step = step;
+    // 相机在圆心 ⇒ 每块板到相机的距离都等于 f ⇒ 视觉宽度恰好等于板宽
+    state.focal = spacing / Math.tan(step);
+    // 可见半角：屏宽的 92%（留 4% 给两端的淡出）
+    MAX_ANGLE = Math.min(Math.atan((vw * 0.46) / state.focal), Math.PI / 2 - 0.02);
+
+    document.documentElement.style.setProperty('--pw', pw + 'px');
+    document.documentElement.style.setProperty('--ph', ph + 'px');
+    document.documentElement.style.setProperty('--stripY', Math.round(ph / 2 + 26) + 'px');
+}
+
+function escapeHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function buildPanels() {
+    stage.innerHTML = '';
+    state.panels = [];
+    if (!state.items.length) return;
+
+    state.items.forEach((item, i) => {
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.className = 'panel';
+        el.style.setProperty('--c', item.accent);
+        el.dataset.i = String(i);
+        el.setAttribute('aria-label', item.title + ' — ' + item.groupZh);
+        // 装饰全在 __clip 里（它负责圆角和裁剪），倒三角挂在 clip 外面 ——
+        // 所以它不会被裁掉，也能跟着面板的 transform 一起动。
+        el.innerHTML =
+            '<span class="panel__clip">' +
+                '<span class="panel__glow"></span>' +
+                '<span class="panel__bar"></span>' +
+                '<span class="panel__sweep"></span>' +
+                '<span class="panel__idx">' + String(i + 1).padStart(2, '0') + '</span>' +
+                '<span class="panel__motif" style="color:' + item.accent + '">' + (MOTIFS[item.group] || MOTIFS.misc) + '</span>' +
+                '<span class="panel__title">' + escapeHtml(item.title) + '</span>' +
+                '<span class="panel__cat">' + escapeHtml(item.groupEn) + '</span>' +
+            '</span>' +
+            '<span class="panel__caret" aria-hidden="true"></span>';
+        stage.appendChild(el);
+        state.panels.push(el);
+    });
+}
+
+/**
+ * 每帧重排。
+ *
+ *   θ  = (i − cur) · step        这块板离正前方多少弧度
+ *   x  = f · tanθ                圆柱投影：等角映射，越靠边越稀
+ *   s  = 1 − 0.18·(|θ|/MAX)²     两端的板稍微收一点，假装有纵深
+ *   a  = 1 − (|θ|/MAX)²          同上，用透明度做空气透视
+ *
+ * 焦点板（θ≈0）再往前"抽"一下：放大 12%、抬起 6px、缩回中心一点。
+ * 抽出来这一步是**手感**的关键 —— 否则转到位和没转到位看起来一样。
+ */
+function render() {
+    const n = state.items.length;
+    if (!n) return;
+
+    const nearest = Math.round(state.cur);
+    const activeIdx = ((nearest % n) + n) % n;
+    const f = state.focal;
+
+    state.panels.forEach((el, i) => {
+        let rel = (i - state.cur) * state.step;
+        // 归一到 (-π, π]
+        rel = rel % (Math.PI * 2);
+        if (rel > Math.PI) rel -= Math.PI * 2;
+        if (rel <= -Math.PI) rel += Math.PI * 2;
+
+        const hidden = Math.abs(rel) > MAX_ANGLE;
+        if (hidden) {
+            if (!el.classList.contains('is-hidden')) {
+                el.classList.add('is-hidden');
+                el.style.opacity = '0';
+                el.style.pointerEvents = 'none';
+                el.setAttribute('aria-hidden', 'true');
+                el.tabIndex = -1;
+            }
+            return;
+        }
+        if (el.classList.contains('is-hidden')) {
+            el.classList.remove('is-hidden');
+            el.style.pointerEvents = '';
+            el.setAttribute('aria-hidden', 'false');
+            el.tabIndex = 0;
+        }
+
+        const isFocus = i === activeIdx;
+        const t = Math.abs(rel) / MAX_ANGLE;
+        const ease = t * t;
+
+        const x = f * Math.tan(rel) * (isFocus ? 0.84 : 1);
+        const y = -ease * 16 - (isFocus ? 6 : 0);
+        const s = (1 - 0.18 * ease) * (isFocus ? 1.12 : 1);
+        const a = isFocus ? 1 : 1 - ease * 0.82;
+
+        el.style.transform = 'translate(-50%, -50%) translate(' + x.toFixed(1) + 'px, ' + y.toFixed(1) + 'px) scale(' + s.toFixed(3) + ')';
+        el.style.opacity = a.toFixed(3);
+        el.classList.toggle('is-focus', isFocus);
+    });
+
+    if (state.shown !== activeIdx) {
+        state.shown = activeIdx;
+        updateHud(activeIdx);
+    }
+}
+
+function updateHud(i) {
+    const item = state.items[i];
+    if (!item) return;
+    const g = GROUP_BY_ID.get(item.group);
+
+    countEl.textContent = String(i + 1).padStart(2, '0') + ' / ' + state.items.length;
+    cardIdx.textContent = String(i + 1).padStart(2, '0');
+    cardCat.textContent = g ? g.en : '';
+    /* 标题**不重复**：卡片上已经写着它了，这里再写一遍，视觉上立刻变成
+       "另一张卡" —— 正是要消掉的那种感觉。只有没有描述时才拿标题顶一下，
+       免得说明区空成一条线。 */
+    const hasDesc = Boolean(item.description);
+    cardTitle.textContent = item.title;
+    cardTitle.hidden = hasDesc;
+    cardDesc.textContent = hasDesc ? item.description : '';
+    cardDesc.hidden = !hasDesc;
+    // 强调色写在 .hud 上：说明文字、编号、竖线共用同一个
+    hudEl.style.setProperty('--accent', item.accent);
+
+    for (const c of state.chips) {
+        c.classList.toggle('is-active', c.dataset.group === item.group);
+    }
+
+    syncStem();
+}
+
+/**
+ * 竖线的两端都是**现算**的：上端是焦点板下沿（板的位置每帧由 transform 写，
+ * 还带 1.12 的缩放），下端是说明文字的顶边（高度随标题换行、描述长短变）。
+ * 写死一个高度，换个文案就错位了。
+ *
+ * 只在换展位和 resize 时跑，不在帧循环里 —— 这里读 getBoundingClientRect
+ * 会强制同步布局，每帧跑就是白扔性能。
+ */
+function syncStem() {
+    const el = state.panels[state.shown];
+    if (!el || !stemEl) return;
+
+    const pr = el.getBoundingClientRect();
+    const dr = detailEl.getBoundingClientRect();
+    const top = pr.bottom + 13;          // 倒三角 10px + 3px 空隙
+    const h = dr.top - top - 6;
+
+    // 空间不够（极扁的窗口）就别画了，一根 0 高的线只会闪一下
+    if (h < 18) { stemEl.classList.remove('is-on'); return; }
+
+    stemEl.style.top = top.toFixed(0) + 'px';
+    stemEl.style.height = h.toFixed(0) + 'px';
+    stemEl.classList.add('is-on');
+}
+
+/* ── 输入 ───────────────────────────────────────────────────────────── */
+
+function nudge(delta) {
+    // 不夹边界：在最后一块往右滚就是绕回第一块
+    state.target += delta;
+}
+
+function jumpTo(index) {
+    state.target = nearestIndex(index, state.target, state.items.length);
+}
+
+let wheelAcc = 0;
+let wheelTimer = 0;
+
+window.addEventListener('wheel', (e) => {
+    if (viewerOpen) return;
+    e.preventDefault();
+    // 触控板一次长划会连发很多 deltaY，攒够阈值才走一格，否则会连跳好几块
+    wheelAcc += e.deltaY;
+    clearTimeout(wheelTimer);
+    wheelTimer = setTimeout(() => { wheelAcc = 0; }, 140);
+    if (Math.abs(wheelAcc) > 42) {
+        nudge(wheelAcc > 0 ? 1 : -1);
+        wheelAcc = 0;
+    }
+}, { passive: false });
+
+/* 拖动转环。
+   ⚠️ 不用 `setPointerCapture`：一旦捕获，浏览器会把随后的 click 派发到
+   捕获元素（.stage）上，`.panel` 的点击就永远收不到 —— 表现为"展板点不动"。
+   改成 pointerdown 记起点、pointermove/up 挂 window。 */
+let dragging = false;
+let dragMoved = 0;
+let dragStartX = 0;
+let dragStartTarget = 0;
+let dragStepPx = 140;
+
+stage.addEventListener('pointerdown', (e) => {
+    if (viewerOpen || e.button !== 0) return;
+    dragging = true;
+    dragMoved = 0;
+    dragStartX = e.clientX;
+    dragStartTarget = state.target;
+    dragStepPx = Math.max(90, state.pw * 0.55);
+    stage.classList.add('is-dragging');
+});
+
+window.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const total = e.clientX - dragStartX;
+    dragMoved = Math.abs(total);
+    state.target = dragStartTarget - total / dragStepPx;
+});
+
+function endDrag() {
+    if (!dragging) return;
+    dragging = false;
+    stage.classList.remove('is-dragging');
+    // 松手吸附到最近一格 —— 停在半个展位上会让正文和展板对不上
+    if (dragMoved > 8) state.target = Math.round(state.target);
+}
+
+window.addEventListener('pointerup', endDrag);
+window.addEventListener('pointercancel', endDrag);
+
+/* 点展板：焦点板直接打开，其他先转过来。
+   直接打开会让"手滑点错"变成"弹出一个浮层"。 */
+stage.addEventListener('click', (e) => {
+    const el = e.target.closest('.panel');
+    if (!el || viewerOpen) return;
+    if (dragMoved > 8) { dragMoved = 0; return; }   // 拖完松手会补一次 click
+    const i = Number(el.dataset.i);
+    const nearest = Math.round(state.cur);
+    const activeIdx = ((nearest % state.items.length) + state.items.length) % state.items.length;
+    if (i === activeIdx) openViewer(state.items[i]);
+    else jumpTo(i);
+});
+
+window.addEventListener('keydown', (e) => {
+    if (viewerOpen) {
+        if (e.key === 'Escape') closeViewer();
+        return;
+    }
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { nudge(1); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { nudge(-1); e.preventDefault(); }
+    else if (e.key === 'Enter') {
+        const nearest = Math.round(state.cur);
+        const idx = ((nearest % state.items.length) + state.items.length) % state.items.length;
+        if (state.items[idx]) openViewer(state.items[idx]);
+    }
+});
+
+/* 每帧把 cur 往 target 推。指数趋近 + 帧时间归一：60fps 与 30fps 手感一致。 */
+let last = performance.now();
+function tick(now) {
+    requestAnimationFrame(tick);
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (Math.abs(state.target - state.cur) < 0.0005) {
+        if (state.cur !== state.target) { state.cur = state.target; render(); }
+        renormalize();
+        return;
+    }
+    state.cur += (state.target - state.cur) * (1 - Math.exp(-9 * dt));
+    render();
+}
+
+/**
+ * 环能无限转，索引就会一直涨（也可以一直跌到负数）。每转满一圈把 cur 和
+ * target **同时**减掉 n：每块板的角度本来就对 2π 取模，所以画面一模一样，
+ * 只是把数字拉回 0 附近，免得转久了浮点精度不够、动画开始抖。
+ *
+ * 拖动中途不跑 —— 那时 `dragStartTarget` 还记着旧的坐标系，挪了就对不上。
+ */
+function renormalize() {
+    const n = state.items.length;
+    if (!n || dragging) return;
+    const k = Math.round(state.cur / n);
+    if (!k) return;
+    state.cur -= k * n;
+    state.target -= k * n;
+}
+
+/* ==========================================================================
+   4. iframe 浮层
+   ========================================================================== */
+
+const viewer = document.getElementById('viewer');
+const viewerFrame = document.getElementById('viewerFrame');
+const viewerTitle = document.getElementById('viewerTitle');
+const viewerCat = document.getElementById('viewerCat');
+const viewerDot = document.getElementById('viewerDot');
+const viewerNewTab = document.getElementById('viewerNewTab');
+const viewerClose = document.getElementById('viewerClose');
+let viewerOpen = false;
+
+function openViewer(item) {
+    if (!item) return;
+    const g = GROUP_BY_ID.get(item.group);
+    viewerOpen = true;
+    viewer.classList.remove('is-ready');
+    viewer.classList.add('is-open');
+    viewer.style.setProperty('--accent', item.accent);
+    viewerTitle.textContent = item.title;
+    viewerCat.textContent = g ? g.en : '';
+    viewerDot.style.background = item.accent;
+    viewerDot.style.boxShadow = '0 0 10px ' + item.accent;
+    viewerNewTab.href = item.url;
+    viewerFrame.src = item.url;
+    viewerClose.focus({ preventScroll: true });
+}
+
+function closeViewer() {
+    if (!viewerOpen) return;
+    viewerOpen = false;
+    viewer.classList.remove('is-open', 'is-ready');
+    // 清 src 而不是留着：iframe 里的动画/音频还在跑，关掉就该停
+    viewerFrame.src = 'about:blank';
+}
+
+viewerFrame.addEventListener('load', () => {
+    if (!viewerOpen) return;
+    if (viewerFrame.src === 'about:blank') return;
+    viewer.classList.add('is-ready');
+
+    /* demo 页左上角那个「← Demos」胶囊在浮层里是**多余的**：它会把
+       iframe 自己导到索引页，用户就困在浮层里了。同源，可以直接塞一条
+       样式把它藏掉 —— 跨源的话这里会抛，catch 掉即可，不影响体验。
+       `.back` 是本页自己的返回胶囊，被别的画廊嵌进去时同理。 */
+    try {
+        const doc = viewerFrame.contentDocument;
+        if (doc && doc.head && !doc.getElementById('lab-embed-style')) {
+            const style = doc.createElement('style');
+            style.id = 'lab-embed-style';
+            style.textContent = '.lab-back,.back{display:none !important}';
+            doc.head.appendChild(style);
+        }
+    } catch (_) { /* 跨源就随它去 */ }
+});
+
+viewerClose.addEventListener('click', closeViewer);
+viewer.querySelector('[data-close]').addEventListener('click', closeViewer);
+
+/* 说明区没有按钮了：进预览的唯一入口就是**点上面那块焦点板**。
+   这既省掉一个重复的 CTA，也逼着两者在视觉上必须连起来（倒三角 + 竖线）。 */
+
+/* ==========================================================================
+   5. 启动
+   ========================================================================== */
+
+function buildRail() {
+    state.chips = [];
+    state.groups.forEach((g) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'chip';
+        b.dataset.group = g.id;
+        b.style.setProperty('--c', g.accent);
+        b.innerHTML =
+            '<span class="chip__dot"></span>' +
+            '<span class="chip__name">' + escapeHtml(g.zh) + '</span>' +
+            '<span class="chip__n">' + g.count + '</span>';
+        b.addEventListener('click', () => jumpTo(g.start));
+        railEl.appendChild(b);
+        state.chips.push(b);
+    });
+}
+
+function buildLab(rawDemos) {
+    const buckets = new Map(GROUPS.map((g) => [g.id, []]));
+    for (const demo of rawDemos || []) {
+        if (!demo || !demo.id) continue;
+        if (demo.id === SELF_ID) continue;       // 别把这一页自己列进环里
+        buckets.get(groupIdOf(demo.id)).push(demo);
+    }
+    const items = [];
+    const groups = [];
+    for (const g of GROUPS) {
+        const bucket = buckets.get(g.id);
+        if (!bucket.length) continue;
+        groups.push({ ...g, start: items.length, count: bucket.length });
+        for (const demo of bucket) {
+            items.push({
+                id: demo.id,
+                title: demo.title || demo.id,
+                description: demo.description || '',
+                url: demo.url || ('/demos/' + demo.id + '/'),
+                group: g.id,
+                groupZh: g.zh,
+                groupEn: g.en,
+                accent: g.accent,
+            });
+        }
+    }
+    return { items, groups };
+}
+
+async function boot() {
+    startShader();
+
+    let data = null;
+    const dataUrl = demosJsonUrl();
+    try {
+        // 路径按地址栏现算：整页复制到任何目录都能用
+        const res = await fetch(dataUrl, { cache: 'no-cache' });
+        if (res.ok) data = await res.json();
+    } catch (_) { /* 落到下面的兜底 */ }
+
+    if (!data) {
+        const empty = document.getElementById('empty');
+        empty.querySelector('code').textContent = dataUrl;
+        empty.classList.add('is-on');
+        detailEl.style.display = 'none';
+        stemEl.style.display = 'none';
+        return;
+    }
+
+    const built = buildLab(data.demos || []);
+    state.items = built.items;
+    state.groups = built.groups;
+    state.cur = -0.55;      // 进场从"半个展位之外"滑到位，比硬出现有生气
+    state.target = 0;
+
+    measure();
+    buildRail();
+    buildPanels();
+    render();
+    requestAnimationFrame(tick);
+
+    // 字体晚到会改变标题/描述的换行 ⇒ 竖线长度得跟着重算
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(syncStem);
+}
+
+window.addEventListener('resize', () => {
+    if (!state.items.length) return;
+    measure();
+    render();
+    syncStem();
+});
+
+boot();
+})();
+</script>
 </body>
 </html>
