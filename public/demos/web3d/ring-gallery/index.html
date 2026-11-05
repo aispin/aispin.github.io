@@ -1394,33 +1394,56 @@ function jumpTo(index) {
 
 /* 滚轮：一次手势只走一格，但**手势一结束就立刻能翻下一格**。
    ---------------------------------------------------------------------
-   🔴 上一版用"静默 N 毫秒才解锁"的定时器，那是它发钝的原因：
-      定时器被**每一个** wheel 事件续期，所以只要事件不断 —— 触控板惯性
-      可以持续 1~2 秒，鼠标快速连滚也是 —— 锁就永远不放，表现成"要等
-      好几秒才翻一格"。调大调小都没用，问题在判据本身。
+   🔴 先说结论：这个需求**没有现成的开源库能直接满足**，两个"成熟方案"都实测过：
 
-   这一版不看"静默"，只看**事件流本身**的形状。四个信号任一成立，
-   就认为"上一段手势结束了，新的手势开始"：
+   · `scroll-snap-type: y mandatory` + `scroll-snap-stop: always`
+     （W3C 专为"一次滑动只停一格"设计的属性）—— 一整屏一格时，一个滚轮格
+     只有 100px，够不到 100vh 的中点，浏览器会**弹回原位**：实测 deltaY=100
+     → 不动，deltaY=1200 → 才走一格。对"滚轮翻页"无效。
+   · Swiper 11 的 `mousewheel` 模块（单事件触发 + 60ms 冷却 + 动画期间不翻）
+     —— 把同一组事件序列喂给官方 bundle 实测：鼠标连滚两格只走 1 格
+     （正好是"第 2、3 次滑动没反应"），长惯性在 3fps 主线程下走 17 格。
+     它的锁是"动画期间"，对"每次滑动都要生效"天然不利。
 
-     ① 距上一个事件 > WHEEL_GAP      鼠标一格一格 / 手指离开触控板
-     ② 幅度衰减中突然变大          惯性还在跑，人又划了一下
-     ③ 方向反转                    惯性不会反向
-     ④ 连续两格幅度完全相同(≥60)   鼠标滚轮的离散档，再快也是一格一格
+   所以还是自己判手势，但判据必须是**形状**而不是**时间**：
+   真实滚轮的事件间隔 = 主线程帧长。headless swiftshader 只有 2~3fps，
+   实测间隔 230~900ms —— 任何"间隔 > N 毫秒算新手势"的判据在卡顿的机器上
+   都会把同一段惯性拆成几十次手势，一划翻十几格（v4 的 gap=70 就是这样）。
+   判据全部改用幅度曲线的形状后，仿真里 8/16/33/100/300ms 五种间隔结论一致。
 
-   ② 之所以要"衰减中"才成立：手势起步时幅度是**递增**的（4→8→15→25），
-   不加这个前提，起步阶段每一帧都会被误判成新手势，累计值被反复清零，
-   于是一次都翻不动。
-   ⚠️ 只拦 wheel，pointer / click 一概不碰 —— 点击交互不受影响。 */
+   四个信号任一成立，就认为"上一段手势结束了，新的开始"：
+
+     ① 距上一个事件 > WHEEL_PAUSE   手指真的离开过触控板（≥0.6s，够不到惯性）
+     ② 幅度从**低谷**重新抬起来      惯性还在跑，人又推了一下
+     ③ 方向反转                     惯性不会反向
+     ④ 大档且**不在衰减**            鼠标的离散档：一格一个大 delta
+
+   ② 的关键是"低谷"：惯性是一条**单调衰减**的曲线，人再推一下必然先把它
+   压低、再抬起来。所以记下翻页之后见过的最小幅度 `wheelLow`，只要当前
+   幅度比它高出 80% 就认新手势 —— 起步时幅度递增不影响，因为那时
+   `wheelLow` 还等于起步幅度，根本算不上"低谷"（`armed` 为假）。
+
+   ④ 的关键是"不在衰减"：惯性一路变小，所以"没变小的大档"只可能是新的一格。
+   ⚠️ 别给它加容差（比如 ≥ 上一下的 85%）：真实惯性的逐事件衰减只有 3%~7%，
+   一加容差就把惯性自己认成新手势了 —— 那正是"滑一下翻 2~3 格"的病根。
+   ⚠️ 只拦 wheel，pointer / click 一概不碰 —— 点击交互不受影响。
+
+   判据的离线验证：`node .workbuddy-ai/harness/sim-wheel.mjs`
+   （把判定逻辑当纯函数跑，同一组手势在五种事件间隔下必须给出同样的格数）。 */
 const WHEEL_STEP = 26;      // 累计这么多算一格
-const WHEEL_GAP = 70;       // 事件间隔超过它 ⇒ 上一段手势结束了
-const WHEEL_JUMP = 1.5;     // 衰减途中幅度突然 ×1.5 ⇒ 又划了一下
+const WHEEL_PAUSE = 600;    // 超过它没事件 ⇒ 手指离开过，上一段手势结束
+const WHEEL_RISE = 1.8;     // 幅度从低谷抬起 80% ⇒ 又推了一下
+const WHEEL_NOTCH = 60;     // 大到这个程度才算"鼠标的离散一格"
 
 let wheelAcc = 0;
 let wheelLocked = false;
 let wheelLastAbs = 0;
 let wheelLastDir = 0;
-let wheelLastAt = 0;
-let wheelDecayed = false;
+let wheelLastAt = -1e9;
+/** 翻页之后见过的最小幅度。惯性一路把它压低，人再推时它就抬起来。 */
+let wheelLow = Infinity;
+/** 翻那一格时的幅度，用来判断"低谷"是否真的低下去过 */
+let wheelStepAbs = 0;
 
 window.addEventListener('wheel', (e) => {
     if (viewerOpen) return;
@@ -1435,23 +1458,27 @@ window.addEventListener('wheel', (e) => {
     const now = performance.now();
     const dir = dy > 0 ? 1 : -1;
 
-    const fresh =
-        (now - wheelLastAt > WHEEL_GAP && abs > 3) ||            // ①
-        (wheelDecayed && abs > wheelLastAbs * WHEEL_JUMP + 6) || // ②
-        (wheelLastDir !== 0 && dir !== wheelLastDir && abs > 4) || // ③
-        (abs >= 60 && abs === wheelLastAbs);                     // ④
+    // "低谷"必须真的比翻页那一下低 30% 以上才算数 —— 否则起步阶段
+    // （幅度单调递增）会被误判成"从低谷回升"，一划翻好几格。
+    const armed = wheelLow <= wheelStepAbs * 0.7;
 
-    // 先更新"正在衰减"标记，再判 fresh —— 顺序反了 ② 会晚一帧
-    const decaying = abs < wheelLastAbs;
+    const fresh =
+        (now - wheelLastAt > WHEEL_PAUSE && abs > 3) ||          // ①
+        (armed && abs > wheelLow * WHEEL_RISE + 2) ||            // ②
+        (wheelLastDir !== 0 && dir !== wheelLastDir && abs > 4) || // ③
+        (abs >= WHEEL_NOTCH && abs >= wheelLastAbs);             // ④
+
     wheelLastAt = now;
     wheelLastAbs = abs;
     wheelLastDir = dir;
-    if (decaying) wheelDecayed = true;
+    if (abs < wheelLow) wheelLow = abs;
 
     if (fresh) {
         wheelLocked = false;
-        wheelDecayed = false;
-        // 🔴 这里**不清** wheelAcc：慢慢划的时候事件间隔可能就超过 GAP，
+        // 新手势从当前幅度重新量低谷
+        wheelLow = abs;
+        wheelStepAbs = abs;
+        // 🔴 这里**不清** wheelAcc：慢慢划的时候事件间隔可能就超过 PAUSE，
         //    清了的话每帧都从 0 开始，永远攒不到一格，变成"怎么划都不动"。
     }
 
@@ -1462,7 +1489,8 @@ window.addEventListener('wheel', (e) => {
         nudge(wheelAcc > 0 ? 1 : -1);
         wheelAcc = 0;
         wheelLocked = true;
-        wheelDecayed = false;
+        wheelStepAbs = abs;
+        wheelLow = abs;
     }
 }, { passive: false });
 
