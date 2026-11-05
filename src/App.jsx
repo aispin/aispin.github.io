@@ -14,7 +14,7 @@ import GlobalOverlay from './components/ui/GlobalOverlay';
 import CareerHud from './components/ui/CareerHud';
 import ScreenReaderOverlay from './components/ui/ScreenReaderOverlay';
 import Toast from './components/ui/Toast';
-import { useDocumentMeta } from './hooks/useDocumentMeta';
+import { useDocumentMeta, getInitialRoomFromUrl } from './hooks/useDocumentMeta';
 import { loadContentData } from './hooks/useContentData';
 import SceneLighting from './components/canvas/SceneLighting';
 import { REST_POSE } from './config/restPose';
@@ -77,6 +77,11 @@ if (isLowEnd) {
 // Debug bypass flag, read once before the router can wipe location.search
 const NO_LOADER = typeof window !== 'undefined' && window.location.search.includes('noloader');
 
+/* 首帧地址栏是不是一个深链（`/career` 之类）。与 NO_LOADER 同一个理由：
+ * 模块级读一次，路由随后会用 replaceState 抹掉 query string。
+ * 它的唯一用途是给 Preloader 一个初值 —— 深链的幕帘要按住，等传送落地再揭。 */
+const DEEP_LINK_ROOM = typeof window !== 'undefined' ? getInitialRoomFromUrl() : null;
+
 // Helper component to handle global audio enable on interaction
 const GlobalAudioEnabler = () => {
   const { enableAudio } = useAudio();
@@ -103,10 +108,18 @@ const GlobalAudioEnabler = () => {
 
 // Bridge component to use hooks inside SceneProvider
 // Handles dynamic meta tags + deep link auto-teleport
-function DocumentMetaBridge() {
+function DocumentMetaBridge({ sceneReady, onHoldChange }) {
   useDocumentMeta();
 
-  const { initialRoom, markDeeplinkHandled, hasEntered, markEntered, teleportTo } = useScene();
+  const {
+    initialRoom, markDeeplinkHandled, hasEntered, markEntered, teleportTo,
+    currentRoom, isTeleporting, teleportPhase,
+  } = useScene();
+
+  const firedRef = useRef(false);
+  /* 这条传送有没有真的飞起来过。用来区分「还没开始」和「飞了但被打断」，
+     只有后者才该放手（看门狗把 isTeleporting 放掉的路径）。 */
+  const sawFlightRef = useRef(false);
 
   /* 深链：`/career` 这类地址**直接进房间**，不再要求先自己走进大门。
      原来的条件是 `initialRoom && hasEntered` —— 别人点开分享出去的链接，会停在
@@ -115,16 +128,37 @@ function DocumentMetaBridge() {
 
      🔴 去重用 `firedRef`，**不能**靠 effect 里 `clearTimeout` 清理：
      `markEntered()` 会让 `hasEntered` 变 true ⇒ 这个 effect 必然再跑一次，
-     而重跑时的 cleanup 会把还没到点的 timer 清掉，深链就静默失效了。 */
-  const firedRef = useRef(false);
+     而重跑时的 cleanup 会把还没到点的 timer 清掉，深链就静默失效了。
+
+     🔴 必须等 `sceneReady`（场景建完）再发传送。原来固定在挂载后 450ms 就发，
+     那时走廊和 DoorSection 都还没注册，传送要么被丢弃、要么卡在纸片 'closing'
+     阶段干等看门狗 —— 而幕帘早已揭开，用户看到的就是「走廊 → 合上 → 再揭开」。 */
   useEffect(() => {
-    if (!initialRoom || firedRef.current) return;
+    if (!initialRoom || firedRef.current || !sceneReady) return;
     firedRef.current = true;
     markDeeplinkHandled();
     if (!hasEntered) markEntered();
     // 等走廊挂载 + 相机切到 CORRIDOR 再转场，否则 DoorSection 还没注册。
     setTimeout(() => teleportTo(initialRoom), 450);
-  }, [initialRoom, hasEntered, markEntered, teleportTo, markDeeplinkHandled]);
+  }, [initialRoom, sceneReady, hasEntered, markEntered, teleportTo, markDeeplinkHandled]);
+
+  /* 幕帘什么时候揭：传送**整条跑完**那一帧。
+     只等 `currentRoom === initialRoom` 是不够的 —— 那一刻纸片还在 'opening'
+     （1.2s 的撕开），幕帘一揭就露出正在撕的纸片，还是"两次幕帘"。
+     必须等 `teleportPhase` 归 null（纸片已 display:none）再放手。
+
+     传送中途失败（看门狗放掉 isTeleporting）也必须揭 —— 否则幕帘永远盖着，
+     整站看起来就是"卡在加载页"。 */
+  useEffect(() => {
+    if (!initialRoom) return;
+    if (isTeleporting) {
+      sawFlightRef.current = true;
+      return;
+    }
+    const landed = currentRoom === initialRoom && !teleportPhase;
+    const failed = sawFlightRef.current && currentRoom !== initialRoom;
+    onHoldChange(!(landed || failed));
+  }, [initialRoom, currentRoom, isTeleporting, teleportPhase, onHoldChange]);
 
   return null;
 }
@@ -199,6 +233,10 @@ function AppContent() {
   // synchronous setState).
   const [isLoaded, setIsLoaded] = useState(NO_LOADER);
   const [sceneReady, setSceneReady] = useState(false);
+  /* 深链时幕帘先按住，等传送落地再揭 —— 否则会看到「走廊 → 合上 → 再揭开」。
+     初值直接给 `true`（模块级读的地址栏），不能等 effect 设，否则第一帧
+     就已经放行了。没有深链时恒为 false，普通加载路径完全不变。 */
+  const [holdLoader, setHoldLoader] = useState(Boolean(DEEP_LINK_ROOM));
 
   // Use Performance Context
   const { settings, downgradeTier, tier } = usePerformance();
@@ -217,7 +255,7 @@ function AppContent() {
   return (
     <AudioProvider>
       <SceneProvider>
-        <DocumentMetaBridge />
+        <DocumentMetaBridge sceneReady={sceneReady} onHoldChange={setHoldLoader} />
         <DebugBridge />
         <GlobalAudioEnabler />
         <div className="app">
@@ -285,10 +323,17 @@ function AppContent() {
               <NavigationUI />
               <CareerHud />
               <GlobalOverlay />
-              <PaperTransition />
               <ScreenReaderOverlay />
             </>
           )}
+
+          {/* 🔴 `PaperTransition` **不能**放在 `isLoaded` 闸门里（2026-11-05）。
+              深链的传送在幕帘还盖着的时候就发了，那时 isLoaded 还是 false ——
+              纸片组件没挂载 ⇒ 'closing' 阶段没人播动画 ⇒ 一直卡到看门狗。
+              等 isLoaded 翻真、组件补挂载，它才把 'closing' 从零播一遍：
+              用户看到的就是「幕帘揭开露出走廊 → 纸片又合上 → 再揭开进房间」。
+              它平时 `display: none`，提前挂载没有副作用。 */}
+          <PaperTransition />
 
           {/* Transient feedback ("why did nothing happen?"). Mounted outside the
               isLoaded gate: the toast exists to explain blocked interactions, and
@@ -303,6 +348,7 @@ function AppContent() {
           {!NO_LOADER && (
             <Preloader
               ready={sceneReady}
+              hold={holdLoader}
               onComplete={() => setIsLoaded(true)}
             />
           )}

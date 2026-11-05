@@ -120,8 +120,23 @@ const percentageStyle = {
   overflow: 'visible'
 };
 
-const Preloader = ({ onComplete, ready }) => {
+const Preloader = ({ onComplete, ready, hold = false }) => {
   const [isDone, setIsDone] = useState(false);
+
+  /* 深链（`/career` 这类地址）专用的「按住不揭幕」开关。
+   *
+   * 为什么需要它：深链要先把相机传送到房间门口再飞进去，而那条路径靠
+   * `PaperTransition` 的纸片合上来遮住镜头跳变。如果幕帘先揭开了，用户就会
+   * 看到「走廊 → 纸片合上 → 再揭开 → 房间」—— 两次加载的观感（用户实测）。
+   *
+   * 所以深链期间 `hold` 为真：进度条照常爬（85 → 99 的匀速渐近，不会停在
+   * 整数上假装完成），但**不揭幕**；等传送落地、`hold` 翻假，进度补满 100
+   * 再撕开纸片 —— 一次幕帘，直接看到房间。
+   *
+   * 🔴 必须同时拦住两条揭幕路径（`checkProgressTriggers` 里的进度触发、
+   *    `[ready]` 那个兜底触发），漏一条就白改。 */
+  const holdRef = useRef(hold);
+  useEffect(() => { holdRef.current = hold; }, [hold]);
 
   // Custom throttled progress state to prevent React 'Maximum update depth exceeded'
   const [realProgress, setRealProgress] = useState(0);
@@ -266,7 +281,9 @@ const Preloader = ({ onComplete, ready }) => {
   }, [realProgress, active]);
 
   useEffect(() => {
-    if (ready) { setTargetProgress(100); return; }
+    if (ready && !hold) { setTargetProgress(100); return; }
+    // 深链被 hold 住时继续走 85→99 的渐近爬升：进度条必须一直在动，
+    // 不能停在 100% 上干等传送（那读起来就是"卡死了"）。
     if (!assetsDone) return;
     const t0 = performance.now();
     const id = window.setInterval(() => {
@@ -278,7 +295,7 @@ const Preloader = ({ onComplete, ready }) => {
       setTargetProgress(prev => Math.max(prev, 85 + 14 * (s / (s + 5))));
     }, 100);
     return () => window.clearInterval(id);
-  }, [assetsDone, ready]);
+  }, [assetsDone, ready, hold]);
 
   // ----------------------------------------
   // EXIT SEQUENCE
@@ -358,7 +375,7 @@ const Preloader = ({ onComplete, ready }) => {
     }
 
     // Exit phase
-    if (val >= 99.5 && readyRef.current) {
+    if (val >= 99.5 && readyRef.current && !holdRef.current) {
       startExit();
     }
   };
@@ -414,11 +431,16 @@ const Preloader = ({ onComplete, ready }) => {
 
 
   // Fallback trigger if ready becomes true AFTER 99.5% reached
+  //
+  // 深链（hold）放开时也走这里：那一刻进度已经爬到 99 左右，上面的补满 100
+  // 的 tween 未必再产生一次 onUpdate（值可能只差 1%），没有这条兜底就会
+  // 停在 99% 不动 —— 幕帘永远不揭。
   useEffect(() => {
+    if (hold) return;
     if (displayProgressRef.current >= 99.5 && ready) {
       startExit();
     }
-  }, [ready]);
+  }, [ready, hold]);
 
   if (isDone) return null;
 
