@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-11-05T08:31:24.541Z",
+  "generatedAt": "2026-11-05T08:45:11.335Z",
   "count": 26,
   "demos": [
     {
       "id": "door",
       "title": "大展宏图 · 门神",
-      "description": "",
+      "description": "纯 SVG 画的门神年画：两扇木门、门环、福字与「大展宏图」横批，全部由路径和渐变拼成，不含一张位图。",
       "url": "/demos/door.html",
       "dir": "public/demos",
       "entry": "door.html",
@@ -15,7 +15,7 @@
     {
       "id": "comment-ui",
       "title": "Gitalk · 轻量评论区",
-      "description": "把 GitHub Issue 变成你的评论区。零后端、零数据库，评论与 Issue 实时同步，接入成本低到几乎无感。",
+      "description": "Gitalk 评论区拆成可嵌入的一块：排序、加载更多、Markdown 预览、图片灯箱，数据全部来自 GitHub Issue。",
       "url": "/demos/comment-ui/",
       "dir": "public/demos/comment-ui",
       "entry": "index.html",
@@ -30,7 +30,7 @@
     {
       "id": "creature-kit",
       "title": "CreatureKit 2.1 - 关节过渡与物种配色",
-      "description": "- 入口：index.html",
+      "description": "参数化角色生成器：人形 / 积木怪物两套骨架，脸型、发型、体型、眼睛、配饰逐项可调，2.1 重写了关节过渡与物种配色。",
       "url": "/demos/creature-kit/",
       "dir": "public/demos/creature-kit",
       "entry": "index.html",
@@ -100,7 +100,7 @@
     {
       "id": "landing",
       "title": "Gitalk — 评论区，从此是一片星系",
-      "description": "每一条评论都是一颗星。Gitalk 把 GitHub Issue 变成你的评论区 —— 零后端、零数据库，一段脚本即可拥有完整评论体验。",
+      "description": "Gitalk 的产品落地页：每条评论是一颗星，拖动可转星系、点星点展开评论 —— 和组件页是同一份数据的另一种讲法。",
       "url": "/demos/landing/",
       "dir": "public/demos/landing",
       "entry": "index.html",
@@ -110,7 +110,7 @@
     {
       "id": "my-3d-site",
       "title": "门联文案 · 24 节气 + 传统节日",
-      "description": "3D 院子里那副门联的全部文案底稿：42 副七言对联 —— 4 副四季日常联 + 1 副彩蛋 + 24 节气 + 10 个传统节日 + 3 个法定假期，外加日期解析规则与 2026–2027 年的实际命中日期。",
+      "description": "3D 院子里那副门联的全部文案底稿：42 副七言对联，覆盖四季、24 节气与 10 个传统节日，附日期解析规则与 2026–2027 的命中日期。",
       "url": "/demos/my-3d-site/couplets-preview.html",
       "dir": "public/demos/my-3d-site",
       "entry": "couplets-preview.html",
@@ -120,7 +120,7 @@
     {
       "id": "skill-ui/examples",
       "title": "Lumen — API 可观测性平台",
-      "description": "Lumen 把日志、指标、链路追踪合并到一个视图里。上线 5 分钟接入，定位一次线上故障平均只需要 47 秒。",
+      "description": "虚构的 API 可观测性产品官网：日志、指标、链路追踪合并到一个视图，纯静态 HTML + CSS 写的 SaaS 落地页样板。",
       "url": "/demos/skill-ui/examples/01-landing.html",
       "dir": "public/demos/skill-ui/examples",
       "entry": "01-landing.html",
@@ -201,7 +201,7 @@
     {
       "id": "web3d/3d-ip-landing",
       "title": "Hugo — 独立开发者 · 创意设计师 · 音乐人",
-      "description": "在代码、像素和声音之间游走。做一些安静的、需要耐心的东西。",
+      "description": "独立开发者 / 设计师 / 音乐人的三段式主页：作品、音乐、联系各占一屏，滚动带动 WebGL 背景。",
       "url": "/demos/web3d/3d-ip-landing/",
       "dir": "public/demos/web3d/3d-ip-landing",
       "entry": "index.html",
@@ -211,7 +211,7 @@
     {
       "id": "web3d/ai-concepts",
       "title": "AI Agent 全景图 · 星球与星系",
-      "description": " 「概念即星球，边界即星系 —— Agent 是 Harness 与 Model 组成的恒星系统，一次提示词的旅程，就是从用户星系出发，穿过 Agent 系统，带着工具的回声返回。」 ",
+      "description": "把 AI Agent 画成星球与星系：用户、Harness、推理、能力、连接、生态六个星系，可拖拽旋转、点星球看解释，也能切 2D 星图。",
       "url": "/demos/web3d/ai-concepts/",
       "dir": "public/demos/web3d/ai-concepts",
       "entry": "index.html",
@@ -221,7 +221,7 @@
     {
       "id": "web3d/career",
       "title": "履历 · 时空隧道 · Textural",
-      "description": "- 入口：index.html",
+      "description": "履历排成一条纵向时空隧道：滚动即沿时间往前走，左侧项目卡跟着浮出来，点开是完整项目详情。",
       "url": "/demos/web3d/career/",
       "dir": "public/demos/web3d/career",
       "entry": "index.html",
@@ -240,7 +240,7 @@
     {
       "id": "web3d/life-meaning",
       "title": "人生的意义 · v0.0.1 · AI Matrix",
-      "description": "- 入口：index.html",
+      "description": "30 秒的纯程序化 Web3D 短片：山川、人海、一步一景，没有一张贴图，全部由几何与着色器生成。",
       "url": "/demos/web3d/life-meaning/",
       "dir": "public/demos/web3d/life-meaning",
       "entry": "index.html",
@@ -250,7 +250,7 @@
     {
       "id": "web3d/monster-kit",
       "title": "MonsterKit v1.0 · 载具图鉴",
-      "description": "8 VEHICLES · 怪物可以住在任何地方",
+      "description": "8 台载具的 SVG 图鉴：造型、参数、配色逐台列出，围绕「怪物可以住在任何地方」的世界观。",
       "url": "/demos/web3d/monster-kit/",
       "dir": "public/demos/web3d/monster-kit",
       "entry": "index.html",
@@ -260,7 +260,7 @@
     {
       "id": "web3d/old-house",
       "title": "黄昏小院 1.8 · 层级重构",
-      "description": "一个黄昏小院，几乎把 Web 3D 的所有难点都集齐了：",
+      "description": "黄昏光线下的中式小院：屋檐、影壁、树影分层渲染，拖动旋转、滚轮缩放，1.8 版重做了层级关系。",
       "url": "/demos/web3d/old-house/",
       "dir": "public/demos/web3d/old-house",
       "entry": "index.html",
@@ -283,7 +283,7 @@
     {
       "id": "web3d/rainy-night",
       "title": "雨夜古镇 v0.0.1 — AI Matrix",
-      "description": "- 入口：index.html",
+      "description": "纯 GLSL 实时生成的雨夜古镇：480×270 的像素场景，湿地面反光、雨丝、灯笼暖光，8 秒无缝循环。",
       "url": "/demos/web3d/rainy-night/",
       "dir": "public/demos/web3d/rainy-night",
       "entry": "index.html",
@@ -303,7 +303,7 @@
     {
       "id": "web3d/tree",
       "title": "3D 柿子树 · Three.js",
-      "description": "- 入口：index.html",
+      "description": "一棵程序化生成的柿子树：枝干按分形生长、果实随机分布，可拖动旋转、滚轮缩放、右键平移。",
       "url": "/demos/web3d/tree/",
       "dir": "public/demos/web3d/tree",
       "entry": "index.html",
