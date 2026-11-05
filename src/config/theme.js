@@ -230,7 +230,7 @@ export function unmultiplyVeil(skyHex, veil = NIGHT_VEIL) {
 export const ROOMS = [
   { id: 'career', zh: '履历', en: 'CAREER', door: 0 },
   { id: 'gallery', zh: '摄影', en: 'GALLERY', door: 1 },
-  { id: 'studio', zh: '创意实验', en: 'CREATIVE LAB', door: 2 },
+  { id: 'craft', zh: '创意实验', en: 'CRAFT', door: 2 },
   { id: 'posts', zh: '文稿', en: 'POSTS', door: 3 },
   { id: 'videos', zh: '视频', en: 'VIDEOS', door: 4 },
   { id: 'music', zh: '音乐', en: 'MUSIC', door: 5 },
@@ -245,7 +245,7 @@ export const ROOMS = [
 export const ROOM_COPY = {
   career: { zh: '一路走来的经历与在意的方向', en: 'Where I have been, and what I care about' },
   gallery: { zh: '摄影作品', en: 'Photography' },
-  studio: { zh: '做过的实验，与还能跑起来的小东西', en: 'Experiments I have shipped, and toys that still run' },
+  craft: { zh: '做过的实验，与还能跑起来的小东西', en: 'Experiments I have shipped, and toys that still run' },
   posts: { zh: '随笔、笔记，以及站外连载的小说', en: 'Notes, essays and novels published elsewhere' },
   videos: { zh: '短片与日常记录', en: 'Short films and everyday records' },
   music: { zh: '自己写的曲子与配乐', en: 'Tunes and scores I wrote myself' },

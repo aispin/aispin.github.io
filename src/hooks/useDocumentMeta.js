@@ -27,10 +27,10 @@ const ROOM_META = {
         title: '摄影 · Gallery — AISPIN',
         description: 'AISPIN 的摄影房间：手绘卡片墙上的光影瞬间。',
     },
-    studio: {
-        path: '/studio',
-        title: '项目 · Studio — AISPIN',
-        description: 'AISPIN 的工作室：项目与实验室，从智能设计平台到 AI 技能应用。',
+    craft: {
+        path: '/craft',
+        title: '创意实验 · Craft — AISPIN',
+        description: 'AISPIN 的创意实验房间：一圈能转的展板，25 个自己做的小实验，点开就在原地跑起来。',
     },
     posts: {
         path: '/posts',
@@ -61,17 +61,19 @@ const ROOM_META = {
 
 // Map URL paths back to room IDs for deep linking.
 //
-// 🔴 `/about` 是**已公开索引过的旧地址**（曾经在 sitemap 里），所以它作为
-//    别名保留：仍然能进房间，但 `useDocumentMeta` 会在首帧把它 replaceState
-//    成 `/career`（因为 canonical / og:url 都取 `ROOM_META[room].path`）。
+// 🔴 这两个别名都是**已公开索引过的旧地址**（`/about` 曾经在 sitemap 里，
+//    `/studio` 2026-11-05 之前一直在），所以它们保留为别名：仍然能进房间，
+//    但 `useDocumentMeta` 会在首帧把它 replaceState 成新地址（因为 canonical /
+//    og:url 都取 `ROOM_META[room].path`）。
 //    也就是说：旧链接不会失效，地址栏会自己纠正，搜索引擎拿到的是新地址。
-//    别名只此一处，别在组件里再写一遍 `/about` 的分支。
+//    别名只此一处，别在组件里再写一遍 `/about`、`/studio` 的分支。
 const PATH_TO_ROOM = {
     '/': null,
     '/career': 'career',
     '/about': 'career',   // 旧地址别名 —— 见上面的说明
     '/gallery': 'gallery',
-    '/studio': 'studio',
+    '/craft': 'craft',
+    '/studio': 'craft',   // 旧地址别名 —— 见上面的说明
     '/posts': 'posts',
     '/videos': 'videos',
     '/music': 'music',

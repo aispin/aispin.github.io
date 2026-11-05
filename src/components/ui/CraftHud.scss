@@ -1,0 +1,794 @@
+/**
+ * 创意实验房间 · 实验环的 DOM 层。
+ *
+ * 🔴 这份样式**不是重新设计的**，是从 `public/demos/web3d/ring-gallery/index.html`
+ *    的 <style> 块原样搬过来的 —— 用户 2026-11-05 确认的就是那一版视觉。
+ *    搬家时只做了三件事，别的都没动：
+ *      1. 所有规则嵌进 `.craft-room`（原来是全局的，会污染整个站）
+ *      2. 丢掉页面级的 `:root` / `*` / `html, body` / `body` / `#bg` /
+ *         `.back` / `.empty`（背景由 3D 星云画，返回键由站内导航负责）
+ *      3. `--bg` 等变量从 `:root` 挪到 `.craft-room` 上
+ *    改视觉请**两边一起改**，或者干脆改完 demo 再搬一次。
+ */
+
+.craft-room,
+.craft-room * { box-sizing: border-box; }
+
+.craft-room {
+    /* 变量：原来在 :root 上 */
+    --bg: #05070c;
+    --ink: #e9edf5;
+    --dim: #8792a6;
+    --mute: #5a6478;
+    --accent: #8ba3ff;
+    --font: "Maple Mono", "MapleUI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", ui-monospace, monospace;
+    --pw: 240px;
+    --ph: 158px;
+
+    position: fixed;
+    inset: 0;
+    /* 压住画布和站内导航：环是满屏的，导航在它下面才不会被展板切断。
+       🔴 浮层（.viewer）必须放在**这一层里面**才能盖住导航；放到外面就
+          成了"z-index 1400 但被父级 950 的层叠上下文关住"，反而不生效。 */
+    z-index: 950;
+    overflow: hidden;
+    color: var(--ink);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    /* 底色由 3D 星云画。这里透明是**故意的**：星云第一帧还没出来时露出走廊，
+       比闪一块纯色好。 */
+    background: transparent;
+    /* 默认不吃指针 —— 只有展板/类别栏/浮层自己打开 */
+    pointer-events: none;
+    /* 进场：星云先出来（0.1s），展板再淡上来；退场见 .is-exiting */
+    opacity: 0;
+    transition: opacity 0.5s ease;
+
+    /* 环下方的一道地光：给"站在一个平台上"一点暗示 */
+    .platform {
+        position: fixed;
+        left: 50%;
+        bottom: 12%;
+        width: min(1200px, 94vw);
+        height: 280px;
+        transform: translateX(-50%);
+        z-index: 1;
+        pointer-events: none;
+        background: radial-gradient(58% 100% at 50% 100%,
+            rgba(120, 150, 255, 0.15) 0%,
+            rgba(90, 120, 220, 0.05) 44%,
+            rgba(0, 0, 0, 0) 74%);
+    }
+
+    /* 环的"轨道"：一条横贯屏幕的极淡光线，落在展板下沿。
+       圆柱投影里地板上的圆环投影出来就是一条水平线 —— 有了它，展板才像
+       **挂在什么东西上**，而不是浮在虚空里。位置由 JS 按板高写 --stripY。 */
+    .strip {
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: var(--rowY, 47%);
+        height: 1px;
+        z-index: 1;
+        transform: translateY(var(--stripY, 88px));
+        pointer-events: none;
+        background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(139, 163, 255, 0.06) 16%,
+            rgba(160, 185, 255, 0.17) 50%,
+            rgba(139, 163, 255, 0.06) 84%,
+            transparent 100%);
+        -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+        mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+    }
+
+    /* 轨道下面一层很宽的柔光，把"地台"垫起来 */
+    .strip::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: -46px;
+        width: min(900px, 74vw);
+        height: 92px;
+        transform: translateX(-50%);
+        background: radial-gradient(50% 50% at 50% 50%,
+            rgba(120, 150, 255, 0.10) 0%,
+            rgba(120, 150, 255, 0.03) 46%,
+            transparent 74%);
+    }
+
+    /* ── 展板层 ──────────────────────────────────────────────────────────── */
+
+    .stage {
+        position: fixed;
+        inset: 0;
+        z-index: 2;
+        overflow: hidden;
+        cursor: grab;
+        touch-action: pan-y;
+        /* 两端的板子要淡出，不能硬切在屏幕边上 —— 硬切会露出"这里只是
+           一排卡片"的真相，淡出才像环转到身后去了。 */
+        -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 22%, #000 78%, transparent 100%);
+        mask-image: linear-gradient(90deg, transparent 0%, #000 22%, #000 78%, transparent 100%);
+    }
+
+    .stage.is-dragging { cursor: grabbing; }
+
+    .panel {
+        position: absolute;
+        left: 50%;
+        top: var(--rowY, 47%);
+        width: var(--pw);
+        height: var(--ph);
+        padding: 0;
+        border: 0;
+        background: none;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+        /* 🔴 不能 overflow:hidden。焦点板下沿那个倒三角画在盒子**外面**，
+           藏进里面就被裁掉了。裁剪交给内层的 .panel__clip。 */
+        overflow: visible;
+        /* 位置每帧由 JS 写，不加 transition —— 加了会和逐帧插值打架 */
+        will-change: transform, opacity;
+        --c: #8ba3ff;
+    }
+
+    /* 真正的那块玻璃。所有装饰都裁在它里面，面板本身只负责定位和变换。 */
+    .panel__clip {
+        position: absolute;
+        inset: 0;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        background: linear-gradient(180deg, rgba(18, 22, 34, 0.94) 0%, rgba(10, 13, 21, 0.96) 100%);
+        /* 所有板都有一层浅影：没有它，板子看起来是"贴"在背景上的贴纸 */
+        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.38);
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    /* 右上角那团类别色 */
+    .panel__glow {
+        position: absolute;
+        inset: -32% -32% auto auto;
+        width: 80%;
+        height: 112%;
+        background: radial-gradient(closest-side, color-mix(in srgb, var(--c) 46%, transparent), transparent 100%);
+        opacity: 0.5;
+        pointer-events: none;
+    }
+
+    /* 左侧色条：远看时类别主要靠它分辨 */
+    .panel__bar {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--c);
+        opacity: 0.85;
+        pointer-events: none;
+    }
+
+    .panel.is-focus .panel__clip {
+        border-color: color-mix(in srgb, var(--c) 58%, transparent);
+        box-shadow:
+            0 0 0 1px color-mix(in srgb, var(--c) 24%, transparent),
+            0 30px 80px rgba(0, 0, 0, 0.6),
+            0 0 70px color-mix(in srgb, var(--c) 20%, transparent);
+    }
+
+    /* 焦点板下沿的倒三角。
+       它的唯一职责是回答"下面那段字跟谁有关"—— 没有它，底部的说明就是
+       一张独立的卡；有了它 + 下面那根竖线，两者才读成"板 + 注解"。 */
+    .panel__caret {
+        position: absolute;
+        left: 50%;
+        bottom: -10px;
+        width: 20px;
+        height: 10px;
+        transform: translateX(-50%);
+        background: var(--c);
+        clip-path: polygon(0 0, 100% 0, 50% 100%);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+        filter: drop-shadow(0 0 10px color-mix(in srgb, var(--c) 55%, transparent));
+    }
+
+    .panel.is-focus .panel__caret { opacity: 0.92; }
+
+    .panel__idx {
+        position: absolute;
+        left: 13px;
+        top: 10px;
+        font-size: 10.5px;
+        letter-spacing: 0.16em;
+        color: color-mix(in srgb, var(--c) 84%, white);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .panel__motif {
+        position: absolute;
+        right: 6px;
+        top: 4px;
+        width: 64%;
+        height: 64%;
+        opacity: 0.55;
+        pointer-events: none;
+    }
+
+    .panel__title {
+        position: absolute;
+        left: 13px;
+        right: 13px;
+        bottom: 26px;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.32;
+        color: #f2f5fb;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .panel__cat {
+        position: absolute;
+        left: 13px;
+        bottom: 9px;
+        font-size: 8.5px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: color-mix(in srgb, var(--c) 72%, #8792a6);
+    }
+
+    /* 焦点板上扫过的一道高光：让它"活着"，也标出哪块能直接点 */
+    .panel__sweep {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0;
+        background: linear-gradient(105deg,
+            transparent 38%,
+            color-mix(in srgb, var(--c) 18%, transparent) 50%,
+            transparent 62%);
+        background-size: 260% 100%;
+    }
+
+    .panel.is-focus .panel__sweep {
+        opacity: 1;
+        animation: sweep 4.8s linear infinite;
+    }
+
+    @keyframes sweep {
+        from { background-position: 180% 0; }
+        to   { background-position: -80% 0; }
+    }
+
+    .hud {
+        position: fixed;
+        inset: 0;
+        z-index: 5;
+        pointer-events: none;
+        color: var(--ink);
+    }
+
+    .hud__head {
+        position: absolute;
+        top: 46px;
+        left: 50%;
+        transform: translateX(-50%);
+        text-align: center;
+        user-select: none;
+    }
+
+    .hud__eyebrow {
+        font-size: 30px;
+        font-weight: 600;
+        letter-spacing: 0.26em;
+        text-indent: 0.26em;
+        line-height: 1.15;
+        color: #f2f5fb;
+        white-space: nowrap;
+        text-shadow: 0 0 40px rgba(139, 163, 255, 0.28);
+    }
+
+    .hud__tagline {
+        margin: 10px 0 0;
+        font-size: 12.5px;
+        letter-spacing: 0.06em;
+        color: rgba(135, 146, 166, 0.85);
+        white-space: nowrap;
+    }
+
+    .hud__count {
+        margin-top: 5px;
+        font-size: 10.5px;
+        letter-spacing: 0.22em;
+        color: var(--accent);
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* 左侧类别竖栏 */
+    .hud__rail {
+        position: absolute;
+        left: 30px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        pointer-events: auto;
+    }
+
+    /* 左栏背后的局部压暗。环上最边上的板（±28.8°）正好落在这一带，
+       光靠 stage 的遮罩要抹掉它就得把遮罩拉到 26%，那样连 ±14.4° 的邻居
+       也一起淡掉了。所以改成"只压暗这一小块"，内容不丢，字也读得清。 */
+    .hud__rail::before {
+        content: '';
+        position: absolute;
+        inset: -54px -74px -54px -46px;
+        z-index: -1;
+        pointer-events: none;
+        background: radial-gradient(64% 60% at 16% 50%,
+            rgba(5, 7, 12, 0.96) 0%,
+            rgba(5, 7, 12, 0.78) 52%,
+            rgba(5, 7, 12, 0) 82%);
+        /* 磨砂：把压在后面的那块展板的文字糊成一片柔光，而不是跟类别名
+           抢着读。光靠压暗是压不干净的 —— 板子本身是亮的。 */
+        backdrop-filter: blur(9px);
+        -webkit-backdrop-filter: blur(9px);
+    }
+
+    .hud__rail-head {
+        font-size: 9.5px;
+        letter-spacing: 0.3em;
+        color: var(--mute);
+        margin-bottom: 8px;
+        padding-left: 14px;
+    }
+
+    .chip {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 6px 12px 6px 0;
+        background: none;
+        border: 0;
+        font: inherit;
+        font-size: 12px;
+        color: var(--dim);
+        cursor: pointer;
+        text-align: left;
+        transition: color 0.18s ease;
+        --c: #8ba3ff;
+    }
+
+    .chip::before {
+        content: '';
+        position: absolute;
+        left: -12px;
+        top: 50%;
+        width: 12px;
+        height: 1px;
+        background: rgba(255, 255, 255, 0.14);
+        transition: background 0.18s ease, width 0.18s ease;
+    }
+
+    .chip:hover { color: #dfe6f4; }
+
+    .chip:hover::before { background: rgba(255, 255, 255, 0.34); }
+
+    .chip.is-active { color: #f2f5fb; }
+
+    .chip.is-active::before { background: var(--c); width: 18px; }
+
+    .chip__dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--c);
+        opacity: 0.42;
+        flex: 0 0 auto;
+        transition: opacity 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .chip.is-active .chip__dot {
+        opacity: 1;
+        transform: scale(1.35);
+        box-shadow: 0 0 10px var(--c);
+    }
+
+    .chip__n {
+        margin-left: auto;
+        padding-left: 10px;
+        font-size: 10px;
+        color: var(--mute);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .chip.is-active .chip__n { color: var(--c); }
+
+    /* ── 焦点板的注解 ──────────────────────────────────────────────────────
+       它**不是一张卡**，是上面那块板的说明：一根竖线从倒三角垂下来，文字居中
+       收在线的末端。所以没有边框、没有底色、没有按钮 —— 加上任何一样，它就
+       又变回"另一张独立的卡"，关联感立刻没了。
+
+       交互也一起收掉了：点上面那块板就能进预览，这里再放一个按钮是重复的。 */
+
+    .hud__stem {
+        position: absolute;
+        left: 50%;
+        width: 1px;
+        transform: translateX(-50%);
+        background: linear-gradient(180deg,
+            color-mix(in srgb, var(--accent) 58%, transparent) 0%,
+            color-mix(in srgb, var(--accent) 14%, transparent) 82%,
+            transparent 100%);
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.4s ease;
+    }
+
+    .hud__stem.is-on { opacity: 1; }
+
+    .hud__detail {
+        position: absolute;
+        left: 50%;
+        /* 上下留白**大致相等**才像设计：板下沿到文字约 150，文字到屏底也约 140。
+           贴着屏底（bottom:44）读起来是页脚；紧贴板下（bottom:300）又把底部的
+           地光全压空了。 */
+        bottom: 140px;
+        transform: translateX(-50%);
+        width: min(560px, calc(100vw - 84px));
+        text-align: center;
+        /* 没有可点的东西了 ⇒ 别挡住底下那层拖拽 */
+        pointer-events: none;
+    }
+
+    /* 星云是动的，纯文字直接压上去会时清时糊。垫一团**没有边界**的暗光：
+       看不出边缘，只是让字更稳 —— 不是面板，别给它描边。 */
+    .hud__detail::before {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 132%;
+        height: 280%;
+        transform: translate(-50%, -50%);
+        z-index: -1;
+        pointer-events: none;
+        background: radial-gradient(50% 50% at 50% 50%,
+            rgba(5, 7, 12, 0.88) 0%,
+            rgba(5, 7, 12, 0.54) 44%,
+            rgba(5, 7, 12, 0) 76%);
+    }
+
+    .hud__meta {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        margin-bottom: 8px;
+    }
+
+    .hud__idx {
+        font-size: 11.5px;
+        letter-spacing: 0.2em;
+        color: var(--accent);
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* 编号与类别之间那截短线：比一个「/」干净，也比空格更像"两段元信息" */
+    .hud__sep {
+        width: 14px;
+        height: 1px;
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .hud__cat {
+        font-size: 10px;
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+        color: var(--mute);
+    }
+
+    .hud__title {
+        margin: 0 0 7px;
+        font-size: 19px;
+        font-weight: 600;
+        line-height: 1.32;
+        letter-spacing: 0.01em;
+        color: #f4f7fd;
+        text-shadow: 0 2px 22px rgba(3, 5, 9, 0.92);
+    }
+
+    .hud__desc {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.72;
+        color: rgba(186, 197, 215, 0.96);
+        text-shadow: 0 1px 14px rgba(3, 5, 9, 0.88);
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    /* `.hud__desc` 是 `display:-webkit-box`，作者样式会压过 UA 的 `[hidden]`，
+       所以这里得显式兜一下 —— 否则 hidden 属性形同虚设。 */
+    .hud__detail [hidden] { display: none !important; }
+
+    .hud__hint {
+        position: absolute;
+        right: 30px;
+        bottom: 30px;
+        font-size: 10.5px;
+        letter-spacing: 0.12em;
+        color: rgba(135, 146, 166, 0.7);
+        user-select: none;
+        white-space: nowrap;
+    }
+
+    /* ── iframe 浮层 ─────────────────────────────────────────────────────── */
+
+    .viewer {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        display: grid;
+        place-items: center;
+        padding: 4vh 3vw;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.26s ease;
+    }
+
+    .viewer.is-open {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    /* 搬家新增：wrapper 现在是 pointer-events:none（否则整屏挡住站内导航），
+       所以真正要吃指针的层要显式打开。stage 自带左右各 22% 的 mask，
+       那两条带子不吃点击 —— 右上角的站内导航正好从那里透过去。 */
+    .stage { pointer-events: auto; }
+
+    .viewer__scrim {
+        position: absolute;
+        inset: 0;
+        background: rgba(3, 5, 9, 0.84);
+        backdrop-filter: blur(10px);
+    }
+
+    .viewer__card {
+        position: relative;
+        width: min(1180px, 94vw);
+        height: min(760px, 88vh);
+        display: flex;
+        flex-direction: column;
+        border-radius: 16px;
+        overflow: hidden;
+        background: #0a0d14;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 40px 120px rgba(0, 0, 0, 0.72);
+        transform: translateY(14px) scale(0.985);
+        transition: transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+    }
+
+    .viewer.is-open .viewer__card { transform: none; }
+
+    .viewer__bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 11px 14px;
+        background: rgba(255, 255, 255, 0.03);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        flex: 0 0 auto;
+    }
+
+    .viewer__dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 10px var(--accent);
+        flex: 0 0 auto;
+    }
+
+    .viewer__title {
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .viewer__cat {
+        font-size: 9.5px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--mute);
+        white-space: nowrap;
+    }
+
+    .viewer__spacer { flex: 1; }
+
+    .viewer__act {
+        font-size: 11.5px;
+        color: var(--dim);
+        text-decoration: none;
+        padding: 5px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        transition: color 0.18s ease, border-color 0.18s ease;
+        white-space: nowrap;
+    }
+
+    .viewer__act:hover { color: #f2f5fb; border-color: rgba(255, 255, 255, 0.3); }
+
+    .viewer__close {
+        width: 30px;
+        height: 30px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--dim);
+        font: inherit;
+        font-size: 15px;
+        line-height: 1;
+        cursor: pointer;
+        transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+    }
+
+    /* 关闭键压在任意内容上，所以用"深字浅底"，不做半透明 */
+    .viewer__close:hover,
+    .viewer__close:focus-visible {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #080a10;
+    }
+
+    .viewer__body {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        background: #05070c;
+    }
+
+    .viewer__frame {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        display: block;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .viewer.is-ready .viewer__frame { opacity: 1; }
+
+    .viewer__loading {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        gap: 12px;
+        color: var(--mute);
+        font-size: 11.5px;
+        letter-spacing: 0.16em;
+        transition: opacity 0.3s ease;
+    }
+
+    .viewer.is-ready .viewer__loading { opacity: 0; pointer-events: none; }
+
+    .spinner {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        border: 1.5px solid rgba(255, 255, 255, 0.14);
+        border-top-color: var(--accent);
+        animation: spin 0.9s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── 窄视口 ──────────────────────────────────────────────────────────── */
+
+    @media (max-width: 860px) {
+        /* 窄视口一屏只放一块板，而且它宽到 76% ⇒ 竖排左栏一定压在板上。
+           改成标题下面一排横向类别。 */
+        .hud__rail {
+            left: 50%;
+            top: 128px;
+            transform: translateX(-50%);
+            flex-direction: row;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 2px 10px;
+            width: calc(100vw - 24px);
+        }
+
+        .hud__rail::before { display: none; }
+        .hud__rail-head { display: none; }
+        .chip { font-size: 10.5px; padding: 4px 0; gap: 7px; }
+        .chip::before { display: none; }
+        .chip__n { display: none; }
+
+        /* 只有一块板可见，不需要两端的淡出 */
+        .stage {
+            -webkit-mask-image: none;
+            mask-image: none;
+        }
+        /* 手机上一屏只有一块板，说明文字就贴在它下面，别推到屏幕最底 */
+        .hud__detail { bottom: 108px; width: calc(100vw - 44px); }
+        .hud__title { font-size: 17px; margin-bottom: 6px; }
+        .hud__desc { font-size: 11.5px; line-height: 1.65; -webkit-line-clamp: 3; line-clamp: 3; }
+        .hud__hint { display: none; }
+        .hud__tagline { display: none; }
+        /* 返回胶囊只留箭头：居中标题在 420px 宽时会顶到"← 退出房间"的右边缘，
+            去掉文字后左边只剩一个 30px 的圆角方块，压不到标题。 */
+        .hud__back { left: 12px; top: 14px; padding: 6px 9px; }
+        .hud__back-label { display: none; }
+        .viewer { padding: 2vh 2vw; }
+        .viewer__card { width: 96vw; height: 90vh; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .panel.is-focus .panel__sweep { animation: none; }
+        .viewer, .viewer__card { transition: none; }
+        .spinner { animation: none; }
+    }
+
+    /* ── 搬家新增（原页面没有的两处）─────────────────────────────────
+       1. 返回胶囊：原页面左上角是 `.back` → /demos，房间里改成"退出房间"，
+          调 SceneContext 的 requestExit（走门关上的那套动画）。
+       2. 进出场：环的 DOM 层比星云晚 0.1s 淡入 —— 星云先出来，展板再浮上来；
+          退场时和星云一起淡掉。 */
+    .hud__back {
+        position: fixed;
+        left: 30px;
+        top: 26px;
+        z-index: 6;
+        pointer-events: auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 13px;
+        font: inherit;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        color: var(--dim);
+        background: rgba(12, 16, 26, 0.62);
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 999px;
+        cursor: pointer;
+        backdrop-filter: blur(8px);
+        transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .hud__back:hover {
+        color: var(--ink);
+        border-color: rgba(255, 255, 255, 0.22);
+        background: rgba(20, 26, 40, 0.78);
+    }
+
+    .hud__back:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+    }
+}
+
+/* 🔴 这两条必须写在 `.craft-room` **外面**：写在里面会被 SCSS 拼成
+   `.craft-room .craft-room.is-in`，永远匹配不到（自己套自己）。 */
+.craft-room.is-in { opacity: 1; }
+.craft-room.is-exiting { opacity: 0; transition-duration: 0.42s; }

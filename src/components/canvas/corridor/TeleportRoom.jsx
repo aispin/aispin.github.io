@@ -6,7 +6,7 @@ import { useScene } from '../../../context/SceneContext';
 const DOOR_POSITIONS_Z = {
     career: -6,
     gallery: -20,
-    studio: -36,
+    craft: -36,
     posts: -50,
     videos: -86,
     music: -100,

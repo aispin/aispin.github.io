@@ -15,6 +15,7 @@ import GalleryRoom from '../rooms/Gallery/GalleryRoom';
 import ContactRoom from '../rooms/Contact/ContactRoom';
 import ContentRoom from '../rooms/ContentRoom';
 import CareerTunnel from '../rooms/CareerTunnel';
+import CraftRing from '../rooms/CraftRing';
 import { SCENE_FONTS } from '../../../config/theme';
 
 // Room configurations
@@ -37,11 +38,13 @@ const SUBTITLES = {
 // 用 ContentRoom 那套「贴卡的房间」的 roomId。
 // `career` **不在**里面 —— 它不再是一面贴卡的墙，而是一整条星空隧道
 // （见 rooms/CareerTunnel.jsx 的文件头）。两者是两种空间，不能共用一个分支。
-const CONTENT_ROOM_IDS = ['studio', 'posts', 'videos', 'music', 'ai'];
+// `craft` 同理：它是一圈**接管渲染**的展板环（rooms/CraftRing.jsx），
+// 也不再是贴卡墙。2026-11-05 从 ContentRoom 里摘出来。
+const CONTENT_ROOM_IDS = ['posts', 'videos', 'music', 'ai'];
 
 // 自己会喊 `onReady` 的房间。必须在下面的兜底里排除掉，否则门会在房间还没
 // 搭好时就打开 —— 隧道尤其明显：先开到一片空白，再"啪"地出现。
-const SELF_READY_IDS = ['gallery', 'contact', 'career', ...CONTENT_ROOM_IDS];
+const SELF_READY_IDS = ['gallery', 'contact', 'career', 'craft', ...CONTENT_ROOM_IDS];
 
 /**
  * RoomInterior Component
@@ -202,6 +205,13 @@ const RoomInterior = ({ label, roomId, showRoom, onReady, isExiting }) => {
                         // 所以这里不能包 `<group position=…>`：那个变换对它是死的。
                         <Suspense fallback={null}>
                             <CareerTunnel onReady={onReady} isExiting={isExiting} />
+                        </Suspense>
+                    ) : roomId === 'craft' ? (
+                        // === 创意实验：一圈展板 ===
+                        // 同样自带 Scene + Camera + 接管渲染（rooms/CraftRing.jsx）。
+                        // 展板本身是 DOM（ui/CraftHud.jsx），所以这里只搭星云背景。
+                        <Suspense fallback={null}>
+                            <CraftRing onReady={onReady} isExiting={isExiting} />
                         </Suspense>
                     ) : CONTENT_ROOM_IDS.includes(roomId) ? (
                         <ContentRoom roomId={roomId} showRoom={roomVisible} onReady={onReady} />

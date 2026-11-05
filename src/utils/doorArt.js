@@ -1037,7 +1037,7 @@ function drawTerminalArt(ctx, W, H) {
     const mono = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace';
     const lines = [
         [['> ', '#7ee787'], ['npm run build', '#c9d1d9']],
-        [['const ', '#ff7b72'], ['studio', '#d2a8ff'], [' = {', '#c9d1d9']],
+        [['const ', '#ff7b72'], ['craft', '#d2a8ff'], [' = {', '#c9d1d9']],
         [['  music', '#7ee787'], [': ', '#c9d1d9'], ["'zeo'", '#a5d6ff'], [',', '#c9d1d9']],
         [['  ai', '#7ee787'], [': ', '#c9d1d9'], ['true', '#ff7b72'], [',', '#c9d1d9']],
         [['  code', '#7ee787'], [': ', '#c9d1d9'], ["'</>'", '#a5d6ff'], [',', '#c9d1d9']],

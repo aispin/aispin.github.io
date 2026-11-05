@@ -12,6 +12,7 @@ import { SceneProvider, useScene } from './context/SceneContext';
 import NavigationUI from './components/ui/NavigationUI';
 import GlobalOverlay from './components/ui/GlobalOverlay';
 import CareerHud from './components/ui/CareerHud';
+import CraftHud from './components/ui/CraftHud';
 import ScreenReaderOverlay from './components/ui/ScreenReaderOverlay';
 import Toast from './components/ui/Toast';
 import { useDocumentMeta, getInitialRoomFromUrl } from './hooks/useDocumentMeta';
@@ -175,7 +176,7 @@ function DebugBridge() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const DOOR_Z = {
-      career: -6, gallery: -20, studio: -36, posts: -50,
+      career: -6, gallery: -20, craft: -36, posts: -50,
       videos: -86, music: -100, ai: -116, contact: -130,
     };
     window.__aispin = {
@@ -322,6 +323,7 @@ function AppContent() {
               <SiteControls />
               <NavigationUI />
               <CareerHud />
+              <CraftHud />
               <GlobalOverlay />
               <ScreenReaderOverlay />
             </>

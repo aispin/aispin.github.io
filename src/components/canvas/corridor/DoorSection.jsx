@@ -306,7 +306,7 @@ const DoorSection = ({
     }, [baseboardTexture]);
 
     // Door dimensions - based on legacy texture aspect ratio (approx 0.376)
-    const doorRatio = doorId === 'studio' ? 0.388 : 0.376;
+    const doorRatio = doorId === 'craft' ? 0.388 : 0.376;
     const doorHeight = 2.5;
     const doorWidth = doorHeight * doorRatio * 1.12;
 

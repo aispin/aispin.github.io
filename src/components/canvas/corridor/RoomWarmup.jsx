@@ -173,11 +173,12 @@ const RoomWarmup = ({ onWarmupComplete, isLowTier }) => {
             </Suspense>
             <Suspense fallback={null}>
                 <group position={[20, 0, 0]}>
-                    {/* 这里原来是 `roomId="career"`。career 已经换成接管渲染的
-                        时空隧道（rooms/CareerTunnel.jsx），它自带 Scene，预热这份
-                        副本既不会上传它的贴图，也没法替它预热 —— 换成一个仍然
-                        走 ContentRoom 的房间，让 ContentRoom 那套着色器照常预热。 */}
-                    <ContentRoom roomId="studio" showRoom={true} onReady={noop} />
+                    {/* 这里原来是 `roomId="career"`，后来换成了 `studio`。两个现在
+                        都是接管渲染的房间（CareerTunnel / CraftRing，各自带 Scene），
+                        预热副本既不会上传它们的贴图，也没法替它们预热 —— 而且
+                        **绝不能**挂第二份（两个 useFrame 接管会互相覆盖）。
+                        所以固定用一个仍然走 ContentRoom 的房间，让那套着色器照常预热。 */}
+                    <ContentRoom roomId="posts" showRoom={true} onReady={noop} />
                 </group>
             </Suspense>
             <Suspense fallback={null}>

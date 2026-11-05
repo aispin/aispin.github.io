@@ -1,5 +1,5 @@
 import { useScene } from '../../context/SceneContext';
-import { useGalleryProjects, useStudioContent, useAwards } from '../../hooks/useContentData';
+import { useGalleryProjects, useAwards } from '../../hooks/useContentData';
 import '../../styles/ScreenReaderOverlay.scss';
 
 /**
@@ -14,7 +14,6 @@ const ScreenReaderOverlay = () => {
     
     // Pobieranie danych do wygenerowania niewidocznego HTML-a dla SEO / robotów
     const projects = useGalleryProjects();
-    const studio = useStudioContent();
     const awards = useAwards();
 
     return (
@@ -48,8 +47,8 @@ const ScreenReaderOverlay = () => {
                                 </button>
                             </li>
                             <li>
-                                <button onClick={() => teleportTo('studio')} type="button">
-                                    项目 Studio — 项目与实验室
+                                <button onClick={() => teleportTo('craft')} type="button">
+                                    创意实验 Craft — 做过的实验与还能跑的小东西
                                 </button>
                             </li>
                             <li>
@@ -87,7 +86,7 @@ const ScreenReaderOverlay = () => {
                             You are in the {currentRoom === 'career' ? 'Career' :
                                 currentRoom === 'gallery' ? 'Gallery' :
                                     currentRoom === 'contact' ? 'Contact' :
-                                        currentRoom === 'studio' ? 'Studio' : currentRoom} room.
+                                        currentRoom === 'craft' ? 'Craft' : currentRoom} room.
                         </p>
                         <button onClick={requestExit} type="button">
                             Go back to corridor
@@ -141,22 +140,10 @@ const ScreenReaderOverlay = () => {
                                 <p>Find my social media links displayed as floating barrels. Click to visit my profiles on LinkedIn, GitHub, and other platforms.</p>
                             </div>
                         )}
-                        {currentRoom === 'studio' && (
-                            <div aria-label="Studio room content">
-                                <h3>The Studio</h3>
-                                <p>Explore my experience and skills on rotating monitors. Click a monitor to read detailed information about my work.</p>
-
-                                {studio && studio.length > 0 && (
-                                    <ul>
-                                        {studio.map((s, i) => (
-                                            <li key={i}>
-                                                <h4>{s.title} ({s.platform})</h4>
-                                                <p>{s.description}</p>
-                                                {s.url && <a href={s.url}>View content</a>}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
+                        {currentRoom === 'craft' && (
+                            <div aria-label="Craft room content">
+                                <h3>Creative Lab</h3>
+                                <p>A ring of 25 glass panels you can turn with the wheel, drag or arrow keys. The panel in front is highlighted; click it to run the experiment right here, press Escape to close.</p>
                             </div>
                         )}
 
@@ -172,8 +159,8 @@ const ScreenReaderOverlay = () => {
                             {currentRoom !== 'contact' && (
                                 <li><button onClick={() => teleportTo('contact')} type="button">Go to Contact</button></li>
                             )}
-                            {currentRoom !== 'studio' && (
-                                <li><button onClick={() => teleportTo('studio')} type="button">Go to Studio</button></li>
+                            {currentRoom !== 'craft' && (
+                                <li><button onClick={() => teleportTo('craft')} type="button">Go to Craft</button></li>
                             )}
                         </ul>
                     </>

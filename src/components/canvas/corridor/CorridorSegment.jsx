@@ -47,7 +47,7 @@ const HERO_INSET = 6.65;
 const FIRST_RUN = [
     { roomId: 'career', relativeZ: -18, side: 'left', icon: '▤', color: '#f5efe6' },
     { roomId: 'gallery', relativeZ: -32, side: 'right', icon: '◇', color: '#e6f5ef' },
-    { roomId: 'studio', relativeZ: -48, side: 'left', icon: '⌂', color: '#efe6f5' },
+    { roomId: 'craft', relativeZ: -48, side: 'left', icon: '⌂', color: '#efe6f5' },
     { roomId: 'posts', relativeZ: -62, side: 'right', icon: '▧', color: '#f5e6e6' },
 ];
 const SECOND_RUN = [
