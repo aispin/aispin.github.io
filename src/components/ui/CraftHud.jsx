@@ -690,6 +690,7 @@ const CraftHud = () => {
                     <div className="viewer__body">
                         {openItem && (
                             <iframe
+                                className="viewer__frame"
                                 ref={frameRef}
                                 src={openItem.url}
                                 title={openItem.title}
