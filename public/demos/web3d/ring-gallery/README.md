@@ -8,7 +8,18 @@
 > 有 N 个互不相干的东西要展示，每个都值得点进去玩一下。
 
 站内「创意实验」房间目前就是用它当静态原型 —— 但页面本身不认这个房间：
-换掉 `GROUPS` 和 `fetch` 的地址，就是另一个画廊。
+换掉 `GROUPS` 和数据源，就是另一个画廊。
+
+**两个落点，同一份源码**：
+
+| URL | 怎么来的 |
+| --- | --- |
+| `/demos/web3d/ring-gallery/` | 本目录，真源 |
+| `/demos/` | 构建时 `scripts/build-demos-index.mjs` 把本文件**原样复制**过去 |
+
+所以 `public/demos/index.html` 是生成物，改它没用 —— 改这里，重新跑一次构建
+（`npm run dev` / `npm run build` 会自动跑）。页面里没有任何写死的相对路径：
+`demos.json` 的位置、自我排除用的 id 都从 `location.pathname` 现算。
 
 ---
 
@@ -18,7 +29,37 @@
 | --- | --- | --- |
 | 环境层 | 全屏 GLSL：五倍频 fbm 星云 + 星点 + 环心冷光 + 暗角，鼠标轻微视差 | `FRAG` 里三个 `vec3`（底色 / 靛蓝 / 紫） |
 | 展板层 | N 块展板绕成一圈，转到位的那块放大、抬起、加扫光 | `buildLab()` 的输入、`GROUPS` 的类别表 |
+| 说明层 | 焦点板下方那根竖线 + 一段注解（编号 / 类别 / 描述） | `updateHud()` 里写什么 |
 | 体验层 | 点焦点板 → iframe 浮层 | `openViewer()` 里 `viewerFrame.src` 换成别的（视频、代码、文档） |
+
+## 环是首尾相接的
+
+`state.target` **故意不夹边界**。夹了的话"停在第 1 块时点最后一块"会被夹回 0，
+表现就是**点了没反应**（这正是一开始报的 bug）。
+
+- 索引随便涨、随便跌到负数，`render()` 里每块板的角度都对 2π 取模；
+- 跳转走 `nearestIndex()`，从第 3 个到第 22 个是**倒着转 6 格**，不是正着转 19 格；
+- 转久了 `renormalize()` 把 `cur` / `target` 同时减掉 N —— 画面一模一样，
+  只是把数字拉回 0 附近，免得浮点精度不够开始抖。拖动中途不跑
+  （`dragStartTarget` 还记着旧坐标系）。
+
+## 说明区是"注解"，不是"另一张卡"
+
+底部那块**曾经**是一张独立的玻璃卡：圆角、描边、背景、一个「在浮层里体验」按钮。
+结果它和上面的展板看起来毫无关系 —— 因为它们确实是两个独立的视觉体。
+
+现在的做法：
+
+1. **焦点板下沿挂一个倒三角**（`.panel__caret`），同色、带辉光；
+2. 一根 1px 竖线从三角垂到文字顶部，长度**现算**（板的 `getBoundingClientRect().bottom`
+   → 说明的 `.top`），因为板的位置每帧由 transform 写、说明的高度随文案变；
+3. 说明区去掉卡片的一切：无边框、无底色、无按钮。只剩编号 + 类别 + 描述；
+4. **标题不重复** —— 卡片上已经写着它了，下面再写一遍立刻又变成"两张卡"。
+   只有没有描述时才拿标题顶一下。
+
+⚠️ 倒三角画在面板盒子**外面**，所以 `.panel` 必须 `overflow: visible`，
+裁剪下沉到内层 `.panel__clip`。原来装饰挂在 `.panel::before/::after` 上、
+靠 `overflow: hidden` 裁圆角，改结构时这两块要一起搬进 clip。
 
 ## 为什么不用 CSS 3D
 
@@ -55,17 +96,21 @@ MAX     = atan(半屏宽 × 0.92 / f)
 
 ## 数据
 
-默认读 `../../demos.json`（构建脚本扫 `public/demos/` 生成的索引）：
+默认读 `demos.json`（构建脚本扫 `public/demos/` 生成的索引）：
 
 ```js
 { "demos": [ { "id": "web3d/career", "title": "…", "url": "/demos/web3d/career/", … } ] }
 ```
 
+路径由 `demosJsonUrl()` 按"这一页在 `demos/` 下第几层"现算，所以整页复制到
+任何深度都能用，也不用"先猜一个再兜底"（兜底会白留一个 404）。
+
 类别取 `id` 的第一段路径（`web3d/career` → `web3d`），认不出的落进 `misc`。
 **往 `public/demos/` 丢一个新目录，环上就自动多一块板。**
 
-环上会排除这一页自己 —— 靠 `SELF_ID`（从 `location.pathname` 推），
-所以换个目录名、或者把整页复制成第二个画廊，自我排除仍然成立。
+环上会排除这一页自己 —— 靠 `SELF_ID`（从 `location.pathname` 推）。在
+`/demos/` 根目录时推不出来，退回本目录的 id（`web3d/ring-gallery`）：根目录
+那一份就是本文件的副本，不排除掉的话环上会多出一块"自己"。
 
 ## 交互
 
@@ -75,9 +120,11 @@ MAX     = atan(半屏宽 × 0.92 / f)
 | 拖动 | 跟手转，松手吸附到最近一格 |
 | ← → ↑ ↓ | 转一格 |
 | Enter | 打开当前这块 |
-| 点焦点板 | 打开浮层 |
+| 点焦点板 | 打开浮层（说明区**没有**按钮，这是唯一入口） |
 | 点别的板 | 先把它转到前面（不直接开，避免手滑弹出浮层） |
 | Esc / 点遮罩 | 关浮层 |
+
+首尾相接：在第 1 块往左滚一格到第 25 块，在第 25 块往右滚一格回第 1 块。
 
 ## 已知的坑
 
@@ -86,9 +133,15 @@ MAX     = atan(半屏宽 × 0.92 / f)
   `pointermove` / `pointerup` 挂 `window`，再用位移阈值抑制"拖完补的那次 click"。
 - **浮层里要注掉 demo 自己的返回胶囊**：`_lab.css` 的 `.lab-back` 会把 iframe
   导去索引页，用户困在浮层里。同源可以往 `contentDocument.head` 塞一条样式；
-  跨源会抛，`catch` 掉即可。
+  跨源会抛，`catch` 掉即可。本页自己的 `.back` 也一起注掉。
 - 环上最边上那块板会压在左侧类别栏后面 —— 靠加深 `stage` 的 mask 会把它整个
   抹掉（那是内容），所以改成给左栏垫一层 `backdrop-filter: blur()` 的局部暗角。
+- **`[hidden]` 会被 `display: -webkit-box` 压掉**：`.hud__desc` 用了行数截断，
+  作者样式赢过 UA 的 `[hidden]`，所以 `.hud__detail [hidden]` 得显式
+  `display: none !important`。
+- **改完这里要重新生成 `/demos/index.html`**（那是副本）。`npm run dev` /
+  `npm run build` 会自动跑 `buildStart`，只改文件不重启的话记得手动
+  `node scripts/build-demos-index.mjs`。
 
 ## 尺寸 / 性能
 

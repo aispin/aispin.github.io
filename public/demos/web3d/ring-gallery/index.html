@@ -22,8 +22,12 @@
      3. 体验层：点开展板 → iframe 浮层里直接跑，不跳走（Esc / 点遮罩关闭）。
         换成"弹窗里放视频 / 放代码"也只是换 overlay 的内容。
 
-   当前的用法：站内「创意实验」房间的静态原型（给 3D 房间定稿用）。
-   把 GROUPS 和 fetch 的地址换掉，就是另一个画廊。
+   当前的用法有两个落点，**同一份源码**：
+     /demos/                      构建时由 scripts/build-demos-index.mjs 原样复制过去，
+                                  所以 demos 的落地页就是这个环，不再是那张卡片列表
+     /demos/web3d/ring-gallery/   本目录（真源）
+   页面对环境的依赖全部按地址栏现算（`demos.json` 的相对路径、自我排除用的 id），
+   所以复制到任何目录都能跑。把 GROUPS 和 demos.json 换掉，就是另一个画廊。
 
    ── 为什么不用 CSS 3D（perspective + rotateY + translateZ）
    试过了，几何上做不到：要让正前方的展板保持 ~250px 的可读尺寸，
@@ -152,24 +156,35 @@ body {
     width: var(--pw);
     height: var(--ph);
     padding: 0;
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    border-radius: 12px;
-    background: linear-gradient(180deg, rgba(18, 22, 34, 0.94) 0%, rgba(10, 13, 21, 0.96) 100%);
+    border: 0;
+    background: none;
     color: inherit;
     font: inherit;
     text-align: left;
     cursor: pointer;
-    overflow: hidden;
+    /* 🔴 不能 overflow:hidden。焦点板下沿那个倒三角画在盒子**外面**，
+       藏进里面就被裁掉了。裁剪交给内层的 .panel__clip。 */
+    overflow: visible;
     /* 位置每帧由 JS 写，不加 transition —— 加了会和逐帧插值打架 */
     will-change: transform, opacity;
     --c: #8ba3ff;
+}
+
+/* 真正的那块玻璃。所有装饰都裁在它里面，面板本身只负责定位和变换。 */
+.panel__clip {
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    background: linear-gradient(180deg, rgba(18, 22, 34, 0.94) 0%, rgba(10, 13, 21, 0.96) 100%);
     /* 所有板都有一层浅影：没有它，板子看起来是"贴"在背景上的贴纸 */
     box-shadow: 0 14px 34px rgba(0, 0, 0, 0.38);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* 右上角那团类别色 */
-.panel::before {
-    content: '';
+.panel__glow {
     position: absolute;
     inset: -32% -32% auto auto;
     width: 80%;
@@ -180,8 +195,7 @@ body {
 }
 
 /* 左侧色条：远看时类别主要靠它分辨 */
-.panel::after {
-    content: '';
+.panel__bar {
     position: absolute;
     left: 0;
     top: 0;
@@ -192,13 +206,33 @@ body {
     pointer-events: none;
 }
 
-.panel.is-focus {
+.panel.is-focus .panel__clip {
     border-color: color-mix(in srgb, var(--c) 58%, transparent);
     box-shadow:
         0 0 0 1px color-mix(in srgb, var(--c) 24%, transparent),
         0 30px 80px rgba(0, 0, 0, 0.6),
         0 0 70px color-mix(in srgb, var(--c) 20%, transparent);
 }
+
+/* 焦点板下沿的倒三角。
+   它的唯一职责是回答"下面那段字跟谁有关"—— 没有它，底部的说明就是
+   一张独立的卡；有了它 + 下面那根竖线，两者才读成"板 + 注解"。 */
+.panel__caret {
+    position: absolute;
+    left: 50%;
+    bottom: -10px;
+    width: 20px;
+    height: 10px;
+    transform: translateX(-50%);
+    background: var(--c);
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    filter: drop-shadow(0 0 10px color-mix(in srgb, var(--c) 55%, transparent));
+}
+
+.panel.is-focus .panel__caret { opacity: 0.92; }
 
 .panel__idx {
     position: absolute;
@@ -439,57 +473,106 @@ body {
 
 .chip.is-active .chip__n { color: var(--c); }
 
-/* 底部：当前展位 */
-.hud__card {
+/* ── 焦点板的注解 ──────────────────────────────────────────────────────
+   它**不是一张卡**，是上面那块板的说明：一根竖线从倒三角垂下来，文字居中
+   收在线的末端。所以没有边框、没有底色、没有按钮 —— 加上任何一样，它就
+   又变回"另一张独立的卡"，关联感立刻没了。
+
+   交互也一起收掉了：点上面那块板就能进预览，这里再放一个按钮是重复的。 */
+
+.hud__stem {
     position: absolute;
     left: 50%;
-    bottom: 42px;
+    width: 1px;
     transform: translateX(-50%);
-    width: min(580px, calc(100vw - 96px));
-    padding: 16px 20px 15px;
-    border-radius: 14px;
-    background: rgba(8, 10, 16, 0.74);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    border-left: 2px solid var(--accent);
-    backdrop-filter: blur(16px);
-    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
-    pointer-events: auto;
-    transition: border-color 0.3s ease;
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--accent) 58%, transparent) 0%,
+        color-mix(in srgb, var(--accent) 14%, transparent) 82%,
+        transparent 100%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+
+.hud__stem.is-on { opacity: 1; }
+
+.hud__detail {
+    position: absolute;
+    left: 50%;
+    /* 上下留白**大致相等**才像设计：板下沿到文字约 150，文字到屏底也约 140。
+       贴着屏底（bottom:44）读起来是页脚；紧贴板下（bottom:300）又把底部的
+       地光全压空了。 */
+    bottom: 140px;
+    transform: translateX(-50%);
+    width: min(560px, calc(100vw - 84px));
+    text-align: center;
+    /* 没有可点的东西了 ⇒ 别挡住底下那层拖拽 */
+    pointer-events: none;
+}
+
+/* 星云是动的，纯文字直接压上去会时清时糊。垫一团**没有边界**的暗光：
+   看不出边缘，只是让字更稳 —— 不是面板，别给它描边。 */
+.hud__detail::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 132%;
+    height: 280%;
+    transform: translate(-50%, -50%);
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(50% 50% at 50% 50%,
+        rgba(5, 7, 12, 0.88) 0%,
+        rgba(5, 7, 12, 0.54) 44%,
+        rgba(5, 7, 12, 0) 76%);
 }
 
 .hud__meta {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 6px;
+    justify-content: center;
+    gap: 9px;
+    margin-bottom: 8px;
 }
 
 .hud__idx {
-    font-size: 11px;
-    letter-spacing: 0.18em;
+    font-size: 11.5px;
+    letter-spacing: 0.2em;
     color: var(--accent);
     font-variant-numeric: tabular-nums;
 }
 
+/* 编号与类别之间那截短线：比一个「/」干净，也比空格更像"两段元信息" */
+.hud__sep {
+    width: 14px;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.2);
+}
+
 .hud__cat {
-    font-size: 9.5px;
-    letter-spacing: 0.22em;
+    font-size: 10px;
+    letter-spacing: 0.24em;
     text-transform: uppercase;
     color: var(--mute);
 }
 
 .hud__title {
-    margin: 0 0 5px;
-    font-size: 18px;
+    margin: 0 0 7px;
+    font-size: 19px;
     font-weight: 600;
-    line-height: 1.35;
+    line-height: 1.32;
+    letter-spacing: 0.01em;
+    color: #f4f7fd;
+    text-shadow: 0 2px 22px rgba(3, 5, 9, 0.92);
 }
 
 .hud__desc {
     margin: 0;
-    font-size: 12.5px;
-    line-height: 1.65;
-    color: rgba(169, 180, 200, 0.92);
+    font-size: 14px;
+    line-height: 1.72;
+    color: rgba(186, 197, 215, 0.96);
+    text-shadow: 0 1px 14px rgba(3, 5, 9, 0.88);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
@@ -497,42 +580,9 @@ body {
     overflow: hidden;
 }
 
-.hud__actions {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-top: 12px;
-}
-
-.btn-open {
-    padding: 7px 15px;
-    border-radius: 999px;
-    border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
-    background: color-mix(in srgb, var(--accent) 16%, transparent);
-    color: #f2f5fb;
-    font: inherit;
-    font-size: 12px;
-    letter-spacing: 0.04em;
-    cursor: pointer;
-    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
-}
-
-/* 深字浅底：压在任意画面上都能读清 */
-.btn-open:hover,
-.btn-open:focus-visible {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #080a10;
-}
-
-.hud__link {
-    font-size: 11.5px;
-    color: var(--mute);
-    text-decoration: none;
-    transition: color 0.18s ease;
-}
-
-.hud__link:hover { color: var(--dim); }
+/* `.hud__desc` 是 `display:-webkit-box`，作者样式会压过 UA 的 `[hidden]`，
+   所以这里得显式兜一下 —— 否则 hidden 属性形同虚设。 */
+.hud__detail [hidden] { display: none !important; }
 
 .hud__hint {
     position: absolute;
@@ -750,8 +800,10 @@ body {
         -webkit-mask-image: none;
         mask-image: none;
     }
-    .hud__card { bottom: 20px; width: calc(100vw - 26px); padding: 13px 15px 12px; }
-    .hud__title { font-size: 15.5px; }
+    /* 手机上一屏只有一块板，说明文字就贴在它下面，别推到屏幕最底 */
+    .hud__detail { bottom: 108px; width: calc(100vw - 44px); }
+    .hud__title { font-size: 17px; margin-bottom: 6px; }
+    .hud__desc { font-size: 11.5px; line-height: 1.65; -webkit-line-clamp: 3; line-clamp: 3; }
     .hud__hint { display: none; }
     .hud__tagline { display: none; }
     .viewer { padding: 2vh 2vw; }
@@ -767,7 +819,7 @@ body {
 </head>
 <body>
 
-<a class="back" href="../..">← Demos</a>
+<a class="back" href="/">← 首页</a>
 
 <canvas id="bg" aria-hidden="true"></canvas>
 <div class="platform" aria-hidden="true"></div>
@@ -785,20 +837,20 @@ body {
         <div class="hud__rail-head">类别</div>
     </nav>
 
-    <section class="hud__card" id="card">
+    <!-- 从焦点板垂下来的那根线，长度由 JS 按两端的实际位置算 -->
+    <div class="hud__stem" id="stem" aria-hidden="true"></div>
+
+    <section class="hud__detail" id="detail" aria-live="polite">
         <div class="hud__meta">
             <span class="hud__idx" id="cardIdx">—</span>
+            <span class="hud__sep" aria-hidden="true"></span>
             <span class="hud__cat" id="cardCat"></span>
         </div>
         <h2 class="hud__title" id="cardTitle">载入中…</h2>
         <p class="hud__desc" id="cardDesc"></p>
-        <div class="hud__actions">
-            <button type="button" class="btn-open" id="btnOpen">在浮层里体验 ↗</button>
-            <a class="hud__link" href="./">全部实验 ↗</a>
-        </div>
     </section>
 
-    <div class="hud__hint">滚动 / 拖动 · 转动实验环</div>
+    <div class="hud__hint">滚动 / 拖动 转动 · 点击展板进入</div>
 </div>
 
 <div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-labelledby="viewerTitle">
@@ -824,9 +876,9 @@ body {
 
 <div class="empty" id="empty">
     <div>
-        取不到 <code>../../demos.json</code>。<br />
+        取不到 <code>demos.json</code>。<br />
         这一页要通过 http 打开（<code>npm run dev</code> 之后访问
-        <code>/demos/web3d/ring-gallery/</code>），<br />
+        <code>/demos/</code> 或 <code>/demos/web3d/ring-gallery/</code>），<br />
         直接双击本地文件是不行的。
     </div>
 </div>
@@ -854,18 +906,34 @@ const GROUPS = [
 const GROUP_BY_ID = new Map(GROUPS.map((g) => [g.id, g]));
 
 /**
- * 环上别把**这一页自己**列进去。
+ * 这一页在 demos.json 里的 id —— 环上别把自己列进去。
  *
- * 从地址栏推而不是写死一个 id：这页本身也是 `demos.json` 里的一条
- * （`web3d/ring-gallery`），换个目录名、或者把它复制成第二个画廊，
- * 自我排除仍然成立。
+ * 从地址栏推，而不是写死一个 id：
  *   /demos/web3d/ring-gallery/            → web3d/ring-gallery
  *   /demos/web3d/ring-gallery/index.html  → web3d/ring-gallery
+ *   /demos/  ·  /demos/index.html         → 推不出来（这里是 demos 根）
+ *
+ * 根目录那一份是构建时从本目录**复制**过去的，内容一样，所以推不出来时
+ * 退回本目录的 id。改目录名的话这两处要一起改（构建脚本读的就是这个路径）。
  */
-const SELF_ID = location.pathname
-    .replace(/^.*?\/demos\//, '')
-    .replace(/index\.html$/, '')
-    .replace(/\/$/, '');
+const SELF_ID = (() => {
+    const id = location.pathname
+        .replace(/^.*?\/demos\//, '')
+        .replace(/index\.html$/, '')
+        .replace(/\/$/, '');
+    return id || 'web3d/ring-gallery';
+})();
+
+/**
+ * `demos.json` 在 demos 根目录。按"这一页在 demos 下第几层"算相对路径：
+ * 整页复制到任何深度都能用，也不用"先猜一个再兜底"——兜底会白留一个 404。
+ */
+function demosJsonUrl() {
+    const after = location.pathname.replace(/^.*?\/demos\//, '');
+    const segs = after.split('/').filter(Boolean);
+    if (segs.length && /\.html?$/i.test(segs[segs.length - 1])) segs.pop();
+    return '../'.repeat(segs.length) + 'demos.json';
+}
 
 /** 这个值在 measure() 里按视口算：见下面。 */
 let MAX_ANGLE = 31 * Math.PI / 180;
@@ -1100,8 +1168,9 @@ const cardIdx = document.getElementById('cardIdx');
 const cardCat = document.getElementById('cardCat');
 const cardTitle = document.getElementById('cardTitle');
 const cardDesc = document.getElementById('cardDesc');
-const btnOpen = document.getElementById('btnOpen');
-const card = document.getElementById('card');
+const detailEl = document.getElementById('detail');
+const stemEl = document.getElementById('stem');
+const hudEl = document.querySelector('.hud');
 
 const state = {
     items: [],
@@ -1120,7 +1189,10 @@ const state = {
     shown: -1,
 };
 
-const clampTarget = (v) => Math.max(0, Math.min(state.items.length - 1, v));
+/* 🔴 环是**首尾相接**的，target 故意不夹边界。
+   夹了的话「停在第 1 块时点最后一块」会被夹回 0 —— 表现就是点了没反应。
+   索引随便涨，`render()` 里每块板的角度都对 2π 取模，转满一圈就是新的一圈；
+   转久了再把 cur/target 一起减掉 n（见 renormalize）。 */
 
 /** 折成离当前最近的等价索引 —— 从第 3 个跳到第 22 个不该倒着转 19 格。 */
 function nearestIndex(target, current, count) {
@@ -1176,12 +1248,19 @@ function buildPanels() {
         el.style.setProperty('--c', item.accent);
         el.dataset.i = String(i);
         el.setAttribute('aria-label', item.title + ' — ' + item.groupZh);
+        // 装饰全在 __clip 里（它负责圆角和裁剪），倒三角挂在 clip 外面 ——
+        // 所以它不会被裁掉，也能跟着面板的 transform 一起动。
         el.innerHTML =
-            '<span class="panel__sweep"></span>' +
-            '<span class="panel__idx">' + String(i + 1).padStart(2, '0') + '</span>' +
-            '<span class="panel__motif" style="color:' + item.accent + '">' + (MOTIFS[item.group] || MOTIFS.misc) + '</span>' +
-            '<span class="panel__title">' + escapeHtml(item.title) + '</span>' +
-            '<span class="panel__cat">' + escapeHtml(item.groupEn) + '</span>';
+            '<span class="panel__clip">' +
+                '<span class="panel__glow"></span>' +
+                '<span class="panel__bar"></span>' +
+                '<span class="panel__sweep"></span>' +
+                '<span class="panel__idx">' + String(i + 1).padStart(2, '0') + '</span>' +
+                '<span class="panel__motif" style="color:' + item.accent + '">' + (MOTIFS[item.group] || MOTIFS.misc) + '</span>' +
+                '<span class="panel__title">' + escapeHtml(item.title) + '</span>' +
+                '<span class="panel__cat">' + escapeHtml(item.groupEn) + '</span>' +
+            '</span>' +
+            '<span class="panel__caret" aria-hidden="true"></span>';
         stage.appendChild(el);
         state.panels.push(el);
     });
@@ -1259,23 +1338,58 @@ function updateHud(i) {
     countEl.textContent = String(i + 1).padStart(2, '0') + ' / ' + state.items.length;
     cardIdx.textContent = String(i + 1).padStart(2, '0');
     cardCat.textContent = g ? g.en : '';
+    /* 标题**不重复**：卡片上已经写着它了，这里再写一遍，视觉上立刻变成
+       "另一张卡" —— 正是要消掉的那种感觉。只有没有描述时才拿标题顶一下，
+       免得说明区空成一条线。 */
+    const hasDesc = Boolean(item.description);
     cardTitle.textContent = item.title;
-    cardDesc.textContent = item.description || item.url;
-    card.style.setProperty('--accent', item.accent);
+    cardTitle.hidden = hasDesc;
+    cardDesc.textContent = hasDesc ? item.description : '';
+    cardDesc.hidden = !hasDesc;
+    // 强调色写在 .hud 上：说明文字、编号、竖线共用同一个
+    hudEl.style.setProperty('--accent', item.accent);
 
     for (const c of state.chips) {
         c.classList.toggle('is-active', c.dataset.group === item.group);
     }
+
+    syncStem();
+}
+
+/**
+ * 竖线的两端都是**现算**的：上端是焦点板下沿（板的位置每帧由 transform 写，
+ * 还带 1.12 的缩放），下端是说明文字的顶边（高度随标题换行、描述长短变）。
+ * 写死一个高度，换个文案就错位了。
+ *
+ * 只在换展位和 resize 时跑，不在帧循环里 —— 这里读 getBoundingClientRect
+ * 会强制同步布局，每帧跑就是白扔性能。
+ */
+function syncStem() {
+    const el = state.panels[state.shown];
+    if (!el || !stemEl) return;
+
+    const pr = el.getBoundingClientRect();
+    const dr = detailEl.getBoundingClientRect();
+    const top = pr.bottom + 13;          // 倒三角 10px + 3px 空隙
+    const h = dr.top - top - 6;
+
+    // 空间不够（极扁的窗口）就别画了，一根 0 高的线只会闪一下
+    if (h < 18) { stemEl.classList.remove('is-on'); return; }
+
+    stemEl.style.top = top.toFixed(0) + 'px';
+    stemEl.style.height = h.toFixed(0) + 'px';
+    stemEl.classList.add('is-on');
 }
 
 /* ── 输入 ───────────────────────────────────────────────────────────── */
 
 function nudge(delta) {
-    state.target = clampTarget(state.target + delta);
+    // 不夹边界：在最后一块往右滚就是绕回第一块
+    state.target += delta;
 }
 
 function jumpTo(index) {
-    state.target = clampTarget(nearestIndex(index, state.target, state.items.length));
+    state.target = nearestIndex(index, state.target, state.items.length);
 }
 
 let wheelAcc = 0;
@@ -1318,7 +1432,7 @@ window.addEventListener('pointermove', (e) => {
     if (!dragging) return;
     const total = e.clientX - dragStartX;
     dragMoved = Math.abs(total);
-    state.target = clampTarget(dragStartTarget - total / dragStepPx);
+    state.target = dragStartTarget - total / dragStepPx;
 });
 
 function endDrag() {
@@ -1326,7 +1440,7 @@ function endDrag() {
     dragging = false;
     stage.classList.remove('is-dragging');
     // 松手吸附到最近一格 —— 停在半个展位上会让正文和展板对不上
-    if (dragMoved > 8) state.target = clampTarget(Math.round(state.target));
+    if (dragMoved > 8) state.target = Math.round(state.target);
 }
 
 window.addEventListener('pointerup', endDrag);
@@ -1367,10 +1481,27 @@ function tick(now) {
     last = now;
     if (Math.abs(state.target - state.cur) < 0.0005) {
         if (state.cur !== state.target) { state.cur = state.target; render(); }
+        renormalize();
         return;
     }
     state.cur += (state.target - state.cur) * (1 - Math.exp(-9 * dt));
     render();
+}
+
+/**
+ * 环能无限转，索引就会一直涨（也可以一直跌到负数）。每转满一圈把 cur 和
+ * target **同时**减掉 n：每块板的角度本来就对 2π 取模，所以画面一模一样，
+ * 只是把数字拉回 0 附近，免得转久了浮点精度不够、动画开始抖。
+ *
+ * 拖动中途不跑 —— 那时 `dragStartTarget` 还记着旧的坐标系，挪了就对不上。
+ */
+function renormalize() {
+    const n = state.items.length;
+    if (!n || dragging) return;
+    const k = Math.round(state.cur / n);
+    if (!k) return;
+    state.cur -= k * n;
+    state.target -= k * n;
 }
 
 /* ==========================================================================
@@ -1417,13 +1548,14 @@ viewerFrame.addEventListener('load', () => {
 
     /* demo 页左上角那个「← Demos」胶囊在浮层里是**多余的**：它会把
        iframe 自己导到索引页，用户就困在浮层里了。同源，可以直接塞一条
-       样式把它藏掉 —— 跨源的话这里会抛，catch 掉即可，不影响体验。 */
+       样式把它藏掉 —— 跨源的话这里会抛，catch 掉即可，不影响体验。
+       `.back` 是本页自己的返回胶囊，被别的画廊嵌进去时同理。 */
     try {
         const doc = viewerFrame.contentDocument;
         if (doc && doc.head && !doc.getElementById('lab-embed-style')) {
             const style = doc.createElement('style');
             style.id = 'lab-embed-style';
-            style.textContent = '.lab-back{display:none !important}';
+            style.textContent = '.lab-back,.back{display:none !important}';
             doc.head.appendChild(style);
         }
     } catch (_) { /* 跨源就随它去 */ }
@@ -1431,11 +1563,9 @@ viewerFrame.addEventListener('load', () => {
 
 viewerClose.addEventListener('click', closeViewer);
 viewer.querySelector('[data-close]').addEventListener('click', closeViewer);
-btnOpen.addEventListener('click', () => {
-    const nearest = Math.round(state.cur);
-    const idx = ((nearest % state.items.length) + state.items.length) % state.items.length;
-    openViewer(state.items[idx]);
-});
+
+/* 说明区没有按钮了：进预览的唯一入口就是**点上面那块焦点板**。
+   这既省掉一个重复的 CTA，也逼着两者在视觉上必须连起来（倒三角 + 竖线）。 */
 
 /* ==========================================================================
    5. 启动
@@ -1492,15 +1622,19 @@ async function boot() {
     startShader();
 
     let data = null;
+    const dataUrl = demosJsonUrl();
     try {
-        // 相对路径而不是绝对路径：整页复制到别的目录也能用
-        const res = await fetch('../../demos.json', { cache: 'no-cache' });
+        // 路径按地址栏现算：整页复制到任何目录都能用
+        const res = await fetch(dataUrl, { cache: 'no-cache' });
         if (res.ok) data = await res.json();
     } catch (_) { /* 落到下面的兜底 */ }
 
     if (!data) {
-        document.getElementById('empty').classList.add('is-on');
-        card.style.display = 'none';
+        const empty = document.getElementById('empty');
+        empty.querySelector('code').textContent = dataUrl;
+        empty.classList.add('is-on');
+        detailEl.style.display = 'none';
+        stemEl.style.display = 'none';
         return;
     }
 
@@ -1515,12 +1649,16 @@ async function boot() {
     buildPanels();
     render();
     requestAnimationFrame(tick);
+
+    // 字体晚到会改变标题/描述的换行 ⇒ 竖线长度得跟着重算
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(syncStem);
 }
 
 window.addEventListener('resize', () => {
     if (!state.items.length) return;
     measure();
     render();
+    syncStem();
 });
 
 boot();
