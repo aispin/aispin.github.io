@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-05T05:40:42.947Z",
+  "generatedAt": "2026-11-05T05:51:08.326Z",
   "count": 26,
   "demos": [
     {
@@ -9,16 +9,6 @@
       "url": "/demos/door.html",
       "dir": "public/demos",
       "entry": "door.html",
-      "readme": false,
-      "variants": []
-    },
-    {
-      "id": "lab",
-      "title": "创意实验 · CREATIVE LAB",
-      "description": "创意实验房间的静态原型：一圈悬浮的实验展板，点开就能在浮层里直接跑。",
-      "url": "/demos/lab.html",
-      "dir": "public/demos",
-      "entry": "lab.html",
       "readme": false,
       "variants": []
     },
@@ -296,6 +286,16 @@
       "description": "- 入口：index.html",
       "url": "/demos/web3d/rainy-night/",
       "dir": "public/demos/web3d/rainy-night",
+      "entry": "index.html",
+      "readme": true,
+      "variants": []
+    },
+    {
+      "id": "web3d/ring-gallery",
+      "title": "实验环 · RING GALLERY",
+      "description": "环形画廊：一圈悬浮展板，圆柱投影转动，点开在 iframe 浮层里直接体验。一个可复用的落地页模式。",
+      "url": "/demos/web3d/ring-gallery/",
+      "dir": "public/demos/web3d/ring-gallery",
       "entry": "index.html",
       "readme": true,
       "variants": []

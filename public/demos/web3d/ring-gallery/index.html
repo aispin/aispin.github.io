@@ -4,17 +4,26 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="robots" content="noindex" />
-<title>创意实验 · CREATIVE LAB</title>
-<meta name="description" content="创意实验房间的静态原型：一圈悬浮的实验展板，点开就能在浮层里直接跑。" />
+<title>实验环 · RING GALLERY</title>
+<meta name="description" content="环形画廊：一圈悬浮展板，圆柱投影转动，点开在 iframe 浮层里直接体验。一个可复用的落地页模式。" />
 <style>
 /* ==========================================================================
-   创意实验 · 静态原型
+   实验环 · RING GALLERY
    --------------------------------------------------------------------------
-   给 3D 房间定稿用的样板，不是最终形态。三件事先跑通：
+   **一个可复用的落地页模式**，不是某个房间的专用页面。它解决的是这一类
+   需求：「有 N 个互不相干的东西要展示，每个都值得点进去玩一下」。
+
+   三层结构，任何一层都可以单独换掉：
 
      1. 环境层：全屏 GLSL（星云 + 星点 + 环心冷光 + 暗角），鼠标轻微视差。
-     2. 展板层：25 块玻璃展板绕成一圈，滚动/拖动转动，正前方那块被抽出来。
-     3. 体验层：点开展板 → iframe 浮层里直接玩，不用跳走。
+        换配色只改 FRAG 里的三个 vec3。
+     2. 展板层：N 块玻璃展板绕成一圈，滚动/拖动转动，正前方那块被抽出来。
+        换内容只改 `buildLab()` 的输入 —— 现在读的是 demos.json。
+     3. 体验层：点开展板 → iframe 浮层里直接跑，不跳走（Esc / 点遮罩关闭）。
+        换成"弹窗里放视频 / 放代码"也只是换 overlay 的内容。
+
+   当前的用法：站内「创意实验」房间的静态原型（给 3D 房间定稿用）。
+   把 GROUPS 和 fetch 的地址换掉，就是另一个画廊。
 
    ── 为什么不用 CSS 3D（perspective + rotateY + translateZ）
    试过了，几何上做不到：要让正前方的展板保持 ~250px 的可读尺寸，
@@ -261,6 +270,32 @@ body {
 }
 
 /* ── HUD ─────────────────────────────────────────────────────────────── */
+
+/* 回索引。左上角是空的（左栏竖直居中），放这里不抢任何东西。 */
+.back {
+    position: fixed;
+    left: 22px;
+    top: 20px;
+    z-index: 9;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    letter-spacing: 0.05em;
+    text-decoration: none;
+    color: var(--mute);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: color 0.18s ease, border-color 0.18s ease;
+}
+
+.back:hover,
+.back:focus-visible {
+    color: var(--dim);
+    border-color: rgba(255, 255, 255, 0.22);
+}
 
 .hud {
     position: fixed;
@@ -732,6 +767,8 @@ body {
 </head>
 <body>
 
+<a class="back" href="../..">← Demos</a>
+
 <canvas id="bg" aria-hidden="true"></canvas>
 <div class="platform" aria-hidden="true"></div>
 <div class="strip" aria-hidden="true"></div>
@@ -787,8 +824,9 @@ body {
 
 <div class="empty" id="empty">
     <div>
-        取不到 <code>./demos.json</code>。<br />
-        这一页要通过 http 打开（<code>npm run dev</code> 之后访问 <code>/demos/lab.html</code>），<br />
+        取不到 <code>../../demos.json</code>。<br />
+        这一页要通过 http 打开（<code>npm run dev</code> 之后访问
+        <code>/demos/web3d/ring-gallery/</code>），<br />
         直接双击本地文件是不行的。
     </div>
 </div>
@@ -815,8 +853,19 @@ const GROUPS = [
 
 const GROUP_BY_ID = new Map(GROUPS.map((g) => [g.id, g]));
 
-/** 这一页自己也在 demos.json 里（根目录单文件 demo），环上别列出自己。 */
-const SELF_ID = 'lab';
+/**
+ * 环上别把**这一页自己**列进去。
+ *
+ * 从地址栏推而不是写死一个 id：这页本身也是 `demos.json` 里的一条
+ * （`web3d/ring-gallery`），换个目录名、或者把它复制成第二个画廊，
+ * 自我排除仍然成立。
+ *   /demos/web3d/ring-gallery/            → web3d/ring-gallery
+ *   /demos/web3d/ring-gallery/index.html  → web3d/ring-gallery
+ */
+const SELF_ID = location.pathname
+    .replace(/^.*?\/demos\//, '')
+    .replace(/index\.html$/, '')
+    .replace(/\/$/, '');
 
 /** 这个值在 measure() 里按视口算：见下面。 */
 let MAX_ANGLE = 31 * Math.PI / 180;
@@ -971,7 +1020,7 @@ function startShader() {
         gl.shaderSource(sh, src);
         gl.compileShader(sh);
         if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
-            console.warn('[lab] shader', gl.getShaderInfoLog(sh));
+            console.warn('[ring-gallery] shader', gl.getShaderInfoLog(sh));
             return null;
         }
         return sh;
@@ -1444,7 +1493,8 @@ async function boot() {
 
     let data = null;
     try {
-        const res = await fetch('./demos.json', { cache: 'no-cache' });
+        // 相对路径而不是绝对路径：整页复制到别的目录也能用
+        const res = await fetch('../../demos.json', { cache: 'no-cache' });
         if (res.ok) data = await res.json();
     } catch (_) { /* 落到下面的兜底 */ }
 
