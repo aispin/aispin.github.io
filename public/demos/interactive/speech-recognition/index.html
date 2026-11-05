@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>语音识别 · Speech Recognition</title>
+<meta name="description" content="浏览器原生 Web Speech API：中文 / English 两档，按住说话、实时出字幕。" />
+<link rel="stylesheet" href="../../_lab.css" />
+<style>
+    .stage {
+        width: min(560px, 100%);
+        padding: 30px 32px 34px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    h1 {
+        margin: 0 0 6px;
+        font-size: 17px;
+        letter-spacing: 0.01em;
+    }
+
+    .hint {
+        margin: 0 0 22px;
+        font-size: 12.5px;
+        color: #7c8798;
+        line-height: 1.7;
+    }
+
+    .langs {
+        display: flex;
+        gap: 18px;
+        margin-bottom: 20px;
+    }
+
+    /* 自绘单选：圆形指示点 + 标签 */
+    .radio {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 13px;
+        color: #b8c2d3;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .radio input {
+        appearance: none;
+        margin: 0;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: rgba(148, 163, 184, 0.3);
+        position: relative;
+        cursor: pointer;
+    }
+
+    .radio input:checked::after {
+        content: '';
+        position: absolute;
+        inset: 3px;
+        border-radius: 50%;
+        background: #8ba3ff;
+    }
+
+    button {
+        padding: 9px 20px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.06);
+        color: #e8edf7;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.16s ease, border-color 0.16s ease;
+    }
+
+    button:hover {
+        background: rgba(255, 255, 255, 0.12);
+        border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    button.is-live {
+        background: #d97706;
+        border-color: #f59e0b;
+        color: #1a1206;
+    }
+
+    .result {
+        margin-top: 18px;
+        min-height: 62px;
+        padding: 12px 14px;
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.32);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        font-size: 13.5px;
+        line-height: 1.75;
+        color: #cfd8e6;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    .result:empty::before {
+        content: '（这里会实时显示你说的话）';
+        color: #55607a;
+    }
+
+    .unsupported {
+        font-size: 13px;
+        color: #f0a3a3;
+        line-height: 1.8;
+    }
+
+    .unsupported a {
+        color: #8ba3ff;
+    }
+
+    [hidden] {
+        display: none !important;
+    }
+</style>
+</head>
+<body>
+<a class="lab-back" href="/demos/">← Demos</a>
+
+<div class="stage">
+    <h1>Speech Recognition</h1>
+    <p class="hint">用的是浏览器自带的 Web Speech API，不需要任何后端。首次点击会请求麦克风权限。</p>
+
+    <p class="unsupported" id="unsupported" hidden>
+        这个浏览器不支持 SpeechRecognition API，<a href="https://caniuse.com/mdn-api_speechrecognition" target="_blank" rel="noopener">看看哪些支持</a>。
+    </p>
+
+    <div id="app" hidden>
+        <div class="langs">
+            <label class="radio">
+                <input type="radio" name="lang" value="zh-CN" checked />
+                <span>中文</span>
+            </label>
+            <label class="radio">
+                <input type="radio" name="lang" value="en-US" />
+                <span>English (US)</span>
+            </label>
+        </div>
+
+        <button type="button" id="toggle">Press and talk</button>
+
+        <div class="result" id="result"></div>
+    </div>
+</div>
+
+<p class="lab-note">Web Speech API · 中文 / English 两档 · 边说边出字</p>
+
+<script>
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+
+    if (!SR) {
+        document.getElementById('unsupported').hidden = false
+    } else {
+        document.getElementById('app').hidden = false
+
+        const btn = document.getElementById('toggle')
+        const result = document.getElementById('result')
+        const radios = [...document.querySelectorAll('input[name="lang"]')]
+
+        const rec = new SR()
+        rec.lang = 'zh-CN'
+        rec.interimResults = true   // 边说边出字，不要等一句说完
+        rec.continuous = false
+
+        let listening = false
+
+        function paint() {
+            btn.textContent = listening ? 'Stop' : 'Press and talk'
+            btn.classList.toggle('is-live', listening)
+        }
+
+        function start() {
+            result.textContent = ''
+            try {
+                rec.start()
+            } catch {
+                /* 连点两下 start() 会抛 InvalidStateError，忽略即可 */
+            }
+        }
+
+        function stop() {
+            rec.stop()
+        }
+
+        rec.onstart = () => { listening = true; paint() }
+        rec.onend = () => { listening = false; paint() }
+        rec.onerror = () => { listening = false; paint() }
+
+        rec.onresult = (e) => {
+            let text = ''
+            for (const r of e.results) text += r[0].transcript
+            result.textContent = text
+        }
+
+        btn.addEventListener('click', () => (listening ? stop() : start()))
+
+        radios.forEach((r) => {
+            r.addEventListener('change', () => {
+                rec.lang = r.value
+                // 正在听就等它自己结束，别中途改语言（Chrome 会直接报错）
+                if (listening) stop()
+            })
+        })
+    }
+</script>
+</body>
+</html>

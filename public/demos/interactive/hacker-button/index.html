@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>黑客按钮 · Hacker Button</title>
+<meta name="description" content="点击后文字被随机字符逐位解码：从左往右一位位定下来，剩下的继续乱跳。" />
+<link rel="stylesheet" href="../../_lab.css" />
+<style>
+    .hacker {
+        position: relative;
+        padding: 12px 22px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: #fff;
+        color: #111827;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        cursor: pointer;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+        transition: background 0.16s ease, color 0.16s ease;
+        /* 解码过程中字符宽度会变，固定最小宽度免得按钮抖 */
+        min-width: 190px;
+        text-align: center;
+    }
+
+    .hacker:hover {
+        background: #f3f4f6;
+    }
+
+    .hacker:active {
+        background: #e5e7eb;
+    }
+
+    .hacker:disabled {
+        cursor: progress;
+    }
+
+    .caption {
+        margin-top: 16px;
+        font-size: 12px;
+        color: #55607a;
+        text-align: center;
+        letter-spacing: 0.02em;
+    }
+</style>
+</head>
+<body>
+<a class="lab-back" href="/demos/">← Demos</a>
+
+<div>
+    <button type="button" class="hacker" id="btn">Submit Form</button>
+    <p class="caption" id="caption">点一下试试</p>
+</div>
+
+<p class="lab-note">每 50ms 定下一个字符，剩下的用 a–z 随机字符顶着</p>
+
+<script>
+    const LABEL = 'Submit Form'
+    const CHARSET = 'abcdefghijklmnopqrstuvwxyz'
+    const btn = document.getElementById('btn')
+    const caption = document.getElementById('caption')
+
+    const randomChars = (n) =>
+        Array.from({ length: n }, () => CHARSET[Math.floor(Math.random() * CHARSET.length)]).join('')
+
+    let running = false
+
+    async function scramble(input) {
+        running = true
+        btn.disabled = true
+        caption.textContent = '解码中…'
+
+        let prefix = ''
+        for (let i = 0; i < input.length; i++) {
+            await new Promise((r) => setTimeout(r, 50))
+            prefix += input.charAt(i)
+            btn.textContent = prefix + randomChars(input.length - prefix.length)
+        }
+
+        btn.textContent = input
+        btn.disabled = false
+        running = false
+        caption.textContent = 'Submitted ✓（再点一次）'
+    }
+
+    btn.addEventListener('click', () => {
+        if (!running) scramble(LABEL)
+    })
+</script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>渐变霓虹文字 · Gradient Neon Text</title>
+<meta name="description" content="纯 CSS：用 border-box 渐变描边 + 多层 text-shadow 做渐变霓虹字，外圈光环反向旋转。" />
+<link rel="stylesheet" href="../../_lab.css" />
+<style>
+    /* 舞台：黑底 + 渐变描边的方框 */
+    .stage {
+        --neon-from: #00f3ff;
+        --neon-to: #fb3fff;
+        --neon-bg: #000;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 56px 72px;
+        border-radius: 8px;
+        border: 2px solid transparent;
+        /* 两层背景：内层纯黑铺 padding-box，外层渐变铺 border-box —— 
+           中间 2px 的透明边框就成了渐变描边。 */
+        background:
+            linear-gradient(var(--neon-bg), var(--neon-bg)) padding-box,
+            linear-gradient(90deg, var(--neon-from), var(--neon-to)) border-box;
+        box-shadow:
+            0 0 10px color-mix(in srgb, var(--neon-from) 50%, transparent),
+            0 0 20px color-mix(in srgb, var(--neon-to) 50%, transparent);
+    }
+
+    .neon {
+        --neon-text-color: #bf3fff;
+        position: relative;
+        z-index: 2;
+        margin: 0;
+        padding-bottom: 0.1em;
+        font-family: 'Jura', ui-sans-serif, system-ui, sans-serif;
+        font-size: 3rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        line-height: 1;
+        color: #fefcff;
+        text-shadow:
+            -0.2rem -0.2rem 1rem rgba(255, 255, 255, 0.25),
+            0.2rem 0.2rem 1rem rgba(255, 255, 255, 0.25),
+            0 0 2rem var(--neon-text-color),
+            0 0 4rem var(--neon-text-color),
+            0 0 6rem var(--neon-text-color),
+            0 0 8rem var(--neon-text-color),
+            0 0 10rem var(--neon-text-color);
+    }
+
+    /* 文字背后的光环：同一套渐变描边，压到 z-index:-1，边发光边慢转 */
+    .neon::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        margin: auto;
+        z-index: -1;
+        height: 180%;
+        aspect-ratio: 1 / 1;
+        border-radius: 50%;
+        border: 2px solid transparent;
+        background:
+            linear-gradient(var(--neon-bg), var(--neon-bg)) padding-box,
+            linear-gradient(90deg, var(--neon-from), var(--neon-to)) border-box;
+        animation:
+            neon-glow 1.5s ease-in-out infinite alternate,
+            neon-rotate 4s linear infinite;
+    }
+
+    @keyframes neon-glow {
+        from {
+            box-shadow:
+                0 0 10px rgba(0, 243, 255, 0.5),
+                0 0 20px rgba(251, 63, 255, 0.5);
+        }
+        to {
+            box-shadow:
+                0 0 20px rgba(0, 243, 255, 0.8),
+                0 0 40px rgba(251, 63, 255, 0.8);
+        }
+    }
+
+    @keyframes neon-rotate {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+</style>
+</head>
+<body>
+<a class="lab-back" href="/demos/">← Demos</a>
+
+<div class="stage">
+    <h1 class="neon">BOWEN</h1>
+</div>
+
+<p class="lab-note">纯 CSS · 渐变描边 + 七层 text-shadow · 光环反向慢转</p>
+</body>
+</html>

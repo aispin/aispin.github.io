@@ -12,8 +12,8 @@ import './ContentRoom.scss'
 import { sharedGeometry } from '../../../engine/resources';
 
 const ROOM_TITLES = {
-  zh: { career: '履历', studio: '项目与实验室', posts: '文稿与随笔', videos: '短视频作品', music: '原创音乐', ai: 'AI Skills 与应用' },
-  en: { career: 'Career', studio: 'Projects & labs', posts: 'Notes & writing', videos: 'Short videos', music: 'Original music', ai: 'AI skills & apps' },
+  zh: { career: '履历', studio: '创意实验', posts: '文稿与随笔', videos: '短视频作品', music: '原创音乐', ai: 'AI Skills 与应用' },
+  en: { career: 'Career', studio: 'Creative lab', posts: 'Notes & writing', videos: 'Short videos', music: 'Original music', ai: 'AI skills & apps' },
 }
 
 const ROOM_LABELS = {
@@ -808,6 +808,40 @@ export default function ContentRoom({ roomId, showRoom, onReady }) {
     return map
   }, [])
 
+  /**
+   * 「创意实验」房间的内容来源：`public/demos/demos.json`。
+   *
+   * 原来这里读 `src/data/labs.json` —— 10 条 Vue SFC 片段塞在 markdown 里，
+   * 卡片点开只能看代码。2026-11-05 全部落成了真页面（`public/demos/
+   * text-effects|interactive|css-art/*`），labs.json 已删。
+   *
+   * 🔴 走 **fetch** 而不是 `import`：demos.json 是 `scripts/build-demos-index.mjs`
+   * 每次构建重新生成的，public/ 下的文件也不该被当模块打包（会多出一份副本，
+   * 而且构建脚本在 buildStart 才写它）。运行时取一次，天然跟着产物走。
+   */
+  const [demoRows, setDemoRows] = useState([])
+  useEffect(() => {
+    if (roomId !== 'studio') return undefined
+    let alive = true
+    fetch('/demos/demos.json')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!alive || !data) return
+        setDemoRows((data.demos || []).map((d) => ({
+          id: `demo:${d.id}`,
+          category: 'demo',
+          title: d.title,
+          description: d.description || d.url,
+          url: d.url,
+          external: true,
+          tag: 'DEMO',
+          footer: d.url,
+        })))
+      })
+      .catch(() => { /* 取不到就当这个房间只有项目，不要把房间搞崩 */ })
+    return () => { alive = false }
+  }, [roomId])
+
   const rows = useMemo(() => {
     if (roomId === 'career') {
       // Every role, newest first. `experiences.json` already stores them in
@@ -838,7 +872,7 @@ export default function ContentRoom({ roomId, showRoom, onReady }) {
     if (roomId === 'studio') {
       return [
         ...getLocalizedCollection('projects', language).map((item) => ({ ...item, title: item.name, category: 'project' })),
-        ...getLocalizedCollection('labs', language).map((item) => ({ ...item, category: 'lab' })),
+        ...demoRows,
       ]
     }
     if (roomId === 'posts') {
@@ -861,7 +895,7 @@ export default function ContentRoom({ roomId, showRoom, onReady }) {
     if (roomId === 'music') return getLocalizedCollection('music', language)
     if (roomId === 'ai') return getLocalizedCollection('aiProjects', language)
     return []
-  }, [roomId, language])
+  }, [roomId, language, demoRows])
 
   const pageCount = Math.max(1, Math.ceil(rows.length / perPage))
 
@@ -915,7 +949,7 @@ export default function ContentRoom({ roomId, showRoom, onReady }) {
     if (item.category === 'novel') return 'articles'
     if (item.category === 'experience') return 'experience'
     if (roomId === 'posts') return 'articles'
-    if (roomId === 'studio') return item.category === 'lab' ? 'labs' : 'projects'
+    if (roomId === 'studio') return 'projects'
     if (roomId === 'music') return 'music'
     if (roomId === 'videos') return 'videos'
     if (roomId === 'ai') return 'aiProjects'

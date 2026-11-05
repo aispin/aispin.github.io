@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>霓虹文字 · Neon Text</title>
+<meta name="description" content="纯 CSS 霓虹灯管字：-webkit-text-stroke 描边 + 多层 text-shadow 发光，背后一圈脉冲光晕。" />
+<link rel="stylesheet" href="../../_lab.css" />
+<style>
+    .stage {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 64px 72px;
+    }
+
+    .neon {
+        --neon-color: #04f;
+        position: relative;
+        z-index: 2;
+        margin: 0;
+        padding-bottom: 0.1em;
+        font-family: 'Jura', ui-sans-serif, system-ui, sans-serif;
+        font-size: 3rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        line-height: 1;
+        color: #fefcff;
+        /* 1px 的浅色描边是"灯管玻璃"的那道边 */
+        -webkit-text-stroke: 1px #4cf1ff;
+        text-shadow:
+            -0.2rem -0.2rem 1rem rgba(255, 255, 255, 0.25),
+            0.2rem 0.2rem 1rem rgba(255, 255, 255, 0.25),
+            0 0 2rem var(--neon-color),
+            0 0 4rem var(--neon-color),
+            0 0 6rem var(--neon-color),
+            0 0 8rem var(--neon-color),
+            0 0 10rem var(--neon-color);
+    }
+
+    /* 背后的圆圈灯管：内外两层 box-shadow，脉冲 */
+    .neon::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        margin: auto;
+        z-index: -1;
+        height: 180%;
+        aspect-ratio: 1 / 1;
+        border: 0.03em solid #fff;
+        border-radius: 50%;
+        animation: neon-pulse 1.5s ease-in-out infinite alternate;
+    }
+
+    @keyframes neon-pulse {
+        from {
+            box-shadow:
+                0 0 5px #fff, 0 0 10px #fff,
+                0 0 15px #04f, 0 0 20px #04f;
+        }
+        to {
+            box-shadow:
+                0 0 2px #fff, 0 0 5px #fff,
+                0 0 10px #04f, 0 0 15px #04f;
+        }
+    }
+</style>
+</head>
+<body>
+<a class="lab-back" href="/demos/">← Demos</a>
+
+<div class="stage">
+    <h1 class="neon">BOWEN</h1>
+</div>
+
+<p class="lab-note">纯 CSS · text-stroke 描边 + 五层发光 · 光圈 1.5s 脉冲</p>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>火箭 · Rocket</title>
+<meta name="description" content="鼠标移上去就点火：机身从上下浮动改成高频抖动，背后的速度线同时提速。" />
+<link rel="stylesheet" href="../../_lab.css" />
+<style>
+    .stage {
+        --streak-speed: 2s;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: min(620px, 100%);
+        height: 260px;
+        overflow: hidden;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: radial-gradient(120% 120% at 20% 50%, #141a26 0%, #0b0d12 70%);
+        cursor: pointer;
+    }
+
+    .rocket {
+        position: relative;
+        z-index: 2;
+        display: block;
+        width: 76px;
+        height: 76px;
+        animation: move 1s linear infinite;
+    }
+
+    .rocket svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+        /* 火箭默认朝上，转 90° 让它朝右飞 */
+        transform: rotate(90deg);
+    }
+
+    /* 点火：换成抖动，速度线同时加速 */
+    .stage.is-fast {
+        --streak-speed: 0.5s;
+    }
+
+    .stage.is-fast .rocket {
+        animation: shake 0.5s linear infinite;
+    }
+
+    /* 速度线：从左侧划到右侧，长度只有舞台的 1/5 */
+    .streak {
+        position: absolute;
+        left: 0;
+        width: 20%;
+        height: 2px;
+        border-radius: 2px;
+        background: linear-gradient(90deg, transparent, rgba(226, 232, 240, 0.55));
+        animation: streaks linear infinite;
+        animation-duration: var(--streak-speed);
+    }
+
+    @keyframes move {
+        0% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+        100% { transform: translateY(0); }
+    }
+
+    /* 手写的紧凑版抖动：原版有 50 帧关键帧，这里只留幅度递增的几拍，
+       读起来是一样的"高频震" */
+    @keyframes shake {
+        0% { transform: translate(0, 0) rotate(0deg); }
+        10% { transform: translate(2.5px, 1.5px) rotate(-0.6deg); }
+        20% { transform: translate(-1.5px, 0.5px) rotate(0.6deg); }
+        30% { transform: translate(2px, 2px) rotate(-0.4deg); }
+        40% { transform: translate(-2px, -1.5px) rotate(0.8deg); }
+        50% { transform: translate(1.5px, 0.5px) rotate(-0.8deg); }
+        60% { transform: translate(-1px, 1.5px) rotate(0.4deg); }
+        70% { transform: translate(2px, -1px) rotate(-0.6deg); }
+        80% { transform: translate(-2px, 0.5px) rotate(0.6deg); }
+        90% { transform: translate(1px, -1.5px) rotate(-0.3deg); }
+        100% { transform: translate(0, 0) rotate(0deg); }
+    }
+
+    @keyframes streaks {
+        to { left: 100%; }
+    }
+</style>
+</head>
+<body>
+<a class="lab-back" href="/demos/">← Demos</a>
+
+<div class="stage" id="stage">
+    <span class="rocket">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+            <path d="M24 3c6.2 5.6 9.4 13 9.4 20.8V30l-4.2 4.2H18.8L14.6 30v-6.2C14.6 16 17.8 8.6 24 3z"
+                  fill="#e2e8f0" />
+            <circle cx="24" cy="18.5" r="4.2" fill="#0b0d12" stroke="#8ba3ff" stroke-width="2" />
+            <path d="M14.6 25.4L8 33.6l6.6-1.6z" fill="#94a3b8" />
+            <path d="M33.4 25.4L40 33.6l-6.6-1.6z" fill="#94a3b8" />
+            <path d="M19.4 34.2h9.2L24 45z" fill="#f59e0b" />
+        </svg>
+    </span>
+    <!-- 速度线由脚本生成，位置/延迟随机，避免五条排成整齐的直线 -->
+</div>
+
+<p class="lab-note">鼠标移上去点火 · 机身抖动 + 速度线 2s → 0.5s</p>
+
+<script>
+    const stage = document.getElementById('stage')
+
+    for (let i = 0; i < 5; i++) {
+        const s = document.createElement('span')
+        s.className = 'streak'
+        s.style.top = Math.random() * 100 + '%'
+        s.style.animationDelay = Math.random() + 's'
+        stage.appendChild(s)
+    }
+
+    stage.addEventListener('mouseenter', () => stage.classList.add('is-fast'))
+    stage.addEventListener('mouseleave', () => stage.classList.remove('is-fast'))
+</script>
+</body>
+</html>

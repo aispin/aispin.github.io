@@ -1,0 +1,67 @@
+/* 创意实验（原「工作室」）里那些小 demo 的公共外壳。
+   每个页面只关心自己的舞台，深色底、左上角返回、底部说明都在这里。
+   路径约定：/demos/<类别>/<slug>/index.html ⇒ 引用 ../../_lab.css */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    padding: 64px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0b0d12;
+    color: #e8edf7;
+    font-family: ui-sans-serif, system-ui, -apple-system, 'PingFang SC',
+        'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+.lab-back {
+    position: fixed;
+    left: 18px;
+    top: 16px;
+    z-index: 9;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    color: #9aa6bb;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.lab-back:hover {
+    color: #e8edf7;
+    border-color: rgba(255, 255, 255, 0.28);
+}
+
+/* 底部一行小字：说清这是什么、怎么交互。 */
+.lab-note {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 14px;
+    text-align: center;
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: #4f596b;
+    letter-spacing: 0.03em;
+    pointer-events: none;
+}

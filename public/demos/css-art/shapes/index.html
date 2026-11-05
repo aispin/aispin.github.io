@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>纯 CSS 形状 · Shapes</title>
+<meta name="description" content="只用 border 和 transform 拼出来的四个几何图形：三角、五角星、沙漏、平行四边形。" />
+<link rel="stylesheet" href="../../_lab.css" />
+<style>
+    /* 浅色卡片：深色图形放在深色页面上会看不见 */
+    .board {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 46px;
+        align-items: center;
+        justify-items: center;
+        padding: 52px 56px;
+        border-radius: 14px;
+        background: #f3f4f6;
+    }
+
+    .cell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 22px;
+        /* 每个格子固定高度，图形大小不同也不会把行撑歪 */
+        height: 92px;
+        justify-content: center;
+    }
+
+    .name {
+        font-size: 10.5px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #9ca3af;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    /* ① 三角形：宽高 0，靠左右透明边框 + 下边框实色"切"出来 */
+    .triangle {
+        width: 0;
+        height: 0;
+        border-left: 30px solid transparent;
+        border-right: 30px solid transparent;
+        border-bottom: 50px solid #1f2937;
+    }
+
+    /* ② 五角星：三个三角形叠出来 —— 一个正向、两个反向旋转贴边 */
+    .star {
+        position: relative;
+        width: 0;
+        height: 0;
+        margin: 17.5px 0;
+        border-left: 35px solid transparent;
+        border-right: 35px solid transparent;
+        border-bottom: 24.5px solid #ef4444;
+        transform: rotate(35deg);
+    }
+
+    .star::before,
+    .star::after {
+        content: '';
+        position: absolute;
+        width: 0;
+        height: 0;
+    }
+
+    .star::before {
+        border-bottom: 28px solid #ef4444;
+        border-left: 10.5px solid transparent;
+        border-right: 10.5px solid transparent;
+        top: -15.75px;
+        left: -22.75px;
+        transform: rotate(-35deg);
+    }
+
+    .star::after {
+        border-bottom: 24.5px solid #ef4444;
+        border-left: 35px solid transparent;
+        border-right: 35px solid transparent;
+        top: 1.05px;
+        left: -36.75px;
+        transform: rotate(-70deg);
+    }
+
+    /* ③ 沙漏：左右透明 + 上下实色 */
+    .hourglass {
+        width: 0;
+        height: 0;
+        border-left: 20px solid transparent;
+        border-right: 20px solid transparent;
+        border-top: 25px solid #6366f1;
+        border-bottom: 25px solid #6366f1;
+    }
+
+    /* ④ 平行四边形：矩形 + 横向斜切 */
+    .parallelogram {
+        width: 80px;
+        height: 48px;
+        background: #14b8a6;
+        transform: skewX(-16deg);
+    }
+
+    @media (max-width: 720px) {
+        .board {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 34px;
+            padding: 36px 30px;
+        }
+    }
+</style>
+</head>
+<body>
+<a class="lab-back" href="/demos/">← Demos</a>
+
+<div class="board">
+    <div class="cell"><div class="triangle"></div><span class="name">triangle</span></div>
+    <div class="cell"><div class="star"></div><span class="name">star</span></div>
+    <div class="cell"><div class="hourglass"></div><span class="name">hourglass</span></div>
+    <div class="cell"><div class="parallelogram"></div><span class="name">skew</span></div>
+</div>
+
+<p class="lab-note">全部用 border 宽度 + transform 拼出来，没有一个 SVG</p>
+</body>
+</html>

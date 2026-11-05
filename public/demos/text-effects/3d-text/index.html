@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>3D 立体字 · 3D Text</title>
+<meta name="description" content="纯 CSS 立体字：26 层 1px 递增的 text-shadow 堆出厚度，不用任何 3D 变换。" />
+<link rel="stylesheet" href="../../_lab.css" />
+<style>
+    :root {
+        --depth: rgb(33, 45, 53);
+        --depth-red: #bd2620;
+    }
+
+    body {
+        background: #0f1216;
+    }
+
+    .stage {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 46px;
+        padding: 40px 24px;
+    }
+
+    /* 26 层 text-shadow，每层比上一层右下挪 1px —— 这就是"厚度" */
+    .text-3d {
+        margin: 0;
+        font-family: Futura, 'Trebuchet MS', Arial, sans-serif;
+        font-size: clamp(2rem, 6vw, 4rem);
+        font-weight: 700;
+        letter-spacing: 0.2rem;
+        color: #fff;
+        text-shadow:
+            1px 1px 0 var(--depth), 2px 2px 0 var(--depth),
+            3px 3px 0 var(--depth), 4px 4px 0 var(--depth),
+            5px 5px 0 var(--depth), 6px 6px 0 var(--depth),
+            7px 7px 0 var(--depth), 8px 8px 0 var(--depth),
+            9px 9px 0 var(--depth), 10px 10px 0 var(--depth),
+            11px 11px 0 var(--depth), 12px 12px 0 var(--depth),
+            13px 13px 0 var(--depth), 14px 14px 0 var(--depth),
+            15px 15px 0 var(--depth), 16px 16px 0 var(--depth),
+            17px 17px 0 var(--depth), 18px 18px 0 var(--depth),
+            19px 19px 0 var(--depth), 20px 20px 0 var(--depth),
+            21px 21px 0 var(--depth), 22px 22px 0 var(--depth),
+            23px 23px 0 var(--depth), 24px 24px 0 var(--depth),
+            25px 25px 0 var(--depth), 26px 26px 0 var(--depth);
+    }
+
+    /* 第二款：橙色 + 红色侧壁，em 单位跟着字号缩放 */
+    .text-3d--red {
+        font-family: 'Teko', 'Futura', sans-serif;
+        font-size: clamp(1.6rem, 4.4vw, 2.6rem);
+        letter-spacing: 0.1rem;
+        text-transform: uppercase;
+        color: #fea42a;
+        text-shadow:
+            0.03em 0.03em 0.05em rgba(0, 0, 0, 0.2),
+            0.01em 0.01em 0 var(--depth-red),
+            0.02em 0.02em 0 var(--depth-red),
+            0.03em 0.03em 0 var(--depth-red),
+            0.03em 0.04em 0 var(--depth-red),
+            0.05em 0.05em 0 var(--depth-red),
+            0.05em 0.06em 0 var(--depth-red),
+            0.05em 0.07em 0 var(--depth-red);
+    }
+
+    .text-3d--red small {
+        font-size: 0.5em;
+        vertical-align: top;
+    }
+
+    .panel {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 34px 56px;
+        border-radius: 12px;
+        background: rgb(28, 38, 45);
+    }
+</style>
+</head>
+<body>
+<a class="lab-back" href="/demos/">← Demos</a>
+
+<div class="stage">
+    <h1 class="text-3d">Bowen Studio</h1>
+    <div class="panel">
+        <h2 class="text-3d--red"><small>“</small>Bowen Studio<small>”</small></h2>
+    </div>
+</div>
+
+<p class="lab-note">纯 CSS · 26 层 text-shadow 堆厚度 · 第二款用 em 让厚度跟着字号缩放</p>
+</body>
+</html>

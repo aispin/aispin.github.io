@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>滚动文字 · Text Rotator</title>
+<meta name="description" content="纯 CSS 文字轮播：一个定高的窗口 + 一条 6 行的列表，用 cubic-bezier 做停顿式上滚。" />
+<link rel="stylesheet" href="../../_lab.css" />
+<style>
+    /* 一行的高度 = font-size × line-height，窗口和每个 li 都用它，动画才能严丝合缝 */
+    .card {
+        --line: 1.40625rem;
+        padding: 22px 28px;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+        background: #f3f4f6;
+        font-size: 1.125rem;
+        line-height: 1.25;
+        font-weight: 800;
+        color: #374151;
+    }
+
+    .card__text {
+        text-wrap: balance;
+    }
+
+    /* 只露出「一行」的窗口 */
+    .rotator {
+        display: inline-flex;
+        flex-direction: column;
+        height: var(--line);
+        overflow: hidden;
+        vertical-align: bottom;
+    }
+
+    .rotator ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        text-align: left;
+        animation: text-slide 12.5s cubic-bezier(0.83, 0, 0.17, 1) infinite;
+    }
+
+    .rotator li {
+        display: block;
+        height: var(--line);
+        line-height: var(--line);
+        white-space: nowrap;
+    }
+
+    /* 每 12.5s 走完 6 条：停 16% 再挪一格，共 5 次 ⇒ 100% 正好回到第 6 条 */
+    @keyframes text-slide {
+        0%, 16%   { transform: translateY(0%); }
+        20%, 36%  { transform: translateY(-16.66%); }
+        40%, 56%  { transform: translateY(-33.33%); }
+        60%, 76%  { transform: translateY(-50%); }
+        80%, 96%  { transform: translateY(-66.66%); }
+        100%      { transform: translateY(-83.33%); }
+    }
+
+    .c-indigo { color: #6366f1; }
+    .c-rose   { color: #f43f5e; }
+    .c-amber  { color: #eab308; }
+    .c-teal   { color: #14b8a6; }
+    .c-pink   { color: #ec4899; }
+    .c-sky    { color: #0ea5e9; }
+</style>
+</head>
+<body>
+<a class="lab-back" href="/demos/">← Demos</a>
+
+<div class="card">
+    <div class="card__text">
+        We design and develop the best
+        <span class="rotator">
+            <ul>
+                <li class="c-indigo">Mobile apps</li>
+                <li class="c-rose">Websites</li>
+                <li class="c-amber">Admin dashboards</li>
+                <li class="c-teal">Landing pages</li>
+                <li class="c-pink">Illustrations</li>
+                <li class="c-sky">Icons</li>
+            </ul>
+        </span>
+    </div>
+</div>
+
+<p class="lab-note">纯 CSS · 定高窗口 + 6 行列表 · 12.5s 一个循环，每格停 2s</p>
+</body>
+</html>

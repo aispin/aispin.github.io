@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>加密文字 · Encrypted Text</title>
+<meta name="description" content="整片随机字符，只在你鼠标周围开一个圆形孔洞能看清 —— 用 radial-gradient 遮罩 + requestAnimationFrame 重刷。" />
+<link rel="stylesheet" href="../../_lab.css" />
+<style>
+    .card {
+        position: relative;
+        width: min(560px, 100%);
+        height: 220px;
+        overflow: hidden;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: #0e1117;
+        font-size: 13px;
+        cursor: crosshair;
+    }
+
+    /* 一整片随机字符。只有 --x / --y 那个圆里的部分可见。 */
+    .letters {
+        --x: 50%;
+        --y: 50%;
+        position: absolute;
+        inset: 0;
+        padding: 8px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        line-height: 1.15;
+        letter-spacing: 0.06em;
+        color: #cbd5e1;
+        word-wrap: break-word;
+        overflow: hidden;
+        user-select: none;
+        /* 两层遮罩相乘：外面一圈柔和的衰减 + 中间实心，边界才不会硬 */
+        -webkit-mask-image: radial-gradient(
+            circle 110px at var(--x) var(--y),
+            #000 0%,
+            #000 42%,
+            transparent 78%
+        );
+        mask-image: radial-gradient(
+            circle 110px at var(--x) var(--y),
+            #000 0%,
+            #000 42%,
+            transparent 78%
+        );
+    }
+
+    .label {
+        position: absolute;
+        left: 14px;
+        bottom: 12px;
+        z-index: 2;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #475569;
+        pointer-events: none;
+    }
+</style>
+</head>
+<body>
+<a class="lab-back" href="/demos/">← Demos</a>
+
+<div class="card" id="card">
+    <div class="letters" id="letters"></div>
+    <span class="label">Move your cursor</span>
+</div>
+
+<p class="lab-note">随机字符铺满 · 圆形遮罩跟着指针 · 每帧重刷 600 个字符</p>
+
+<script>
+    const CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    const card = document.getElementById('card')
+    const letters = document.getElementById('letters')
+
+    const randomChar = () => CHARS[Math.floor(Math.random() * CHARS.length)]
+    const randomString = (n) => Array.from({ length: n }, randomChar).join('')
+
+    let queued = false
+    let pendingX = 0
+    let pendingY = 0
+
+    /* 指针每动一下都会来事件，但重排 600 个字符很贵 —— 合并到一帧里做一次，
+       否则快速划动时会把主线程打满（这就是 requestAnimationFrame 在这里的作用）。 */
+    function flush() {
+        queued = false
+        letters.style.setProperty('--x', pendingX + 'px')
+        letters.style.setProperty('--y', pendingY + 'px')
+        letters.textContent = randomString(600)
+    }
+
+    card.addEventListener('mousemove', (e) => {
+        const rect = card.getBoundingClientRect()
+        pendingX = e.clientX - rect.left
+        pendingY = e.clientY - rect.top
+        if (!queued) {
+            queued = true
+            requestAnimationFrame(flush)
+        }
+    })
+
+    // 初始先铺满，别等鼠标进来才有东西
+    letters.textContent = randomString(600)
+</script>
+</body>
+</html>
