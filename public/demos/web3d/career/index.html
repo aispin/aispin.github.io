@@ -183,13 +183,20 @@
   }
   .modal-card::-webkit-scrollbar{width:6px}
   .modal-card::-webkit-scrollbar-thumb{background:rgba(139,163,255,.3);border-radius:3px}
+  /* 关闭按钮的 sticky 轨道：height:0 不占布局，滚动时自己贴住 scrollport 顶边。 */
+  .modal-close-rail{
+    position:sticky;top:0;z-index:2;height:0;
+    display:flex;justify-content:flex-end;pointer-events:none;
+  }
   .modal-close{
-    position:absolute;top:14px;right:14px;z-index:2;
+    pointer-events:auto;margin:14px 14px 0 0;
     width:34px;height:34px;border-radius:50%;cursor:pointer;
-    background:rgba(8,10,16,.72);color:#dfe5f0;font-size:15px;line-height:1;
+    /* 滚动时会压在正文上 ⇒ 底色加厚 + 轻微模糊，别让文字透出来 */
+    background:rgba(8,10,16,.92);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    color:#dfe5f0;font-size:15px;line-height:1;
     border:1px solid rgba(255,255,255,.16);
   }
-  .modal-close:hover{background:rgba(139,163,255,.28)}
+  .modal-close:hover{background:rgba(139,163,255,.42)}
   .modal-hero{
     /* 🔴 用**高度**封顶，不要 `aspect-ratio` + `max-height` —— 后者会让
        宽高比反过来决定宽度（980 的卡里只画出 604 的图，右边留一块暗带）。
@@ -278,7 +285,12 @@
 
 <div class="modal" id="modal">
   <div class="modal-card">
-    <button class="modal-close" id="modal-close" aria-label="关闭">✕</button>
+    <!-- 关闭按钮钉在卡上、不跟着滚：卡片自己是滚动容器，按钮又必须 absolute
+         压在头图上（绝对定位不参与流，sticky 无从生效）⇒ 套一层 0 高度轨道。
+         与站内 CareerProjectModal 同一套写法。 -->
+    <div class="modal-close-rail">
+      <button class="modal-close" id="modal-close" aria-label="关闭">✕</button>
+    </div>
     <div class="modal-hero" id="modal-hero"></div>
     <div class="modal-body">
       <div class="modal-date" id="modal-date"></div>

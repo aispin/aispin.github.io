@@ -40,23 +40,44 @@
         }
     }
 
-    &__close {
-        position: absolute;
-        top: 14px;
-        right: 14px;
+    /* 关闭按钮的 sticky 轨道。
+       🔴 不能直接把按钮写成 `position: sticky`：它必须 `absolute` 压在头图上，
+       而**绝对定位元素不参与流**，sticky 是相对流内位置生效的，写了等于没写。
+       所以套一层 0 高度的轨道当"流内锚点"：
+         · `height: 0` ⇒ 不占布局，头图仍然从卡片顶边开始（与改前逐像素一致）
+         · `position: sticky; top: 0` ⇒ 滚动时轨道自己贴住 scrollport 顶边，
+           里面的按钮跟着一起停住
+         · `pointer-events: none` + 按钮 `auto` ⇒ 这层不拦截头图的点击/拖拽
+       按钮的 14px 内边距改成 `margin`，否则 `top: 14px` 会与 margin 叠加成 28px。 */
+    &__close-rail {
+        position: sticky;
+        top: 0;
         z-index: 3;
+        display: flex;
+        justify-content: flex-end;
+        height: 0;
+        pointer-events: none;
+    }
+
+    &__close {
+        pointer-events: auto;
+        margin: 14px 14px 0 0;
         width: 34px;
         height: 34px;
         border-radius: 50%;
         cursor: pointer;
-        background: rgba(8, 10, 16, 0.72);
+        /* 改前它只压在头图上，0.72 的半透明没问题；现在滚动时它会压在正文上，
+           文字会从底下透出来 ⇒ 加厚底色 + 轻微模糊，读起来是个实心控件。 */
+        background: rgba(8, 10, 16, 0.92);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
         color: #dfe5f0;
         font-size: 15px;
         line-height: 1;
         border: 1px solid rgba(255, 255, 255, 0.16);
 
         &:hover {
-            background: rgba(139, 163, 255, 0.28);
+            background: rgba(139, 163, 255, 0.42);
         }
     }
 

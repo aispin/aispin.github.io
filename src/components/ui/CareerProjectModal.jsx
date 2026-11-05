@@ -164,14 +164,20 @@ const CareerProjectModal = ({ project, onClose }) => {
         >
             <div className="career-project__backdrop" onClick={onClose} />
             <div className="career-project__card" ref={cardRef}>
-                <button
-                    type="button"
-                    className="career-project__close"
-                    onClick={onClose}
-                    aria-label={copy.close}
-                >
-                    ×
-                </button>
+                {/* 关闭按钮要**钉在卡上、不跟着滚**。卡片自己就是滚动容器，
+                    所以不能直接给按钮 sticky（它还得 absolute 压在头图上，
+                    绝对定位不参与流，sticky 无从生效）—— 外面套一层 0 高度的
+                    sticky 轨道，见 CareerProjectModal.scss 的说明。 */}
+                <div className="career-project__close-rail">
+                    <button
+                        type="button"
+                        className="career-project__close"
+                        onClick={onClose}
+                        aria-label={copy.close}
+                    >
+                        ×
+                    </button>
+                </div>
 
                 <div
                     className={`career-project__hero${portrait ? ' is-fit' : ''}${loaded ? '' : ' is-empty'}`}
