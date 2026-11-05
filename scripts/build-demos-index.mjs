@@ -207,13 +207,27 @@ export function buildDemosIndex({ quiet = false } = {}) {
   const demos = collect()
   const written = writeMissingReadmes(demos)
 
-  const payload = {
+  const next = {
     generatedAt: new Date().toISOString(),
     count: demos.length,
     demos,
   }
 
-  writeFileSync(join(DEMOS_DIR, 'demos.json'), JSON.stringify(payload, null, 2) + '\n', 'utf8')
+  /* 内容没变就**原样保留旧的 generatedAt**。
+     否则每次 dev/build 都会留一行"只改了时间戳"的 diff —— 真正的改动会被
+     这行噪音淹掉。判据只看 demos 数组，时间戳本身不参与比较。 */
+  const jsonPath = join(DEMOS_DIR, 'demos.json')
+  let payload = next
+  if (existsSync(jsonPath)) {
+    try {
+      const prev = JSON.parse(readFileSync(jsonPath, 'utf8'))
+      if (prev.count === next.count && JSON.stringify(prev.demos) === JSON.stringify(next.demos)) {
+        payload = prev
+      }
+    } catch { /* 旧文件坏了就按新的重写 */ }
+  }
+
+  writeFileSync(jsonPath, JSON.stringify(payload, null, 2) + '\n', 'utf8')
   writeFileSync(join(DEMOS_DIR, 'index.html'), renderLanding(demos), 'utf8')
 
   if (!quiet) {
