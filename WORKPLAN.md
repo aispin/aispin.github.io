@@ -49,7 +49,7 @@
 - **需求原文**：「现在创意实验的排版很简陋，我希望酷炫的 web3d（svg, canvas,
   webgl, glsl shader 等技术），并且每个 demo 可以通过 iframe 浮层去体验效果。
   先在 demos 目录实现静态 demo 效果，我确认后再整合到 3d 房间。」
-- **已做（`f6fb21b`）**：`public/demos/lab.html` —— 全屏 GLSL 星云 +
+- **已做（`f6fb21b`）**：`public/demos/web3d/ring-gallery/` —— 全屏 GLSL 星云 +
   25 块玻璃展板绕成一圈（圆柱投影 x = f·tanθ）+ iframe 浮层。
   桌面一屏 4 块、手机 1 块，滚动/拖动转动，点焦点板开浮层。
 - **待你确认**：视觉方向（深空星云 + 玻璃展板 + 类别色弧）与交互
@@ -58,7 +58,7 @@
   同 `CareerTunnel` 的骨架）、`ui/StudioHud.jsx`、`state/studioLab.js`，
   并把 `studio` 从 `CONTENT_ROOM_IDS` 里摘掉、`RoomWarmup` 的预热副本换房间。
   ⚠️ 半成品已经写好并暂存在 `.workbuddy-ai/wip/studio-lab/`（未接线、
-  未提交），整合时以 `lab.html` 定稿的视觉为准重写，别直接拿来用。
+  未提交），整合时以 `ring-gallery/index.html` 定稿的视觉为准重写，别直接拿来用。
 
 ---
 
