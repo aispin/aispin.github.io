@@ -27,10 +27,18 @@
 
     position: fixed;
     inset: 0;
-    /* 压住画布和站内导航：环是满屏的，导航在它下面才不会被展板切断。
-       🔴 浮层（.viewer）必须放在**这一层里面**才能盖住导航；放到外面就
-          成了"z-index 1400 但被父级 950 的层叠上下文关住"，反而不生效。 */
-    z-index: 950;
+    /* 🔴 **低于**站内导航（`.navigation-ui` 是 100），不是高于。
+       这一条被改过两次，写清楚为什么：
+       · 环是满屏的，`.stage` 又必须 `pointer-events: auto`（拖动转环），
+         于是它会在左上角把站内那颗返回键**盖在下面** —— 看得见（本层背景
+         透明）但点不到。
+       · 一度把本层抬到 950 去压住导航，结果左上角只能自己再画一颗
+         "← 退出房间"，和站内那颗叠在一起（用户 2026-11-05 报的"重复"）。
+       · 压到导航下面之后：退出只走站内那颗（和 `career` 一致），本层只管
+         展板。浮层要盖住全部控件时靠 `.is-viewing` 临时抬到 1500。
+       也不能抬到 1000 以上去"顺手压住 SiteControls"——那会让导航按钮浮到
+       Preloader 上面。 */
+    z-index: 90;
     overflow: hidden;
     color: var(--ink);
     font-family: var(--font);
@@ -715,7 +723,12 @@
             flex-wrap: wrap;
             justify-content: center;
             gap: 2px 10px;
-            width: calc(100vw - 24px);
+            /* 🔴 两侧各让出 60px，给右上角那排站内图标（18 + 42 ≈ 60）。
+               原来是 `100vw - 24px` —— demo 里没有那排图标，搬进房间后
+               最后一个类别（「其它」）正好压在齿轮/音频两颗按钮下面，
+               既被挡又点不到（420px 实测：chip x352~391 与按钮 x362~408 相交）。
+               让出之后 6 个类别折成两行，也不影响下面的展板。 */
+            width: calc(100vw - 120px);
         }
 
         .hud__rail::before { display: none; }
@@ -735,10 +748,6 @@
         .hud__desc { font-size: 11.5px; line-height: 1.65; -webkit-line-clamp: 3; line-clamp: 3; }
         .hud__hint { display: none; }
         .hud__tagline { display: none; }
-        /* 返回胶囊只留箭头：居中标题在 420px 宽时会顶到"← 退出房间"的右边缘，
-            去掉文字后左边只剩一个 30px 的圆角方块，压不到标题。 */
-        .hud__back { left: 12px; top: 14px; padding: 6px 9px; }
-        .hud__back-label { display: none; }
         .viewer { padding: 2vh 2vw; }
         .viewer__card { width: 96vw; height: 90vh; }
     }
@@ -749,46 +758,27 @@
         .spinner { animation: none; }
     }
 
-    /* ── 搬家新增（原页面没有的两处）─────────────────────────────────
-       1. 返回胶囊：原页面左上角是 `.back` → /demos，房间里改成"退出房间"，
-          调 SceneContext 的 requestExit（走门关上的那套动画）。
-       2. 进出场：环的 DOM 层比星云晚 0.1s 淡入 —— 星云先出来，展板再浮上来；
-          退场时和星云一起淡掉。 */
-    .hud__back {
-        position: fixed;
-        left: 30px;
-        top: 26px;
-        z-index: 6;
-        pointer-events: auto;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 7px 13px;
-        font: inherit;
-        font-size: 12px;
-        letter-spacing: 0.04em;
-        color: var(--dim);
-        background: rgba(12, 16, 26, 0.62);
-        border: 1px solid rgba(255, 255, 255, 0.09);
-        border-radius: 999px;
-        cursor: pointer;
-        backdrop-filter: blur(8px);
-        transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
-    }
+    /* ── 搬家新增 ──────────────────────────────────────────────────────
+       只有一处：进出场。环的 DOM 层比星云晚 0.1s 淡入 —— 星云先出来，
+       展板再浮上来；退场时和星云一起淡掉。
 
-    .hud__back:hover {
-        color: var(--ink);
-        border-color: rgba(255, 255, 255, 0.22);
-        background: rgba(20, 26, 40, 0.78);
-    }
-
-    .hud__back:focus-visible {
-        outline: 2px solid var(--accent);
-        outline-offset: 2px;
-    }
+       🔴 左上角**没有**自己的返回键。原 demo 那里是 `.back` → /demos，
+       搬进房间后一度换成"← 退出房间"胶囊，但它和站内那颗返回图标
+       （`.hud-cluster--left`，top 18 / left 18）叠在同一处 —— 用户
+       2026-11-05 报的"重复"。房间和 `career` 一样，退出只走站内那颗：
+       它在本层（z 950）下面，但 `.stage` 左右各 22% 的 mask 不带指针，
+       左上角正好在透明带里，所以看得见也点得到。 */
 }
 
 /* 🔴 这两条必须写在 `.craft-room` **外面**：写在里面会被 SCSS 拼成
    `.craft-room .craft-room.is-in`，永远匹配不到（自己套自己）。 */
 .craft-room.is-in { opacity: 1; }
 .craft-room.is-exiting { opacity: 0; transition-duration: 0.42s; }
+
+/* 浮层打开时把整层抬到 1500 —— 和 `CareerProjectModal` 同一个高度。
+   原因：本层是 950，而右上角那排站内控件是 `.hud-cluster` 1000 /
+   `.site-controls__update-wrap` 1001 ⇒ 它们会**浮在浮层上面**，浮层只盖住了
+   画布和左上角那颗返回键（它在 `.navigation-ui` 的 z 100 里，被 950 关住），
+   看起来像"只盖住了一半"。浮层是模态的，这一帧本来就该盖住全部控件。
+   关掉浮层立刻退回 950，房间里的站内控件照旧可见、可点。 */
+.craft-room.is-viewing { z-index: 1500; }

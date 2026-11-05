@@ -70,7 +70,6 @@ const COPY = {
         eyebrow: '创意实验',
         tagline: '做过的实验，与还能跑起来的小东西',
         hint: '滚动 / 拖动 转动 · 点击展板进入',
-        back: '← 退出房间',
         close: '关闭',
         newTab: '新标签打开 ↗',
         loading: '载入中…',
@@ -80,7 +79,6 @@ const COPY = {
         eyebrow: 'CRAFT',
         tagline: 'Experiments I have shipped, and toys that still run',
         hint: 'Scroll / drag to turn · click a panel to run it',
-        back: '← Leave room',
         close: 'Close',
         newTab: 'Open in new tab ↗',
         loading: 'Loading…',
@@ -132,6 +130,23 @@ function nearestIndex(target, current, count) {
 }
 
 /**
+ * 给 demo 的地址挂上"从哪来"，demo 页左上角的返回胶囊据此指回本房间
+ * （脚本是 `public/demos/_from.js`）。
+ *
+ * 🔴 只能**显式传参**：`window.open(..., 'noopener,noreferrer')` 和
+ *    `rel="noreferrer"` 都会让 `document.referrer` 恒为空，靠 referrer 认来源
+ *    这条路走不通（`?from=` 因此是唯一的办法）。
+ * 已经带了 query 的地址（`?a=1`）要接 `&`，hash 要留在最后。
+ */
+function withFrom(url) {
+    if (!url) return url
+    const cut = url.indexOf('#')
+    const base = cut < 0 ? url : url.slice(0, cut)
+    const hash = cut < 0 ? '' : url.slice(cut)
+    return `${base}${base.includes('?') ? '&' : '?'}from=craft${hash}`
+}
+
+/**
  * 展板。**用 memo 包住**：环的帧循环直接改 `.panel` 的 transform / opacity，
  * React 一旦因为"换了一块"重渲染这里，就会把 style 重写成只剩 `--c`，
  * 手写上去的 transform 全部丢失（展板瞬间全叠到中心）。
@@ -171,7 +186,7 @@ const RingPanels = memo(function RingPanels({ items, panelRefs, onPick }) {
 })
 
 const CraftHud = () => {
-    const { currentRoom, requestExit, exitRequested } = useScene()
+    const { currentRoom, exitRequested } = useScene()
     const { language } = useSitePreferences()
     const t = COPY[language] || COPY.zh
 
@@ -206,8 +221,16 @@ const CraftHud = () => {
        **25 块板全被判成"太偏"藏起来**，整环凭空消失（2026-11-05 实测，
        画面上只剩 HUD 文字）。 */
     useLayoutEffect(() => { itemsRef.current = items }, [items])
-    useEffect(() => { viewerOpenRef.current = Boolean(openItem) }, [openItem])
-
+    /* 浮层开着时把整层抬到 1500（见 SCSS 里 `.is-viewing` 的说明）。
+       ⚠️ 这一句**必须用 classList**，不能写成 className 里的一个动态片段：
+          `is-in` 是上面那个 effect 手动加的，React 只在自己算出的字符串**变了**
+          时才写 className —— 一旦模板里多出一个随 state 变的片段，React 就会
+          用新字符串覆盖整个 class 属性，`is-in` 当场被抹掉，整间房 opacity 归零。
+          （2026-11-05 实测：打开浮层后全屏只剩右上角那排站内图标。） */
+    useEffect(() => {
+        viewerOpenRef.current = Boolean(openItem)
+        rootRef.current?.classList.toggle('is-viewing', Boolean(openItem))
+    }, [openItem])
     /* 进场淡入：挂载后**下一帧**才加 .is-in，否则插入即终态、CSS 过渡不跑。
        ⚠️ 用 classList 而不是 state —— 在 effect 里同步 setState 会多渲染一轮，
           eslint 的 set-state-in-effect 会直接报出来。 */
@@ -607,13 +630,6 @@ const CraftHud = () => {
             </div>
 
             <div className="hud">
-                {/* 箭头和文字分开：窄视口下标题居中会顶到这个胶囊，
-                    媒体查询里只留箭头（图标化），标题就不被压了。 */}
-                <button className="hud__back" type="button" onClick={requestExit}>
-                    <span className="hud__back-arrow" aria-hidden="true">←</span>
-                    <span className="hud__back-label">{t.back.replace(/^←\s*/, '')}</span>
-                </button>
-
                 <header className="hud__head">
                     <div className="hud__eyebrow">{t.eyebrow}</div>
                     <p className="hud__tagline">{t.tagline}</p>
@@ -681,7 +697,7 @@ const CraftHud = () => {
                         <span className="viewer__cat">{openItem ? GROUP_BY_ID.get(openItem.group)?.en : ''}</span>
                         <span className="viewer__spacer" />
                         {openItem && (
-                            <a className="viewer__act" href={openItem.url} target="_blank" rel="noreferrer">
+                            <a className="viewer__act" href={withFrom(openItem.url)} target="_blank" rel="noreferrer">
                                 {t.newTab}
                             </a>
                         )}
@@ -692,7 +708,7 @@ const CraftHud = () => {
                             <iframe
                                 className="viewer__frame"
                                 ref={frameRef}
-                                src={openItem.url}
+                                src={withFrom(openItem.url)}
                                 title={openItem.title}
                                 onLoad={onFrameLoad}
                             />

@@ -6,6 +6,7 @@
 <title>数字滚动 · Animated Number Counter</title>
 <meta name="description" content="不写一行补间循环：把 --num 注册成 <integer>，用 Web Animations 补间它，再由 counter() 渲染成数字。" />
 <link rel="stylesheet" href="../../_lab.css" />
+<script src="/demos/_from.js" defer></script>
 <style>
     /* 关键：只有注册过的自定义属性才有"类型"，WAAPI 才补得动它。
        inherits:false ⇒ 每个元素各算各的，不会互相污染。 */
