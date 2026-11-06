@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-06T06:40:18.895Z",
-  "count": 26,
+  "generatedAt": "2026-11-06T12:23:49.815Z",
+  "count": 27,
   "demos": [
     {
       "id": "door",
@@ -302,6 +302,17 @@
           "url": "/demos/web3d/old-house/tree.html"
         }
       ]
+    },
+    {
+      "id": "web3d/posts-fold",
+      "title": "经折 · Accordion Article Room",
+      "description": "文稿房间的空间语言：一条经折装的长纸，一折一篇，沿对角线退进暗处，当前这一折立起来面对你。滚轮一折一翻，点开是阅读层。纯 CSS 3D + DOM，每个字都是真文本。",
+      "url": "/demos/web3d/posts-fold/",
+      "thumb": "/demos/thumbs/web3d/posts-fold.webp",
+      "dir": "public/demos/web3d/posts-fold",
+      "entry": "index.html",
+      "readme": true,
+      "variants": []
     },
     {
       "id": "web3d/rainy-night",

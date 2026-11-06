@@ -108,3 +108,65 @@
   - **反过来该重做的时候**：demo 涨到 40+ 或开始有"系列"（同主题 5~6 个变体），
     环形展板才撑不住，那时才值得给**类别**一层空间（三个展台而不是转一圈）。
     25 个现在刚好。
+
+### DR-G · 文章体系怎么落：md 源 + 静态 HTML 产物（**待拍板**）
+
+- **需求原文**：「处理 articles.json（先讨论方案，注意未来文章应该都不需要人类写，
+  由 AI 代笔）：A. markdown 文件 + 文章渲染 html 模板；B. 参考 demos，文章直接
+  静态化为 html 文件，搭配文章专属的酷炫屌炸天的落地页」。
+- **底数**（2026-11-06 实测，明细在 `.workbuddy-ai/memory/2026-11-06.md` §3）：
+  - 18 篇（zh 10 / en 8）；正文 **占主包 gzip 的 49%**（46.7KB / 94.7KB）。
+  - 文章**没有 URL** ⇒ 不能分享、不进索引、JSON-LD 里的 `Article` 没有 `url`。
+  - `seo-plugin` 读的是 `a.date` / `a.summary`，数据里是 `publishedAt` /
+    `description` ⇒ `dist/llms.txt` 的 18 行**全是空描述无日期**（活 bug）。
+  - `MarkdownBody.jsx` 是 277 行手写 parser，**不支持有序列表 / 嵌套列表 / 代码高亮**。
+- **我的判断**：A 和 B 不是二选一 —— **A 是写法，B 是产物**。
+  AI 代笔 ⇒ 源必须是最省 token、最可 diff 的格式（md + frontmatter）；
+  读者/爬虫 ⇒ 产物必须是有稳定 URL 的静态 HTML。两者合成一条流水线，
+  和 `build-demos-index.mjs` 扫盘生成 `/demos/` 是同一条路。
+- **推荐方案（合体）**：
+  ```
+  content/articles/<locale>/<slug>.md      唯一真源（AI 写，人只审）
+    ↓ scripts/build-articles.mjs（构建期，buildStart 钩子）
+  public/articles/<slug>/index.html        每篇一页（og / JSON-LD / canonical）
+  public/articles/index.html               文章落地页
+  public/articles/articles.json            只有元数据（3.4KB gz），房间用
+  ```
+  - frontmatter 决定一切：`title/description/date/tags/lang/slug/pair/theme/seed/draft`。
+  - **`theme` 是闭集**（如 `paper|neon|ink|blueprint|warm`），`seed` 缺省按 slug 哈希
+    ⇒ 每篇的"专属落地页"由 theme × seed 组合出来，**不是每篇手写 CSS**。
+  - 构建期校验（这就是"AI 写、人不管"的前提）：缺 `description`、slug 冲突、
+    正文过短、未知 theme、图片不存在 ⇒ **构建失败并指出文件**。
+- **三条不能踩的线**：
+  1. 🔴 **零位图**：hero 只能是程序化（canvas / SVG / shader），AI 生图不算数。
+  2. 🔴 **构建确定性**：同一份 md 必须产出逐字节相同的 HTML（无时间戳、无随机），
+     否则每次 build 都是脏 diff。seed 一律由 slug 哈希，不许 `Math.random()`。
+  3. 🔴 **一份渲染器**：构建期产出 HTML 片段，房间浮层与静态页**共用**
+     （`dangerouslySetInnerHTML` + 现有的 `.markdown-body` 样式），
+     不要留两套 parser。构建期要 sanitize（禁 `<script>` / `on*`）。
+- **已拍板（2026-11-06）**：
+  - **(1) 入口哲学 = 参考创意实验房间**：房间、静态页**均可访问**，谁也不锁在谁后面。
+  - **(2) 落地页 = 用 web3d 重做文稿房间本身**，**完全替换**现在那面 4×N 卡墙
+    （用户原话：「现在卡墙没有设计感且平淡无奇。我希望每个房间都是独一无二的 web3d 秀」）。
+  - **(3) 依赖**：加 `markdown-it`（**必须最新版**），并**顺便把现有依赖全量升级**。
+- **房间形态已定：经折装（accordion fold）** —— 一条长纸，一折一篇，沿对角线退进暗处，
+  当前这一折立起来面对你。选它的理由是**空间轴不撞车**：career 纵向隧道（序列）、
+  craft 环形展板（并列）、posts 一条长卷（长度）。篇数涨到 100 只是带子更长，不改设计。
+  - 原型已交付：**`/demos/web3d/posts-fold/`**（`public/demos/web3d/posts-fold/`）。
+    折页 300×420、单折角 ±24°、带子偏 30°、折距 = `W·cos(24°)` 才是共边真折痕；
+    非焦点折只留巨大浅色页码 + 折痕（显示标题会被前景页遮一半，像 bug）；
+    景深 = `blur` + `brightness(.86)` + `opacity` 三重衰减。
+  - 实现选型：**CSS 3D + DOM，不用 three** —— 折页上全是中文标题正文，走 three 得渲成
+    纹理：缩放会糊、不能选中、读屏读不到。平面用 `translate3d/rotateY` 与 three 的 plane
+    视觉几乎无差别。代价是没有真光照/真阴影（现在是 `box-shadow` + 手绘明暗）。
+  - 还没接的：真实数据（`content/articles/<locale>/<slug>.md` 的 frontmatter）、
+    阅读层换成与静态页共用的 HTML 片段、`_from.js` 里加 `posts` 一行。
+- **分期**（每期单独 commit）：
+  - **P1 止血**：正文搬出主包（md 文件 + 房间按需 fetch）⇒ 主包 gzip 94.7 → ~50KB；
+    顺手修 `seo-plugin` 的字段错配。
+  - **P2 静态页**：`build-articles.mjs` + `/articles/<slug>/` + 落地页 + sitemap/llms.txt。
+  - **P3 专属视觉**：theme × seed 的程序化 hero。
+  - **P4 房间落地**：把 `posts-fold` 原型接进 `src/`（换成 `useFrame` 接管的房间），
+    卡片点开走静态页或阅读层，复用 `?from=posts` 胶囊回路。
+  - ⚠️ **卡墙先留着**：P4 落地之前 `ContentRoom` 不动，别半途改成四不像。
+

@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="../../_from.js" defer></script>
+<title>经折 · Accordion Article Room</title>
+<meta name="description" content="文稿房间的空间语言：一条经折装的长纸，一折一篇，沿对角线退进暗处，当前这一折立起来面对你。滚轮一折一翻，点开是阅读层。纯 CSS 3D + DOM，每个字都是真文本。">
+<style>
+@font-face{
+  font-family:'MapleUI';
+  src:url('/fonts/maple-ui.woff2') format('woff2');
+  font-weight:400 500;font-display:swap;
+}
+:root{
+  --ink:#141110;
+  --ink-2:#1c1815;
+  --paper:#f0e9dc;
+  --paper-2:#e2d9c8;
+  --paper-edge:#c9bda8;
+  --text:#241f1a;
+  --text-soft:#6d6257;
+  --vermilion:#b23a2c;
+  --w:300px;
+  --h:420px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:
+    radial-gradient(60% 46% at 76% 58%, rgba(126,86,52,.13), rgba(126,86,52,0) 70%),
+    radial-gradient(1200px 820px at 26% 18%, #241d18 0%, #171311 46%, #0b0908 100%);
+  color:#e8e0d4;
+  font-family:'MapleUI',ui-monospace,'PingFang SC',monospace;
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+
+#dust{position:fixed;inset:0;pointer-events:none;opacity:.7}
+
+.stage{
+  position:fixed;inset:0;
+  perspective:1900px;
+  perspective-origin:52% 46%;
+  cursor:grab;
+}
+.stage.dragging{cursor:grabbing}
+
+.ribbon{
+  position:absolute;left:50%;top:50%;
+  width:0;height:0;
+  transform-style:preserve-3d;
+  transform:translate3d(var(--sx), -1%, 0) rotateX(-3deg) rotateY(26deg);
+  will-change:transform;
+}
+
+.thread{
+  position:absolute;left:0;top:-236px;height:1px;
+  background:linear-gradient(90deg, rgba(178,58,44,.85) 0%, rgba(178,58,44,.5) 55%, rgba(178,58,44,0) 100%);
+  transform-origin:0 50%;
+}
+.fold{
+  position:absolute;
+  left:calc(var(--w) / -2);
+  top:calc(var(--h) / -2);
+  width:var(--w);
+  height:var(--h);
+  transform-style:preserve-3d;
+  transform-origin:50% 50%;
+  overflow:hidden;
+  border-radius:2px;
+  background:
+    linear-gradient(90deg, rgba(64,48,30,.20) 0%, rgba(64,48,30,0) 10%, rgba(64,48,30,0) 90%, rgba(64,48,30,.14) 100%),
+    linear-gradient(180deg, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 18%),
+    linear-gradient(172deg, var(--paper) 0%, var(--paper-2) 100%);
+  box-shadow:
+    0 26px 64px -22px rgba(0,0,0,.9),
+    inset 0 0 0 1px rgba(120,105,86,.22),
+    inset 14px 0 22px -18px rgba(90,74,56,.5);
+  color:var(--text);
+  cursor:pointer;
+  transition:transform .66s cubic-bezier(.22,.61,.36,1), opacity .5s ease;
+  will-change:transform,opacity;
+}
+.fold::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:1px;
+  background:linear-gradient(180deg, transparent, rgba(178,58,44,.55) 12%, rgba(178,58,44,.55) 88%, transparent);
+  opacity:.55;
+}
+.fold::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(92% 72% at 22% 3%, rgba(255,255,255,.42), rgba(255,255,255,0) 64%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.055'/></svg>");
+  mix-blend-mode:multiply;
+}
+.fold.is-focus{
+  box-shadow:
+    0 46px 110px -34px rgba(0,0,0,.96),
+    0 6px 18px -8px rgba(0,0,0,.55),
+    inset 0 0 0 1px rgba(120,105,86,.26),
+    inset 16px 0 26px -20px rgba(90,74,56,.55);
+}
+.fold.is-away{
+  background:
+    linear-gradient(90deg, rgba(52,40,26,.30) 0%, rgba(52,40,26,0) 11%, rgba(52,40,26,0) 89%, rgba(52,40,26,.22) 100%),
+    linear-gradient(180deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,0) 18%),
+    linear-gradient(172deg, #cfc5b3 0%, #bdb2a0 100%);
+}
+
+.pad{position:absolute;inset:0;padding:26px 24px 22px;display:flex;flex-direction:column}
+
+.idx{
+  font-size:9.5px;letter-spacing:.22em;color:var(--vermilion);
+  display:flex;align-items:center;gap:10px;
+}
+.idx i{display:block;width:26px;height:1px;background:currentColor;opacity:.55;font-style:normal}
+
+.title{
+  margin-top:auto;
+  font-size:19px;line-height:1.6;font-weight:500;letter-spacing:.01em;
+  text-wrap:balance;
+}
+.title em{font-style:normal;color:var(--vermilion)}
+
+.excerpt{
+  margin-top:10px;font-size:10.5px;line-height:1.9;color:#7c6f61;
+  max-width:26ch;
+}
+
+.meta{
+  margin-top:12px;padding-top:10px;
+  border-top:1px solid rgba(90,74,56,.22);
+  font-size:9.5px;line-height:1.85;color:var(--text-soft);
+  display:flex;flex-direction:column;gap:2px;
+}
+.meta b{font-weight:400;color:var(--text);letter-spacing:.02em}
+
+.ghost{
+  position:absolute;right:16px;top:8px;
+  font-size:74px;line-height:1;letter-spacing:-.04em;
+  color:rgba(84,68,48,.13);pointer-events:none;
+}
+.fold.is-focus .ghost{color:rgba(84,68,48,.05)}
+
+.folio{
+  position:absolute;right:24px;bottom:18px;
+  font-size:8.5px;letter-spacing:.18em;color:#9a8b78;
+}
+
+.fold:not(.is-focus) .title,
+.fold:not(.is-focus) .excerpt,
+.fold:not(.is-focus) .meta,
+.fold:not(.is-focus) .cta,
+.fold:not(.is-focus) .folio{
+  opacity:0;transition:opacity .38s ease;
+}
+.fold.is-focus .title,
+.fold.is-focus .excerpt,
+.fold.is-focus .meta,
+.fold.is-focus .folio{opacity:1;transition:opacity .5s ease .1s}
+
+.cta{
+  margin-top:12px;font-size:9.5px;letter-spacing:.14em;color:var(--vermilion);
+  display:flex;align-items:center;gap:8px;opacity:0;transform:translateY(4px);
+  transition:opacity .45s ease .12s, transform .45s ease .12s;
+}
+.fold.is-focus .cta{opacity:1;transform:none}
+.cta span{display:block;width:18px;height:1px;background:currentColor}
+
+/* ---------- HUD ---------- */
+.beam{
+  position:fixed;left:4%;top:-30%;width:62%;height:170%;z-index:4;
+  pointer-events:none;transform:rotate(-9deg);filter:blur(34px);
+  background:linear-gradient(100deg, rgba(255,241,220,0) 0%, rgba(255,241,220,.055) 42%, rgba(255,241,220,0) 74%);
+}
+.scrim{position:fixed;inset:0;pointer-events:none;z-index:5}
+.scrim::before{
+  content:'';position:absolute;inset:0;
+  background:
+    linear-gradient(to left, rgba(11,9,8,.97) 0%, rgba(11,9,8,.6) 16%, rgba(11,9,8,0) 42%),
+    linear-gradient(to top, rgba(11,9,8,.88) 0%, rgba(11,9,8,0) 26%),
+    linear-gradient(to right, rgba(11,9,8,.5) 0%, rgba(11,9,8,0) 16%);
+}
+.scrim::after{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(115% 95% at 46% 44%, rgba(0,0,0,0) 36%, rgba(0,0,0,.6) 100%);
+}
+.hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+
+/* 回房间胶囊。样式照 _lab.css 那套，但换成这间的暖色，否则一块冷灰
+   贴在墨色背景上像外来的零件。文案与 href 由 _from.js 改写。 */
+.lab-back{
+  position:absolute;left:48px;top:20px;pointer-events:auto;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:5px 11px;border-radius:999px;
+  font-size:10.5px;letter-spacing:.18em;text-decoration:none;
+  color:#8d8073;background:rgba(255,246,232,.03);
+  border:1px solid rgba(200,186,168,.16);
+  transition:color .18s ease,border-color .18s ease;
+}
+.lab-back:hover{color:#efe7db;border-color:rgba(200,186,168,.34)}
+
+/* 标题让出胶囊那一行（top 20 + 高 26 ⇒ 从 56 起） */
+.hud__tl{position:absolute;left:48px;top:56px;pointer-events:auto}
+.hud__tl h1{
+  font-size:12px;font-weight:500;letter-spacing:.34em;color:#efe7db;
+}
+.hud__tl p{
+  margin-top:10px;font-size:11px;letter-spacing:.12em;color:#7d7266;line-height:1.9;
+}
+.hud__tl p b{font-weight:400;color:#b9ac9b}
+
+.hud__tr{
+  position:absolute;right:48px;top:56px;display:flex;gap:2px;pointer-events:auto;
+}
+.hud__tr button{
+  appearance:none;border:0;background:transparent;cursor:pointer;
+  font-family:inherit;font-size:11px;letter-spacing:.18em;
+  color:#6d6257;padding:6px 12px;border-radius:2px;transition:color .25s,background .25s;
+}
+.hud__tr button[aria-pressed="true"]{color:#efe7db;background:rgba(255,255,255,.07)}
+.hud__tr button:hover{color:#cfc3b3}
+
+.rail{
+  position:absolute;left:48px;top:50%;transform:translateY(-50%);
+  display:flex;flex-direction:column;gap:9px;align-items:flex-start;pointer-events:auto;
+}
+.rail button{
+  appearance:none;border:0;background:transparent;padding:0;cursor:pointer;
+  display:flex;align-items:center;gap:8px;height:6px;
+}
+.rail i{display:block;width:14px;height:1px;background:#6b6155;transition:all .35s ease}
+.rail button[aria-current="true"] i{width:30px;height:2px;background:var(--vermilion)}
+.rail span{
+  font-size:9px;letter-spacing:.1em;color:#6d6257;opacity:0;transition:opacity .3s;
+}
+.rail button:hover span,.rail button[aria-current="true"] span{opacity:1}
+
+.hud__bl{
+  position:absolute;left:48px;bottom:40px;
+  font-size:11px;letter-spacing:.14em;color:#6d6257;line-height:2;
+}
+.hud__bl b{font-weight:400;color:#a99d8d}
+
+/* ---------- reader ---------- */
+.reader{
+  position:fixed;inset:0;z-index:40;display:grid;place-items:center;
+  background:rgba(8,6,5,.72);backdrop-filter:blur(6px);
+  opacity:0;pointer-events:none;transition:opacity .45s ease;
+}
+.reader.is-open{opacity:1;pointer-events:auto}
+.sheet{
+  width:min(720px,86vw);max-height:82vh;overflow:auto;
+  background:linear-gradient(180deg,#f4eee2,#eae2d3);
+  color:var(--text);border-radius:3px;
+  border-left:2px solid var(--vermilion);
+  padding:54px 58px 62px;
+  box-shadow:0 40px 120px -30px rgba(0,0,0,.9);
+  transform:translateY(18px) scale(.985);
+  transition:transform .5s cubic-bezier(.22,.61,.36,1);
+}
+.reader.is-open .sheet{transform:none}
+.sheet h2{font-size:26px;line-height:1.6;font-weight:500;letter-spacing:.01em}
+.sheet .sub{margin-top:14px;font-size:11px;letter-spacing:.14em;color:var(--text-soft)}
+.sheet hr{border:0;border-top:1px solid rgba(90,74,56,.2);margin:26px 0}
+.sheet p{font-size:14px;line-height:2.05;color:#3a332c;margin-bottom:16px}
+.sheet .note{
+  margin-top:26px;padding:14px 16px;background:rgba(178,58,44,.06);
+  border-left:2px solid var(--vermilion);font-size:11px;line-height:2;color:#7a4a3f;
+}
+.close{
+  position:absolute;right:40px;top:34px;appearance:none;border:0;background:transparent;
+  color:#8a7f72;font-family:inherit;font-size:11px;letter-spacing:.2em;cursor:pointer;padding:8px;
+}
+.close:hover{color:#efe7db}
+
+@media (max-width:900px){
+  :root{--w:300px;--h:420px}
+  .hud__tl{left:24px;top:26px}
+  .hud__tr{right:24px;top:26px}
+  .hud__bl{left:24px;bottom:24px}
+  .rail{right:22px}
+  .title{font-size:19px}
+  .pad{padding:28px 24px 24px}
+  .sheet{padding:38px 28px 44px}
+}
+@media (prefers-reduced-motion:reduce){
+  .fold,.reader,.sheet,.cta{transition-duration:.01s}
+}
+
+/* 减少动态偏好：翻折、开合全部瞬时完成。
+   用 !important 是因为过渡分散在 .fold / .fold.is-focus .title / .reader 上，
+   逐条覆盖会漏；这里只有"停掉"一个意图，压过优先级是合理的。 */
+@media (prefers-reduced-motion: reduce) {
+  .fold, .fold *, .reader, .sheet {
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+  }
+}
+</style>
+</head>
+<body>
+<canvas id="dust"></canvas>
+
+<div class="stage" id="stage">
+  <div class="ribbon" id="ribbon"></div>
+</div>
+
+<div class="beam"></div>
+<div class="scrim"></div>
+
+<div class="hud">
+  <a class="lab-back" href="/demos/">← Demos</a>
+  <div class="hud__tl">
+    <h1>文稿 · POSTS</h1>
+    <p>经折 · <b>18</b> 篇 · 中英双语</p>
+  </div>
+  <div class="hud__tr" id="locale">
+    <button data-loc="zh" aria-pressed="true">中文</button>
+    <button data-loc="en" aria-pressed="false">EN</button>
+  </div>
+  <div class="hud__bl"><span id="pos">01 / 10</span> · 滚轮 / 拖拽 翻阅 · 点击展开</div>
+</div>
+
+<div class="reader" id="reader">
+  <button class="close" id="close">ESC 关闭</button>
+  <article class="sheet" id="sheet"></article>
+</div>
+
+<script>
+const DATA = {
+  zh: [
+    { t:'使用 Express.js 构建你的第一个 API：初学者指南', x:'从零搭一个能跑的 HTTP 服务，七步走完。', d:'2023.11.02', g:'Node.js · Express', n:'1,667 字' },
+    { t:'使用 Semantic-Release 和 Github Workflow 实现自动化版本发布', x:'提交信息即版本号：把发版从手工流程变成流水线。', d:'2024.08.10', g:'CICD · Semantic-Release', n:'2,470 字' },
+    { t:'Vitest 模拟第三方模块指南', x:'vi.mock 的三种写法，以及 hoisting 为什么让你踩坑。', d:'2025.08.26', g:'Vitest · Mock · Unit Test', n:'3,659 字' },
+    { t:'Neon serverless-driver 结合 Vercel、阿里云实战指南', x:'在 Vercel 与函数计算之间，把 Postgres 连接池跑通。', d:'2024.08.26', g:'Serverless · Neon · PostgreSQL', n:'6,952 字' },
+    { t:'教大家更直观的理解 Docker', x:'一层层叠起来，理解镜像、容器和它们的关系。', d:'2024.08.05', g:'Docker · 容器技术', n:'5,384 字' },
+    { t:'如何使用 Canvas 将 SVG 转换为 PNG', x:'不借助后端，在浏览器里栅格化并下载。', d:'2023.11.22', g:'Canvas · SVG', n:'1,658 字' },
+    { t:'亚马逊和美团的领导力原则', x:'亚马逊十四条与美团的土办法，哪些真的能落地。', d:'2024.03.06', g:'领导力原则', n:'4,002 字' },
+    { t:'美团公司的目标管理实践总结', x:'目标管理在真实组织里最容易走形的三个地方。', d:'2023.11.02', g:'目标管理 · OKR · SMART', n:'4,125 字' },
+    { t:'SWOT 在业务策划及组织管理中的应用', x:'把 SWOT 从表格变成决策工具，而不是事后总结。', d:'2021.11.11', g:'SWOT · 分析策略', n:'1,687 字' },
+    { t:'京东公司的过程管理实践总结', x:'Scrum、MVP、PDCA 三个词，是怎么串起来的。', d:'2022.05.06', g:'过程管理 · 敏捷开发 · MVP', n:'882 字' }
+  ],
+  en: [
+    { t:'Building Your First API with Express.js', x:'Seven steps from an empty folder to a running server.', d:'2023.11.02', g:'Node.js · Express', n:'2,899 w' },
+    { t:'Automating Releases with Semantic-Release and GitHub Actions', x:'Commit messages as version numbers, without a checklist.', d:'2024.08.10', g:'CICD · Semantic-Release', n:'4,084 w' },
+    { t:'A more intuitive understanding of Docker', x:'Images, containers and layers, explained by building one up.', d:'2024.08.05', g:'Docker · Containers', n:'12,724 w' },
+    { t:'How to convert a SVG to PNG using Canvas', x:'Rasterise a vector in the browser and download it, no backend.', d:'2023.11.22', g:'Canvas · SVG', n:'3,011 w' },
+    { t:'Leadership Principles of Amazon and Meituan', x:"Amazon's fourteen and Meituan's own — what survives contact.", d:'2024.03.06', g:'Leadership', n:'11,674 w' },
+    { t:"Summary of Meituan's Goal Management Practices", x:'Three places goal management quietly bends in a real org.', d:'2023.11.02', g:'OKR · SMART', n:'12,087 w' },
+    { t:'SWOT in Business Planning and Organizational Management', x:'From a table of quadrants to an actual decision.', d:'2021.11.11', g:'SWOT', n:'5,077 w' },
+    { t:'Summary of Process Management Practices at JD.com', x:'Scrum, MVP, PDCA — how the three connect in practice.', d:'2022.05.06', g:'Agile · MVP', n:'2,387 w' }
+  ]
+};
+
+const Q = new URLSearchParams(location.search);
+/* 窄屏：折页仍是 300×420（字号按它排的），只是不再放大、位置收回中间，
+   折带留在右侧当背景。改尺寸会连带改字号，那才是真的会崩。 */
+const NARROW = innerWidth < 760;
+const W = +(Q.get('w') ?? 300), H = +(Q.get('h') ?? 420);
+const ALPHA = +(Q.get('alpha') ?? (NARROW ? 18 : 24));
+const RIBBON_YAW = +(Q.get('yaw') ?? (NARROW ? 22 : 30));
+const FOCUS_X = +(Q.get('fx') ?? (NARROW ? -26 : -180));
+const STEP = W * Math.cos(ALPHA * Math.PI / 180);
+const FOCUS_S = +(Q.get('fs') ?? (NARROW ? 1.04 : 1.45));
+const FOG = +(Q.get('fog') ?? (NARROW ? 0.3 : 0.17));
+const SHIFT = +(Q.get('sx') ?? (NARROW ? 0 : 4));
+const ribbon = document.getElementById('ribbon');
+ribbon.style.setProperty('--sx', SHIFT + '%');
+document.documentElement.style.setProperty('--w', W + 'px');
+document.documentElement.style.setProperty('--h', H + 'px');
+const rail = document.getElementById('rail');
+const stage = document.getElementById('stage');
+const reader = document.getElementById('reader');
+const sheet = document.getElementById('sheet');
+
+let loc = 'zh';
+let k = 0;
+let folds = [];
+let open = false;
+
+const pad2 = (n) => String(n + 1).padStart(2, '0');
+
+function build() {
+  const list = DATA[loc];
+  k = Math.min(k, list.length - 1);
+  ribbon.innerHTML = '';
+  folds = list.map((a, i) => {
+    const el = document.createElement('div');
+    el.className = 'fold';
+    el.innerHTML =
+      '<div class="pad">' +
+        '<div class="idx"><i></i>' + pad2(i) + '</div>' +
+        '<h3 class="title">' + a.t + '</h3>' +
+        '<p class="excerpt">' + a.x + '</p>' +
+        '<div class="meta"><span><b>' + a.d + '</b></span><span>' + a.g + '</span><span>' + a.n + '</span></div>' +
+        '<div class="cta"><span></span>阅读全文</div>' +
+      '</div>' +
+      '<div class="ghost">' + pad2(i) + '</div>' +
+      '<div class="folio">' + pad2(i) + ' / ' + pad2(list.length - 1) + '</div>';
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (i === k) openReader(); else go(i);
+    });
+    ribbon.appendChild(el);
+    return el;
+  });
+  render();
+}
+
+function render() {
+  folds.forEach((el, i) => {
+    const s = i - k;
+    let x = s * STEP;
+    let y = -s * 7;
+    let z = 0;
+    let yaw = (i % 2 ? -ALPHA : ALPHA);
+    let rx = 0;
+    let sc = 1;
+    let op = 0;
+
+    if (s === 0) {
+      yaw = -RIBBON_YAW;
+      rx = 3;
+      sc = FOCUS_S;
+      z = 70;
+      x = FOCUS_X;
+      op = 1;
+      el.classList.add('is-focus');
+      el.classList.remove('is-away');
+    } else if (s > 0) {
+      op = Math.max(0, 1 - s * FOG);
+      x += 22 * (1 - op);
+      el.classList.remove('is-focus');
+      el.classList.toggle('is-away', i % 2 === 1);
+    } else {
+      op = 0;
+      x -= 180;
+      el.classList.remove('is-focus');
+    }
+
+    el.style.transform = 'translate3d(' + x + 'px,' + y + 'px,' + z + 'px) rotateY(' + yaw + 'deg) rotateX(' + rx + 'deg) scale(' + sc + ')';
+    el.style.opacity = op;
+    el.style.filter = s === 0 ? 'none'
+      : 'blur(' + Math.min(1.2 + s * 0.9, 4).toFixed(2) + 'px) brightness(.86)';
+    el.style.transitionDelay = reduce ? '0ms' : Math.min(Math.abs(s) * 26, 130) + 'ms, 0ms';
+  });
+  pos.textContent = pad2(k) + ' / ' + pad2(DATA[loc].length - 1);
+}
+
+function go(n) {
+  const max = DATA[loc].length - 1;
+  const next = Math.max(0, Math.min(max, n));
+  if (next === k) return;
+  k = next;
+  render();
+}
+
+function openReader() {
+  const a = DATA[loc][k];
+  sheet.innerHTML =
+    '<h2>' + a.t + '</h2>' +
+    '<div class="sub">' + pad2(k) + ' · ' + a.d + ' · ' + a.g + ' · ' + a.n + '</div>' +
+    '<hr>' +
+    '<p>这一层是版式示意，不是真正文。折页上四个位置——标题、摘要、日期/标签/字数、' +
+    '朱砂色「阅读全文」——就是 frontmatter 里 <code>title / description / date / tags</code> 的去处。</p>' +
+    '<p>折带的好处是它不挑长度：一折一篇，篇数涨到 100，带子只是更长，不用改设计。' +
+    '这也是它取代 4×N 卡片墙的理由——卡墙到 20 张就开始挤。</p>' +
+    '<div class="note">为什么用 CSS 3D 而不是 three：折页上是中文标题与正文，走 three 就得把字渲成纹理——' +
+    '缩放会糊、不能选中、读屏软件读不到。平面用 <code>translate3d</code> 和 three 的 plane 视觉上几乎无差别。</div>';
+  reader.classList.add('is-open');
+  open = true;
+}
+function closeReader() { reader.classList.remove('is-open'); open = false; }
+
+/* ---------- 输入 ---------- */
+let acc = 0, lock = 0;
+window.addEventListener('wheel', (e) => {
+  if (open) return;
+  e.preventDefault();
+  acc += e.deltaY;
+  const now = performance.now();
+  if (Math.abs(acc) >= 42 && now - lock > 260) {
+    go(k + Math.sign(acc));
+    acc = 0;
+    lock = now;
+  }
+}, { passive: false });
+
+let drag = null;
+stage.addEventListener('pointerdown', (e) => {
+  if (open) return;
+  drag = { x: e.clientX, k };
+  stage.classList.add('dragging');
+  stage.setPointerCapture(e.pointerId);
+});
+stage.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  const d = Math.round((drag.x - e.clientX) / 150);
+  if (d !== 0) { go(drag.k + d); }
+});
+const endDrag = () => { drag = null; stage.classList.remove('dragging'); };
+stage.addEventListener('pointerup', endDrag);
+stage.addEventListener('pointercancel', endDrag);
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { closeReader(); return; }
+  if (open) return;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') go(k + 1);
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') go(k - 1);
+});
+
+document.getElementById('close').addEventListener('click', closeReader);
+reader.addEventListener('click', (e) => { if (e.target === reader) closeReader(); });
+
+document.getElementById('locale').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  loc = b.dataset.loc;
+  k = 0;
+  [...e.currentTarget.children].forEach((x) => x.setAttribute('aria-pressed', x === b));
+  build();
+});
+
+/* ---------- 尘埃 ---------- */
+const cv = document.getElementById('dust');
+const cx = cv.getContext('2d');
+let dust = [];
+function resize() {
+  cv.width = innerWidth * devicePixelRatio;
+  cv.height = innerHeight * devicePixelRatio;
+  cv.style.width = innerWidth + 'px';
+  cv.style.height = innerHeight + 'px';
+  cx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  dust = Array.from({ length: 64 }, () => ({
+    x: Math.random() * innerWidth,
+    y: Math.random() * innerHeight,
+    r: 0.5 + Math.random() * 1.4,
+    a: 0.05 + Math.random() * 0.18,
+    vy: -0.05 - Math.random() * 0.16,
+    vx: -0.02 - Math.random() * 0.08
+  }));
+}
+addEventListener('resize', resize);
+resize();
+
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let t0 = performance.now();
+
+/* 尘埃单独抽出来：减少动态偏好下只画一遍，不留一个永不停的 rAF 在跑。 */
+function paint() {
+  cx.clearRect(0, 0, innerWidth, innerHeight);
+  for (const p of dust) {
+    cx.fillStyle = 'rgba(240,232,218,' + p.a + ')';
+    cx.beginPath(); cx.arc(p.x, p.y, p.r, 0, 6.283); cx.fill();
+  }
+}
+
+function loop(t) {
+  const dt = Math.min(64, t - t0) / 16.7;
+  t0 = t;
+  for (const p of dust) {
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.y < -4) { p.y = innerHeight + 4; p.x = Math.random() * innerWidth; }
+    if (p.x < -4) p.x = innerWidth + 4;
+  }
+  paint();
+  /* 呼吸漂移：整条带子极缓慢地起伏，静止画面才不会像一张贴图 */
+  const s = Math.sin(t * 0.00022);
+  const c = Math.cos(t * 0.00016);
+  ribbon.style.transform =
+    'translate3d(calc(var(--sx) + ' + (s * 0.6) + '%), ' + (-1 + c * 0.5) + '%, 0) rotateX(-3deg) rotateY(' + (RIBBON_YAW + s * 1.1) + 'deg)';
+  requestAnimationFrame(loop);
+}
+
+if (reduce) {
+  paint();
+  addEventListener('resize', paint);
+} else {
+  requestAnimationFrame(loop);
+}
+
+build();
+</script>
+</body>
+</html>
