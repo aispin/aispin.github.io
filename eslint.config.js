@@ -36,7 +36,7 @@ const COMPILER_ADVISORIES = [
   'set-state-in-effect',           // 多数是「同步外部系统」的合法用法，见文件头
   'no-deriving-state-in-effects',
   'memoized-effect-dependencies',
-  'automatic-effect-dependencies',
+  'exhaustive-effect-dependencies',   // 7.1 由 automatic-effect-dependencies 改名
   'incompatible-library',
   'capitalized-calls',
   'void-use-memo',
@@ -107,6 +107,25 @@ export default defineConfig([
         varsIgnorePattern: '^[A-Z_]',
         argsIgnorePattern: '^[A-Z_]',
       }],
+    },
+  },
+
+  // ---------------------------------------------------------------------
+  // 3D 层：R3F 是命令式模型，`useFrame` 里直接改 three 对象是**唯一**写法。
+  // 这三条 React Compiler 规则描述的是"纯函数组件"，对 canvas 里的代码基本
+  // 全是误报（2026-11-06 升级到 eslint 10 / react-hooks 7.1 后才报出来）：
+  //   · immutability —— 每帧改 mesh.position / material.uniforms
+  //   · refs         —— 渲染期读 uniform 对象（它是 three 的引用，不是 React ref）
+  //   · purity       —— 用 Math.random 造粒子初始位置
+  // 降为 warn：信号保留，但不拦构建。UI 层（src/components/ui、src/me 等）
+  // 仍是 error —— 那里没有 three，这三条该拦就得拦。
+  // ---------------------------------------------------------------------
+  {
+    files: ['src/components/canvas/**', 'src/hooks/**', 'src/shaders/**', 'src/audio/**'],
+    rules: {
+      'react-hooks/immutability': 'warn',
+      'react-hooks/refs': 'warn',
+      'react-hooks/purity': 'warn',
     },
   },
 

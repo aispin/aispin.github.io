@@ -41,11 +41,15 @@ function build() {
      * context 创建点。与其在它旁边再开一个，不如把它接管过来：
      * 已经有就复用，没有就让它建，然后 setContext 钉死。
      * 这样无论谁先跑，最终都只有一个原生 context。 */
-    let shared = null;
+    /* 不给初值：try 与 catch 都会决定它。原来写 `let shared = null` +
+       `catch { shared = null }`，两个 null 都是死赋值（eslint 10 的
+       no-useless-assignment 会指出来）；抛错时它保持 undefined，下面 `!shared`
+       照样兜得住。 */
+    let shared;
     try {
         shared = ThreeAudioContext.getContext();   // 不存在时会自己建一个
     } catch {
-        shared = null;                              // 非浏览器环境 / 无 Web Audio
+        /* 非浏览器环境 / 无 Web Audio ⇒ 保持 undefined */
     }
     if (!shared) {
         const Ctor = AC();
