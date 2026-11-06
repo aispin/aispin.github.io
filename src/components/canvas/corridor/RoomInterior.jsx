@@ -16,6 +16,7 @@ import ContactRoom from '../rooms/Contact/ContactRoom';
 import ContentRoom from '../rooms/ContentRoom';
 import CareerTunnel from '../rooms/CareerTunnel';
 import CraftRing from '../rooms/CraftRing';
+import PostsFold from '../rooms/PostsFold';
 import { SCENE_FONTS } from '../../../config/theme';
 
 // Room configurations
@@ -40,11 +41,13 @@ const SUBTITLES = {
 // （见 rooms/CareerTunnel.jsx 的文件头）。两者是两种空间，不能共用一个分支。
 // `craft` 同理：它是一圈**接管渲染**的展板环（rooms/CraftRing.jsx），
 // 也不再是贴卡墙。2026-11-05 从 ContentRoom 里摘出来。
-const CONTENT_ROOM_IDS = ['posts', 'videos', 'music', 'ai'];
+// `posts` 同理：2026-11-06 换成一条**接管渲染**的经折（rooms/PostsFold.jsx），
+// 折页与 HUD 是 DOM（ui/PostsHud.jsx）。至此 8 个房间里有 3 个是独立空间。
+const CONTENT_ROOM_IDS = ['videos', 'music', 'ai'];
 
 // 自己会喊 `onReady` 的房间。必须在下面的兜底里排除掉，否则门会在房间还没
 // 搭好时就打开 —— 隧道尤其明显：先开到一片空白，再"啪"地出现。
-const SELF_READY_IDS = ['gallery', 'contact', 'career', 'craft', ...CONTENT_ROOM_IDS];
+const SELF_READY_IDS = ['gallery', 'contact', 'career', 'craft', 'posts', ...CONTENT_ROOM_IDS];
 
 /**
  * RoomInterior Component
@@ -212,6 +215,13 @@ const RoomInterior = ({ label, roomId, showRoom, onReady, isExiting }) => {
                         // 展板本身是 DOM（ui/CraftHud.jsx），所以这里只搭星云背景。
                         <Suspense fallback={null}>
                             <CraftRing onReady={onReady} isExiting={isExiting} />
+                        </Suspense>
+                    ) : roomId === 'posts' ? (
+                        // === 文稿：一条经折 ===
+                        // 同上：自带 Scene + Camera + 接管渲染（rooms/PostsFold.jsx），
+                        // 折页与阅读层是 DOM（ui/PostsHud.jsx），这里只搭暖黑底。
+                        <Suspense fallback={null}>
+                            <PostsFold onReady={onReady} isExiting={isExiting} />
                         </Suspense>
                     ) : CONTENT_ROOM_IDS.includes(roomId) ? (
                         <ContentRoom roomId={roomId} showRoom={roomVisible} onReady={onReady} />

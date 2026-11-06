@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Building Your First API with Express.js: A Beginner's Guide — AISPIN</title>
+<meta name="description" content="A beginner-friendly guide to building your first API with Express.js">
+<link rel="canonical" href="https://aispin.github.io/articles/en/building-your-first-api-with-expressjs-a-beginners-guide/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Building Your First API with Express.js: A Beginner's Guide — AISPIN">
+<meta property="og:description" content="A beginner-friendly guide to building your first API with Express.js">
+<meta property="og:url" content="https://aispin.github.io/articles/en/building-your-first-api-with-expressjs-a-beginners-guide/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="/fonts/maple-ui.woff2" as="font" type="font/woff2" crossorigin>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Building Your First API with Express.js: A Beginner's Guide","description":"A beginner-friendly guide to building your first API with Express.js","datePublished":"2023-11-02","inLanguage":"en","url":"https://aispin.github.io/articles/en/building-your-first-api-with-expressjs-a-beginners-guide/","mainEntityOfPage":"https://aispin.github.io/articles/en/building-your-first-api-with-expressjs-a-beginners-guide/","author":{"@type":"Person","name":"ZEO AI","url":"https://aispin.github.io"},"keywords":""}</script>
+<style>
+:root{--bg:#f4eee2;--paper:#fbf7ee;--ink:#241f1a;--soft:#6d6257;--accent:#b23a2c;--line:rgba(90,74,56,.18)}
+
+@font-face{font-family:'MapleUI';src:url('/fonts/maple-ui.woff2') format('woff2');font-weight:400 500;font-display:swap}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:'MapleUI',ui-monospace,'PingFang SC',monospace;
+  -webkit-font-smoothing:antialiased;line-height:1.8}
+a{color:inherit}
+.wrap{max-width:760px;margin:0 auto;padding:0 32px}
+
+/* 顶栏：滚到哪儿都在 */
+.bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;
+  padding:14px 32px;font-size:10.5px;letter-spacing:.2em;
+  background:color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line)}
+.bar__back{text-decoration:none;color:var(--soft);display:inline-flex;align-items:center;gap:7px;
+  transition:color .2s ease}
+.bar__back:hover{color:var(--ink)}
+.bar__sep{flex:1}
+.bar__lang{display:flex;gap:2px}
+.bar__lang a,.bar__lang span{text-decoration:none;padding:5px 10px;border-radius:999px;color:var(--soft)}
+.bar__lang a:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.bar__lang [aria-current]{color:var(--ink);background:color-mix(in srgb, var(--ink) 8%, transparent)}
+
+/* hero */
+.hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
+.hero__art{position:absolute;inset:0;width:100%;height:100%;display:block}
+/* ⚠️ 只写 padding-top/bottom：.wrap 与 .hero__in 同为单类选择器，这里若用
+   简写 padding 会把 .wrap 的左右内边距清零（手机标题被裁掉左边就是这个）。
+   注意：这段 CSS 在 JS 模板字符串里，注释中不能出现反引号。 */
+.hero__in{position:relative;z-index:2;padding-top:70px;padding-bottom:50px;min-height:clamp(240px,34vw,340px);
+  display:flex;flex-direction:column;justify-content:center}
+.hero__kicker{font-size:10px;letter-spacing:.34em;color:var(--accent);display:flex;align-items:center;gap:10px}
+.hero__kicker i{display:block;width:26px;height:1px;background:currentColor;opacity:.6;font-style:normal}
+.hero h1{margin-top:22px;font-size:clamp(28px,4.4vw,42px);line-height:1.5;font-weight:500;
+  letter-spacing:.01em;max-width:22ch;text-wrap:balance}
+.hero__meta{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px 18px;font-size:10.5px;
+  letter-spacing:.14em;color:var(--soft)}
+.hero__meta b{font-weight:400;color:var(--ink)}
+
+/* 正文 */
+.prose{padding:52px 0 24px;font-size:15px;line-height:2.05;color:var(--ink)}
+.prose>*+*{margin-top:18px}
+.prose h2{margin-top:44px;font-size:21px;line-height:1.7;font-weight:500;letter-spacing:.01em}
+.prose h3{margin-top:34px;font-size:16.5px;line-height:1.7;font-weight:500;color:var(--ink)}
+.prose h4{margin-top:26px;font-size:14.5px;font-weight:500;color:var(--soft)}
+.prose p{color:color-mix(in srgb, var(--ink) 88%, var(--soft))}
+.prose ul,.prose ol{padding-left:1.4em}
+.prose li+li{margin-top:6px}
+.prose li::marker{color:var(--accent)}
+.prose a{color:var(--accent);text-decoration:none;border-bottom:1px solid color-mix(in srgb, var(--accent) 40%, transparent)}
+.prose a:hover{border-bottom-color:var(--accent)}
+.prose strong{font-weight:500;color:var(--ink)}
+.prose code{font-family:inherit;font-size:.92em;padding:.12em .4em;border-radius:3px;
+  background:color-mix(in srgb, var(--ink) 8%, transparent)}
+.prose pre{overflow:auto;padding:18px 20px;border-radius:4px;font-size:12.5px;line-height:1.85;
+  background:color-mix(in srgb, var(--ink) 7%, transparent);border:1px solid var(--line)}
+.prose pre code{padding:0;background:none}
+.prose blockquote{padding:2px 0 2px 18px;border-left:2px solid var(--accent);color:var(--soft)}
+.prose blockquote p{color:var(--soft)}
+.prose img{display:block;max-width:100%;height:auto;border-radius:3px;
+  border:1px solid var(--line);background:var(--paper)}
+.prose hr{border:0;border-top:1px solid var(--line);margin:40px 0}
+.prose table{width:100%;border-collapse:collapse;font-size:12.5px;line-height:1.7;
+  display:block;overflow-x:auto;white-space:normal}
+.prose th,.prose td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+.prose th{background:color-mix(in srgb, var(--ink) 6%, transparent);font-weight:500}
+
+/* 文末 */
+.foot{margin-top:56px;padding:26px 0 70px;border-top:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;gap:18px;
+  font-size:10.5px;letter-spacing:.16em}
+.foot a{text-decoration:none;color:var(--soft);padding:8px 12px;border-radius:999px;
+  transition:color .2s ease,background .2s ease;max-width:46%}
+.foot a:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.foot__fin{color:var(--soft);opacity:.7}
+.foot__spacer{flex:1}
+@media(max-width:640px){
+  .wrap{padding:0 22px}
+  .bar{padding:12px 22px}
+  .hero__in{padding-top:46px;padding-bottom:34px;min-height:230px}
+  /* 窄屏折带会铺满整行、从标题底下穿过：压到 45%，只当纸纹用 */
+  .hero__art{opacity:.45}
+  .prose{font-size:14.5px;line-height:2}
+  .foot a{max-width:48%}
+}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <a class="bar__back" href="/articles/">← Writing</a>
+  <span class="bar__sep"></span>
+  <div class="bar__lang">
+    <a href="/articles/building-your-first-api-with-expressjs-a-beginners-guide/">中文</a>
+    <span aria-current="page">EN</span>
+  </div>
+</header>
+
+<section class="hero">
+  <svg class="hero__art" viewBox="0 0 1200 340" preserveAspectRatio="xMaxYMid slice" aria-hidden="true" focusable="false">
+  <defs>
+    <radialGradient id="glow" cx="74%" cy="34%" r="52%">
+      <stop offset="0%" stop-color="#b23a2c" stop-opacity=".13"/>
+      <stop offset="100%" stop-color="#b23a2c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="veil" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f4eee2" stop-opacity="1"/>
+      <stop offset="34%" stop-color="#f4eee2" stop-opacity=".72"/>
+      <stop offset="62%" stop-color="#f4eee2" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f4eee2" stop-opacity="0"/>
+      <stop offset="84%" stop-color="#f4eee2" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#f4eee2" stop-opacity=".85"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="340" fill="url(#glow)"/>
+  <path d="M372.0 113.6 L446.0 120.6 L446.0 320.6 L372.0 313.6 Z" fill="#241f1a" fill-opacity="0.290"/><path d="M372.0 113.6 L372.0 313.6" stroke="#b23a2c" stroke-opacity="0.45999999999999996" stroke-width="1"/><path d="M446.0 120.6 L520.0 126.1 L520.0 326.1 L446.0 320.6 Z" fill="#241f1a" fill-opacity="0.152"/><path d="M446.0 120.6 L446.0 320.6" stroke="#241f1a" stroke-opacity="0.15294117647058822" stroke-width="1"/><path d="M520.0 126.1 L594.0 128.6 L594.0 328.6 L520.0 326.1 Z" fill="#241f1a" fill-opacity="0.259"/><path d="M520.0 126.1 L520.0 326.1" stroke="#b23a2c" stroke-opacity="0.4105882352941176" stroke-width="1"/><path d="M594.0 128.6 L668.0 127.2 L668.0 327.2 L594.0 328.6 Z" fill="#241f1a" fill-opacity="0.137"/><path d="M594.0 128.6 L594.0 328.6" stroke="#241f1a" stroke-opacity="0.1388235294117647" stroke-width="1"/><path d="M668.0 127.2 L742.0 122.4 L742.0 322.4 L668.0 327.2 Z" fill="#241f1a" fill-opacity="0.229"/><path d="M668.0 127.2 L668.0 327.2" stroke="#b23a2c" stroke-opacity="0.36117647058823527" stroke-width="1"/><path d="M742.0 122.4 L816.0 115.6 L816.0 315.6 L742.0 322.4 Z" fill="#241f1a" fill-opacity="0.122"/><path d="M742.0 122.4 L742.0 322.4" stroke="#241f1a" stroke-opacity="0.12470588235294117" stroke-width="1"/><path d="M816.0 115.6 L890.0 108.8 L890.0 308.8 L816.0 315.6 Z" fill="#241f1a" fill-opacity="0.198"/><path d="M816.0 115.6 L816.0 315.6" stroke="#b23a2c" stroke-opacity="0.3117647058823529" stroke-width="1"/><path d="M890.0 108.8 L964.0 104.0 L964.0 304.0 L890.0 308.8 Z" fill="#241f1a" fill-opacity="0.106"/><path d="M890.0 108.8 L890.0 308.8" stroke="#241f1a" stroke-opacity="0.11058823529411765" stroke-width="1"/><path d="M964.0 104.0 L1038.0 102.6 L1038.0 302.6 L964.0 304.0 Z" fill="#241f1a" fill-opacity="0.168"/><path d="M964.0 104.0 L964.0 304.0" stroke="#b23a2c" stroke-opacity="0.26235294117647057" stroke-width="1"/><path d="M1038.0 102.6 L1112.0 105.1 L1112.0 305.1 L1038.0 302.6 Z" fill="#241f1a" fill-opacity="0.091"/><path d="M1038.0 102.6 L1038.0 302.6" stroke="#241f1a" stroke-opacity="0.09647058823529411" stroke-width="1"/><path d="M1112.0 105.1 L1186.0 110.7 L1186.0 310.7 L1112.0 305.1 Z" fill="#241f1a" fill-opacity="0.137"/><path d="M1112.0 105.1 L1112.0 305.1" stroke="#b23a2c" stroke-opacity="0.21294117647058822" stroke-width="1"/><path d="M1186.0 110.7 L1260.0 117.7 L1260.0 317.7 L1186.0 310.7 Z" fill="#241f1a" fill-opacity="0.076"/><path d="M1186.0 110.7 L1186.0 310.7" stroke="#241f1a" stroke-opacity="0.08235294117647057" stroke-width="1"/><path d="M1260.0 117.7 L1334.0 124.1 L1334.0 324.1 L1260.0 317.7 Z" fill="#241f1a" fill-opacity="0.106"/><path d="M1260.0 117.7 L1260.0 317.7" stroke="#b23a2c" stroke-opacity="0.16352941176470587" stroke-width="1"/><path d="M1334.0 124.1 L1408.0 128.0 L1408.0 328.0 L1334.0 324.1 Z" fill="#241f1a" fill-opacity="0.061"/><path d="M1334.0 124.1 L1334.0 324.1" stroke="#241f1a" stroke-opacity="0.06823529411764706" stroke-width="1"/><path d="M372.0 113.6 L446.0 120.6 L520.0 126.1 L594.0 128.6 L668.0 127.2 L742.0 122.4 L816.0 115.6 L890.0 108.8 L964.0 104.0 L1038.0 102.6 L1112.0 105.1 L1186.0 110.7 L1260.0 117.7 L1334.0 124.1 L1408.0 128.0" fill="none" stroke="#b23a2c" stroke-opacity=".34" stroke-width="1.2"/><path d="M1408 127.9793790903159 L1408 327.9793790903159" stroke="#b23a2c" stroke-opacity=".2" stroke-width="1"/>
+  <circle cx="1047.4" cy="210.1" r="0.95" fill="#b23a2c" fill-opacity="0.148"/><circle cx="117.7" cy="176.9" r="0.54" fill="#b23a2c" fill-opacity="0.116"/><circle cx="268.8" cy="64.5" r="0.71" fill="#b23a2c" fill-opacity="0.060"/><circle cx="661.6" cy="202.6" r="0.70" fill="#b23a2c" fill-opacity="0.102"/><circle cx="623.3" cy="124.3" r="0.79" fill="#b23a2c" fill-opacity="0.060"/><circle cx="544.3" cy="4.4" r="1.39" fill="#b23a2c" fill-opacity="0.088"/><circle cx="198.1" cy="201.1" r="1.49" fill="#b23a2c" fill-opacity="0.156"/><circle cx="945.6" cy="114.2" r="0.84" fill="#b23a2c" fill-opacity="0.149"/><circle cx="866.6" cy="307.7" r="0.61" fill="#b23a2c" fill-opacity="0.178"/><circle cx="876.1" cy="252.9" r="0.59" fill="#b23a2c" fill-opacity="0.150"/><circle cx="185.7" cy="121.6" r="0.51" fill="#b23a2c" fill-opacity="0.074"/><circle cx="1064.1" cy="100.4" r="1.23" fill="#b23a2c" fill-opacity="0.176"/><circle cx="1112.6" cy="159.8" r="0.55" fill="#b23a2c" fill-opacity="0.090"/><circle cx="627.9" cy="337.0" r="0.82" fill="#b23a2c" fill-opacity="0.079"/><circle cx="1075.0" cy="31.7" r="1.04" fill="#b23a2c" fill-opacity="0.096"/><circle cx="120.1" cy="123.3" r="1.47" fill="#b23a2c" fill-opacity="0.158"/><circle cx="886.9" cy="44.1" r="1.25" fill="#b23a2c" fill-opacity="0.140"/><circle cx="22.5" cy="144.7" r="1.53" fill="#b23a2c" fill-opacity="0.160"/><circle cx="1141.0" cy="88.4" r="1.36" fill="#b23a2c" fill-opacity="0.062"/><circle cx="306.9" cy="69.5" r="0.75" fill="#b23a2c" fill-opacity="0.180"/><circle cx="1063.2" cy="28.6" r="0.73" fill="#b23a2c" fill-opacity="0.184"/><circle cx="136.1" cy="104.8" r="1.47" fill="#b23a2c" fill-opacity="0.099"/><circle cx="154.0" cy="271.8" r="1.62" fill="#b23a2c" fill-opacity="0.161"/><circle cx="1037.2" cy="82.4" r="0.69" fill="#b23a2c" fill-opacity="0.067"/><circle cx="598.0" cy="61.1" r="1.52" fill="#b23a2c" fill-opacity="0.155"/><circle cx="364.7" cy="298.8" r="1.32" fill="#b23a2c" fill-opacity="0.145"/>
+  <rect width="1200" height="340" fill="url(#veil)"/>
+  <rect width="1200" height="340" fill="url(#fade)"/>
+</svg>
+  <div class="wrap hero__in">
+    <div class="hero__kicker"><i></i>12 / 18</div>
+    <h1>Building Your First API with Express.js: A Beginner's Guide</h1>
+    <div class="hero__meta">
+      <span><b>2023.11.02</b></span>
+      
+      <span>368 words · 1 min</span>
+    </div>
+  </div>
+</section>
+
+<main class="wrap">
+  <article class="prose"><blockquote>
+<p>This article was created using ChatGPT and meant as a placeholder</p>
+</blockquote>
+<h2>What is Express.js?</h2>
+<p>Express.js is a minimal and flexible Node.js web application framework that provides a robust set of features to develop web and mobile applications. It facilitates the rapid development of Node-based web applications and is widely used to build APIs due to its simplicity and performance.</p>
+<h2>Step 1: Setting Up Your Environment</h2>
+<p>Before you start, ensure that you have Node.js installed on your system. You can download it from Node.js official website.</p>
+<p>Once Node.js is installed, you can initiate your project:</p>
+<pre><code class="language-bash">mkdir my-express-api
+cd my-express-api
+npm init -y
+</code></pre>
+<p>This creates a new directory for your project and initializes a new Node.js project.</p>
+<h2>Step 2: Installing Express.js</h2>
+<p>Install Express.js using npm (Node Package Manager):</p>
+<pre><code class="language-bash">npm install express --save
+# This command installs Express.js and adds it to your project's dependencies.
+</code></pre>
+<h2>Step 3: Creating Your First Express Server</h2>
+<p>Create a file named app.js in your project directory. This file will be the entry point of your API. Add the following code to app.js:</p>
+<pre><code class="language-js">const express = require('express')
+
+const app = express()
+const port = 3000
+
+app.get('/', (req, res) =&gt; {
+  res.send('Hello World!')
+})
+
+app.listen(port, () =&gt; {
+  console.log(`Example app listening at http://localhost:${port}`)
+})
+</code></pre>
+<p>This code creates a basic Express server that listens on port 3000 and responds with &quot;Hello World!&quot; to HTTP GET requests to the root URL (/).</p>
+<h2>Step 4: Running Your Express Server</h2>
+<p>Run your server using Node.js:</p>
+<pre><code class="language-bash">node app.js
+# Visit http://localhost:3000 in your browser. You should see the message &quot;Hello World!&quot;.
+</code></pre>
+<h2>Step 5: Building a Simple API</h2>
+<p>Now, let's expand our server to act as a simple API. For example, let's create an endpoint that returns a list of users.</p>
+<p>Add the following code to your app.js:</p>
+<pre><code class="language-javascript">const users = [{ name: 'Alice' }, { name: 'Bob' }]
+
+app.get('/users', (req, res) =&gt; {
+  res.json(users)
+})
+</code></pre>
+<p>Now, if you visit <a href="http://localhost:3000/users" target="_blank" rel="noopener noreferrer">http://localhost:3000/users</a>, you will see the JSON representation of the users array.</p>
+<h2>Step 6: Testing Your API</h2>
+<p>It’s important to test your API. You can use tools like Postman or curl to test your endpoints.</p>
+<h2>Step 7: Next Steps</h2>
+<p>From here, you can start building more complex APIs. Consider the following:</p>
+<ul>
+<li>Implementing CRUD (Create, Read, Update, Delete) operations.</li>
+<li>Connecting your API to a database.</li>
+<li>Adding authentication and authorization.</li>
+<li>Organizing your code with routers and controllers.</li>
+</ul>
+<h2>Conclusion</h2>
+<p>Express.js simplifies the process of building APIs in Node.js. It's a great starting point for developers looking to delve into backend development. With its minimalist approach, you have the freedom to structure your applications as you see fit, making Express.js an invaluable tool in your development toolkit.</p>
+</article>
+  <nav class="foot">
+    <a href="/articles/en/management-by-objectives/">← Previous<br><span style="opacity:.65">Summary of Meituan's Goal Management Pra</span></a>
+    <span class="foot__fin">Fin</span>
+    <a href="/articles/en/how-to-convert-a-svg-to-png-using-canvas/" style="text-align:right">Next →<br><span style="opacity:.65">How to convert a SVG to PNG using Canvas</span></a>
+  </nav>
+</main>
+
+<script>
+(function () {
+  try {
+    if (new URLSearchParams(location.search).get('from') !== 'posts') return;
+    var a = document.querySelector('.bar__back');
+    if (!a) return;
+    a.setAttribute('href', '/posts');
+    a.textContent = document.documentElement.lang === 'en' ? '← Writing' : '← 文稿';
+  } catch (e) { /* 老浏览器：保持指向 /articles/ */ }
+})();
+</script>
+</body>
+</html>

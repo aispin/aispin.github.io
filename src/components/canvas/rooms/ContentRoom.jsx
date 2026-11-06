@@ -837,9 +837,11 @@ export default function ContentRoom({ roomId, showRoom, onReady }) {
       })
     }
     if (roomId === 'posts') {
-      // The novels used to hang in the corridor as drei <Html transform>
-      // plaques, which re-wrote a matrix3d transform + repainted a 260px
-      // box-shadow card every frame. They live here as plain procedural cards.
+      // ⚠️ 2026-11-06 起这条路**走不到了**：posts 房间换成了经折
+      // （`rooms/PostsFold.jsx` + `ui/PostsHud.jsx`），`RoomInterior` 不再把
+      // posts 交给 ContentRoom，`RoomWarmup` 也换成了 videos。
+      // 留着是因为**小说卡只挂在这里**（`NOVELS`），删掉等于把小说从站上抹掉。
+      // 小说的去处是待定项，不是"顺手删干净"能解决的 —— 见 WORKPLAN。
       const novelCards = (NOVELS.items || []).map((novel) => ({
         id: novel.id,
         title: language === 'zh' ? novel.zh : novel.en,

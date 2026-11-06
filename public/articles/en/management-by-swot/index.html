@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SWOT in Business Planning and Organizational Management — AISPIN</title>
+<meta name="description" content="SWOT analysis is a powerful strategic planning tool that helps managers identify and leverage an organization's strengths and opportunities, while identifying and mitigating potential weaknesses and threats. During my tenure at JD.com from 2015 to 2022, I have applied SWOT analysis in the organizational management process to identify the strengths, weaknesses, opportunities, and challenges of teams and individuals, helping the organization and employees develop plans for growth.">
+<link rel="canonical" href="https://aispin.github.io/articles/en/management-by-swot/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SWOT in Business Planning and Organizational Management — AISPIN">
+<meta property="og:description" content="SWOT analysis is a powerful strategic planning tool that helps managers identify and leverage an organization's strengths and opportunities, while identifying and mitigating potential weaknesses and threats. During my tenure at JD.com from 2015 to 2022, I have applied SWOT analysis in the organizational management process to identify the strengths, weaknesses, opportunities, and challenges of teams and individuals, helping the organization and employees develop plans for growth.">
+<meta property="og:url" content="https://aispin.github.io/articles/en/management-by-swot/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="/fonts/maple-ui.woff2" as="font" type="font/woff2" crossorigin>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"SWOT in Business Planning and Organizational Management","description":"SWOT analysis is a powerful strategic planning tool that helps managers identify and leverage an organization's strengths and opportunities, while identifying and mitigating potential weaknesses and threats. During my tenure at JD.com from 2015 to 2022, I have applied SWOT analysis in the organizational management process to identify the strengths, weaknesses, opportunities, and challenges of teams and individuals, helping the organization and employees develop plans for growth.","datePublished":"2021-11-11","inLanguage":"en","url":"https://aispin.github.io/articles/en/management-by-swot/","mainEntityOfPage":"https://aispin.github.io/articles/en/management-by-swot/","author":{"@type":"Person","name":"ZEO AI","url":"https://aispin.github.io"},"keywords":"SWOT"}</script>
+<style>
+:root{--bg:#141110;--paper:#1b1714;--ink:#e8e0d4;--soft:#8d8073;--accent:#c9553f;--line:rgba(200,186,168,.16)}
+
+@font-face{font-family:'MapleUI';src:url('/fonts/maple-ui.woff2') format('woff2');font-weight:400 500;font-display:swap}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:'MapleUI',ui-monospace,'PingFang SC',monospace;
+  -webkit-font-smoothing:antialiased;line-height:1.8}
+a{color:inherit}
+.wrap{max-width:760px;margin:0 auto;padding:0 32px}
+
+/* 顶栏：滚到哪儿都在 */
+.bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;
+  padding:14px 32px;font-size:10.5px;letter-spacing:.2em;
+  background:color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line)}
+.bar__back{text-decoration:none;color:var(--soft);display:inline-flex;align-items:center;gap:7px;
+  transition:color .2s ease}
+.bar__back:hover{color:var(--ink)}
+.bar__sep{flex:1}
+.bar__lang{display:flex;gap:2px}
+.bar__lang a,.bar__lang span{text-decoration:none;padding:5px 10px;border-radius:999px;color:var(--soft)}
+.bar__lang a:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.bar__lang [aria-current]{color:var(--ink);background:color-mix(in srgb, var(--ink) 8%, transparent)}
+
+/* hero */
+.hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
+.hero__art{position:absolute;inset:0;width:100%;height:100%;display:block}
+/* ⚠️ 只写 padding-top/bottom：.wrap 与 .hero__in 同为单类选择器，这里若用
+   简写 padding 会把 .wrap 的左右内边距清零（手机标题被裁掉左边就是这个）。
+   注意：这段 CSS 在 JS 模板字符串里，注释中不能出现反引号。 */
+.hero__in{position:relative;z-index:2;padding-top:70px;padding-bottom:50px;min-height:clamp(240px,34vw,340px);
+  display:flex;flex-direction:column;justify-content:center}
+.hero__kicker{font-size:10px;letter-spacing:.34em;color:var(--accent);display:flex;align-items:center;gap:10px}
+.hero__kicker i{display:block;width:26px;height:1px;background:currentColor;opacity:.6;font-style:normal}
+.hero h1{margin-top:22px;font-size:clamp(28px,4.4vw,42px);line-height:1.5;font-weight:500;
+  letter-spacing:.01em;max-width:22ch;text-wrap:balance}
+.hero__meta{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px 18px;font-size:10.5px;
+  letter-spacing:.14em;color:var(--soft)}
+.hero__meta b{font-weight:400;color:var(--ink)}
+
+/* 正文 */
+.prose{padding:52px 0 24px;font-size:15px;line-height:2.05;color:var(--ink)}
+.prose>*+*{margin-top:18px}
+.prose h2{margin-top:44px;font-size:21px;line-height:1.7;font-weight:500;letter-spacing:.01em}
+.prose h3{margin-top:34px;font-size:16.5px;line-height:1.7;font-weight:500;color:var(--ink)}
+.prose h4{margin-top:26px;font-size:14.5px;font-weight:500;color:var(--soft)}
+.prose p{color:color-mix(in srgb, var(--ink) 88%, var(--soft))}
+.prose ul,.prose ol{padding-left:1.4em}
+.prose li+li{margin-top:6px}
+.prose li::marker{color:var(--accent)}
+.prose a{color:var(--accent);text-decoration:none;border-bottom:1px solid color-mix(in srgb, var(--accent) 40%, transparent)}
+.prose a:hover{border-bottom-color:var(--accent)}
+.prose strong{font-weight:500;color:var(--ink)}
+.prose code{font-family:inherit;font-size:.92em;padding:.12em .4em;border-radius:3px;
+  background:color-mix(in srgb, var(--ink) 8%, transparent)}
+.prose pre{overflow:auto;padding:18px 20px;border-radius:4px;font-size:12.5px;line-height:1.85;
+  background:color-mix(in srgb, var(--ink) 7%, transparent);border:1px solid var(--line)}
+.prose pre code{padding:0;background:none}
+.prose blockquote{padding:2px 0 2px 18px;border-left:2px solid var(--accent);color:var(--soft)}
+.prose blockquote p{color:var(--soft)}
+.prose img{display:block;max-width:100%;height:auto;border-radius:3px;
+  border:1px solid var(--line);background:var(--paper)}
+.prose hr{border:0;border-top:1px solid var(--line);margin:40px 0}
+.prose table{width:100%;border-collapse:collapse;font-size:12.5px;line-height:1.7;
+  display:block;overflow-x:auto;white-space:normal}
+.prose th,.prose td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+.prose th{background:color-mix(in srgb, var(--ink) 6%, transparent);font-weight:500}
+
+/* 文末 */
+.foot{margin-top:56px;padding:26px 0 70px;border-top:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;gap:18px;
+  font-size:10.5px;letter-spacing:.16em}
+.foot a{text-decoration:none;color:var(--soft);padding:8px 12px;border-radius:999px;
+  transition:color .2s ease,background .2s ease;max-width:46%}
+.foot a:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.foot__fin{color:var(--soft);opacity:.7}
+.foot__spacer{flex:1}
+@media(max-width:640px){
+  .wrap{padding:0 22px}
+  .bar{padding:12px 22px}
+  .hero__in{padding-top:46px;padding-bottom:34px;min-height:230px}
+  /* 窄屏折带会铺满整行、从标题底下穿过：压到 45%，只当纸纹用 */
+  .hero__art{opacity:.45}
+  .prose{font-size:14.5px;line-height:2}
+  .foot a{max-width:48%}
+}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <a class="bar__back" href="/articles/">← Writing</a>
+  <span class="bar__sep"></span>
+  <div class="bar__lang">
+    <a href="/articles/management-by-swot/">中文</a>
+    <span aria-current="page">EN</span>
+  </div>
+</header>
+
+<section class="hero">
+  <svg class="hero__art" viewBox="0 0 1200 340" preserveAspectRatio="xMaxYMid slice" aria-hidden="true" focusable="false">
+  <defs>
+    <radialGradient id="glow" cx="74%" cy="34%" r="52%">
+      <stop offset="0%" stop-color="#c9553f" stop-opacity=".13"/>
+      <stop offset="100%" stop-color="#c9553f" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="veil" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#141110" stop-opacity="1"/>
+      <stop offset="34%" stop-color="#141110" stop-opacity=".72"/>
+      <stop offset="62%" stop-color="#141110" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#141110" stop-opacity="0"/>
+      <stop offset="84%" stop-color="#141110" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#141110" stop-opacity=".85"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="340" fill="url(#glow)"/>
+  <path d="M372.0 103.9 L446.0 108.5 L446.0 308.5 L372.0 303.9 Z" fill="#e8e0d4" fill-opacity="0.290"/><path d="M372.0 103.9 L372.0 303.9" stroke="#c9553f" stroke-opacity="0.45999999999999996" stroke-width="1"/><path d="M446.0 108.5 L520.0 115.2 L520.0 315.2 L446.0 308.5 Z" fill="#e8e0d4" fill-opacity="0.152"/><path d="M446.0 108.5 L446.0 308.5" stroke="#e8e0d4" stroke-opacity="0.15294117647058822" stroke-width="1"/><path d="M520.0 115.2 L594.0 122.1 L594.0 322.1 L520.0 315.2 Z" fill="#e8e0d4" fill-opacity="0.259"/><path d="M520.0 115.2 L520.0 315.2" stroke="#c9553f" stroke-opacity="0.4105882352941176" stroke-width="1"/><path d="M594.0 122.1 L668.0 127.0 L668.0 327.0 L594.0 322.1 Z" fill="#e8e0d4" fill-opacity="0.137"/><path d="M594.0 122.1 L594.0 322.1" stroke="#e8e0d4" stroke-opacity="0.1388235294117647" stroke-width="1"/><path d="M668.0 127.0 L742.0 128.6 L742.0 328.6 L668.0 327.0 Z" fill="#e8e0d4" fill-opacity="0.229"/><path d="M668.0 127.0 L668.0 327.0" stroke="#c9553f" stroke-opacity="0.36117647058823527" stroke-width="1"/><path d="M742.0 128.6 L816.0 126.3 L816.0 326.3 L742.0 328.6 Z" fill="#e8e0d4" fill-opacity="0.122"/><path d="M742.0 128.6 L742.0 328.6" stroke="#e8e0d4" stroke-opacity="0.12470588235294117" stroke-width="1"/><path d="M816.0 126.3 L890.0 120.9 L890.0 320.9 L816.0 326.3 Z" fill="#e8e0d4" fill-opacity="0.198"/><path d="M816.0 126.3 L816.0 326.3" stroke="#c9553f" stroke-opacity="0.3117647058823529" stroke-width="1"/><path d="M890.0 120.9 L964.0 113.9 L964.0 313.9 L890.0 320.9 Z" fill="#e8e0d4" fill-opacity="0.106"/><path d="M890.0 120.9 L890.0 320.9" stroke="#e8e0d4" stroke-opacity="0.11058823529411765" stroke-width="1"/><path d="M964.0 113.9 L1038.0 107.4 L1038.0 307.4 L964.0 313.9 Z" fill="#e8e0d4" fill-opacity="0.168"/><path d="M964.0 113.9 L964.0 313.9" stroke="#c9553f" stroke-opacity="0.26235294117647057" stroke-width="1"/><path d="M1038.0 107.4 L1112.0 103.3 L1112.0 303.3 L1038.0 307.4 Z" fill="#e8e0d4" fill-opacity="0.091"/><path d="M1038.0 107.4 L1038.0 307.4" stroke="#e8e0d4" stroke-opacity="0.09647058823529411" stroke-width="1"/><path d="M1112.0 103.3 L1186.0 102.9 L1186.0 302.9 L1112.0 303.3 Z" fill="#e8e0d4" fill-opacity="0.137"/><path d="M1112.0 103.3 L1112.0 303.3" stroke="#c9553f" stroke-opacity="0.21294117647058822" stroke-width="1"/><path d="M1186.0 102.9 L1260.0 106.2 L1260.0 306.2 L1186.0 302.9 Z" fill="#e8e0d4" fill-opacity="0.076"/><path d="M1186.0 102.9 L1186.0 302.9" stroke="#e8e0d4" stroke-opacity="0.08235294117647057" stroke-width="1"/><path d="M1260.0 106.2 L1334.0 112.2 L1334.0 312.2 L1260.0 306.2 Z" fill="#e8e0d4" fill-opacity="0.106"/><path d="M1260.0 106.2 L1260.0 306.2" stroke="#c9553f" stroke-opacity="0.16352941176470587" stroke-width="1"/><path d="M1334.0 112.2 L1408.0 119.3 L1408.0 319.3 L1334.0 312.2 Z" fill="#e8e0d4" fill-opacity="0.061"/><path d="M1334.0 112.2 L1334.0 312.2" stroke="#e8e0d4" stroke-opacity="0.06823529411764706" stroke-width="1"/><path d="M372.0 103.9 L446.0 108.5 L520.0 115.2 L594.0 122.1 L668.0 127.0 L742.0 128.6 L816.0 126.3 L890.0 120.9 L964.0 113.9 L1038.0 107.4 L1112.0 103.3 L1186.0 102.9 L1260.0 106.2 L1334.0 112.2 L1408.0 119.3" fill="none" stroke="#c9553f" stroke-opacity=".34" stroke-width="1.2"/><path d="M1408 119.30067276688635 L1408 319.30067276688635" stroke="#c9553f" stroke-opacity=".2" stroke-width="1"/>
+  <circle cx="888.7" cy="273.8" r="1.16" fill="#c9553f" fill-opacity="0.053"/><circle cx="1055.8" cy="45.0" r="0.52" fill="#c9553f" fill-opacity="0.174"/><circle cx="1071.0" cy="226.4" r="0.93" fill="#c9553f" fill-opacity="0.133"/><circle cx="408.6" cy="128.6" r="1.29" fill="#c9553f" fill-opacity="0.138"/><circle cx="215.9" cy="296.9" r="1.44" fill="#c9553f" fill-opacity="0.063"/><circle cx="782.0" cy="202.6" r="1.48" fill="#c9553f" fill-opacity="0.178"/><circle cx="252.6" cy="240.8" r="1.16" fill="#c9553f" fill-opacity="0.153"/><circle cx="159.5" cy="232.9" r="1.61" fill="#c9553f" fill-opacity="0.189"/><circle cx="1143.2" cy="106.2" r="1.69" fill="#c9553f" fill-opacity="0.146"/><circle cx="14.5" cy="42.3" r="1.45" fill="#c9553f" fill-opacity="0.188"/><circle cx="1091.6" cy="159.4" r="1.45" fill="#c9553f" fill-opacity="0.110"/><circle cx="1150.8" cy="141.0" r="1.12" fill="#c9553f" fill-opacity="0.142"/><circle cx="372.7" cy="95.6" r="0.91" fill="#c9553f" fill-opacity="0.158"/><circle cx="861.9" cy="77.9" r="1.17" fill="#c9553f" fill-opacity="0.159"/><circle cx="279.3" cy="184.0" r="1.68" fill="#c9553f" fill-opacity="0.077"/><circle cx="435.8" cy="15.6" r="1.26" fill="#c9553f" fill-opacity="0.098"/><circle cx="507.9" cy="272.1" r="1.01" fill="#c9553f" fill-opacity="0.130"/><circle cx="282.2" cy="276.3" r="0.86" fill="#c9553f" fill-opacity="0.098"/><circle cx="1135.8" cy="143.8" r="1.60" fill="#c9553f" fill-opacity="0.128"/><circle cx="1119.5" cy="118.7" r="0.57" fill="#c9553f" fill-opacity="0.151"/><circle cx="945.1" cy="63.0" r="1.51" fill="#c9553f" fill-opacity="0.144"/><circle cx="406.3" cy="56.1" r="1.36" fill="#c9553f" fill-opacity="0.190"/><circle cx="382.9" cy="3.4" r="1.28" fill="#c9553f" fill-opacity="0.182"/><circle cx="935.7" cy="113.8" r="1.59" fill="#c9553f" fill-opacity="0.071"/><circle cx="1018.2" cy="171.8" r="0.85" fill="#c9553f" fill-opacity="0.080"/><circle cx="850.8" cy="210.6" r="1.25" fill="#c9553f" fill-opacity="0.137"/>
+  <rect width="1200" height="340" fill="url(#veil)"/>
+  <rect width="1200" height="340" fill="url(#fade)"/>
+</svg>
+  <div class="wrap hero__in">
+    <div class="hero__kicker"><i></i>18 / 18</div>
+    <h1>SWOT in Business Planning and Organizational Management</h1>
+    <div class="hero__meta">
+      <span><b>2021.11.11</b></span>
+      <span>SWOT</span>
+      <span>695 words · 2 min</span>
+    </div>
+  </div>
+</section>
+
+<main class="wrap">
+  <article class="prose"><blockquote>
+<p>SWOT analysis is a powerful strategic planning tool that helps managers identify and leverage an organization's strengths and opportunities, while identifying and mitigating potential weaknesses and threats. During my tenure at JD.com from 2015 to 2022, I have applied SWOT analysis in the organizational management process to identify the strengths, weaknesses, opportunities, and challenges of teams and individuals, helping the organization and employees develop plans for growth. The colleagues from JD.com's Aotu Lab should have some impression on this. Below is a summary of how to apply SWOT analysis in business planning and organizational management, combining real cases from Meituan Youxuan and a fictional case.</p>
+</blockquote>
+<h2>Introduction to SWOT Analysis</h2>
+<p>SWOT analysis consists of four aspects: Strengths, Weaknesses, Opportunities, and Threats. By analyzing these four aspects, it can help the analyzed object better understand its internal and external environment and formulate appropriate development strategies and plans.</p>
+<h2>Applications of SWOT</h2>
+<p>There are many scenarios where SWOT analysis can be applied in life and work, such as:</p>
+<ol>
+<li><strong>New Business Planning</strong>: Before launching a new business or project, use SWOT analysis to evaluate potential strengths, weaknesses, opportunities, and threats.</li>
+<li><strong>Corporate Strategic Planning</strong>: Companies can regularly conduct SWOT analysis to formulate or adjust their long-term strategic plans.</li>
+<li><strong>Career Development Planning</strong>: Individuals can use SWOT analysis to assess their career paths, identify growth opportunities, and potential challenges.</li>
+<li><strong>Marketing Strategy</strong>: When formulating marketing strategies, SWOT analysis helps identify the characteristics of the target market and competitive environment.</li>
+<li><strong>Product Development</strong>: When developing new products or services, SWOT analysis can help the team predict market acceptance and potential obstacles.</li>
+<li><strong>Crisis Management</strong>: In times of crisis, SWOT analysis can help organizations quickly identify problems and develop response strategies.</li>
+<li><strong>Education Institution Management</strong>: Schools and universities can use SWOT analysis to improve curriculum design, student services, and campus facilities.</li>
+<li><strong>Nonprofit Organization Strategy</strong>: Nonprofit organizations can use SWOT analysis to identify fundraising opportunities and potential partners.</li>
+</ol>
+<p>Regardless of the application scenario, the essence of applying SWOT analysis is to:</p>
+<ul>
+<li>Understand oneself and others before utilizing resources.</li>
+<li>Know oneself and know the enemy, and you will never be defeated.</li>
+<li>&quot;Leverage strengths and mitigate weaknesses&quot; or &quot;leverage strengths and compensate for weaknesses&quot; to achieve better self-development.</li>
+</ul>
+<h2>Case Study 1: Meituan Youxuan</h2>
+<p><em>— 美团优选SWOT —</em></p>
+<h2>Case Study 2: XYZ Team</h2>
+<p>The XYZ team is a small development team consisting of 20 technical professionals. The team is responsible for software development and technical support for the company. However, the team has been facing some challenges recently, such as poor communication, outdated technology, and project pressure.</p>
+<h3>1. Internal Strengths</h3>
+<ul>
+<li>Technical expertise: The members of the XYZ team have rich knowledge and experience in the technical field.</li>
+<li>Collaboration ability: The team members have good collaboration and communication skills.</li>
+<li>High autonomy: The team members have a high level of autonomy in the projects.</li>
+</ul>
+<h3>2. Internal Weaknesses</h3>
+<ul>
+<li>Lack of communication: There is a lack of effective communication and collaboration among team members.</li>
+<li>Outdated technology: The technology tools used by the team need to be upgraded.</li>
+<li>Project pressure: The team needs to complete multiple projects within tight deadlines.</li>
+</ul>
+<h3>3. External Opportunities</h3>
+<ul>
+<li>Market demand growth: The market demand in the technology industry is continuously expanding.</li>
+<li>Technology training: Improve the skills of team members to adapt to new technologies.</li>
+<li>Customer collaboration: Collaborate with other teams or clients to drive project success.</li>
+</ul>
+<h3>4. External Threats</h3>
+<ul>
+<li>Intense competition: The technology industry is highly competitive, and other teams are constantly innovating.</li>
+<li>Technological changes: The emergence of new technologies may affect the team's existing work methods.</li>
+<li>Project deadlines: Tight project deadlines may affect the team's work efficiency.</li>
+</ul>
+<h3>Conclusion</h3>
+<p>Based on the SWOT analysis above, the XYZ team can take the following measures:</p>
+<ul>
+<li>Strengthen internal communication: Facilitate information sharing and collaboration among team members.</li>
+<li>Continuous learning and technology training: Keep up with technological changes and improve the team's technical skills.</li>
+<li>Flexibly handle project pressure: Allocate resources effectively to ensure timely project delivery.</li>
+</ul>
+<p>Through SWOT analysis, the XYZ team can better manage its workforce, optimize resources, and achieve long-term development for projects and the team.</p>
+<h2>Appendix</h2>
+<ul>
+<li><a href="https://www.pmquanzi.com/articlDetails/1139.html" target="_blank" rel="noopener noreferrer">Essential Tool for Product Analysis - Detailed Explanation of SWOT Case</a></li>
+</ul>
+</article>
+  <nav class="foot">
+    <span class="foot__spacer"></span>
+    <span class="foot__fin">Fin</span>
+    <a href="/articles/en/scrum-mvp-pdca/" style="text-align:right">Next →<br><span style="opacity:.65">Summary of Process Management Practices </span></a>
+  </nav>
+</main>
+
+<script>
+(function () {
+  try {
+    if (new URLSearchParams(location.search).get('from') !== 'posts') return;
+    var a = document.querySelector('.bar__back');
+    if (!a) return;
+    a.setAttribute('href', '/posts');
+    a.textContent = document.documentElement.lang === 'en' ? '← Writing' : '← 文稿';
+  } catch (e) { /* 老浏览器：保持指向 /articles/ */ }
+})();
+</script>
+</body>
+</html>

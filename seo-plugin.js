@@ -6,6 +6,9 @@ const PLUGIN_DIR = dirname(fileURLToPath(import.meta.url));
 
 // Content is local JSON under src/data — no CMS, no network at build time.
 const DATA_DIR = resolve(PLUGIN_DIR, 'src/data');
+// 有些数据不是源码，而是**构建产物**：文章元数据来自 content/articles 的
+// 编译结果，demos 索引来自扫盘。它们住在 public/ 下，跟着一起发出去。
+const PUBLIC_DIR = resolve(PLUGIN_DIR, 'public');
 
 // 主站入口。多页构建后 /me 也是一条 entry，但它有自己的 title/description，
 // 不该被这里注入的「八个房间」文案覆盖。
@@ -31,13 +34,51 @@ function readJson(name, fallback) {
     }
 }
 
+function readPublicJson(relPath, fallback) {
+    try {
+        return JSON.parse(readFileSync(resolve(PUBLIC_DIR, relPath), 'utf-8'));
+    } catch {
+        return fallback;
+    }
+}
+
+/**
+ * 项目清单。
+ *
+ * 🔴 这里曾经读 `src/data/projects.json` —— 那个文件 2026-10-21 已经删了，
+ *    `readJson('projects', [])` 于是**静默返回 []**：llms.txt 的 `## Projects`
+ *    整段消失、JSON-LD 的 ItemList 也不见了，页面上看不出任何异常。
+ *    现在项目挂在 `experiences[].projects[]` 里（按 id 查的那份是 meData 的事），
+ *    这里拍平、按 zh 取一份、按 name+url 去重。
+ */
+function flattenProjects(experiences) {
+    if (!Array.isArray(experiences)) return [];
+    const seen = new Set();
+    const out = [];
+    for (const exp of experiences) {
+        if (!exp || exp.locale !== 'zh') continue;
+        for (const p of exp.projects || []) {
+            if (!p || !p.name) continue;
+            const key = `${p.name}|${p.url || ''}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            out.push({ title: p.name, description: p.description || '', url: p.url || '' });
+        }
+    }
+    return out;
+}
+
 function loadSeoData() {
+    const demos = readPublicJson('demos/demos.json', { demos: [] });
     return {
         site: readJson('site', null),
-        projects: readJson('projects', []),
-        articles: readJson('articles', []),
+        projects: flattenProjects(readJson('experiences', [])),
+        // 文章：唯一真源是 content/articles 的编译产物（scripts/build-articles.mjs）。
+        // 以前读的是 src/data/articles.json —— 它已经被删了，正文改成静态页。
+        articles: readPublicJson('articles/index.json', []),
         photography: readJson('photography', []),
-        labs: readJson('labs', []),
+        // 「创意实验」= 扫盘生成的 demos 索引（labs.json 也早已不存在）
+        labs: Array.isArray(demos.demos) ? demos.demos : [],
         music: readJson('music', []),
         aiProjects: readJson('aiProjects', []),
     };
@@ -130,8 +171,15 @@ function buildJsonLd(site, projects, articles, photography, aiProjects) {
                 item: {
                     '@type': 'Article',
                     headline: a.title,
-                    ...(a.date ? { datePublished: formatIsoDate(a.date) } : {}),
-                    ...(a.summary ? { description: a.summary } : {}),
+                    // 🔴 字段名来自 `public/articles/index.json`（publishedAt /
+                    // description / url）。这里原来读 `a.date` / `a.summary` ——
+                    // 那是旧 articles.json 的写法，改完数据源就全是 undefined，
+                    // 于是 18 篇文章在结构化数据里既没有日期也没有描述、也没有 URL。
+                    ...(a.publishedAt ? { datePublished: formatIsoDate(a.publishedAt) } : {}),
+                    ...(a.description ? { description: a.description } : {}),
+                    ...(a.url ? { url: `${SITE_URL}${a.url}` } : {}),
+                    ...(a.tags?.length ? { keywords: a.tags.join(', ') } : {}),
+                    inLanguage: a.locale === 'en' ? 'en-US' : 'zh-CN',
                     author: { '@id': `${SITE_URL}/#person` },
                 },
             })),
@@ -202,7 +250,9 @@ function buildLlmsTxt(site, projects, articles, labs, music, aiProjects) {
     if (articles.length) {
         content += `## Articles\n`;
         articles.forEach((a) => {
-            content += `- ${a.title}${a.date ? ` (${a.date})` : ''}: ${a.summary || ''}\n`;
+            // 绝对 URL 是给模型看的：llms.txt 的读者不会自己去拼相对路径
+            const abs = a.url ? `${SITE_URL}${a.url}` : '';
+            content += `- ${a.title}${a.publishedAt ? ` (${a.publishedAt})` : ''}${abs ? ` <${abs}>` : ''}: ${a.description || ''}\n`;
         });
         content += '\n';
     }

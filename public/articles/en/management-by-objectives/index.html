@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Summary of Meituan's Goal Management Practices — AISPIN</title>
+<meta name="description" content="Meituan takes Amazon as a learning benchmark in terms of management culture and has been advocating for `Learning from Amazon` since 2022. Therefore, many management concepts are learned and adapted from Amazon, combined with Meituan's own optimization and adjustments. For example, `Leadership Principles`, `Growth Flywheel`, `Operation Plans (OP)`, `Team Goals (TG)`, etc.">
+<link rel="canonical" href="https://aispin.github.io/articles/en/management-by-objectives/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Summary of Meituan's Goal Management Practices — AISPIN">
+<meta property="og:description" content="Meituan takes Amazon as a learning benchmark in terms of management culture and has been advocating for `Learning from Amazon` since 2022. Therefore, many management concepts are learned and adapted from Amazon, combined with Meituan's own optimization and adjustments. For example, `Leadership Principles`, `Growth Flywheel`, `Operation Plans (OP)`, `Team Goals (TG)`, etc.">
+<meta property="og:url" content="https://aispin.github.io/articles/en/management-by-objectives/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="/fonts/maple-ui.woff2" as="font" type="font/woff2" crossorigin>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Summary of Meituan's Goal Management Practices","description":"Meituan takes Amazon as a learning benchmark in terms of management culture and has been advocating for `Learning from Amazon` since 2022. Therefore, many management concepts are learned and adapted from Amazon, combined with Meituan's own optimization and adjustments. For example, `Leadership Principles`, `Growth Flywheel`, `Operation Plans (OP)`, `Team Goals (TG)`, etc.","datePublished":"2023-11-02","inLanguage":"en","url":"https://aispin.github.io/articles/en/management-by-objectives/","mainEntityOfPage":"https://aispin.github.io/articles/en/management-by-objectives/","author":{"@type":"Person","name":"ZEO AI","url":"https://aispin.github.io"},"keywords":"Goal Management, OKR, SMART"}</script>
+<style>
+:root{--bg:#141110;--paper:#1b1714;--ink:#e8e0d4;--soft:#8d8073;--accent:#c9553f;--line:rgba(200,186,168,.16)}
+
+@font-face{font-family:'MapleUI';src:url('/fonts/maple-ui.woff2') format('woff2');font-weight:400 500;font-display:swap}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:'MapleUI',ui-monospace,'PingFang SC',monospace;
+  -webkit-font-smoothing:antialiased;line-height:1.8}
+a{color:inherit}
+.wrap{max-width:760px;margin:0 auto;padding:0 32px}
+
+/* 顶栏：滚到哪儿都在 */
+.bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;
+  padding:14px 32px;font-size:10.5px;letter-spacing:.2em;
+  background:color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line)}
+.bar__back{text-decoration:none;color:var(--soft);display:inline-flex;align-items:center;gap:7px;
+  transition:color .2s ease}
+.bar__back:hover{color:var(--ink)}
+.bar__sep{flex:1}
+.bar__lang{display:flex;gap:2px}
+.bar__lang a,.bar__lang span{text-decoration:none;padding:5px 10px;border-radius:999px;color:var(--soft)}
+.bar__lang a:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.bar__lang [aria-current]{color:var(--ink);background:color-mix(in srgb, var(--ink) 8%, transparent)}
+
+/* hero */
+.hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
+.hero__art{position:absolute;inset:0;width:100%;height:100%;display:block}
+/* ⚠️ 只写 padding-top/bottom：.wrap 与 .hero__in 同为单类选择器，这里若用
+   简写 padding 会把 .wrap 的左右内边距清零（手机标题被裁掉左边就是这个）。
+   注意：这段 CSS 在 JS 模板字符串里，注释中不能出现反引号。 */
+.hero__in{position:relative;z-index:2;padding-top:70px;padding-bottom:50px;min-height:clamp(240px,34vw,340px);
+  display:flex;flex-direction:column;justify-content:center}
+.hero__kicker{font-size:10px;letter-spacing:.34em;color:var(--accent);display:flex;align-items:center;gap:10px}
+.hero__kicker i{display:block;width:26px;height:1px;background:currentColor;opacity:.6;font-style:normal}
+.hero h1{margin-top:22px;font-size:clamp(28px,4.4vw,42px);line-height:1.5;font-weight:500;
+  letter-spacing:.01em;max-width:22ch;text-wrap:balance}
+.hero__meta{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px 18px;font-size:10.5px;
+  letter-spacing:.14em;color:var(--soft)}
+.hero__meta b{font-weight:400;color:var(--ink)}
+
+/* 正文 */
+.prose{padding:52px 0 24px;font-size:15px;line-height:2.05;color:var(--ink)}
+.prose>*+*{margin-top:18px}
+.prose h2{margin-top:44px;font-size:21px;line-height:1.7;font-weight:500;letter-spacing:.01em}
+.prose h3{margin-top:34px;font-size:16.5px;line-height:1.7;font-weight:500;color:var(--ink)}
+.prose h4{margin-top:26px;font-size:14.5px;font-weight:500;color:var(--soft)}
+.prose p{color:color-mix(in srgb, var(--ink) 88%, var(--soft))}
+.prose ul,.prose ol{padding-left:1.4em}
+.prose li+li{margin-top:6px}
+.prose li::marker{color:var(--accent)}
+.prose a{color:var(--accent);text-decoration:none;border-bottom:1px solid color-mix(in srgb, var(--accent) 40%, transparent)}
+.prose a:hover{border-bottom-color:var(--accent)}
+.prose strong{font-weight:500;color:var(--ink)}
+.prose code{font-family:inherit;font-size:.92em;padding:.12em .4em;border-radius:3px;
+  background:color-mix(in srgb, var(--ink) 8%, transparent)}
+.prose pre{overflow:auto;padding:18px 20px;border-radius:4px;font-size:12.5px;line-height:1.85;
+  background:color-mix(in srgb, var(--ink) 7%, transparent);border:1px solid var(--line)}
+.prose pre code{padding:0;background:none}
+.prose blockquote{padding:2px 0 2px 18px;border-left:2px solid var(--accent);color:var(--soft)}
+.prose blockquote p{color:var(--soft)}
+.prose img{display:block;max-width:100%;height:auto;border-radius:3px;
+  border:1px solid var(--line);background:var(--paper)}
+.prose hr{border:0;border-top:1px solid var(--line);margin:40px 0}
+.prose table{width:100%;border-collapse:collapse;font-size:12.5px;line-height:1.7;
+  display:block;overflow-x:auto;white-space:normal}
+.prose th,.prose td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+.prose th{background:color-mix(in srgb, var(--ink) 6%, transparent);font-weight:500}
+
+/* 文末 */
+.foot{margin-top:56px;padding:26px 0 70px;border-top:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;gap:18px;
+  font-size:10.5px;letter-spacing:.16em}
+.foot a{text-decoration:none;color:var(--soft);padding:8px 12px;border-radius:999px;
+  transition:color .2s ease,background .2s ease;max-width:46%}
+.foot a:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.foot__fin{color:var(--soft);opacity:.7}
+.foot__spacer{flex:1}
+@media(max-width:640px){
+  .wrap{padding:0 22px}
+  .bar{padding:12px 22px}
+  .hero__in{padding-top:46px;padding-bottom:34px;min-height:230px}
+  /* 窄屏折带会铺满整行、从标题底下穿过：压到 45%，只当纸纹用 */
+  .hero__art{opacity:.45}
+  .prose{font-size:14.5px;line-height:2}
+  .foot a{max-width:48%}
+}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <a class="bar__back" href="/articles/">← Writing</a>
+  <span class="bar__sep"></span>
+  <div class="bar__lang">
+    <a href="/articles/management-by-objectives/">中文</a>
+    <span aria-current="page">EN</span>
+  </div>
+</header>
+
+<section class="hero">
+  <svg class="hero__art" viewBox="0 0 1200 340" preserveAspectRatio="xMaxYMid slice" aria-hidden="true" focusable="false">
+  <defs>
+    <radialGradient id="glow" cx="74%" cy="34%" r="52%">
+      <stop offset="0%" stop-color="#c9553f" stop-opacity=".13"/>
+      <stop offset="100%" stop-color="#c9553f" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="veil" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#141110" stop-opacity="1"/>
+      <stop offset="34%" stop-color="#141110" stop-opacity=".72"/>
+      <stop offset="62%" stop-color="#141110" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#141110" stop-opacity="0"/>
+      <stop offset="84%" stop-color="#141110" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#141110" stop-opacity=".85"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="340" fill="url(#glow)"/>
+  <path d="M372.0 124.2 L446.0 117.8 L446.0 317.8 L372.0 324.2 Z" fill="#e8e0d4" fill-opacity="0.290"/><path d="M372.0 124.2 L372.0 324.2" stroke="#c9553f" stroke-opacity="0.45999999999999996" stroke-width="1"/><path d="M446.0 117.8 L520.0 110.8 L520.0 310.8 L446.0 317.8 Z" fill="#e8e0d4" fill-opacity="0.152"/><path d="M446.0 117.8 L446.0 317.8" stroke="#e8e0d4" stroke-opacity="0.15294117647058822" stroke-width="1"/><path d="M520.0 110.8 L594.0 105.2 L594.0 305.2 L520.0 310.8 Z" fill="#e8e0d4" fill-opacity="0.259"/><path d="M520.0 110.8 L520.0 310.8" stroke="#c9553f" stroke-opacity="0.4105882352941176" stroke-width="1"/><path d="M594.0 105.2 L668.0 102.7 L668.0 302.7 L594.0 305.2 Z" fill="#e8e0d4" fill-opacity="0.137"/><path d="M594.0 105.2 L594.0 305.2" stroke="#e8e0d4" stroke-opacity="0.1388235294117647" stroke-width="1"/><path d="M668.0 102.7 L742.0 103.9 L742.0 303.9 L668.0 302.7 Z" fill="#e8e0d4" fill-opacity="0.229"/><path d="M668.0 102.7 L668.0 302.7" stroke="#c9553f" stroke-opacity="0.36117647058823527" stroke-width="1"/><path d="M742.0 103.9 L816.0 108.6 L816.0 308.6 L742.0 303.9 Z" fill="#e8e0d4" fill-opacity="0.122"/><path d="M742.0 103.9 L742.0 303.9" stroke="#e8e0d4" stroke-opacity="0.12470588235294117" stroke-width="1"/><path d="M816.0 108.6 L890.0 115.4 L890.0 315.4 L816.0 308.6 Z" fill="#e8e0d4" fill-opacity="0.198"/><path d="M816.0 108.6 L816.0 308.6" stroke="#c9553f" stroke-opacity="0.3117647058823529" stroke-width="1"/><path d="M890.0 115.4 L964.0 122.2 L964.0 322.2 L890.0 315.4 Z" fill="#e8e0d4" fill-opacity="0.106"/><path d="M890.0 115.4 L890.0 315.4" stroke="#e8e0d4" stroke-opacity="0.11058823529411765" stroke-width="1"/><path d="M964.0 122.2 L1038.0 127.1 L1038.0 327.1 L964.0 322.2 Z" fill="#e8e0d4" fill-opacity="0.168"/><path d="M964.0 122.2 L964.0 322.2" stroke="#c9553f" stroke-opacity="0.26235294117647057" stroke-width="1"/><path d="M1038.0 127.1 L1112.0 128.6 L1112.0 328.6 L1038.0 327.1 Z" fill="#e8e0d4" fill-opacity="0.091"/><path d="M1038.0 127.1 L1038.0 327.1" stroke="#e8e0d4" stroke-opacity="0.09647058823529411" stroke-width="1"/><path d="M1112.0 128.6 L1186.0 126.2 L1186.0 326.2 L1112.0 328.6 Z" fill="#e8e0d4" fill-opacity="0.137"/><path d="M1112.0 128.6 L1112.0 328.6" stroke="#c9553f" stroke-opacity="0.21294117647058822" stroke-width="1"/><path d="M1186.0 126.2 L1260.0 120.7 L1260.0 320.7 L1186.0 326.2 Z" fill="#e8e0d4" fill-opacity="0.076"/><path d="M1186.0 126.2 L1186.0 326.2" stroke="#e8e0d4" stroke-opacity="0.08235294117647057" stroke-width="1"/><path d="M1260.0 120.7 L1334.0 113.7 L1334.0 313.7 L1260.0 320.7 Z" fill="#e8e0d4" fill-opacity="0.106"/><path d="M1260.0 120.7 L1260.0 320.7" stroke="#c9553f" stroke-opacity="0.16352941176470587" stroke-width="1"/><path d="M1334.0 113.7 L1408.0 107.3 L1408.0 307.3 L1334.0 313.7 Z" fill="#e8e0d4" fill-opacity="0.061"/><path d="M1334.0 113.7 L1334.0 313.7" stroke="#e8e0d4" stroke-opacity="0.06823529411764706" stroke-width="1"/><path d="M372.0 124.2 L446.0 117.8 L520.0 110.8 L594.0 105.2 L668.0 102.7 L742.0 103.9 L816.0 108.6 L890.0 115.4 L964.0 122.2 L1038.0 127.1 L1112.0 128.6 L1186.0 126.2 L1260.0 120.7 L1334.0 113.7 L1408.0 107.3" fill="none" stroke="#c9553f" stroke-opacity=".34" stroke-width="1.2"/><path d="M1408 107.2872347260041 L1408 307.2872347260041" stroke="#c9553f" stroke-opacity=".2" stroke-width="1"/>
+  <circle cx="755.5" cy="315.2" r="0.81" fill="#c9553f" fill-opacity="0.136"/><circle cx="355.8" cy="319.8" r="1.63" fill="#c9553f" fill-opacity="0.181"/><circle cx="549.7" cy="91.7" r="0.85" fill="#c9553f" fill-opacity="0.081"/><circle cx="642.9" cy="13.7" r="1.10" fill="#c9553f" fill-opacity="0.149"/><circle cx="900.2" cy="28.2" r="1.42" fill="#c9553f" fill-opacity="0.163"/><circle cx="684.8" cy="44.9" r="0.85" fill="#c9553f" fill-opacity="0.144"/><circle cx="259.9" cy="102.2" r="1.05" fill="#c9553f" fill-opacity="0.066"/><circle cx="780.6" cy="17.3" r="1.64" fill="#c9553f" fill-opacity="0.124"/><circle cx="818.8" cy="274.5" r="0.57" fill="#c9553f" fill-opacity="0.154"/><circle cx="252.7" cy="327.6" r="0.60" fill="#c9553f" fill-opacity="0.163"/><circle cx="292.8" cy="75.4" r="0.67" fill="#c9553f" fill-opacity="0.081"/><circle cx="109.2" cy="154.7" r="0.80" fill="#c9553f" fill-opacity="0.102"/><circle cx="255.1" cy="313.8" r="1.43" fill="#c9553f" fill-opacity="0.159"/><circle cx="288.4" cy="208.7" r="1.06" fill="#c9553f" fill-opacity="0.147"/><circle cx="811.6" cy="116.0" r="1.16" fill="#c9553f" fill-opacity="0.145"/><circle cx="693.2" cy="225.7" r="1.28" fill="#c9553f" fill-opacity="0.072"/><circle cx="1152.7" cy="68.6" r="0.75" fill="#c9553f" fill-opacity="0.155"/><circle cx="1034.2" cy="22.7" r="0.94" fill="#c9553f" fill-opacity="0.181"/><circle cx="1150.5" cy="133.4" r="0.52" fill="#c9553f" fill-opacity="0.169"/><circle cx="837.4" cy="267.9" r="0.99" fill="#c9553f" fill-opacity="0.088"/><circle cx="756.9" cy="34.6" r="0.83" fill="#c9553f" fill-opacity="0.088"/><circle cx="681.2" cy="165.3" r="0.78" fill="#c9553f" fill-opacity="0.138"/><circle cx="734.8" cy="100.6" r="0.98" fill="#c9553f" fill-opacity="0.113"/><circle cx="179.2" cy="72.6" r="0.79" fill="#c9553f" fill-opacity="0.137"/><circle cx="36.9" cy="158.1" r="0.80" fill="#c9553f" fill-opacity="0.090"/><circle cx="590.9" cy="80.3" r="0.93" fill="#c9553f" fill-opacity="0.124"/>
+  <rect width="1200" height="340" fill="url(#veil)"/>
+  <rect width="1200" height="340" fill="url(#fade)"/>
+</svg>
+  <div class="wrap hero__in">
+    <div class="hero__kicker"><i></i>14 / 18</div>
+    <h1>Summary of Meituan's Goal Management Practices</h1>
+    <div class="hero__meta">
+      <span><b>2023.11.02</b></span>
+      <span>Goal Management · OKR · SMART</span>
+      <span>1,771 words · 4 min</span>
+    </div>
+  </div>
+</section>
+
+<main class="wrap">
+  <article class="prose"><blockquote>
+<p>Author: ZEO AI, Former Head of Waima Terminal Team, Shangou Technology Department, Meituan Daojia, responsible for frontend development and management of the self-operated liquor business, Waima.</p>
+</blockquote>
+<p>This article provides a summary of Meituan's goal management practices. It represents my personal understanding and is intended for self-improvement and personal reflection. The content mentioned here is publicly available on the internet. The department I was in during my time at Meituan was the Meituan Daojia R&amp;D department. Different business groups and departments may have variations. I welcome colleagues and friends to discuss and provide feedback.</p>
+<h2>Introduction</h2>
+<p>Meituan takes Amazon as a learning benchmark in terms of management culture and has been advocating for &quot;Learning from Amazon&quot; since 2022. Therefore, many management concepts are learned and adapted from Amazon, combined with Meituan's own optimization and adjustments. For example, &quot;Leadership Principles,&quot; &quot;Growth Flywheel,&quot; &quot;Operation Plans (OP),&quot; &quot;Team Goals (TG),&quot; etc. Among them, the methodology related to goal management is mainly &quot;Operation Plans (OP).&quot; Since the second half of 2022, Meituan has vigorously promoted OP and launched a new goal management system in conjunction with &quot;Operation Plans.&quot; Although OKR and TG are no longer mentioned in internal Meituan documents, OKR is still used by execution departments to track organizational goals.</p>
+<p>There is a significant mixture of Chinese and English in internal Meituan documents, and there is a tendency to use English abbreviations, such as OP, TG, KP (Key Person), etc. For newly hired employees, it may be confusing at first. Fortunately, starting from 2023, Vice President Mu Rongjun has issued a document requiring the replacement of various English abbreviations with Chinese. However, changing habits takes time. In addition, in 2023, Wang Puzhong, the head of the Daojia business group and Vice President of the company, proposed the implementation of &quot;management subtraction,&quot; believing that in the past, there was excessive imitation of Amazon's management methodologies, and it is necessary to optimize and simplify them based on Meituan's own situation. This topic can be discussed in another article.</p>
+<p>In general, as of the end of 2023, Meituan's goal management consists of Operation Plans (OP), Team Goals (TG), and OKR combined:</p>
+<ol>
+<li>Major departments (such as the first-level department &quot;Daojia R&amp;D Department&quot; and the second-level department &quot;Shangou Technology Department&quot;) primarily use Operation Plans (OP).</li>
+<li>Subordinate teams and individuals use OKR to break down the Operation Plans into sub-goals.</li>
+</ol>
+<p>Of course, there may also be some third and fourth-level departments that use Operation Plans to manage team goals, such as the terminal development group I was in and the terminal group I was responsible for. Both groups practiced Operation Plans in 2023.</p>
+<p>It is worth mentioning that Operation Plans are mainly bottom-up, starting from the operation plans of lower-level departments, gradually refining them at each level, and finally selecting the most important goals for the entire company by the core decision-making level (S-Teams), known as S-Team Goals.</p>
+<h2>Operation Plans (OP), S-Team Goals &amp; OKR</h2>
+<p>Operation Plans (OP) are usually annual and involve decisions regarding business indicators and resource allocation. An effective operation plan aligns and reaches consensus between each business group and the core management team (S-Team). It mainly covers the following aspects:</p>
+<ul>
+<li>Financial plan for the next year: including a complete profit and loss statement (P&amp;L) and a detailed plan for employee headcount (HC).</li>
+<li>Key inputs and measures for the next year: identifying the key inputs (such as launching new products, expanding product categories, etc.) and key initiatives required to achieve the financial plan.</li>
+</ul>
+<p>Team Goals, Objectives and Key Results (OKR), and KPIs used by some teams within the company are all tools for goal management, but with slightly different focuses.</p>
+<p>Based on benchmarking with Amazon's practices, Meituan's unified requirement in 2023 is that business group/platform department-level organizations should use operation plans to manage goals and plans. Teams at lower levels, including individual goal management, can decide which tools to use based on their own circumstances.</p>
+<p>Since 23, the Waima Terminal team I am responsible for has actively responded to the company's management policies and has been using operation plans to manage team goals. Subordinate organizations (Waima Terminal Group 1, Group 2) align with the Waima product team and use OKR for goal management.</p>
+<p>The table below shows the relationship between operation plans, S-Team Goals, and OKR based on my management practices at Meituan and relevant management materials from Amazon. It is used in the Waima Terminal team as a reference:</p>
+<p><em>— MT OP &amp; OKR —</em></p>
+<h2>Goal Management and Process Review without PPT</h2>
+<p>Compared to JD and Tencent, the biggest characteristic of Meituan's goal management and process review (including promotion and job performance) is that there is no need to write PPT. Instead, it is based on descriptive documents (STAR principle). The typical process is as follows:</p>
+<ul>
+<li><strong>Before the meeting</strong>: Spend 10-15 minutes reading the document.</li>
+<li><strong>During the meeting</strong>: Ask questions and discuss.</li>
+<li><strong>After the meeting</strong>: Provide feedback and summary (including positive and negative feedback).</li>
+</ul>
+<p>Therefore, Meituan places great importance on employees' writing skills. Its document system is very powerful and can be considered the best document system the author has ever seen (comparable to Tencent Docs, a commercial product). In daily work, employees only need to focus on delivering good results in their job, while continuously improving the accumulation and documentation process, enhancing their own writing abilities, and naturally feeling more at ease during performance reviews and promotions.</p>
+<p>Note: Meituan's use of descriptive documents instead of PPT for meetings is also inspired by Amazon. However, PPT is still required for presenting achievements and plans during the annual and mid-year business group management meetings.</p>
+<h2>Outline of Operation Plans Document</h2>
+<p>Before entering the goal management system (here, I would also like to complain about the goal management system launched in 2023. Personally, I think it is not as user-friendly as documents. I suggest integrating it with the document system), the output of the operation plan is also a descriptive document. The content generally includes the following topics, which can be combined and used by different functional departments:</p>
+<p><em>— OP outline —</em></p>
+<p>The following diagram shows an example of the outline used by the organization I was responsible for in 2023. It may vary for other departments:</p>
+<p><em>— OP waima —</em></p>
+<h2>OKR Management Requirements</h2>
+<p>Next, let's talk about some requirements for using OKR for goal management in the subordinate organization during my time at Meituan. Some of the content is borrowed from the product team of Meituan's Waima business and is for reference only.</p>
+<p>In addition, for more knowledge about OKR management practices, I recommend the book &quot;OKR Working Method: High-performance Secrets of Top Companies such as Google and LinkedIn&quot;. You can apply it according to your own situation.</p>
+<h3>Principles</h3>
+<p>The three key principles are as follows:</p>
+<ol>
+<li>O (Objectives) represents goals, which need to reflect business/product/technical value, be inspiring, and be executable and controllable. The quantity should be limited to 3-4;</li>
+<li>KR needs to comply with the SMART principle, which means they should be specific, measurable, challenging, and limited to 3-4;</li>
+<li>The key to OKR is to align the consensus of peers, superiors, and subordinates on goals and expected results.</li>
+</ol>
+<p>Regarding SMART, it is the basic requirement for OKR:</p>
+<ul>
+<li>Specific: Objectives should be clear and specific, without ambiguity.</li>
+<li>Measurable: Objectives and key results should be quantifiable for tracking and evaluation.</li>
+<li>Achievable: Objectives should be realistic and feasible, without being overly idealistic.</li>
+<li>Relevant: Objectives should be relevant to the organization's or individual's strategic direction and needs.</li>
+<li>Time-bound: Objectives should have a deadline for tracking progress.</li>
+</ul>
+<h3>Goal Setting and Management Process</h3>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Time</th>
+<th>Input</th>
+<th>Output</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Drafting</td>
+<td>Last 2 weeks of each quarter (adjustments with prior notice)</td>
+<td>Business phase goals, product phase goals (these goals may be subject to changes)</td>
+<td><strong>Initial draft of OKRs for each team</strong><br/>1. Discussion with relevant stakeholders (prioritize focusing on internal business)<br/>2. Some quantifiable metrics may not be mandatory if difficult to measure</td>
+<td>Drafting OKRs should be an active action, clear and objective business goals may take time, but responsible individuals should initiate the drafting process based on their understanding of the business</td>
+</tr>
+<tr>
+<td>Alignment</td>
+<td>From the submission of initial OKR drafts until the start of the next quarter<br/>(Objective OKRs require a certain period of time for determination)</td>
+<td>【Upward Alignment】<br/>Individual initial OKR drafts<br/>【Downward Alignment】<br/>Supervisor initial OKR drafts</td>
+<td>Suggestions and feedback on OKRs, as well as revised delivery time</td>
+<td>Alignment often requires multiple iterations, in addition to upward and downward alignment, horizontal alignment should also be considered to ensure alignment with key stakeholders</td>
+</tr>
+<tr>
+<td>Publishing</td>
+<td>After supervisor approval of OKRs<br/>(Generally in the first month of the quarter)</td>
+<td>Approved and confirmed OKRs</td>
+<td>Publish on the OKR system</td>
+<td>It is recommended to backup the online document as well, as the system may have some imperfections</td>
+</tr>
+<tr>
+<td>Monthly Evaluation</td>
+<td>First week of the following month</td>
+<td>Evaluation of the following aspects:<br/>1. Self-assessment of progress (monthly basis), usually represented by red, yellow, and green lights<br/>2. Gap analysis and reasons for not achieving the goals<br/>3. Sharing of key results and insights<br/>4. Plans and focus for the next month<br/>5. Support and resources needed</td>
+<td>Revise plans for the next phase based on the evaluation</td>
+<td><strong>Red Light</strong>: Not completed and no confidence in completion<br/><strong>Yellow Light</strong>: Not completed but have some confidence in catching up<br/><strong>Green Light</strong>: Completed<br/>A challenging and reasonable OKR should have very few red lights and a few yellow lights.</td>
+</tr>
+<tr>
+<td>Quarterly Evaluation</td>
+<td>Based on company assessment schedule</td>
+<td>Refer to quarterly/half-year assessment criteria</td>
+<td>Self-assessment of quarterly/half-year performance</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3>Examples</h3>
+<p>Here are some examples based on OKR and SMART for reference:</p>
+<h4>Company-level OKRs:</h4>
+<p><strong>Objective</strong>: Increase the company's market share.</p>
+<p><strong>Key Results</strong>:</p>
+<ul>
+<li>Increase the number of new customers by at least 20%.</li>
+<li>Improve customer satisfaction rating by at least 10%.</li>
+<li>Reduce product development cycle by at least 15%.</li>
+</ul>
+<h4>Department-level OKRs (e.g. Marketing Department):</h4>
+<p><strong>Objective</strong>: Increase brand awareness.</p>
+<p><strong>Key Results</strong>:</p>
+<ul>
+<li>Increase social media engagement by 30%.</li>
+<li>Improve website traffic by at least 25%.</li>
+<li>Increase media coverage by at least 15%.</li>
+</ul>
+<h3>5.4 Common Questions about OKRs</h3>
+<h4>Q1: Can OKRs be modified once they are set?</h4>
+<p>A: Yes, but it requires going through the modification process, explaining the background/reason for the modification, and keeping records of the changes. In principle, we are more willing to accept results caused by uncontrollable external factors or adjustments in business direction.</p>
+<h4>Q2: What is the relationship between OKRs and performance evaluation?</h4>
+<p>A: The implementation of OKRs plays an important role in performance evaluation, but completion rate does not directly equate to performance. Performance is also influenced by other dimensions. At the same time, the completion of OKRs needs to be evaluated in combination with the complexity of the OKRs.</p>
+</article>
+  <nav class="foot">
+    <a href="/articles/en/scrum-mvp-pdca/">← Previous<br><span style="opacity:.65">Summary of Process Management Practices </span></a>
+    <span class="foot__fin">Fin</span>
+    <a href="/articles/en/building-your-first-api-with-expressjs-a-beginners-guide/" style="text-align:right">Next →<br><span style="opacity:.65">Building Your First API with Express.js:</span></a>
+  </nav>
+</main>
+
+<script>
+(function () {
+  try {
+    if (new URLSearchParams(location.search).get('from') !== 'posts') return;
+    var a = document.querySelector('.bar__back');
+    if (!a) return;
+    a.setAttribute('href', '/posts');
+    a.textContent = document.documentElement.lang === 'en' ? '← Writing' : '← 文稿';
+  } catch (e) { /* 老浏览器：保持指向 /articles/ */ }
+})();
+</script>
+</body>
+</html>

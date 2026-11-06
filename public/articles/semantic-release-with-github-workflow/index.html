@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>使用 Semantic-Release 和 Github Workflow 实现自动化版本发布 — AISPIN</title>
+<meta name="description" content="本文介绍了如何使用 Semantic-Release 和 GitHub Actions 实现自动化版本发布，包括安装相关包、创建个人访问令牌、配置发布文件和 GitHub 工作流，以及测试和触发发布过程的详细步骤。">
+<link rel="canonical" href="https://aispin.github.io/articles/semantic-release-with-github-workflow/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="使用 Semantic-Release 和 Github Workflow 实现自动化版本发布 — AISPIN">
+<meta property="og:description" content="本文介绍了如何使用 Semantic-Release 和 GitHub Actions 实现自动化版本发布，包括安装相关包、创建个人访问令牌、配置发布文件和 GitHub 工作流，以及测试和触发发布过程的详细步骤。">
+<meta property="og:url" content="https://aispin.github.io/articles/semantic-release-with-github-workflow/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="/fonts/maple-ui.woff2" as="font" type="font/woff2" crossorigin>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"使用 Semantic-Release 和 Github Workflow 实现自动化版本发布","description":"本文介绍了如何使用 Semantic-Release 和 GitHub Actions 实现自动化版本发布，包括安装相关包、创建个人访问令牌、配置发布文件和 GitHub 工作流，以及测试和触发发布过程的详细步骤。","datePublished":"2024-08-10","inLanguage":"zh-CN","url":"https://aispin.github.io/articles/semantic-release-with-github-workflow/","mainEntityOfPage":"https://aispin.github.io/articles/semantic-release-with-github-workflow/","author":{"@type":"Person","name":"ZEO AI","url":"https://aispin.github.io"},"keywords":"CICD, Semantic-Release, Github Workflow, Github Actions, 自动化发布"}</script>
+<style>
+:root{--bg:#07080f;--paper:#0d0f18;--ink:#e6f0ff;--soft:#7f8aa3;--accent:#5ee7ff;--line:rgba(94,231,255,.20)}
+
+@font-face{font-family:'MapleUI';src:url('/fonts/maple-ui.woff2') format('woff2');font-weight:400 500;font-display:swap}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:'MapleUI',ui-monospace,'PingFang SC',monospace;
+  -webkit-font-smoothing:antialiased;line-height:1.8}
+a{color:inherit}
+.wrap{max-width:760px;margin:0 auto;padding:0 32px}
+
+/* 顶栏：滚到哪儿都在 */
+.bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;
+  padding:14px 32px;font-size:10.5px;letter-spacing:.2em;
+  background:color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line)}
+.bar__back{text-decoration:none;color:var(--soft);display:inline-flex;align-items:center;gap:7px;
+  transition:color .2s ease}
+.bar__back:hover{color:var(--ink)}
+.bar__sep{flex:1}
+.bar__lang{display:flex;gap:2px}
+.bar__lang a,.bar__lang span{text-decoration:none;padding:5px 10px;border-radius:999px;color:var(--soft)}
+.bar__lang a:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.bar__lang [aria-current]{color:var(--ink);background:color-mix(in srgb, var(--ink) 8%, transparent)}
+
+/* hero */
+.hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
+.hero__art{position:absolute;inset:0;width:100%;height:100%;display:block}
+/* ⚠️ 只写 padding-top/bottom：.wrap 与 .hero__in 同为单类选择器，这里若用
+   简写 padding 会把 .wrap 的左右内边距清零（手机标题被裁掉左边就是这个）。
+   注意：这段 CSS 在 JS 模板字符串里，注释中不能出现反引号。 */
+.hero__in{position:relative;z-index:2;padding-top:70px;padding-bottom:50px;min-height:clamp(240px,34vw,340px);
+  display:flex;flex-direction:column;justify-content:center}
+.hero__kicker{font-size:10px;letter-spacing:.34em;color:var(--accent);display:flex;align-items:center;gap:10px}
+.hero__kicker i{display:block;width:26px;height:1px;background:currentColor;opacity:.6;font-style:normal}
+.hero h1{margin-top:22px;font-size:clamp(28px,4.4vw,42px);line-height:1.5;font-weight:500;
+  letter-spacing:.01em;max-width:22ch;text-wrap:balance}
+.hero__meta{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px 18px;font-size:10.5px;
+  letter-spacing:.14em;color:var(--soft)}
+.hero__meta b{font-weight:400;color:var(--ink)}
+
+/* 正文 */
+.prose{padding:52px 0 24px;font-size:15px;line-height:2.05;color:var(--ink)}
+.prose>*+*{margin-top:18px}
+.prose h2{margin-top:44px;font-size:21px;line-height:1.7;font-weight:500;letter-spacing:.01em}
+.prose h3{margin-top:34px;font-size:16.5px;line-height:1.7;font-weight:500;color:var(--ink)}
+.prose h4{margin-top:26px;font-size:14.5px;font-weight:500;color:var(--soft)}
+.prose p{color:color-mix(in srgb, var(--ink) 88%, var(--soft))}
+.prose ul,.prose ol{padding-left:1.4em}
+.prose li+li{margin-top:6px}
+.prose li::marker{color:var(--accent)}
+.prose a{color:var(--accent);text-decoration:none;border-bottom:1px solid color-mix(in srgb, var(--accent) 40%, transparent)}
+.prose a:hover{border-bottom-color:var(--accent)}
+.prose strong{font-weight:500;color:var(--ink)}
+.prose code{font-family:inherit;font-size:.92em;padding:.12em .4em;border-radius:3px;
+  background:color-mix(in srgb, var(--ink) 8%, transparent)}
+.prose pre{overflow:auto;padding:18px 20px;border-radius:4px;font-size:12.5px;line-height:1.85;
+  background:color-mix(in srgb, var(--ink) 7%, transparent);border:1px solid var(--line)}
+.prose pre code{padding:0;background:none}
+.prose blockquote{padding:2px 0 2px 18px;border-left:2px solid var(--accent);color:var(--soft)}
+.prose blockquote p{color:var(--soft)}
+.prose img{display:block;max-width:100%;height:auto;border-radius:3px;
+  border:1px solid var(--line);background:var(--paper)}
+.prose hr{border:0;border-top:1px solid var(--line);margin:40px 0}
+.prose table{width:100%;border-collapse:collapse;font-size:12.5px;line-height:1.7;
+  display:block;overflow-x:auto;white-space:normal}
+.prose th,.prose td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+.prose th{background:color-mix(in srgb, var(--ink) 6%, transparent);font-weight:500}
+
+/* 文末 */
+.foot{margin-top:56px;padding:26px 0 70px;border-top:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;gap:18px;
+  font-size:10.5px;letter-spacing:.16em}
+.foot a{text-decoration:none;color:var(--soft);padding:8px 12px;border-radius:999px;
+  transition:color .2s ease,background .2s ease;max-width:46%}
+.foot a:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.foot__fin{color:var(--soft);opacity:.7}
+.foot__spacer{flex:1}
+@media(max-width:640px){
+  .wrap{padding:0 22px}
+  .bar{padding:12px 22px}
+  .hero__in{padding-top:46px;padding-bottom:34px;min-height:230px}
+  /* 窄屏折带会铺满整行、从标题底下穿过：压到 45%，只当纸纹用 */
+  .hero__art{opacity:.45}
+  .prose{font-size:14.5px;line-height:2}
+  .foot a{max-width:48%}
+}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <a class="bar__back" href="/articles/">← 文稿</a>
+  <span class="bar__sep"></span>
+  <div class="bar__lang">
+    <span aria-current="page">中文</span>
+    <a href="/articles/en/semantic-release-with-github-workflow/">EN</a>
+  </div>
+</header>
+
+<section class="hero">
+  <svg class="hero__art" viewBox="0 0 1200 340" preserveAspectRatio="xMaxYMid slice" aria-hidden="true" focusable="false">
+  <defs>
+    <radialGradient id="glow" cx="74%" cy="34%" r="52%">
+      <stop offset="0%" stop-color="#5ee7ff" stop-opacity=".13"/>
+      <stop offset="100%" stop-color="#5ee7ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="veil" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#07080f" stop-opacity="1"/>
+      <stop offset="34%" stop-color="#07080f" stop-opacity=".72"/>
+      <stop offset="62%" stop-color="#07080f" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#07080f" stop-opacity="0"/>
+      <stop offset="84%" stop-color="#07080f" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#07080f" stop-opacity=".85"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="340" fill="url(#glow)"/>
+  <path d="M372.0 126.3 L446.0 128.6 L446.0 328.6 L372.0 326.3 Z" fill="#e6f0ff" fill-opacity="0.290"/><path d="M372.0 126.3 L372.0 326.3" stroke="#5ee7ff" stroke-opacity="0.45999999999999996" stroke-width="1"/><path d="M446.0 128.6 L520.0 127.0 L520.0 327.0 L446.0 328.6 Z" fill="#e6f0ff" fill-opacity="0.152"/><path d="M446.0 128.6 L446.0 328.6" stroke="#e6f0ff" stroke-opacity="0.15294117647058822" stroke-width="1"/><path d="M520.0 127.0 L594.0 122.1 L594.0 322.1 L520.0 327.0 Z" fill="#e6f0ff" fill-opacity="0.259"/><path d="M520.0 127.0 L520.0 327.0" stroke="#5ee7ff" stroke-opacity="0.4105882352941176" stroke-width="1"/><path d="M594.0 122.1 L668.0 115.3 L668.0 315.3 L594.0 322.1 Z" fill="#e6f0ff" fill-opacity="0.137"/><path d="M594.0 122.1 L594.0 322.1" stroke="#e6f0ff" stroke-opacity="0.1388235294117647" stroke-width="1"/><path d="M668.0 115.3 L742.0 108.6 L742.0 308.6 L668.0 315.3 Z" fill="#e6f0ff" fill-opacity="0.229"/><path d="M668.0 115.3 L668.0 315.3" stroke="#5ee7ff" stroke-opacity="0.36117647058823527" stroke-width="1"/><path d="M742.0 108.6 L816.0 103.9 L816.0 303.9 L742.0 308.6 Z" fill="#e6f0ff" fill-opacity="0.122"/><path d="M742.0 108.6 L742.0 308.6" stroke="#e6f0ff" stroke-opacity="0.12470588235294117" stroke-width="1"/><path d="M816.0 103.9 L890.0 102.7 L890.0 302.7 L816.0 303.9 Z" fill="#e6f0ff" fill-opacity="0.198"/><path d="M816.0 103.9 L816.0 303.9" stroke="#5ee7ff" stroke-opacity="0.3117647058823529" stroke-width="1"/><path d="M890.0 102.7 L964.0 105.3 L964.0 305.3 L890.0 302.7 Z" fill="#e6f0ff" fill-opacity="0.106"/><path d="M890.0 102.7 L890.0 302.7" stroke="#e6f0ff" stroke-opacity="0.11058823529411765" stroke-width="1"/><path d="M964.0 105.3 L1038.0 110.9 L1038.0 310.9 L964.0 305.3 Z" fill="#e6f0ff" fill-opacity="0.168"/><path d="M964.0 105.3 L964.0 305.3" stroke="#5ee7ff" stroke-opacity="0.26235294117647057" stroke-width="1"/><path d="M1038.0 110.9 L1112.0 117.9 L1112.0 317.9 L1038.0 310.9 Z" fill="#e6f0ff" fill-opacity="0.091"/><path d="M1038.0 110.9 L1038.0 310.9" stroke="#e6f0ff" stroke-opacity="0.09647058823529411" stroke-width="1"/><path d="M1112.0 117.9 L1186.0 124.3 L1186.0 324.3 L1112.0 317.9 Z" fill="#e6f0ff" fill-opacity="0.137"/><path d="M1112.0 117.9 L1112.0 317.9" stroke="#5ee7ff" stroke-opacity="0.21294117647058822" stroke-width="1"/><path d="M1186.0 124.3 L1260.0 128.1 L1260.0 328.1 L1186.0 324.3 Z" fill="#e6f0ff" fill-opacity="0.076"/><path d="M1186.0 124.3 L1186.0 324.3" stroke="#e6f0ff" stroke-opacity="0.08235294117647057" stroke-width="1"/><path d="M1260.0 128.1 L1334.0 128.2 L1334.0 328.2 L1260.0 328.1 Z" fill="#e6f0ff" fill-opacity="0.106"/><path d="M1260.0 128.1 L1260.0 328.1" stroke="#5ee7ff" stroke-opacity="0.16352941176470587" stroke-width="1"/><path d="M1334.0 128.2 L1408.0 124.6 L1408.0 324.6 L1334.0 328.2 Z" fill="#e6f0ff" fill-opacity="0.061"/><path d="M1334.0 128.2 L1334.0 328.2" stroke="#e6f0ff" stroke-opacity="0.06823529411764706" stroke-width="1"/><path d="M372.0 126.3 L446.0 128.6 L520.0 127.0 L594.0 122.1 L668.0 115.3 L742.0 108.6 L816.0 103.9 L890.0 102.7 L964.0 105.3 L1038.0 110.9 L1112.0 117.9 L1186.0 124.3 L1260.0 128.1 L1334.0 128.2 L1408.0 124.6" fill="none" stroke="#5ee7ff" stroke-opacity=".34" stroke-width="1.2"/><path d="M1408 124.5578370713413 L1408 324.5578370713413" stroke="#5ee7ff" stroke-opacity=".2" stroke-width="1"/>
+  <circle cx="1150.5" cy="53.1" r="0.83" fill="#5ee7ff" fill-opacity="0.155"/><circle cx="354.8" cy="61.8" r="1.12" fill="#5ee7ff" fill-opacity="0.140"/><circle cx="443.1" cy="282.3" r="0.94" fill="#5ee7ff" fill-opacity="0.101"/><circle cx="546.8" cy="170.8" r="0.76" fill="#5ee7ff" fill-opacity="0.187"/><circle cx="958.9" cy="284.2" r="1.53" fill="#5ee7ff" fill-opacity="0.164"/><circle cx="40.5" cy="47.5" r="1.58" fill="#5ee7ff" fill-opacity="0.113"/><circle cx="305.0" cy="111.3" r="0.70" fill="#5ee7ff" fill-opacity="0.121"/><circle cx="1122.4" cy="169.8" r="0.69" fill="#5ee7ff" fill-opacity="0.074"/><circle cx="251.5" cy="171.7" r="1.64" fill="#5ee7ff" fill-opacity="0.184"/><circle cx="207.6" cy="216.9" r="0.80" fill="#5ee7ff" fill-opacity="0.175"/><circle cx="50.3" cy="11.5" r="1.40" fill="#5ee7ff" fill-opacity="0.119"/><circle cx="692.1" cy="181.2" r="0.98" fill="#5ee7ff" fill-opacity="0.123"/><circle cx="1144.8" cy="11.4" r="0.76" fill="#5ee7ff" fill-opacity="0.062"/><circle cx="238.2" cy="178.0" r="0.71" fill="#5ee7ff" fill-opacity="0.173"/><circle cx="108.1" cy="229.4" r="1.03" fill="#5ee7ff" fill-opacity="0.181"/><circle cx="643.8" cy="261.6" r="0.54" fill="#5ee7ff" fill-opacity="0.089"/><circle cx="885.6" cy="314.8" r="0.83" fill="#5ee7ff" fill-opacity="0.110"/><circle cx="852.1" cy="186.2" r="0.60" fill="#5ee7ff" fill-opacity="0.066"/><circle cx="472.2" cy="205.4" r="1.12" fill="#5ee7ff" fill-opacity="0.094"/><circle cx="63.0" cy="147.0" r="0.67" fill="#5ee7ff" fill-opacity="0.081"/><circle cx="619.0" cy="262.8" r="0.92" fill="#5ee7ff" fill-opacity="0.154"/><circle cx="969.5" cy="4.5" r="1.01" fill="#5ee7ff" fill-opacity="0.176"/><circle cx="230.8" cy="223.2" r="0.85" fill="#5ee7ff" fill-opacity="0.187"/><circle cx="1003.0" cy="266.8" r="0.90" fill="#5ee7ff" fill-opacity="0.091"/><circle cx="687.1" cy="291.1" r="0.64" fill="#5ee7ff" fill-opacity="0.185"/><circle cx="40.6" cy="263.5" r="0.54" fill="#5ee7ff" fill-opacity="0.094"/>
+  <rect width="1200" height="340" fill="url(#veil)"/>
+  <rect width="1200" height="340" fill="url(#fade)"/>
+</svg>
+  <div class="wrap hero__in">
+    <div class="hero__kicker"><i></i>03 / 18</div>
+    <h1>使用 Semantic-Release 和 Github Workflow 实现自动化版本发布</h1>
+    <div class="hero__meta">
+      <span><b>2024.08.10</b></span>
+      <span>CICD · Semantic-Release · Github Workflow · Github Actions · 自动化发布</span>
+      <span>381 字 · 1 分钟</span>
+    </div>
+  </div>
+</section>
+
+<main class="wrap">
+  <article class="prose"><p>本文介绍了如何使用 Semantic-Release 和 GitHub Actions 实现自动化版本发布，包括安装相关包、创建个人访问令牌、配置发布文件和 GitHub 工作流，以及测试和触发发布过程的详细步骤。</p>
+<h2>1, 安装 semantic-release 相关依赖</h2>
+<pre><code class="language-bash">pnpm add -D semantic-release @semantic-release/changelog @semantic-release/git @semantic-release/github @semantic-release/npm
+</code></pre>
+<h2>2, 创建一个 Github 的私人 TOKEN (下面简称 <code>PAT</code>)</h2>
+<ul>
+<li>打开 <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">Github Personal Access Token</a> 页面</li>
+<li>点击 <code>Generate new token</code></li>
+<li>在 <code>Repository Access</code> 的地方，选中你的仓库</li>
+<li>给 <code>PAT</code> 授权如下:
+<ul>
+<li>Actions - read and write</li>
+<li>Commit statuses - read and write</li>
+<li>Contents - read and write</li>
+<li>Deployments - read and write</li>
+<li>Issues - read and write</li>
+</ul>
+</li>
+</ul>
+<p>注意：记得保存 <code>PAT</code>，因为你只能看到一次！</p>
+<h2>3, 在 Github 仓库中添加 <code>PAT</code></h2>
+<ul>
+<li>打开 Github 仓库的首页</li>
+<li>点击 <code>Settings</code> -&gt; <code>Secrets and variables</code> -&gt; <code>New repository secret</code></li>
+<li>输入 TOKEN 的名称为 <code>GH_TOKEN</code>， 粘贴 <code>PAT</code> 到值的地方</li>
+</ul>
+<h2>4, 在项目根目录下创建 <code>release.config.mjs</code></h2>
+<pre><code class="language-ts">const config = {
+  branches: ['main'],
+  plugins: [
+    '@semantic-release/commit-analyzer',
+    '@semantic-release/release-notes-generator',
+    '@semantic-release/changelog',
+    '@semantic-release/github',
+    '@semantic-release/npm',
+    '@semantic-release/git',
+  ],
+}
+
+export default config
+</code></pre>
+<h2>5, 在 <code>.github/workflows</code> 目录下创建一个名为 <code>release.yml</code> 的工作流配置文件</h2>
+<pre><code class="language-yml">name: Semantic Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: npx semantic-release
+</code></pre>
+<h2>6, 本地测试下 <code>PAT</code> 和 <code>Semantic Release</code> 工作流是否配置正确</h2>
+<pre><code class="language-bash">GH_TOKEN=your_pat npx semantic-release --dry-run
+</code></pre>
+<h2>7, 尝试提交一个 commit 到 main 分支触发自动版本发布</h2>
+<pre><code class="language-bash">git add .
+git commit -m &quot;chore(release): 0.0.1&quot;
+git push
+</code></pre>
+<h2>常见问题</h2>
+<h3>错误: Cannot push the version tag to the branch <code>main</code> on the remote Git repository with URL <code>http://x-access-token:[secure]@github.com/xxxx</code></h3>
+<p>如果 <code>步骤 6</code> 没报错, 请做以下额外的设置:</p>
+<ul>
+<li>打开 Github 仓库的首页</li>
+<li>点击 <code>Settings</code> -&gt; Code and automation <code>Actions</code> -&gt; <code>General</code></li>
+<li>在 <code>Workflow Permissions</code> 的地方, 勾上 <code>Read and write permission</code> 选项</li>
+<li>点击 <code>Save</code></li>
+</ul>
+<p>关于这个报错，可以到 <a href="https://github.com/semantic-release/semantic-release/issues/2481#issuecomment-1421429306" target="_blank" rel="noopener noreferrer">issue</a> 查看更多相关信息。</p>
+</article>
+  <nav class="foot">
+    <a href="/articles/intuitive-understanding-of-docker/">← 上一篇<br><span style="opacity:.65">教大家更直观的理解 Docker</span></a>
+    <span class="foot__fin">完</span>
+    <a href="/articles/neon-serverless-driver-vercel-aliyun/" style="text-align:right">下一篇 →<br><span style="opacity:.65">Neon serverless-driver 结合 Vercel、阿里云实战指南</span></a>
+  </nav>
+</main>
+
+<script>
+(function () {
+  try {
+    if (new URLSearchParams(location.search).get('from') !== 'posts') return;
+    var a = document.querySelector('.bar__back');
+    if (!a) return;
+    a.setAttribute('href', '/posts');
+    a.textContent = document.documentElement.lang === 'en' ? '← Writing' : '← 文稿';
+  } catch (e) { /* 老浏览器：保持指向 /articles/ */ }
+})();
+</script>
+</body>
+</html>

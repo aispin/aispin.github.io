@@ -13,6 +13,7 @@ import NavigationUI from './components/ui/NavigationUI';
 import GlobalOverlay from './components/ui/GlobalOverlay';
 import CareerHud from './components/ui/CareerHud';
 import CraftHud from './components/ui/CraftHud';
+import PostsHud from './components/ui/PostsHud';
 import ScreenReaderOverlay from './components/ui/ScreenReaderOverlay';
 import Toast from './components/ui/Toast';
 import { useDocumentMeta, getInitialRoomFromUrl } from './hooks/useDocumentMeta';
@@ -324,6 +325,7 @@ function AppContent() {
               <NavigationUI />
               <CareerHud />
               <CraftHud />
+              <PostsHud />
               <GlobalOverlay />
               <ScreenReaderOverlay />
             </>

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>How to convert a SVG to PNG using Canvas — AISPIN</title>
+<meta name="description" content="A simple way to convert a SVG to PNG using Canvas">
+<link rel="canonical" href="https://aispin.github.io/articles/en/how-to-convert-a-svg-to-png-using-canvas/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="How to convert a SVG to PNG using Canvas — AISPIN">
+<meta property="og:description" content="A simple way to convert a SVG to PNG using Canvas">
+<meta property="og:url" content="https://aispin.github.io/articles/en/how-to-convert-a-svg-to-png-using-canvas/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="/fonts/maple-ui.woff2" as="font" type="font/woff2" crossorigin>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"How to convert a SVG to PNG using Canvas","description":"A simple way to convert a SVG to PNG using Canvas","datePublished":"2023-11-22","inLanguage":"en","url":"https://aispin.github.io/articles/en/how-to-convert-a-svg-to-png-using-canvas/","mainEntityOfPage":"https://aispin.github.io/articles/en/how-to-convert-a-svg-to-png-using-canvas/","author":{"@type":"Person","name":"ZEO AI","url":"https://aispin.github.io"},"keywords":""}</script>
+<style>
+:root{--bg:#f4eee2;--paper:#fbf7ee;--ink:#241f1a;--soft:#6d6257;--accent:#b23a2c;--line:rgba(90,74,56,.18)}
+
+@font-face{font-family:'MapleUI';src:url('/fonts/maple-ui.woff2') format('woff2');font-weight:400 500;font-display:swap}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:'MapleUI',ui-monospace,'PingFang SC',monospace;
+  -webkit-font-smoothing:antialiased;line-height:1.8}
+a{color:inherit}
+.wrap{max-width:760px;margin:0 auto;padding:0 32px}
+
+/* 顶栏：滚到哪儿都在 */
+.bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;
+  padding:14px 32px;font-size:10.5px;letter-spacing:.2em;
+  background:color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line)}
+.bar__back{text-decoration:none;color:var(--soft);display:inline-flex;align-items:center;gap:7px;
+  transition:color .2s ease}
+.bar__back:hover{color:var(--ink)}
+.bar__sep{flex:1}
+.bar__lang{display:flex;gap:2px}
+.bar__lang a,.bar__lang span{text-decoration:none;padding:5px 10px;border-radius:999px;color:var(--soft)}
+.bar__lang a:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.bar__lang [aria-current]{color:var(--ink);background:color-mix(in srgb, var(--ink) 8%, transparent)}
+
+/* hero */
+.hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
+.hero__art{position:absolute;inset:0;width:100%;height:100%;display:block}
+/* ⚠️ 只写 padding-top/bottom：.wrap 与 .hero__in 同为单类选择器，这里若用
+   简写 padding 会把 .wrap 的左右内边距清零（手机标题被裁掉左边就是这个）。
+   注意：这段 CSS 在 JS 模板字符串里，注释中不能出现反引号。 */
+.hero__in{position:relative;z-index:2;padding-top:70px;padding-bottom:50px;min-height:clamp(240px,34vw,340px);
+  display:flex;flex-direction:column;justify-content:center}
+.hero__kicker{font-size:10px;letter-spacing:.34em;color:var(--accent);display:flex;align-items:center;gap:10px}
+.hero__kicker i{display:block;width:26px;height:1px;background:currentColor;opacity:.6;font-style:normal}
+.hero h1{margin-top:22px;font-size:clamp(28px,4.4vw,42px);line-height:1.5;font-weight:500;
+  letter-spacing:.01em;max-width:22ch;text-wrap:balance}
+.hero__meta{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px 18px;font-size:10.5px;
+  letter-spacing:.14em;color:var(--soft)}
+.hero__meta b{font-weight:400;color:var(--ink)}
+
+/* 正文 */
+.prose{padding:52px 0 24px;font-size:15px;line-height:2.05;color:var(--ink)}
+.prose>*+*{margin-top:18px}
+.prose h2{margin-top:44px;font-size:21px;line-height:1.7;font-weight:500;letter-spacing:.01em}
+.prose h3{margin-top:34px;font-size:16.5px;line-height:1.7;font-weight:500;color:var(--ink)}
+.prose h4{margin-top:26px;font-size:14.5px;font-weight:500;color:var(--soft)}
+.prose p{color:color-mix(in srgb, var(--ink) 88%, var(--soft))}
+.prose ul,.prose ol{padding-left:1.4em}
+.prose li+li{margin-top:6px}
+.prose li::marker{color:var(--accent)}
+.prose a{color:var(--accent);text-decoration:none;border-bottom:1px solid color-mix(in srgb, var(--accent) 40%, transparent)}
+.prose a:hover{border-bottom-color:var(--accent)}
+.prose strong{font-weight:500;color:var(--ink)}
+.prose code{font-family:inherit;font-size:.92em;padding:.12em .4em;border-radius:3px;
+  background:color-mix(in srgb, var(--ink) 8%, transparent)}
+.prose pre{overflow:auto;padding:18px 20px;border-radius:4px;font-size:12.5px;line-height:1.85;
+  background:color-mix(in srgb, var(--ink) 7%, transparent);border:1px solid var(--line)}
+.prose pre code{padding:0;background:none}
+.prose blockquote{padding:2px 0 2px 18px;border-left:2px solid var(--accent);color:var(--soft)}
+.prose blockquote p{color:var(--soft)}
+.prose img{display:block;max-width:100%;height:auto;border-radius:3px;
+  border:1px solid var(--line);background:var(--paper)}
+.prose hr{border:0;border-top:1px solid var(--line);margin:40px 0}
+.prose table{width:100%;border-collapse:collapse;font-size:12.5px;line-height:1.7;
+  display:block;overflow-x:auto;white-space:normal}
+.prose th,.prose td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+.prose th{background:color-mix(in srgb, var(--ink) 6%, transparent);font-weight:500}
+
+/* 文末 */
+.foot{margin-top:56px;padding:26px 0 70px;border-top:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;gap:18px;
+  font-size:10.5px;letter-spacing:.16em}
+.foot a{text-decoration:none;color:var(--soft);padding:8px 12px;border-radius:999px;
+  transition:color .2s ease,background .2s ease;max-width:46%}
+.foot a:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.foot__fin{color:var(--soft);opacity:.7}
+.foot__spacer{flex:1}
+@media(max-width:640px){
+  .wrap{padding:0 22px}
+  .bar{padding:12px 22px}
+  .hero__in{padding-top:46px;padding-bottom:34px;min-height:230px}
+  /* 窄屏折带会铺满整行、从标题底下穿过：压到 45%，只当纸纹用 */
+  .hero__art{opacity:.45}
+  .prose{font-size:14.5px;line-height:2}
+  .foot a{max-width:48%}
+}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <a class="bar__back" href="/articles/">← Writing</a>
+  <span class="bar__sep"></span>
+  <div class="bar__lang">
+    <a href="/articles/how-to-convert-a-svg-to-png-using-canvas/">中文</a>
+    <span aria-current="page">EN</span>
+  </div>
+</header>
+
+<section class="hero">
+  <svg class="hero__art" viewBox="0 0 1200 340" preserveAspectRatio="xMaxYMid slice" aria-hidden="true" focusable="false">
+  <defs>
+    <radialGradient id="glow" cx="74%" cy="34%" r="52%">
+      <stop offset="0%" stop-color="#b23a2c" stop-opacity=".13"/>
+      <stop offset="100%" stop-color="#b23a2c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="veil" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f4eee2" stop-opacity="1"/>
+      <stop offset="34%" stop-color="#f4eee2" stop-opacity=".72"/>
+      <stop offset="62%" stop-color="#f4eee2" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f4eee2" stop-opacity="0"/>
+      <stop offset="84%" stop-color="#f4eee2" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#f4eee2" stop-opacity=".85"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="340" fill="url(#glow)"/>
+  <path d="M372.0 125.0 L446.0 128.3 L446.0 328.3 L372.0 325.0 Z" fill="#241f1a" fill-opacity="0.290"/><path d="M372.0 125.0 L372.0 325.0" stroke="#b23a2c" stroke-opacity="0.45999999999999996" stroke-width="1"/><path d="M446.0 128.3 L520.0 127.9 L520.0 327.9 L446.0 328.3 Z" fill="#241f1a" fill-opacity="0.152"/><path d="M446.0 128.3 L446.0 328.3" stroke="#241f1a" stroke-opacity="0.15294117647058822" stroke-width="1"/><path d="M520.0 127.9 L594.0 123.8 L594.0 323.8 L520.0 327.9 Z" fill="#241f1a" fill-opacity="0.259"/><path d="M520.0 127.9 L520.0 327.9" stroke="#b23a2c" stroke-opacity="0.4105882352941176" stroke-width="1"/><path d="M594.0 123.8 L668.0 117.3 L668.0 317.3 L594.0 323.8 Z" fill="#241f1a" fill-opacity="0.137"/><path d="M594.0 123.8 L594.0 323.8" stroke="#241f1a" stroke-opacity="0.1388235294117647" stroke-width="1"/><path d="M668.0 117.3 L742.0 110.3 L742.0 310.3 L668.0 317.3 Z" fill="#241f1a" fill-opacity="0.229"/><path d="M668.0 117.3 L668.0 317.3" stroke="#b23a2c" stroke-opacity="0.36117647058823527" stroke-width="1"/><path d="M742.0 110.3 L816.0 104.9 L816.0 304.9 L742.0 310.3 Z" fill="#241f1a" fill-opacity="0.122"/><path d="M742.0 110.3 L742.0 310.3" stroke="#241f1a" stroke-opacity="0.12470588235294117" stroke-width="1"/><path d="M816.0 104.9 L890.0 102.6 L890.0 302.6 L816.0 304.9 Z" fill="#241f1a" fill-opacity="0.198"/><path d="M816.0 104.9 L816.0 304.9" stroke="#b23a2c" stroke-opacity="0.3117647058823529" stroke-width="1"/><path d="M890.0 102.6 L964.0 104.2 L964.0 304.2 L890.0 302.6 Z" fill="#241f1a" fill-opacity="0.106"/><path d="M890.0 102.6 L890.0 302.6" stroke="#241f1a" stroke-opacity="0.11058823529411765" stroke-width="1"/><path d="M964.0 104.2 L1038.0 109.1 L1038.0 309.1 L964.0 304.2 Z" fill="#241f1a" fill-opacity="0.168"/><path d="M964.0 104.2 L964.0 304.2" stroke="#b23a2c" stroke-opacity="0.26235294117647057" stroke-width="1"/><path d="M1038.0 109.1 L1112.0 116.0 L1112.0 316.0 L1038.0 309.1 Z" fill="#241f1a" fill-opacity="0.091"/><path d="M1038.0 109.1 L1038.0 309.1" stroke="#241f1a" stroke-opacity="0.09647058823529411" stroke-width="1"/><path d="M1112.0 116.0 L1186.0 122.7 L1186.0 322.7 L1112.0 316.0 Z" fill="#241f1a" fill-opacity="0.137"/><path d="M1112.0 116.0 L1112.0 316.0" stroke="#b23a2c" stroke-opacity="0.21294117647058822" stroke-width="1"/><path d="M1186.0 122.7 L1260.0 127.3 L1260.0 327.3 L1186.0 322.7 Z" fill="#241f1a" fill-opacity="0.076"/><path d="M1186.0 122.7 L1186.0 322.7" stroke="#241f1a" stroke-opacity="0.08235294117647057" stroke-width="1"/><path d="M1260.0 127.3 L1334.0 128.5 L1334.0 328.5 L1260.0 327.3 Z" fill="#241f1a" fill-opacity="0.106"/><path d="M1260.0 127.3 L1260.0 327.3" stroke="#b23a2c" stroke-opacity="0.16352941176470587" stroke-width="1"/><path d="M1334.0 128.5 L1408.0 125.9 L1408.0 325.9 L1334.0 328.5 Z" fill="#241f1a" fill-opacity="0.061"/><path d="M1334.0 128.5 L1334.0 328.5" stroke="#241f1a" stroke-opacity="0.06823529411764706" stroke-width="1"/><path d="M372.0 125.0 L446.0 128.3 L520.0 127.9 L594.0 123.8 L668.0 117.3 L742.0 110.3 L816.0 104.9 L890.0 102.6 L964.0 104.2 L1038.0 109.1 L1112.0 116.0 L1186.0 122.7 L1260.0 127.3 L1334.0 128.5 L1408.0 125.9" fill="none" stroke="#b23a2c" stroke-opacity=".34" stroke-width="1.2"/><path d="M1408 125.895250288335 L1408 325.895250288335" stroke="#b23a2c" stroke-opacity=".2" stroke-width="1"/>
+  <circle cx="839.1" cy="296.3" r="1.09" fill="#b23a2c" fill-opacity="0.103"/><circle cx="56.1" cy="98.5" r="0.60" fill="#b23a2c" fill-opacity="0.063"/><circle cx="964.6" cy="74.9" r="1.68" fill="#b23a2c" fill-opacity="0.146"/><circle cx="587.6" cy="70.3" r="0.77" fill="#b23a2c" fill-opacity="0.136"/><circle cx="411.4" cy="90.8" r="0.83" fill="#b23a2c" fill-opacity="0.064"/><circle cx="92.8" cy="305.5" r="0.92" fill="#b23a2c" fill-opacity="0.078"/><circle cx="712.6" cy="321.5" r="1.30" fill="#b23a2c" fill-opacity="0.100"/><circle cx="625.7" cy="201.3" r="1.39" fill="#b23a2c" fill-opacity="0.079"/><circle cx="342.5" cy="219.4" r="1.59" fill="#b23a2c" fill-opacity="0.135"/><circle cx="609.0" cy="89.5" r="1.02" fill="#b23a2c" fill-opacity="0.073"/><circle cx="227.4" cy="194.0" r="1.05" fill="#b23a2c" fill-opacity="0.054"/><circle cx="285.1" cy="43.5" r="1.46" fill="#b23a2c" fill-opacity="0.108"/><circle cx="744.3" cy="95.0" r="0.90" fill="#b23a2c" fill-opacity="0.155"/><circle cx="1171.7" cy="228.4" r="0.59" fill="#b23a2c" fill-opacity="0.187"/><circle cx="290.1" cy="242.0" r="1.05" fill="#b23a2c" fill-opacity="0.061"/><circle cx="808.0" cy="139.5" r="0.58" fill="#b23a2c" fill-opacity="0.141"/><circle cx="308.8" cy="94.6" r="1.02" fill="#b23a2c" fill-opacity="0.071"/><circle cx="1187.7" cy="118.2" r="1.00" fill="#b23a2c" fill-opacity="0.061"/><circle cx="180.3" cy="291.9" r="1.09" fill="#b23a2c" fill-opacity="0.131"/><circle cx="252.4" cy="141.2" r="0.77" fill="#b23a2c" fill-opacity="0.124"/><circle cx="988.0" cy="293.3" r="0.85" fill="#b23a2c" fill-opacity="0.100"/><circle cx="923.1" cy="297.4" r="1.57" fill="#b23a2c" fill-opacity="0.107"/><circle cx="694.2" cy="73.7" r="1.20" fill="#b23a2c" fill-opacity="0.157"/><circle cx="291.2" cy="38.9" r="1.29" fill="#b23a2c" fill-opacity="0.161"/><circle cx="979.3" cy="295.4" r="0.67" fill="#b23a2c" fill-opacity="0.167"/><circle cx="1183.0" cy="236.0" r="1.63" fill="#b23a2c" fill-opacity="0.080"/>
+  <rect width="1200" height="340" fill="url(#veil)"/>
+  <rect width="1200" height="340" fill="url(#fade)"/>
+</svg>
+  <div class="wrap hero__in">
+    <div class="hero__kicker"><i></i>10 / 18</div>
+    <h1>How to convert a SVG to PNG using Canvas</h1>
+    <div class="hero__meta">
+      <span><b>2023.11.22</b></span>
+      
+      <span>396 words · 1 min</span>
+    </div>
+  </div>
+</section>
+
+<main class="wrap">
+  <article class="prose"><blockquote>
+<p>This article was created using ChatGPT and meant as a placeholder</p>
+</blockquote>
+<p>Converting an SVG to a PNG in JavaScript using a canvas element is a handy technique for web developers who need to manipulate vector graphics for various applications. This process essentially involves rendering an SVG image onto a canvas and then converting the canvas to a PNG format. Here's a step-by-step guide on how to achieve this:</p>
+<ol>
+<li>
+<p>Prepare the SVG
+Ensure your SVG code is ready. You can use an SVG file or an SVG string embedded directly in your JavaScript code. If you're using an external SVG file, you'll need to load it into your application.</p>
+</li>
+<li>
+<p>Create a Canvas Element
+You need a canvas element to draw your SVG onto. This can be an existing canvas in your HTML or one created dynamically using JavaScript:</p>
+</li>
+</ol>
+<pre><code class="language-js">const canvas = document.createElement('canvas')
+canvas.width = 500 // Set the canvas width
+canvas.height = 500 // Set the canvas height
+</code></pre>
+<p>Set the width and height of the canvas to match the desired dimensions of your final PNG.</p>
+<ol start="3">
+<li>Draw the SVG onto the Canvas
+To draw the SVG onto the canvas, you need to convert the SVG into an image and then draw that image on the canvas. This can be done using the Image object in JavaScript:</li>
+</ol>
+<pre><code class="language-js">const img = new Image()
+img.onload = function () {
+  const ctx = canvas.getContext('2d')
+  ctx.drawImage(img, 0, 0)
+}
+img.src = `data:image/svg+xml;base64,${btoa(svgString)}`
+</code></pre>
+<p>In this code, replace svgString with your SVG code. If you're using an external SVG file, ensure the file is read and converted into a base64 string.</p>
+<ol start="4">
+<li>Convert Canvas to PNG
+Once your SVG is rendered on the canvas, you can convert the canvas to a PNG image:</li>
+</ol>
+<pre><code class="language-js">const pngUrl = canvas.toDataURL('image/png')
+</code></pre>
+<p>This pngUrl is a base64 encoded string representing your PNG image.</p>
+<ol start="5">
+<li>Use or Save the PNG Image
+Now that you have your PNG in base64 format, you can use it as needed in your application. For example, you can display it in an <img> element or download it:</li>
+</ol>
+<pre><code class="language-js">const imgElement = document.createElement('img')
+imgElement.src = pngUrl
+document.body.appendChild(imgElement)
+
+// To download the image
+const downloadLink = document.createElement('a')
+downloadLink.href = pngUrl
+downloadLink.download = 'image.png'
+downloadLink.click()
+</code></pre>
+<h3>Additional Considerations</h3>
+<ul>
+<li>Cross-Origin Issues: If you're loading an SVG from an external source, you may encounter cross-origin issues. Ensure CORS policies are configured correctly on the server hosting the SVG file.</li>
+<li>SVG Features: Some SVG features may not render correctly on canvas, so test your SVGs thoroughly.</li>
+<li>Performance: For large SVG files, consider the performance implications of this conversion process.</li>
+</ul>
+<h3>Conclusion</h3>
+<p>Converting SVG to PNG using JavaScript and canvas is a powerful technique that can be integrated into web applications for dynamic image manipulation. By following these steps, developers can effectively translate the versatility of SVGs into the wide compatibility of PNGs.</p>
+</article>
+  <nav class="foot">
+    <a href="/articles/en/building-your-first-api-with-expressjs-a-beginners-guide/">← Previous<br><span style="opacity:.65">Building Your First API with Express.js:</span></a>
+    <span class="foot__fin">Fin</span>
+    <a href="/articles/en/leadership-principles/" style="text-align:right">Next →<br><span style="opacity:.65">Leadership Principles of Amazon and Meit</span></a>
+  </nav>
+</main>
+
+<script>
+(function () {
+  try {
+    if (new URLSearchParams(location.search).get('from') !== 'posts') return;
+    var a = document.querySelector('.bar__back');
+    if (!a) return;
+    a.setAttribute('href', '/posts');
+    a.textContent = document.documentElement.lang === 'en' ? '← Writing' : '← 文稿';
+  } catch (e) { /* 老浏览器：保持指向 /articles/ */ }
+})();
+</script>
+</body>
+</html>

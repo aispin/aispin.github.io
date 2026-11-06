@@ -30,7 +30,8 @@
     /* 房间 id → 地址与两种语言的叫法。加房间时在这里加一行即可。 */
     var ROOMS = {
         craft: { href: '/craft', zh: '创意实验', en: 'Craft' },
-        career: { href: '/career', zh: '履历', en: 'Career' }
+        career: { href: '/career', zh: '履历', en: 'Career' },
+        posts: { href: '/posts', zh: '文稿', en: 'Writing' }
     };
 
     var room = ROOMS[from];

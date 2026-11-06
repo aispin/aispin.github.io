@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Leadership Principles of Amazon and Meituan — AISPIN</title>
+<meta name="description" content="The Amazon Leadership Principles define how Amazon conducts business, leads, and makes decisions. It is a cultural system that ensures the healthy operation and success of the entire company, and is worth learning and emulating for every company and individual.">
+<link rel="canonical" href="https://aispin.github.io/articles/en/leadership-principles/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Leadership Principles of Amazon and Meituan — AISPIN">
+<meta property="og:description" content="The Amazon Leadership Principles define how Amazon conducts business, leads, and makes decisions. It is a cultural system that ensures the healthy operation and success of the entire company, and is worth learning and emulating for every company and individual.">
+<meta property="og:url" content="https://aispin.github.io/articles/en/leadership-principles/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="/fonts/maple-ui.woff2" as="font" type="font/woff2" crossorigin>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Leadership Principles of Amazon and Meituan","description":"The Amazon Leadership Principles define how Amazon conducts business, leads, and makes decisions. It is a cultural system that ensures the healthy operation and success of the entire company, and is worth learning and emulating for every company and individual.","datePublished":"2024-03-06","inLanguage":"en","url":"https://aispin.github.io/articles/en/leadership-principles/","mainEntityOfPage":"https://aispin.github.io/articles/en/leadership-principles/","author":{"@type":"Person","name":"ZEO AI","url":"https://aispin.github.io"},"keywords":"Leadership Principles"}</script>
+<style>
+:root{--bg:#f4eee2;--paper:#fbf7ee;--ink:#241f1a;--soft:#6d6257;--accent:#b23a2c;--line:rgba(90,74,56,.18)}
+
+@font-face{font-family:'MapleUI';src:url('/fonts/maple-ui.woff2') format('woff2');font-weight:400 500;font-display:swap}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:'MapleUI',ui-monospace,'PingFang SC',monospace;
+  -webkit-font-smoothing:antialiased;line-height:1.8}
+a{color:inherit}
+.wrap{max-width:760px;margin:0 auto;padding:0 32px}
+
+/* 顶栏：滚到哪儿都在 */
+.bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;
+  padding:14px 32px;font-size:10.5px;letter-spacing:.2em;
+  background:color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line)}
+.bar__back{text-decoration:none;color:var(--soft);display:inline-flex;align-items:center;gap:7px;
+  transition:color .2s ease}
+.bar__back:hover{color:var(--ink)}
+.bar__sep{flex:1}
+.bar__lang{display:flex;gap:2px}
+.bar__lang a,.bar__lang span{text-decoration:none;padding:5px 10px;border-radius:999px;color:var(--soft)}
+.bar__lang a:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.bar__lang [aria-current]{color:var(--ink);background:color-mix(in srgb, var(--ink) 8%, transparent)}
+
+/* hero */
+.hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
+.hero__art{position:absolute;inset:0;width:100%;height:100%;display:block}
+/* ⚠️ 只写 padding-top/bottom：.wrap 与 .hero__in 同为单类选择器，这里若用
+   简写 padding 会把 .wrap 的左右内边距清零（手机标题被裁掉左边就是这个）。
+   注意：这段 CSS 在 JS 模板字符串里，注释中不能出现反引号。 */
+.hero__in{position:relative;z-index:2;padding-top:70px;padding-bottom:50px;min-height:clamp(240px,34vw,340px);
+  display:flex;flex-direction:column;justify-content:center}
+.hero__kicker{font-size:10px;letter-spacing:.34em;color:var(--accent);display:flex;align-items:center;gap:10px}
+.hero__kicker i{display:block;width:26px;height:1px;background:currentColor;opacity:.6;font-style:normal}
+.hero h1{margin-top:22px;font-size:clamp(28px,4.4vw,42px);line-height:1.5;font-weight:500;
+  letter-spacing:.01em;max-width:22ch;text-wrap:balance}
+.hero__meta{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px 18px;font-size:10.5px;
+  letter-spacing:.14em;color:var(--soft)}
+.hero__meta b{font-weight:400;color:var(--ink)}
+
+/* 正文 */
+.prose{padding:52px 0 24px;font-size:15px;line-height:2.05;color:var(--ink)}
+.prose>*+*{margin-top:18px}
+.prose h2{margin-top:44px;font-size:21px;line-height:1.7;font-weight:500;letter-spacing:.01em}
+.prose h3{margin-top:34px;font-size:16.5px;line-height:1.7;font-weight:500;color:var(--ink)}
+.prose h4{margin-top:26px;font-size:14.5px;font-weight:500;color:var(--soft)}
+.prose p{color:color-mix(in srgb, var(--ink) 88%, var(--soft))}
+.prose ul,.prose ol{padding-left:1.4em}
+.prose li+li{margin-top:6px}
+.prose li::marker{color:var(--accent)}
+.prose a{color:var(--accent);text-decoration:none;border-bottom:1px solid color-mix(in srgb, var(--accent) 40%, transparent)}
+.prose a:hover{border-bottom-color:var(--accent)}
+.prose strong{font-weight:500;color:var(--ink)}
+.prose code{font-family:inherit;font-size:.92em;padding:.12em .4em;border-radius:3px;
+  background:color-mix(in srgb, var(--ink) 8%, transparent)}
+.prose pre{overflow:auto;padding:18px 20px;border-radius:4px;font-size:12.5px;line-height:1.85;
+  background:color-mix(in srgb, var(--ink) 7%, transparent);border:1px solid var(--line)}
+.prose pre code{padding:0;background:none}
+.prose blockquote{padding:2px 0 2px 18px;border-left:2px solid var(--accent);color:var(--soft)}
+.prose blockquote p{color:var(--soft)}
+.prose img{display:block;max-width:100%;height:auto;border-radius:3px;
+  border:1px solid var(--line);background:var(--paper)}
+.prose hr{border:0;border-top:1px solid var(--line);margin:40px 0}
+.prose table{width:100%;border-collapse:collapse;font-size:12.5px;line-height:1.7;
+  display:block;overflow-x:auto;white-space:normal}
+.prose th,.prose td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+.prose th{background:color-mix(in srgb, var(--ink) 6%, transparent);font-weight:500}
+
+/* 文末 */
+.foot{margin-top:56px;padding:26px 0 70px;border-top:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;gap:18px;
+  font-size:10.5px;letter-spacing:.16em}
+.foot a{text-decoration:none;color:var(--soft);padding:8px 12px;border-radius:999px;
+  transition:color .2s ease,background .2s ease;max-width:46%}
+.foot a:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.foot__fin{color:var(--soft);opacity:.7}
+.foot__spacer{flex:1}
+@media(max-width:640px){
+  .wrap{padding:0 22px}
+  .bar{padding:12px 22px}
+  .hero__in{padding-top:46px;padding-bottom:34px;min-height:230px}
+  /* 窄屏折带会铺满整行、从标题底下穿过：压到 45%，只当纸纹用 */
+  .hero__art{opacity:.45}
+  .prose{font-size:14.5px;line-height:2}
+  .foot a{max-width:48%}
+}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <a class="bar__back" href="/articles/">← Writing</a>
+  <span class="bar__sep"></span>
+  <div class="bar__lang">
+    <a href="/articles/leadership-principles/">中文</a>
+    <span aria-current="page">EN</span>
+  </div>
+</header>
+
+<section class="hero">
+  <svg class="hero__art" viewBox="0 0 1200 340" preserveAspectRatio="xMaxYMid slice" aria-hidden="true" focusable="false">
+  <defs>
+    <radialGradient id="glow" cx="74%" cy="34%" r="52%">
+      <stop offset="0%" stop-color="#b23a2c" stop-opacity=".13"/>
+      <stop offset="100%" stop-color="#b23a2c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="veil" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f4eee2" stop-opacity="1"/>
+      <stop offset="34%" stop-color="#f4eee2" stop-opacity=".72"/>
+      <stop offset="62%" stop-color="#f4eee2" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f4eee2" stop-opacity="0"/>
+      <stop offset="84%" stop-color="#f4eee2" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#f4eee2" stop-opacity=".85"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="340" fill="url(#glow)"/>
+  <path d="M372.0 125.4 L446.0 128.4 L446.0 328.4 L372.0 325.4 Z" fill="#241f1a" fill-opacity="0.290"/><path d="M372.0 125.4 L372.0 325.4" stroke="#b23a2c" stroke-opacity="0.45999999999999996" stroke-width="1"/><path d="M446.0 128.4 L520.0 127.7 L520.0 327.7 L446.0 328.4 Z" fill="#241f1a" fill-opacity="0.152"/><path d="M446.0 128.4 L446.0 328.4" stroke="#241f1a" stroke-opacity="0.15294117647058822" stroke-width="1"/><path d="M520.0 127.7 L594.0 123.4 L594.0 323.4 L520.0 327.7 Z" fill="#241f1a" fill-opacity="0.259"/><path d="M520.0 127.7 L520.0 327.7" stroke="#b23a2c" stroke-opacity="0.4105882352941176" stroke-width="1"/><path d="M594.0 123.4 L668.0 116.8 L668.0 316.8 L594.0 323.4 Z" fill="#241f1a" fill-opacity="0.137"/><path d="M594.0 123.4 L594.0 323.4" stroke="#241f1a" stroke-opacity="0.1388235294117647" stroke-width="1"/><path d="M668.0 116.8 L742.0 109.8 L742.0 309.8 L668.0 316.8 Z" fill="#241f1a" fill-opacity="0.229"/><path d="M668.0 116.8 L668.0 316.8" stroke="#b23a2c" stroke-opacity="0.36117647058823527" stroke-width="1"/><path d="M742.0 109.8 L816.0 104.6 L816.0 304.6 L742.0 309.8 Z" fill="#241f1a" fill-opacity="0.122"/><path d="M742.0 109.8 L742.0 309.8" stroke="#241f1a" stroke-opacity="0.12470588235294117" stroke-width="1"/><path d="M816.0 104.6 L890.0 102.6 L890.0 302.6 L816.0 304.6 Z" fill="#241f1a" fill-opacity="0.198"/><path d="M816.0 104.6 L816.0 304.6" stroke="#b23a2c" stroke-opacity="0.3117647058823529" stroke-width="1"/><path d="M890.0 102.6 L964.0 104.4 L964.0 304.4 L890.0 302.6 Z" fill="#241f1a" fill-opacity="0.106"/><path d="M890.0 102.6 L890.0 302.6" stroke="#241f1a" stroke-opacity="0.11058823529411765" stroke-width="1"/><path d="M964.0 104.4 L1038.0 109.6 L1038.0 309.6 L964.0 304.4 Z" fill="#241f1a" fill-opacity="0.168"/><path d="M964.0 104.4 L964.0 304.4" stroke="#b23a2c" stroke-opacity="0.26235294117647057" stroke-width="1"/><path d="M1038.0 109.6 L1112.0 116.5 L1112.0 316.5 L1038.0 309.6 Z" fill="#241f1a" fill-opacity="0.091"/><path d="M1038.0 109.6 L1038.0 309.6" stroke="#241f1a" stroke-opacity="0.09647058823529411" stroke-width="1"/><path d="M1112.0 116.5 L1186.0 123.1 L1186.0 323.1 L1112.0 316.5 Z" fill="#241f1a" fill-opacity="0.137"/><path d="M1112.0 116.5 L1112.0 316.5" stroke="#b23a2c" stroke-opacity="0.21294117647058822" stroke-width="1"/><path d="M1186.0 123.1 L1260.0 127.6 L1260.0 327.6 L1186.0 323.1 Z" fill="#241f1a" fill-opacity="0.076"/><path d="M1186.0 123.1 L1186.0 323.1" stroke="#241f1a" stroke-opacity="0.08235294117647057" stroke-width="1"/><path d="M1260.0 127.6 L1334.0 128.5 L1334.0 328.5 L1260.0 327.6 Z" fill="#241f1a" fill-opacity="0.106"/><path d="M1260.0 127.6 L1260.0 327.6" stroke="#b23a2c" stroke-opacity="0.16352941176470587" stroke-width="1"/><path d="M1334.0 128.5 L1408.0 125.6 L1408.0 325.6 L1334.0 328.5 Z" fill="#241f1a" fill-opacity="0.061"/><path d="M1334.0 128.5 L1334.0 328.5" stroke="#241f1a" stroke-opacity="0.06823529411764706" stroke-width="1"/><path d="M372.0 125.4 L446.0 128.4 L520.0 127.7 L594.0 123.4 L668.0 116.8 L742.0 109.8 L816.0 104.6 L890.0 102.6 L964.0 104.4 L1038.0 109.6 L1112.0 116.5 L1186.0 123.1 L1260.0 127.6 L1334.0 128.5 L1408.0 125.6" fill="none" stroke="#b23a2c" stroke-opacity=".34" stroke-width="1.2"/><path d="M1408 125.57679632712515 L1408 325.5767963271252" stroke="#b23a2c" stroke-opacity=".2" stroke-width="1"/>
+  <circle cx="663.6" cy="275.8" r="1.48" fill="#b23a2c" fill-opacity="0.058"/><circle cx="765.8" cy="32.5" r="0.94" fill="#b23a2c" fill-opacity="0.125"/><circle cx="1035.8" cy="309.9" r="1.28" fill="#b23a2c" fill-opacity="0.157"/><circle cx="259.2" cy="90.5" r="0.77" fill="#b23a2c" fill-opacity="0.190"/><circle cx="771.4" cy="33.0" r="0.96" fill="#b23a2c" fill-opacity="0.182"/><circle cx="1129.6" cy="1.2" r="1.16" fill="#b23a2c" fill-opacity="0.085"/><circle cx="69.1" cy="238.1" r="0.94" fill="#b23a2c" fill-opacity="0.054"/><circle cx="342.7" cy="119.3" r="0.57" fill="#b23a2c" fill-opacity="0.175"/><circle cx="241.9" cy="182.6" r="1.42" fill="#b23a2c" fill-opacity="0.089"/><circle cx="529.2" cy="257.7" r="0.99" fill="#b23a2c" fill-opacity="0.068"/><circle cx="743.8" cy="296.9" r="1.34" fill="#b23a2c" fill-opacity="0.079"/><circle cx="719.4" cy="195.8" r="0.63" fill="#b23a2c" fill-opacity="0.102"/><circle cx="479.8" cy="178.2" r="1.42" fill="#b23a2c" fill-opacity="0.061"/><circle cx="309.4" cy="30.1" r="1.50" fill="#b23a2c" fill-opacity="0.086"/><circle cx="914.5" cy="205.8" r="1.01" fill="#b23a2c" fill-opacity="0.174"/><circle cx="329.2" cy="94.8" r="0.67" fill="#b23a2c" fill-opacity="0.068"/><circle cx="394.3" cy="155.3" r="1.26" fill="#b23a2c" fill-opacity="0.116"/><circle cx="729.3" cy="277.4" r="0.51" fill="#b23a2c" fill-opacity="0.051"/><circle cx="1123.4" cy="316.0" r="0.95" fill="#b23a2c" fill-opacity="0.068"/><circle cx="695.3" cy="285.6" r="1.58" fill="#b23a2c" fill-opacity="0.108"/><circle cx="41.2" cy="241.8" r="0.55" fill="#b23a2c" fill-opacity="0.111"/><circle cx="73.8" cy="87.8" r="1.52" fill="#b23a2c" fill-opacity="0.109"/><circle cx="1084.5" cy="338.9" r="0.64" fill="#b23a2c" fill-opacity="0.079"/><circle cx="905.4" cy="332.7" r="1.55" fill="#b23a2c" fill-opacity="0.147"/><circle cx="329.1" cy="258.0" r="0.90" fill="#b23a2c" fill-opacity="0.137"/><circle cx="905.8" cy="73.3" r="0.96" fill="#b23a2c" fill-opacity="0.173"/>
+  <rect width="1200" height="340" fill="url(#veil)"/>
+  <rect width="1200" height="340" fill="url(#fade)"/>
+</svg>
+  <div class="wrap hero__in">
+    <div class="hero__kicker"><i></i>08 / 18</div>
+    <h1>Leadership Principles of Amazon and Meituan</h1>
+    <div class="hero__meta">
+      <span><b>2024.03.06</b></span>
+      <span>Leadership Principles</span>
+      <span>1,762 words · 4 min</span>
+    </div>
+  </div>
+</section>
+
+<main class="wrap">
+  <article class="prose"><h2>Preface</h2>
+<p>In a previous management article, I mentioned that Meituan shapes its company's management culture by learning from Amazon. Before sharing Meituan's latest leadership principles for 2023, I would like to share the 2021 Amazon leadership principles. It is important to note that I have excerpted the Amazon leadership principles from this article on the Sohu website: <a href="https://www.sohu.com/a/485479376_121124366" target="_blank" rel="noopener noreferrer">2021 Amazon's Latest 16 Leadership Principles</a>. I have only done formatting optimization for this part, and the copyright belongs to the original author. Additionally, I have always kept Meituan's leadership principles in mind and put them into practice, hoping to influence more students through sharing.</p>
+<p>The leadership principles define how the company conducts business, leads, and makes decisions. It is a cultural system that ensures the healthy operation and success of the entire company.</p>
+<p>The leadership principles are not requirements for leaders, they are requirements for all employees of the company, because &quot;everyone is their own leader&quot;.</p>
+<h2>Amazon Leadership Principles</h2>
+<blockquote>
+<p>We are responsible for the leadership principles through our daily actions. The leadership principles describe how Amazon conducts business, how leaders lead, and how we put customers at the center of our decisions. The unique Amazon culture described in the leadership principles helps us relentlessly pursue our mission - to be the most customer-centric company on Earth, the best employer, and the safest workplace.</p>
+</blockquote>
+<h3>1. Customer Obsession</h3>
+<p>Leaders start with the customer and work backwards. They work vigorously to earn and keep customer trust. They pay attention to competitors, but they obsess over customers.</p>
+<h3>2. Ownership</h3>
+<p>Leaders act on behalf of the entire company. They think long term and don't sacrifice long-term value for short-term results. They act on behalf of their team, not just themselves. They never say &quot;that's not my job.&quot;</p>
+<h3>3. Invent and Simplify</h3>
+<p>Leaders expect and require innovation and invention from their teams. They find new ways to simplify processes and are externally aware. They constantly seek out new ideas and are not limited to the way things have been done before. They are willing to be misunderstood for long periods of time when exploring new business opportunities.</p>
+<h3>4. Are Right, A Lot</h3>
+<p>Leaders have strong judgment and good instincts. They seek diverse perspectives and work to disconfirm their beliefs.</p>
+<h3>5. Learn and Be Curious</h3>
+<p>Leaders never stop learning and constantly seek opportunities to improve themselves. They are curious about various possibilities and take action to explore them.</p>
+<h3>6. Hire and Develop the Best</h3>
+<p>Leaders raise performance standards through every hiring and promotion. They identify outstanding talents and are willing to sharpen them through job rotations within the organization. Leaders cultivate leadership talents and take their responsibility for talent development seriously. They establish mechanisms for career development from an employee's perspective.</p>
+<h3>7. Insist on the Highest Standard</h3>
+<p>Leaders have almost rigorous high standards that may seem unreasonable to many. They continuously raise the bar, pushing their teams to deliver high-quality products, services, and processes. They prevent problems from spreading, promptly and thoroughly resolve them, and ensure they do not recur.</p>
+<h3>8. Think Big</h3>
+<p>If you think you can't do it, you definitely won't. Set and communicate bold directions that inspire results. Think from different perspectives and constantly explore various ways to serve customers.</p>
+<h3>9. Bias for Action</h3>
+<p>Speed is crucial for business impact. Many decisions and actions can be adjusted along the way, so there is no need to find a perfect solution before taking action. We value taking risks under thoughtful consideration.</p>
+<h3>10. Frugality</h3>
+<p>Achieve greater output with fewer inputs. Limited resources foster agility, self-reliance, and innovation. Increasing manpower, budget, and fixed expenses does not earn extra points.</p>
+<h3>11. Earn Trust</h3>
+<p>Leaders focus on listening, communicating openly, and respecting others. They are willing to self-criticize, even if it makes them uncomfortable or embarrassed. They do not believe that they or their team are always right. They hold themselves and their team to the highest standards.</p>
+<h3>12. Dive Deep</h3>
+<p>Leaders delve into every aspect, master the details, and review repeatedly. They maintain a skeptical attitude when data contradicts statements. No detail is overlooked.</p>
+<h3>13. Have Backbone; Disagree and Commit</h3>
+<p>Leaders have an obligation to respectfully challenge decisions they cannot agree with, even if it makes them uncomfortable or exhausted. Leaders must have conviction and resilience. They do not compromise for the sake of harmony within the team. Once a decision is made, they fully commit to it.</p>
+<h3>14. Deliver Results</h3>
+<p>Leaders focus on the critical success factors of their business, ensuring quality work and timely delivery. Despite setbacks, they remain adaptable and never compromise.</p>
+<h3>15. Strive to be Earth's Best Employer</h3>
+<p>Leaders strive every day to create a safer, more productive, higher-performing, diverse, and fair work environment. They lead with empathy, find joy in their work, and make it easy for others to find joy. Leaders ask themselves: Are my employees growing? Do they have enough empowerment? Are they ready for the next step? Whether at Amazon or elsewhere, leaders should have a vision and commitment to the personal success of their employees.</p>
+<h3>16. Success and Scale Bring Broad Responsibility</h3>
+<p>We started in a garage, but we have now outgrown it. We have the power to impact the world, but we are far from perfect. We must remain humble, thoughtful, and even consider the unforeseen impacts of our actions. Our country, the Earth, and future generations demand that we do better every day. We must start each day with a determination to do more and do better for our customers, our employees, our partners, and the world as a whole. At the end of the day, we must deeply acknowledge that tomorrow can be even better. Leaders must create more than they consume and make things better than they were initially.</p>
+<h2>Meituan Leadership Principles (2023)</h2>
+<blockquote>
+<p>The content is based on my memory and combined with my own case practices and understanding. It may not be precise (Meituan also iterates and updates its principles), but it should be close. In fact, many of Meituan's leadership principles are similar to Amazon's.</p>
+</blockquote>
+<h3>1. Bias for Action</h3>
+<p>Speed is important. Many actions are reversible and do not require extensive research. Calculated risks are worth taking. Not everything needs to be studied in detail; iterate and correct through action.</p>
+<h3>2. Strive to be Right</h3>
+<p>Approach work with a scientific method, seeking and following objective rules. Seek diverse perspectives and strive to disprove what you originally believed.</p>
+<p>&quot;Without deep thinking, all diligence is in vain.&quot; - In an interview with a journalist from &quot;Caijing&quot; in 2016, Xing Ge (Wang Xing, Meituan CEO)</p>
+<h3>3. Master the Fundamentals</h3>
+<p>By mastering the fundamentals, you can accomplish 99% of things. Practice deliberately and continuously improve. Invent mechanisms to continuously improve the team's fundamentals.</p>
+<p>Anders Ericsson wrote in his book &quot;Peak: Secrets from the New Science of Expertise&quot;: Deliberate practice requires your full attention and may not be easy throughout the process. This aligns with the &quot;hard work&quot; in mastering the fundamentals. The ultimate goal is to form muscle memory. The simpler and more concise the principle, the more practice it requires. Simplicity is not the reason; it is the result of continuous practice.</p>
+<h3>4. Customer Obsession</h3>
+<p>Start with the customer and work backward. Work hard to earn the trust of customers. Pay extreme attention to customers and also keep an eye on competitors.</p>
+<h3>5. Ownership</h3>
+<p>Have long-term patience and persist in doing the right thing, not just the easy thing. When working, represent the entire company, not just your own team. Never say &quot;that's not my job.&quot; Balance &quot;short-term results&quot; with a focus on &quot;long-term value.&quot;</p>
+<h4>Practical Case</h4>
+<p>A. Establish a mechanism for inspecting the user experience of Meituan products, proactively improving product functionality and experience.</p>
+<h3>6. Invent and Simplify</h3>
+<p>Expect and demand innovation and invention, and find ways to simplify. Look for new ideas without being limited to &quot;not invented here.&quot;</p>
+<p>&quot;Not invented here&quot; refers to a common term in the field of technology. The &quot;Not Invented Here Syndrome&quot; is a cultural phenomenon in society, companies, and organizations where people are unwilling to use, purchase, or accept a certain product, research result, or knowledge not because of technical or legal reasons, but simply because it originated from elsewhere (definition source: Wikipedia).</p>
+<p>&quot;Simplify&quot; means solving complex problems with simple methods. Complex products and processes imply higher understanding costs, usage barriers, and operational difficulties, which have a negative impact on customer experience and on ourselves and our partners. &quot;Simplify&quot; is also about achieving more with less. By reducing resource input, efficiency is improved. &quot;Simplify&quot; is also about combating entropy. During business growth and problem-solving, people often have a higher tolerance for complexity, neglecting and underestimating the long-term effects of simplification. By consciously and proactively simplifying, a system can be maintained in an orderly state in the long run, which is also conducive to better scalability. Good simplification is often good innovation and has its own value.</p>
+<h3>7. Express Different Opinions, Commit to Decisions</h3>
+<p>Politely challenge decisions when having different opinions, even if it is uncomfortable or requires a lot of effort. Once a decision is made, commit to it.</p>
+<h3>8. Dive Deep</h3>
+<p>Operate at all levels, maintain a connection with details, review frequently, and maintain skepticism when indicators and individual cases are inconsistent.</p>
+<p>Do not fly high, always stay grounded!</p>
+<h3>9. Deliver Results</h3>
+<p>Focus on the critical inputs of the business and never settle for delivering quality results.</p>
+<p>Note: Other leadership principles can be considered as inputs for &quot;Deliver Results.&quot;</p>
+<h3>10. Recruit and Develop the Best Talent</h3>
+<p>Set the benchmark for performance through every recruitment and promotion. Coach others to grow.</p>
+<p>Recruitment is the most important management action - Rong Jun</p>
+<h3>11. Learn and Curiosity</h3>
+<p>Never stop learning and always seek to improve yourself. Be curious about various new possibilities and take action to explore them. Don't be afraid of failure, learn and grow from it.</p>
+<p>I can't, but I can learn.</p>
+<p>Universal methodology for learning:</p>
+<p>A. Find the direction of learning
+B. Find the best resources
+C. Learn -&gt; Memorize -&gt; Share</p>
+<h3>12. Dare to Think</h3>
+<p>Don't limit yourself, don't be confined to current resources. Explore various ways to serve customers comprehensively.</p>
+<p>The core of strategy is &quot;dare to think&quot;.</p>
+<h3>13. Frugality</h3>
+<p>Achieve more with less.</p>
+<p>Get more results with limited resource constraints.</p>
+<h3>14. Earn Trust</h3>
+<p>Listen attentively, speak candidly, and treat others with respect. Be truthful, don't embellish, exaggerate, or hide.</p>
+<p>Deliver results with professional competence.</p>
+<h3>15. Uphold the Highest Standards</h3>
+<p>Continuously raise the bar and drive the team to deliver high-quality products, services, and processes. Ensure defects are not passed downstream, problems are resolved, and do not recur.</p>
+</article>
+  <nav class="foot">
+    <a href="/articles/en/how-to-convert-a-svg-to-png-using-canvas/">← Previous<br><span style="opacity:.65">How to convert a SVG to PNG using Canvas</span></a>
+    <span class="foot__fin">Fin</span>
+    <a href="/articles/en/intuitive-understanding-of-docker/" style="text-align:right">Next →<br><span style="opacity:.65">A more intuitive understanding of Docker</span></a>
+  </nav>
+</main>
+
+<script>
+(function () {
+  try {
+    if (new URLSearchParams(location.search).get('from') !== 'posts') return;
+    var a = document.querySelector('.bar__back');
+    if (!a) return;
+    a.setAttribute('href', '/posts');
+    a.textContent = document.documentElement.lang === 'en' ? '← Writing' : '← 文稿';
+  } catch (e) { /* 老浏览器：保持指向 /articles/ */ }
+})();
+</script>
+</body>
+</html>

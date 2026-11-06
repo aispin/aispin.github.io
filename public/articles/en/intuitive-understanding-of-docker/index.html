@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A more intuitive understanding of Docker — AISPIN</title>
+<meta name="description" content="A more intuitive understanding of Docker">
+<link rel="canonical" href="https://aispin.github.io/articles/en/intuitive-understanding-of-docker/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="A more intuitive understanding of Docker — AISPIN">
+<meta property="og:description" content="A more intuitive understanding of Docker">
+<meta property="og:url" content="https://aispin.github.io/articles/en/intuitive-understanding-of-docker/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="/fonts/maple-ui.woff2" as="font" type="font/woff2" crossorigin>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"A more intuitive understanding of Docker","description":"A more intuitive understanding of Docker","datePublished":"2024-08-05","inLanguage":"en","url":"https://aispin.github.io/articles/en/intuitive-understanding-of-docker/","mainEntityOfPage":"https://aispin.github.io/articles/en/intuitive-understanding-of-docker/","author":{"@type":"Person","name":"ZEO AI","url":"https://aispin.github.io"},"keywords":"Docker"}</script>
+<style>
+:root{--bg:#f4eee2;--paper:#fbf7ee;--ink:#241f1a;--soft:#6d6257;--accent:#b23a2c;--line:rgba(90,74,56,.18)}
+
+@font-face{font-family:'MapleUI';src:url('/fonts/maple-ui.woff2') format('woff2');font-weight:400 500;font-display:swap}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:'MapleUI',ui-monospace,'PingFang SC',monospace;
+  -webkit-font-smoothing:antialiased;line-height:1.8}
+a{color:inherit}
+.wrap{max-width:760px;margin:0 auto;padding:0 32px}
+
+/* 顶栏：滚到哪儿都在 */
+.bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;
+  padding:14px 32px;font-size:10.5px;letter-spacing:.2em;
+  background:color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line)}
+.bar__back{text-decoration:none;color:var(--soft);display:inline-flex;align-items:center;gap:7px;
+  transition:color .2s ease}
+.bar__back:hover{color:var(--ink)}
+.bar__sep{flex:1}
+.bar__lang{display:flex;gap:2px}
+.bar__lang a,.bar__lang span{text-decoration:none;padding:5px 10px;border-radius:999px;color:var(--soft)}
+.bar__lang a:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.bar__lang [aria-current]{color:var(--ink);background:color-mix(in srgb, var(--ink) 8%, transparent)}
+
+/* hero */
+.hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
+.hero__art{position:absolute;inset:0;width:100%;height:100%;display:block}
+/* ⚠️ 只写 padding-top/bottom：.wrap 与 .hero__in 同为单类选择器，这里若用
+   简写 padding 会把 .wrap 的左右内边距清零（手机标题被裁掉左边就是这个）。
+   注意：这段 CSS 在 JS 模板字符串里，注释中不能出现反引号。 */
+.hero__in{position:relative;z-index:2;padding-top:70px;padding-bottom:50px;min-height:clamp(240px,34vw,340px);
+  display:flex;flex-direction:column;justify-content:center}
+.hero__kicker{font-size:10px;letter-spacing:.34em;color:var(--accent);display:flex;align-items:center;gap:10px}
+.hero__kicker i{display:block;width:26px;height:1px;background:currentColor;opacity:.6;font-style:normal}
+.hero h1{margin-top:22px;font-size:clamp(28px,4.4vw,42px);line-height:1.5;font-weight:500;
+  letter-spacing:.01em;max-width:22ch;text-wrap:balance}
+.hero__meta{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px 18px;font-size:10.5px;
+  letter-spacing:.14em;color:var(--soft)}
+.hero__meta b{font-weight:400;color:var(--ink)}
+
+/* 正文 */
+.prose{padding:52px 0 24px;font-size:15px;line-height:2.05;color:var(--ink)}
+.prose>*+*{margin-top:18px}
+.prose h2{margin-top:44px;font-size:21px;line-height:1.7;font-weight:500;letter-spacing:.01em}
+.prose h3{margin-top:34px;font-size:16.5px;line-height:1.7;font-weight:500;color:var(--ink)}
+.prose h4{margin-top:26px;font-size:14.5px;font-weight:500;color:var(--soft)}
+.prose p{color:color-mix(in srgb, var(--ink) 88%, var(--soft))}
+.prose ul,.prose ol{padding-left:1.4em}
+.prose li+li{margin-top:6px}
+.prose li::marker{color:var(--accent)}
+.prose a{color:var(--accent);text-decoration:none;border-bottom:1px solid color-mix(in srgb, var(--accent) 40%, transparent)}
+.prose a:hover{border-bottom-color:var(--accent)}
+.prose strong{font-weight:500;color:var(--ink)}
+.prose code{font-family:inherit;font-size:.92em;padding:.12em .4em;border-radius:3px;
+  background:color-mix(in srgb, var(--ink) 8%, transparent)}
+.prose pre{overflow:auto;padding:18px 20px;border-radius:4px;font-size:12.5px;line-height:1.85;
+  background:color-mix(in srgb, var(--ink) 7%, transparent);border:1px solid var(--line)}
+.prose pre code{padding:0;background:none}
+.prose blockquote{padding:2px 0 2px 18px;border-left:2px solid var(--accent);color:var(--soft)}
+.prose blockquote p{color:var(--soft)}
+.prose img{display:block;max-width:100%;height:auto;border-radius:3px;
+  border:1px solid var(--line);background:var(--paper)}
+.prose hr{border:0;border-top:1px solid var(--line);margin:40px 0}
+.prose table{width:100%;border-collapse:collapse;font-size:12.5px;line-height:1.7;
+  display:block;overflow-x:auto;white-space:normal}
+.prose th,.prose td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+.prose th{background:color-mix(in srgb, var(--ink) 6%, transparent);font-weight:500}
+
+/* 文末 */
+.foot{margin-top:56px;padding:26px 0 70px;border-top:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;gap:18px;
+  font-size:10.5px;letter-spacing:.16em}
+.foot a{text-decoration:none;color:var(--soft);padding:8px 12px;border-radius:999px;
+  transition:color .2s ease,background .2s ease;max-width:46%}
+.foot a:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.foot__fin{color:var(--soft);opacity:.7}
+.foot__spacer{flex:1}
+@media(max-width:640px){
+  .wrap{padding:0 22px}
+  .bar{padding:12px 22px}
+  .hero__in{padding-top:46px;padding-bottom:34px;min-height:230px}
+  /* 窄屏折带会铺满整行、从标题底下穿过：压到 45%，只当纸纹用 */
+  .hero__art{opacity:.45}
+  .prose{font-size:14.5px;line-height:2}
+  .foot a{max-width:48%}
+}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <a class="bar__back" href="/articles/">← Writing</a>
+  <span class="bar__sep"></span>
+  <div class="bar__lang">
+    <a href="/articles/intuitive-understanding-of-docker/">中文</a>
+    <span aria-current="page">EN</span>
+  </div>
+</header>
+
+<section class="hero">
+  <svg class="hero__art" viewBox="0 0 1200 340" preserveAspectRatio="xMaxYMid slice" aria-hidden="true" focusable="false">
+  <defs>
+    <radialGradient id="glow" cx="74%" cy="34%" r="52%">
+      <stop offset="0%" stop-color="#b23a2c" stop-opacity=".13"/>
+      <stop offset="100%" stop-color="#b23a2c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="veil" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f4eee2" stop-opacity="1"/>
+      <stop offset="34%" stop-color="#f4eee2" stop-opacity=".72"/>
+      <stop offset="62%" stop-color="#f4eee2" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f4eee2" stop-opacity="0"/>
+      <stop offset="84%" stop-color="#f4eee2" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#f4eee2" stop-opacity=".85"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="340" fill="url(#glow)"/>
+  <path d="M372.0 116.4 L446.0 109.5 L446.0 309.5 L372.0 316.4 Z" fill="#241f1a" fill-opacity="0.290"/><path d="M372.0 116.4 L372.0 316.4" stroke="#b23a2c" stroke-opacity="0.45999999999999996" stroke-width="1"/><path d="M446.0 109.5 L520.0 104.4 L520.0 304.4 L446.0 309.5 Z" fill="#241f1a" fill-opacity="0.152"/><path d="M446.0 109.5 L446.0 309.5" stroke="#241f1a" stroke-opacity="0.15294117647058822" stroke-width="1"/><path d="M520.0 104.4 L594.0 102.6 L594.0 302.6 L520.0 304.4 Z" fill="#241f1a" fill-opacity="0.259"/><path d="M520.0 104.4 L520.0 304.4" stroke="#b23a2c" stroke-opacity="0.4105882352941176" stroke-width="1"/><path d="M594.0 102.6 L668.0 104.6 L668.0 304.6 L594.0 302.6 Z" fill="#241f1a" fill-opacity="0.137"/><path d="M594.0 102.6 L594.0 302.6" stroke="#241f1a" stroke-opacity="0.1388235294117647" stroke-width="1"/><path d="M668.0 104.6 L742.0 109.9 L742.0 309.9 L668.0 304.6 Z" fill="#241f1a" fill-opacity="0.229"/><path d="M668.0 104.6 L668.0 304.6" stroke="#b23a2c" stroke-opacity="0.36117647058823527" stroke-width="1"/><path d="M742.0 109.9 L816.0 116.9 L816.0 316.9 L742.0 309.9 Z" fill="#241f1a" fill-opacity="0.122"/><path d="M742.0 109.9 L742.0 309.9" stroke="#241f1a" stroke-opacity="0.12470588235294117" stroke-width="1"/><path d="M816.0 116.9 L890.0 123.4 L890.0 323.4 L816.0 316.9 Z" fill="#241f1a" fill-opacity="0.198"/><path d="M816.0 116.9 L816.0 316.9" stroke="#b23a2c" stroke-opacity="0.3117647058823529" stroke-width="1"/><path d="M890.0 123.4 L964.0 127.7 L964.0 327.7 L890.0 323.4 Z" fill="#241f1a" fill-opacity="0.106"/><path d="M890.0 123.4 L890.0 323.4" stroke="#241f1a" stroke-opacity="0.11058823529411765" stroke-width="1"/><path d="M964.0 127.7 L1038.0 128.4 L1038.0 328.4 L964.0 327.7 Z" fill="#241f1a" fill-opacity="0.168"/><path d="M964.0 127.7 L964.0 327.7" stroke="#b23a2c" stroke-opacity="0.26235294117647057" stroke-width="1"/><path d="M1038.0 128.4 L1112.0 125.3 L1112.0 325.3 L1038.0 328.4 Z" fill="#241f1a" fill-opacity="0.091"/><path d="M1038.0 128.4 L1038.0 328.4" stroke="#241f1a" stroke-opacity="0.09647058823529411" stroke-width="1"/><path d="M1112.0 125.3 L1186.0 119.4 L1186.0 319.4 L1112.0 325.3 Z" fill="#241f1a" fill-opacity="0.137"/><path d="M1112.0 125.3 L1112.0 325.3" stroke="#b23a2c" stroke-opacity="0.21294117647058822" stroke-width="1"/><path d="M1186.0 119.4 L1260.0 112.3 L1260.0 312.3 L1186.0 319.4 Z" fill="#241f1a" fill-opacity="0.076"/><path d="M1186.0 119.4 L1186.0 319.4" stroke="#241f1a" stroke-opacity="0.08235294117647057" stroke-width="1"/><path d="M1260.0 112.3 L1334.0 106.2 L1334.0 306.2 L1260.0 312.3 Z" fill="#241f1a" fill-opacity="0.106"/><path d="M1260.0 112.3 L1260.0 312.3" stroke="#b23a2c" stroke-opacity="0.16352941176470587" stroke-width="1"/><path d="M1334.0 106.2 L1408.0 102.9 L1408.0 302.9 L1334.0 306.2 Z" fill="#241f1a" fill-opacity="0.061"/><path d="M1334.0 106.2 L1334.0 306.2" stroke="#241f1a" stroke-opacity="0.06823529411764706" stroke-width="1"/><path d="M372.0 116.4 L446.0 109.5 L520.0 104.4 L594.0 102.6 L668.0 104.6 L742.0 109.9 L816.0 116.9 L890.0 123.4 L964.0 127.7 L1038.0 128.4 L1112.0 125.3 L1186.0 119.4 L1260.0 112.3 L1334.0 106.2 L1408.0 102.9" fill="none" stroke="#b23a2c" stroke-opacity=".34" stroke-width="1.2"/><path d="M1408 102.89792769776676 L1408 302.89792769776676" stroke="#b23a2c" stroke-opacity=".2" stroke-width="1"/>
+  <circle cx="783.1" cy="288.7" r="1.39" fill="#b23a2c" fill-opacity="0.098"/><circle cx="425.9" cy="145.0" r="0.50" fill="#b23a2c" fill-opacity="0.081"/><circle cx="890.0" cy="29.7" r="0.89" fill="#b23a2c" fill-opacity="0.116"/><circle cx="1150.6" cy="169.9" r="1.66" fill="#b23a2c" fill-opacity="0.189"/><circle cx="733.4" cy="203.0" r="1.18" fill="#b23a2c" fill-opacity="0.052"/><circle cx="911.4" cy="29.8" r="1.12" fill="#b23a2c" fill-opacity="0.172"/><circle cx="937.9" cy="253.0" r="1.02" fill="#b23a2c" fill-opacity="0.125"/><circle cx="532.8" cy="102.6" r="0.74" fill="#b23a2c" fill-opacity="0.075"/><circle cx="1052.4" cy="318.1" r="1.59" fill="#b23a2c" fill-opacity="0.107"/><circle cx="654.3" cy="155.6" r="0.52" fill="#b23a2c" fill-opacity="0.159"/><circle cx="935.9" cy="28.1" r="0.77" fill="#b23a2c" fill-opacity="0.173"/><circle cx="727.4" cy="42.6" r="0.72" fill="#b23a2c" fill-opacity="0.072"/><circle cx="331.1" cy="268.1" r="0.79" fill="#b23a2c" fill-opacity="0.189"/><circle cx="347.6" cy="102.0" r="0.86" fill="#b23a2c" fill-opacity="0.060"/><circle cx="789.8" cy="289.6" r="0.53" fill="#b23a2c" fill-opacity="0.093"/><circle cx="303.4" cy="290.9" r="0.66" fill="#b23a2c" fill-opacity="0.079"/><circle cx="63.4" cy="266.9" r="0.80" fill="#b23a2c" fill-opacity="0.154"/><circle cx="695.8" cy="271.5" r="0.52" fill="#b23a2c" fill-opacity="0.097"/><circle cx="925.4" cy="323.8" r="1.63" fill="#b23a2c" fill-opacity="0.094"/><circle cx="682.9" cy="296.3" r="0.53" fill="#b23a2c" fill-opacity="0.101"/><circle cx="170.5" cy="194.4" r="0.99" fill="#b23a2c" fill-opacity="0.123"/><circle cx="1014.9" cy="93.4" r="1.64" fill="#b23a2c" fill-opacity="0.078"/><circle cx="102.0" cy="107.6" r="1.13" fill="#b23a2c" fill-opacity="0.161"/><circle cx="664.4" cy="20.9" r="1.19" fill="#b23a2c" fill-opacity="0.105"/><circle cx="370.6" cy="275.6" r="0.74" fill="#b23a2c" fill-opacity="0.180"/><circle cx="774.3" cy="157.9" r="0.63" fill="#b23a2c" fill-opacity="0.156"/>
+  <rect width="1200" height="340" fill="url(#veil)"/>
+  <rect width="1200" height="340" fill="url(#fade)"/>
+</svg>
+  <div class="wrap hero__in">
+    <div class="hero__kicker"><i></i>06 / 18</div>
+    <h1>A more intuitive understanding of Docker</h1>
+    <div class="hero__meta">
+      <span><b>2024.08.05</b></span>
+      <span>Docker</span>
+      <span>1,848 words · 5 min</span>
+    </div>
+  </div>
+</section>
+
+<main class="wrap">
+  <article class="prose"><h2>Introduction</h2>
+<p>Assuming your company is secretly developing the next &quot;Today's Headlines&quot; app, let's call it &quot;Tomorrow's Headlines&quot;. The programmers themselves built an environment from scratch to start coding. After finishing the code, the programmers have to hand it over to the testing team. At this point, the testing team starts building the same environment from scratch. If any issues arise during testing, the programmers can innocently say, &quot;It worked perfectly fine in my environment.&quot;</p>
+<p>Once the testing is done, the operations team has to rebuild the entire environment from scratch. After putting in a lot of effort, they start the deployment, but unfortunately, the system crashes. At this point, the resilient programmers can once again showcase their acting skills and say, &quot;It worked perfectly fine in my environment.&quot;</p>
+<p>From this entire process, we can see that not only do we repeat the process of building three separate environments, but we also force the programmers to become actors, wasting their talent. It's a typical waste of time and efficiency. Smart programmers are never satisfied with the current situation, which brings us to the time when programmers change the world - the emergence of container technology.</p>
+<p>Some may say, &quot;Wait, let's not change the world just yet. We have virtual machines, and VMware is incredibly useful. We can build a virtual machine environment and then replicate it for testing and operations, right?&quot;</p>
+<p>Before container technology, this was indeed a good solution, but it wasn't perfect.</p>
+<p>Let's first understand that the underlying foundation of cloud computing is virtual machine technology. Cloud computing providers buy a bunch of hardware to build data centers and then use virtual machine technology to divide the hardware resources. For example, they can divide it into 100 virtual machines and sell them to many users.</p>
+<p>You might wonder why this solution isn't ideal.</p>
+<h2>Virtual Machines vs. Containers</h2>
+<p>We know that compared to a simple application, an operating system is a heavy and clumsy program, abbreviated as heavyweight. How heavy is it?</p>
+<p>We know that running an operating system requires a lot of resources, and we all have deep experience with this. A freshly installed system without any deployments already takes up at least tens of gigabytes of disk space and several gigabytes of memory.</p>
+<p>Let's say I have a machine with 16GB of memory and need to deploy three applications. With virtual machine technology, I can divide it like this:</p>
+<img src="/articles/docker-vm-memory-split.webp" alt="Splitting 16 GB of physical memory across three virtual machines: VM1 (4 GB + 2 GB), VM2 (3 GB + 1 GB) and VM3 (2 GB + 4 GB)" />
+<p>On this machine, three virtual machines are started, with each virtual machine deploying an application. VM1 occupies 2GB of memory, VM2 occupies 1GB of memory, and VM3 occupies 4GB of memory.</p>
+<p>We can see that the virtual machines themselves occupy a total of 7GB of memory. Therefore, we cannot allocate more virtual machines to deploy more applications. However, what we deploy are applications, not operating systems, and we need the memory for applications, not the operating system.</p>
+<p>Wouldn't it be great if there was a technology that could prevent us from wasting memory on &quot;useless&quot; operating systems? This is the first problem, mainly because the operating system is too heavy.</p>
+<p>There is another problem, which is the startup time. We know that restarting the operating system is very slow because the operating system needs to check everything and load everything from scratch. This process is very slow, taking several minutes. Therefore, the operating system is still too slow.</p>
+<p>So, is there a technology that can give us the benefits of virtual machines while overcoming these drawbacks and achieving the best of both worlds?</p>
+<p>The answer is yes, and that is container technology.</p>
+<h2>What is a container?</h2>
+<p>The term &quot;container&quot; in English also means &quot;shipping container,&quot; which is indeed one of the most remarkable inventions in commercial history, significantly reducing the cost of maritime trade. Let's take a look at the benefits of shipping containers:</p>
+<ul>
+<li>Containers are isolated from each other.</li>
+<li>They can be used repeatedly over a long period.</li>
+<li>They allow for quick loading and unloading.</li>
+<li>They have standardized specifications, making them easy to handle at ports and on ships.</li>
+<li>Returning to software containers, the concept is quite similar to that of shipping containers.</li>
+</ul>
+<p>One of the main goals of modern software development is isolation, where applications run independently without interfering with each other. Achieving this isolation is not easy. One solution is the virtual machine technology mentioned above, which isolates applications by deploying them on different virtual machines.</p>
+<img src="/articles/docker-vm-architecture.webp" alt="Virtual machine architecture: every VM carries its own guest OS and binaries/libraries, all sitting on a hypervisor, which itself runs on the host operating system and hardware" />
+<p>However, container technology is different from virtual machine technology in that it only isolates the runtime environment of the application, while containers can share the same operating system. The runtime environment here refers to the various libraries and configurations that the program depends on.</p>
+<img src="/articles/docker-container-isolation.webp" alt="Container isolation: several containers share a single host OS kernel while each keeps its own isolated runtime environment" />
+<p>From the figure, we can see that containers are more lightweight and consume fewer resources. Compared to operating systems that often occupy several gigabytes of memory, container technology only requires a few megabytes of space. Therefore, we can deploy a large number of containers on the same hardware, which is incomparable to virtual machines. Moreover, unlike the several minutes it takes for an operating system to start, containers can start almost instantly. Container technology provides a more efficient way to package service stacks. So cool.</p>
+<p>So how do we use containers? This brings us to Docker.</p>
+<p>Note that containers are a general technology, and Docker is just one implementation of it.</p>
+<h2>What is Docker</h2>
+<p>docker is an open-source project implemented in Go language, which allows us to easily create and use containers. Docker packages the program and all its dependencies into a docker container, so your program will have consistent behavior in any environment. Here, the dependencies of the program running are like containers, and the operating system environment where the containers are located is like a cargo ship or a port. The behavior of the program is only related to the container, not to the cargo ship or the port (operating system).</p>
+<p>Therefore, we can see that Docker can abstract away the differences in environments. In other words, once your program is packaged into Docker, its behavior will be consistent regardless of the environment it runs in. Programmers can no longer showcase their talent by saying &quot;it works on my machine,&quot; but instead achieve the true goal of &quot;build once, run everywhere.&quot;</p>
+<p>Another benefit of Docker is fast deployment, which is a common use case in current internet companies. One reason is that containers start up very quickly, and another reason is that as long as the program in a container runs correctly, you can be confident that it will run correctly no matter how many instances are deployed in the production environment.</p>
+<h2>How to use Docker</h2>
+<p>docker has several concepts:</p>
+<ul>
+<li>dockerfile</li>
+<li>image</li>
+<li>container</li>
+</ul>
+<p>In fact, you can simply think of an image as an executable program, and a container as a running process.</p>
+<p>So, just as writing a program requires source code, &quot;writing&quot; an image requires a dockerfile. The dockerfile is the source code of the image, and Docker is the &quot;compiler&quot;.</p>
+<p>Therefore, all we need to do is specify in the dockerfile which programs are needed and what kind of configuration is required. Then, we give the dockerfile to the &quot;compiler&quot; Docker for &quot;compilation&quot;, which is done using the docker build command. The resulting executable program is the image, and we can then run this image using the docker run command, which creates a Docker container.</p>
+<p>Specific usage details are beyond the scope of this message, but you can refer to the official Docker documentation for detailed explanations.</p>
+<h2>How docker works</h2>
+<p>Actually, Docker uses a common CS architecture, which is the client-server model. The Docker client handles various user commands, such as docker build and docker run, while the actual work is done by the server, which is the Docker daemon. It is worth noting that the Docker client and Docker daemon can run on the same machine.</p>
+<p>Next, let's use a few commands to explain the workflow of Docker:</p>
+<h3>1, docker build</h3>
+<p>When we finish writing the dockerfile and hand it over to Docker for &quot;compilation&quot; using this command, the client forwards the request to the Docker daemon, and then the Docker daemon creates an &quot;executable program&quot; image based on the dockerfile.</p>
+<img src="/articles/docker-build-flow.webp" alt="docker build flow: the client forwards the request to the Docker daemon, which builds an image from the Dockerfile" />
+<h3>2，docker run</h3>
+<p>With the &quot;executable program&quot; image, you can now run the program. Next, use the command <code>docker run</code>. When the Docker daemon receives this command, it will locate the specific image and load it into memory to start execution. The execution of the image is referred to as a container.</p>
+<img src="/articles/docker-run-flow.webp" alt="docker run flow: the daemon finds the requested image and loads it into memory; a running image is a container" />
+<h3>3，docker pull</h3>
+<p>Actually, <code>docker build</code> and <code>docker run</code> are the two most fundamental commands. Once you know how to use these two commands, you can pretty much start using Docker, the rest is just supplementary.</p>
+<p>So, what does <code>docker pull</code> mean?</p>
+<p>As we mentioned before, the concept of an image in Docker is similar to an &quot;executable program&quot;. Where can we download pre-written applications from? It's simple, from the APPStore, the application store. Similarly, since an image is also a type of &quot;executable program&quot;, is there a &quot;Docker image Store&quot;? The answer is yes, and it's called Docker Hub, the official &quot;application store&quot; for Docker. You can download pre-written images from here, so you don't have to write your own Dockerfile.</p>
+<p><code>docker registry</code> is used to store various images, and the Docker Hub is a public repository where anyone can download images. So, how do we download an image from Docker Hub? That's where the <code>docker pull</code> command comes in.</p>
+<p>Therefore, the implementation of this command is quite simple. The user sends the command through the Docker client, the Docker daemon receives the command, and then sends a request to the Docker registry to download the image. Once downloaded, it is stored locally, and then we can use the image.</p>
+<img src="/articles/docker-pull-flow.webp" alt="docker pull flow: the client issues the command, the daemon requests the image from the registry and stores it locally" />
+<p>Finally, let's take a look at the underlying implementation of Docker.</p>
+<h2>The underlying implementation of Docker</h2>
+<p>docker is implemented based on the following features provided by the Linux kernel:</p>
+<ul>
+<li>
+<p>NameSpace</p>
+<p>We know that resources like PID, IPC, and network in Linux are global. However, the NameSpace mechanism is a resource isolation solution where these resources are no longer global but belong to a specific NameSpace. Resources in different NameSpaces do not interfere with each other, making each NameSpace appear as an independent operating system. However, NameSpace alone is not enough.</p>
+</li>
+<li>
+<p>Control groups</p>
+<p>Although NameSpace technology enables resource isolation, processes can still access system resources without control, such as CPU, memory, disk, and network. To control process access to resources within a container, Docker uses control groups technology (also known as cgroups). With cgroups, you can control the resource consumption of processes in a container, such as limiting memory usage or specifying which CPUs to run on.</p>
+</li>
+</ul>
+<p>With these two technologies, containers truly resemble independent operating systems.</p>
+<h2>Summary</h2>
+<p>Docker is a very popular technology at present, and many companies are using it in production environments. However, the underlying technology that Docker relies on has actually appeared a long time ago. Now it has been revitalized in the form of Docker and can solve the problems faced very well. I hope this article can help you understand Docker.</p>
+</article>
+  <nav class="foot">
+    <a href="/articles/en/leadership-principles/">← Previous<br><span style="opacity:.65">Leadership Principles of Amazon and Meit</span></a>
+    <span class="foot__fin">Fin</span>
+    <a href="/articles/en/semantic-release-with-github-workflow/" style="text-align:right">Next →<br><span style="opacity:.65">Automating Releases with Semantic-Releas</span></a>
+  </nav>
+</main>
+
+<script>
+(function () {
+  try {
+    if (new URLSearchParams(location.search).get('from') !== 'posts') return;
+    var a = document.querySelector('.bar__back');
+    if (!a) return;
+    a.setAttribute('href', '/posts');
+    a.textContent = document.documentElement.lang === 'en' ? '← Writing' : '← 文稿';
+  } catch (e) { /* 老浏览器：保持指向 /articles/ */ }
+})();
+</script>
+</body>
+</html>

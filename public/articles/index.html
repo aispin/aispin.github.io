@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>文稿 · Writing — AISPIN</title>
+<meta name="description" content="AISPIN 的文稿：10 篇中文、8 篇英文，关于工程实践、研发管理与产品思维。一折一篇，点开即读。">
+<link rel="canonical" href="https://aispin.github.io/articles/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="文稿 · Writing — AISPIN">
+<meta property="og:description" content="AISPIN 的文稿：10 篇中文、8 篇英文，关于工程实践、研发管理与产品思维。一折一篇，点开即读。">
+<meta property="og:url" content="https://aispin.github.io/articles/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="/fonts/maple-ui.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+:root{--bg:#f4eee2;--paper:#fbf7ee;--ink:#241f1a;--soft:#6d6257;--accent:#b23a2c;--line:rgba(90,74,56,.18)}
+
+@font-face{font-family:'MapleUI';src:url('/fonts/maple-ui.woff2') format('woff2');font-weight:400 500;font-display:swap}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:'MapleUI',ui-monospace,'PingFang SC',monospace;
+  -webkit-font-smoothing:antialiased;line-height:1.8}
+a{color:inherit}
+.wrap{max-width:760px;margin:0 auto;padding:0 32px}
+
+/* 顶栏：滚到哪儿都在 */
+.bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;
+  padding:14px 32px;font-size:10.5px;letter-spacing:.2em;
+  background:color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line)}
+.bar__back{text-decoration:none;color:var(--soft);display:inline-flex;align-items:center;gap:7px;
+  transition:color .2s ease}
+.bar__back:hover{color:var(--ink)}
+.bar__sep{flex:1}
+.bar__lang{display:flex;gap:2px}
+.bar__lang a,.bar__lang span{text-decoration:none;padding:5px 10px;border-radius:999px;color:var(--soft)}
+.bar__lang a:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.bar__lang [aria-current]{color:var(--ink);background:color-mix(in srgb, var(--ink) 8%, transparent)}
+
+/* hero */
+.hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
+.hero__art{position:absolute;inset:0;width:100%;height:100%;display:block}
+/* ⚠️ 只写 padding-top/bottom：.wrap 与 .hero__in 同为单类选择器，这里若用
+   简写 padding 会把 .wrap 的左右内边距清零（手机标题被裁掉左边就是这个）。
+   注意：这段 CSS 在 JS 模板字符串里，注释中不能出现反引号。 */
+.hero__in{position:relative;z-index:2;padding-top:70px;padding-bottom:50px;min-height:clamp(240px,34vw,340px);
+  display:flex;flex-direction:column;justify-content:center}
+.hero__kicker{font-size:10px;letter-spacing:.34em;color:var(--accent);display:flex;align-items:center;gap:10px}
+.hero__kicker i{display:block;width:26px;height:1px;background:currentColor;opacity:.6;font-style:normal}
+.hero h1{margin-top:22px;font-size:clamp(28px,4.4vw,42px);line-height:1.5;font-weight:500;
+  letter-spacing:.01em;max-width:22ch;text-wrap:balance}
+.hero__meta{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px 18px;font-size:10.5px;
+  letter-spacing:.14em;color:var(--soft)}
+.hero__meta b{font-weight:400;color:var(--ink)}
+
+/* 正文 */
+.prose{padding:52px 0 24px;font-size:15px;line-height:2.05;color:var(--ink)}
+.prose>*+*{margin-top:18px}
+.prose h2{margin-top:44px;font-size:21px;line-height:1.7;font-weight:500;letter-spacing:.01em}
+.prose h3{margin-top:34px;font-size:16.5px;line-height:1.7;font-weight:500;color:var(--ink)}
+.prose h4{margin-top:26px;font-size:14.5px;font-weight:500;color:var(--soft)}
+.prose p{color:color-mix(in srgb, var(--ink) 88%, var(--soft))}
+.prose ul,.prose ol{padding-left:1.4em}
+.prose li+li{margin-top:6px}
+.prose li::marker{color:var(--accent)}
+.prose a{color:var(--accent);text-decoration:none;border-bottom:1px solid color-mix(in srgb, var(--accent) 40%, transparent)}
+.prose a:hover{border-bottom-color:var(--accent)}
+.prose strong{font-weight:500;color:var(--ink)}
+.prose code{font-family:inherit;font-size:.92em;padding:.12em .4em;border-radius:3px;
+  background:color-mix(in srgb, var(--ink) 8%, transparent)}
+.prose pre{overflow:auto;padding:18px 20px;border-radius:4px;font-size:12.5px;line-height:1.85;
+  background:color-mix(in srgb, var(--ink) 7%, transparent);border:1px solid var(--line)}
+.prose pre code{padding:0;background:none}
+.prose blockquote{padding:2px 0 2px 18px;border-left:2px solid var(--accent);color:var(--soft)}
+.prose blockquote p{color:var(--soft)}
+.prose img{display:block;max-width:100%;height:auto;border-radius:3px;
+  border:1px solid var(--line);background:var(--paper)}
+.prose hr{border:0;border-top:1px solid var(--line);margin:40px 0}
+.prose table{width:100%;border-collapse:collapse;font-size:12.5px;line-height:1.7;
+  display:block;overflow-x:auto;white-space:normal}
+.prose th,.prose td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+.prose th{background:color-mix(in srgb, var(--ink) 6%, transparent);font-weight:500}
+
+/* 文末 */
+.foot{margin-top:56px;padding:26px 0 70px;border-top:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;gap:18px;
+  font-size:10.5px;letter-spacing:.16em}
+.foot a{text-decoration:none;color:var(--soft);padding:8px 12px;border-radius:999px;
+  transition:color .2s ease,background .2s ease;max-width:46%}
+.foot a:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.foot__fin{color:var(--soft);opacity:.7}
+.foot__spacer{flex:1}
+@media(max-width:640px){
+  .wrap{padding:0 22px}
+  .bar{padding:12px 22px}
+  .hero__in{padding-top:46px;padding-bottom:34px;min-height:230px}
+  /* 窄屏折带会铺满整行、从标题底下穿过：压到 45%，只当纸纹用 */
+  .hero__art{opacity:.45}
+  .prose{font-size:14.5px;line-height:2}
+  .foot a{max-width:48%}
+}
+
+.list{list-style:none;padding:26px 0 8px}
+.list__h{margin-top:44px;font-size:11px;letter-spacing:.3em;color:var(--accent);font-weight:400}
+.row a{display:grid;grid-template-columns:44px 1fr auto;gap:16px;align-items:baseline;
+  padding:14px 12px;text-decoration:none;border-bottom:1px solid var(--line);
+  transition:background .18s ease}
+.row a:hover{background:color-mix(in srgb, var(--ink) 5%, transparent)}
+.row__n{font-size:10px;letter-spacing:.14em;color:var(--soft);font-variant-numeric:tabular-nums}
+.row__t{font-size:15px;line-height:1.7}
+.row__d{font-size:10.5px;letter-spacing:.1em;color:var(--soft);white-space:nowrap}
+@media(max-width:640px){.row a{grid-template-columns:30px 1fr;gap:4px 12px}.row__d{grid-column:2;font-size:10px}}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <a class="bar__back" href="/">← AISPIN</a>
+  <span class="bar__sep"></span>
+  <div class="bar__lang"><span aria-current="page">中文</span><a href="#en">EN</a></div>
+</header>
+
+<section class="hero" style="--h:300px">
+  <svg class="hero__art" viewBox="0 0 1200 340" preserveAspectRatio="xMaxYMid slice" aria-hidden="true" focusable="false">
+  <defs>
+    <radialGradient id="glow" cx="74%" cy="34%" r="52%">
+      <stop offset="0%" stop-color="#b23a2c" stop-opacity=".13"/>
+      <stop offset="100%" stop-color="#b23a2c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="veil" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f4eee2" stop-opacity="1"/>
+      <stop offset="34%" stop-color="#f4eee2" stop-opacity=".72"/>
+      <stop offset="62%" stop-color="#f4eee2" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f4eee2" stop-opacity="0"/>
+      <stop offset="84%" stop-color="#f4eee2" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#f4eee2" stop-opacity=".85"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="340" fill="url(#glow)"/>
+  <path d="M372.0 116.7 L446.0 123.3 L446.0 323.3 L372.0 316.7 Z" fill="#241f1a" fill-opacity="0.290"/><path d="M372.0 116.7 L372.0 316.7" stroke="#b23a2c" stroke-opacity="0.45999999999999996" stroke-width="1"/><path d="M446.0 123.3 L520.0 127.6 L520.0 327.6 L446.0 323.3 Z" fill="#241f1a" fill-opacity="0.152"/><path d="M446.0 123.3 L446.0 323.3" stroke="#241f1a" stroke-opacity="0.15294117647058822" stroke-width="1"/><path d="M520.0 127.6 L594.0 128.4 L594.0 328.4 L520.0 327.6 Z" fill="#241f1a" fill-opacity="0.259"/><path d="M520.0 127.6 L520.0 327.6" stroke="#b23a2c" stroke-opacity="0.4105882352941176" stroke-width="1"/><path d="M594.0 128.4 L668.0 125.4 L668.0 325.4 L594.0 328.4 Z" fill="#241f1a" fill-opacity="0.137"/><path d="M594.0 128.4 L594.0 328.4" stroke="#241f1a" stroke-opacity="0.1388235294117647" stroke-width="1"/><path d="M668.0 125.4 L742.0 119.5 L742.0 319.5 L668.0 325.4 Z" fill="#241f1a" fill-opacity="0.229"/><path d="M668.0 125.4 L668.0 325.4" stroke="#b23a2c" stroke-opacity="0.36117647058823527" stroke-width="1"/><path d="M742.0 119.5 L816.0 112.5 L816.0 312.5 L742.0 319.5 Z" fill="#241f1a" fill-opacity="0.122"/><path d="M742.0 119.5 L742.0 319.5" stroke="#241f1a" stroke-opacity="0.12470588235294117" stroke-width="1"/><path d="M816.0 112.5 L890.0 106.3 L890.0 306.3 L816.0 312.5 Z" fill="#241f1a" fill-opacity="0.198"/><path d="M816.0 112.5 L816.0 312.5" stroke="#b23a2c" stroke-opacity="0.3117647058823529" stroke-width="1"/><path d="M890.0 106.3 L964.0 102.9 L964.0 302.9 L890.0 306.3 Z" fill="#241f1a" fill-opacity="0.106"/><path d="M890.0 106.3 L890.0 306.3" stroke="#241f1a" stroke-opacity="0.11058823529411765" stroke-width="1"/><path d="M964.0 102.9 L1038.0 103.3 L1038.0 303.3 L964.0 302.9 Z" fill="#241f1a" fill-opacity="0.168"/><path d="M964.0 102.9 L964.0 302.9" stroke="#b23a2c" stroke-opacity="0.26235294117647057" stroke-width="1"/><path d="M1038.0 103.3 L1112.0 107.2 L1112.0 307.2 L1038.0 303.3 Z" fill="#241f1a" fill-opacity="0.091"/><path d="M1038.0 103.3 L1038.0 303.3" stroke="#241f1a" stroke-opacity="0.09647058823529411" stroke-width="1"/><path d="M1112.0 107.2 L1186.0 113.7 L1186.0 313.7 L1112.0 307.2 Z" fill="#241f1a" fill-opacity="0.137"/><path d="M1112.0 107.2 L1112.0 307.2" stroke="#b23a2c" stroke-opacity="0.21294117647058822" stroke-width="1"/><path d="M1186.0 113.7 L1260.0 120.7 L1260.0 320.7 L1186.0 313.7 Z" fill="#241f1a" fill-opacity="0.076"/><path d="M1186.0 113.7 L1186.0 313.7" stroke="#241f1a" stroke-opacity="0.08235294117647057" stroke-width="1"/><path d="M1260.0 120.7 L1334.0 126.2 L1334.0 326.2 L1260.0 320.7 Z" fill="#241f1a" fill-opacity="0.106"/><path d="M1260.0 120.7 L1260.0 320.7" stroke="#b23a2c" stroke-opacity="0.16352941176470587" stroke-width="1"/><path d="M1334.0 126.2 L1408.0 128.6 L1408.0 328.6 L1334.0 326.2 Z" fill="#241f1a" fill-opacity="0.061"/><path d="M1334.0 126.2 L1334.0 326.2" stroke="#241f1a" stroke-opacity="0.06823529411764706" stroke-width="1"/><path d="M372.0 116.7 L446.0 123.3 L520.0 127.6 L594.0 128.4 L668.0 125.4 L742.0 119.5 L816.0 112.5 L890.0 106.3 L964.0 102.9 L1038.0 103.3 L1112.0 107.2 L1186.0 113.7 L1260.0 120.7 L1334.0 126.2 L1408.0 128.6" fill="none" stroke="#b23a2c" stroke-opacity=".34" stroke-width="1.2"/><path d="M1408 128.5691464000854 L1408 328.5691464000854" stroke="#b23a2c" stroke-opacity=".2" stroke-width="1"/>
+  <circle cx="1066.1" cy="241.6" r="0.72" fill="#b23a2c" fill-opacity="0.173"/><circle cx="387.4" cy="149.8" r="0.60" fill="#b23a2c" fill-opacity="0.130"/><circle cx="454.7" cy="36.7" r="1.61" fill="#b23a2c" fill-opacity="0.167"/><circle cx="355.4" cy="279.2" r="1.13" fill="#b23a2c" fill-opacity="0.107"/><circle cx="288.3" cy="279.7" r="1.13" fill="#b23a2c" fill-opacity="0.079"/><circle cx="529.7" cy="199.8" r="0.95" fill="#b23a2c" fill-opacity="0.085"/><circle cx="280.4" cy="207.7" r="1.44" fill="#b23a2c" fill-opacity="0.128"/><circle cx="277.9" cy="64.4" r="1.06" fill="#b23a2c" fill-opacity="0.115"/><circle cx="1036.0" cy="328.7" r="0.87" fill="#b23a2c" fill-opacity="0.076"/><circle cx="677.1" cy="282.4" r="0.91" fill="#b23a2c" fill-opacity="0.100"/><circle cx="624.1" cy="206.7" r="1.48" fill="#b23a2c" fill-opacity="0.086"/><circle cx="1042.8" cy="193.9" r="1.68" fill="#b23a2c" fill-opacity="0.181"/><circle cx="1126.1" cy="301.4" r="1.52" fill="#b23a2c" fill-opacity="0.097"/><circle cx="953.8" cy="291.1" r="1.20" fill="#b23a2c" fill-opacity="0.175"/><circle cx="125.8" cy="131.7" r="1.49" fill="#b23a2c" fill-opacity="0.185"/><circle cx="673.2" cy="262.1" r="1.35" fill="#b23a2c" fill-opacity="0.053"/><circle cx="852.1" cy="264.2" r="1.44" fill="#b23a2c" fill-opacity="0.072"/><circle cx="614.9" cy="50.7" r="1.55" fill="#b23a2c" fill-opacity="0.143"/><circle cx="547.9" cy="8.1" r="1.17" fill="#b23a2c" fill-opacity="0.081"/><circle cx="788.9" cy="283.3" r="1.45" fill="#b23a2c" fill-opacity="0.091"/><circle cx="539.3" cy="317.1" r="1.07" fill="#b23a2c" fill-opacity="0.095"/><circle cx="423.8" cy="125.8" r="0.70" fill="#b23a2c" fill-opacity="0.064"/><circle cx="1084.3" cy="237.9" r="0.59" fill="#b23a2c" fill-opacity="0.181"/><circle cx="203.3" cy="258.8" r="0.51" fill="#b23a2c" fill-opacity="0.091"/><circle cx="271.9" cy="40.1" r="1.58" fill="#b23a2c" fill-opacity="0.110"/><circle cx="257.0" cy="47.9" r="0.66" fill="#b23a2c" fill-opacity="0.169"/>
+  <rect width="1200" height="340" fill="url(#veil)"/>
+  <rect width="1200" height="340" fill="url(#fade)"/>
+</svg>
+  <div class="wrap hero__in">
+    <div class="hero__kicker"><i></i>WRITING · POSTS</div>
+    <h1>文稿</h1>
+    <div class="hero__meta"><span><b>18</b> 篇</span><span>中文 10 · EN 8</span></div>
+  </div>
+</section>
+
+<main class="wrap">
+  <ul class="list" id="zh">
+    <li class="row">
+      <a href="/articles/vitest-mock-guide/">
+        <span class="row__n">01</span>
+        <span class="row__t">Vitest 模拟第三方模块指南</span>
+        <span class="row__d">2025.08.26</span>
+      </a>
+    </li>
+    <li class="row">
+      <a href="/articles/neon-serverless-driver-vercel-aliyun/">
+        <span class="row__n">02</span>
+        <span class="row__t">Neon serverless-driver 结合 Vercel、阿里云实战指南</span>
+        <span class="row__d">2024.08.26</span>
+      </a>
+    </li>
+    <li class="row">
+      <a href="/articles/semantic-release-with-github-workflow/">
+        <span class="row__n">03</span>
+        <span class="row__t">使用 Semantic-Release 和 Github Workflow 实现自动化版本发布</span>
+        <span class="row__d">2024.08.10</span>
+      </a>
+    </li>
+    <li class="row">
+      <a href="/articles/intuitive-understanding-of-docker/">
+        <span class="row__n">04</span>
+        <span class="row__t">教大家更直观的理解 Docker</span>
+        <span class="row__d">2024.08.05</span>
+      </a>
+    </li>
+    <li class="row">
+      <a href="/articles/leadership-principles/">
+        <span class="row__n">05</span>
+        <span class="row__t">亚马逊和美团的领导力原则</span>
+        <span class="row__d">2024.03.06</span>
+      </a>
+    </li>
+    <li class="row">
+      <a href="/articles/how-to-convert-a-svg-to-png-using-canvas/">
+        <span class="row__n">06</span>
+        <span class="row__t">如何使用 Canvas 将 SVG 转换为 PNG</span>
+        <span class="row__d">2023.11.22</span>
+      </a>
+    </li>
+    <li class="row">
+      <a href="/articles/building-your-first-api-with-expressjs-a-beginners-guide/">
+        <span class="row__n">07</span>
+        <span class="row__t">使用 Express.js 构建你的第一个 API：初学者指南</span>
+        <span class="row__d">2023.11.02</span>
+      </a>
+    </li>
+    <li class="row">
+      <a href="/articles/management-by-objectives/">
+        <span class="row__n">08</span>
+        <span class="row__t">美团公司的目标管理实践总结</span>
+        <span class="row__d">2023.11.02</span>
+      </a>
+    </li>
+    <li class="row">
+      <a href="/articles/scrum-mvp-pdca/">
+        <span class="row__n">09</span>
+        <span class="row__t">京东公司的过程管理实践总结</span>
+        <span class="row__d">2022.05.06</span>
+      </a>
+    </li>
+    <li class="row">
+      <a href="/articles/management-by-swot/">
+        <span class="row__n">10</span>
+        <span class="row__t">SWOT 在业务策划及组织管理中的应用</span>
+        <span class="row__d">2021.11.11</span>
+      </a>
+    </li></ul>
+  <h2 class="list__h" id="en">English</h2>
+  <ul class="list">
+    <li class="row">
+      <a href="/articles/en/semantic-release-with-github-workflow/">
+        <span class="row__n">01</span>
+        <span class="row__t">Automating Releases with Semantic-Release and GitHub Actions</span>
+        <span class="row__d">2024.08.10</span>
+      </a>
+    </li>
+    <li class="row">
+      <a href="/articles/en/intuitive-understanding-of-docker/">
+        <span class="row__n">02</span>
+        <span class="row__t">A more intuitive understanding of Docker</span>
+        <span class="row__d">2024.08.05</span>
+      </a>
+    </li>
+    <li class="row">
+      <a href="/articles/en/leadership-principles/">
+        <span class="row__n">03</span>
+        <span class="row__t">Leadership Principles of Amazon and Meituan</span>
+        <span class="row__d">2024.03.06</span>
+      </a>
+    </li>
+    <li class="row">
+      <a href="/articles/en/how-to-convert-a-svg-to-png-using-canvas/">
+        <span class="row__n">04</span>
+        <span class="row__t">How to convert a SVG to PNG using Canvas</span>
+        <span class="row__d">2023.11.22</span>
+      </a>
+    </li>
+    <li class="row">
+      <a href="/articles/en/building-your-first-api-with-expressjs-a-beginners-guide/">
+        <span class="row__n">05</span>
+        <span class="row__t">Building Your First API with Express.js: A Beginner's Guide</span>
+        <span class="row__d">2023.11.02</span>
+      </a>
+    </li>
+    <li class="row">
+      <a href="/articles/en/management-by-objectives/">
+        <span class="row__n">06</span>
+        <span class="row__t">Summary of Meituan's Goal Management Practices</span>
+        <span class="row__d">2023.11.02</span>
+      </a>
+    </li>
+    <li class="row">
+      <a href="/articles/en/scrum-mvp-pdca/">
+        <span class="row__n">07</span>
+        <span class="row__t">Summary of Process Management Practices at JD.com</span>
+        <span class="row__d">2022.05.06</span>
+      </a>
+    </li>
+    <li class="row">
+      <a href="/articles/en/management-by-swot/">
+        <span class="row__n">08</span>
+        <span class="row__t">SWOT in Business Planning and Organizational Management</span>
+        <span class="row__d">2021.11.11</span>
+      </a>
+    </li></ul>
+  <nav class="foot"><a href="/posts">走进房间读 ↗</a><span class="foot__fin">经折</span><span class="foot__spacer"></span></nav>
+</main>
+
+<script>
+(function () {
+  try {
+    if (new URLSearchParams(location.search).get('from') !== 'posts') return;
+    var a = document.querySelector('.bar__back');
+    if (!a) return;
+    a.setAttribute('href', '/posts');
+    a.textContent = document.documentElement.lang === 'en' ? '← Writing' : '← 文稿';
+  } catch (e) { /* 老浏览器：保持指向 /articles/ */ }
+})();
+</script>
+</body>
+</html>

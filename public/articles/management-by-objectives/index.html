@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>美团公司的目标管理实践总结 — AISPIN</title>
+<meta name="description" content="美团公司在管理文化方面以「亚马逊」公司为学习榜样，自 2022 年起提倡「猛学亚马逊」，因此许多经营管理理念均在学习参考亚马逊公司的基础上，结合美团自身进行优化调整。例如，「领导力原则」、「增长飞轮」、「运营计划（OP）」、「团队目标（Team Goals，简称 TG）」等。">
+<link rel="canonical" href="https://aispin.github.io/articles/management-by-objectives/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="美团公司的目标管理实践总结 — AISPIN">
+<meta property="og:description" content="美团公司在管理文化方面以「亚马逊」公司为学习榜样，自 2022 年起提倡「猛学亚马逊」，因此许多经营管理理念均在学习参考亚马逊公司的基础上，结合美团自身进行优化调整。例如，「领导力原则」、「增长飞轮」、「运营计划（OP）」、「团队目标（Team Goals，简称 TG）」等。">
+<meta property="og:url" content="https://aispin.github.io/articles/management-by-objectives/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="/fonts/maple-ui.woff2" as="font" type="font/woff2" crossorigin>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"美团公司的目标管理实践总结","description":"美团公司在管理文化方面以「亚马逊」公司为学习榜样，自 2022 年起提倡「猛学亚马逊」，因此许多经营管理理念均在学习参考亚马逊公司的基础上，结合美团自身进行优化调整。例如，「领导力原则」、「增长飞轮」、「运营计划（OP）」、「团队目标（Team Goals，简称 TG）」等。","datePublished":"2023-11-02","inLanguage":"zh-CN","url":"https://aispin.github.io/articles/management-by-objectives/","mainEntityOfPage":"https://aispin.github.io/articles/management-by-objectives/","author":{"@type":"Person","name":"ZEO AI","url":"https://aispin.github.io"},"keywords":"目标管理, OKR, SMART"}</script>
+<style>
+:root{--bg:#141110;--paper:#1b1714;--ink:#e8e0d4;--soft:#8d8073;--accent:#c9553f;--line:rgba(200,186,168,.16)}
+
+@font-face{font-family:'MapleUI';src:url('/fonts/maple-ui.woff2') format('woff2');font-weight:400 500;font-display:swap}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:'MapleUI',ui-monospace,'PingFang SC',monospace;
+  -webkit-font-smoothing:antialiased;line-height:1.8}
+a{color:inherit}
+.wrap{max-width:760px;margin:0 auto;padding:0 32px}
+
+/* 顶栏：滚到哪儿都在 */
+.bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;
+  padding:14px 32px;font-size:10.5px;letter-spacing:.2em;
+  background:color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line)}
+.bar__back{text-decoration:none;color:var(--soft);display:inline-flex;align-items:center;gap:7px;
+  transition:color .2s ease}
+.bar__back:hover{color:var(--ink)}
+.bar__sep{flex:1}
+.bar__lang{display:flex;gap:2px}
+.bar__lang a,.bar__lang span{text-decoration:none;padding:5px 10px;border-radius:999px;color:var(--soft)}
+.bar__lang a:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.bar__lang [aria-current]{color:var(--ink);background:color-mix(in srgb, var(--ink) 8%, transparent)}
+
+/* hero */
+.hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
+.hero__art{position:absolute;inset:0;width:100%;height:100%;display:block}
+/* ⚠️ 只写 padding-top/bottom：.wrap 与 .hero__in 同为单类选择器，这里若用
+   简写 padding 会把 .wrap 的左右内边距清零（手机标题被裁掉左边就是这个）。
+   注意：这段 CSS 在 JS 模板字符串里，注释中不能出现反引号。 */
+.hero__in{position:relative;z-index:2;padding-top:70px;padding-bottom:50px;min-height:clamp(240px,34vw,340px);
+  display:flex;flex-direction:column;justify-content:center}
+.hero__kicker{font-size:10px;letter-spacing:.34em;color:var(--accent);display:flex;align-items:center;gap:10px}
+.hero__kicker i{display:block;width:26px;height:1px;background:currentColor;opacity:.6;font-style:normal}
+.hero h1{margin-top:22px;font-size:clamp(28px,4.4vw,42px);line-height:1.5;font-weight:500;
+  letter-spacing:.01em;max-width:22ch;text-wrap:balance}
+.hero__meta{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px 18px;font-size:10.5px;
+  letter-spacing:.14em;color:var(--soft)}
+.hero__meta b{font-weight:400;color:var(--ink)}
+
+/* 正文 */
+.prose{padding:52px 0 24px;font-size:15px;line-height:2.05;color:var(--ink)}
+.prose>*+*{margin-top:18px}
+.prose h2{margin-top:44px;font-size:21px;line-height:1.7;font-weight:500;letter-spacing:.01em}
+.prose h3{margin-top:34px;font-size:16.5px;line-height:1.7;font-weight:500;color:var(--ink)}
+.prose h4{margin-top:26px;font-size:14.5px;font-weight:500;color:var(--soft)}
+.prose p{color:color-mix(in srgb, var(--ink) 88%, var(--soft))}
+.prose ul,.prose ol{padding-left:1.4em}
+.prose li+li{margin-top:6px}
+.prose li::marker{color:var(--accent)}
+.prose a{color:var(--accent);text-decoration:none;border-bottom:1px solid color-mix(in srgb, var(--accent) 40%, transparent)}
+.prose a:hover{border-bottom-color:var(--accent)}
+.prose strong{font-weight:500;color:var(--ink)}
+.prose code{font-family:inherit;font-size:.92em;padding:.12em .4em;border-radius:3px;
+  background:color-mix(in srgb, var(--ink) 8%, transparent)}
+.prose pre{overflow:auto;padding:18px 20px;border-radius:4px;font-size:12.5px;line-height:1.85;
+  background:color-mix(in srgb, var(--ink) 7%, transparent);border:1px solid var(--line)}
+.prose pre code{padding:0;background:none}
+.prose blockquote{padding:2px 0 2px 18px;border-left:2px solid var(--accent);color:var(--soft)}
+.prose blockquote p{color:var(--soft)}
+.prose img{display:block;max-width:100%;height:auto;border-radius:3px;
+  border:1px solid var(--line);background:var(--paper)}
+.prose hr{border:0;border-top:1px solid var(--line);margin:40px 0}
+.prose table{width:100%;border-collapse:collapse;font-size:12.5px;line-height:1.7;
+  display:block;overflow-x:auto;white-space:normal}
+.prose th,.prose td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+.prose th{background:color-mix(in srgb, var(--ink) 6%, transparent);font-weight:500}
+
+/* 文末 */
+.foot{margin-top:56px;padding:26px 0 70px;border-top:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;gap:18px;
+  font-size:10.5px;letter-spacing:.16em}
+.foot a{text-decoration:none;color:var(--soft);padding:8px 12px;border-radius:999px;
+  transition:color .2s ease,background .2s ease;max-width:46%}
+.foot a:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.foot__fin{color:var(--soft);opacity:.7}
+.foot__spacer{flex:1}
+@media(max-width:640px){
+  .wrap{padding:0 22px}
+  .bar{padding:12px 22px}
+  .hero__in{padding-top:46px;padding-bottom:34px;min-height:230px}
+  /* 窄屏折带会铺满整行、从标题底下穿过：压到 45%，只当纸纹用 */
+  .hero__art{opacity:.45}
+  .prose{font-size:14.5px;line-height:2}
+  .foot a{max-width:48%}
+}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <a class="bar__back" href="/articles/">← 文稿</a>
+  <span class="bar__sep"></span>
+  <div class="bar__lang">
+    <span aria-current="page">中文</span>
+    <a href="/articles/en/management-by-objectives/">EN</a>
+  </div>
+</header>
+
+<section class="hero">
+  <svg class="hero__art" viewBox="0 0 1200 340" preserveAspectRatio="xMaxYMid slice" aria-hidden="true" focusable="false">
+  <defs>
+    <radialGradient id="glow" cx="74%" cy="34%" r="52%">
+      <stop offset="0%" stop-color="#c9553f" stop-opacity=".13"/>
+      <stop offset="100%" stop-color="#c9553f" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="veil" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#141110" stop-opacity="1"/>
+      <stop offset="34%" stop-color="#141110" stop-opacity=".72"/>
+      <stop offset="62%" stop-color="#141110" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#141110" stop-opacity="0"/>
+      <stop offset="84%" stop-color="#141110" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#141110" stop-opacity=".85"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="340" fill="url(#glow)"/>
+  <path d="M372.0 124.2 L446.0 117.8 L446.0 317.8 L372.0 324.2 Z" fill="#e8e0d4" fill-opacity="0.290"/><path d="M372.0 124.2 L372.0 324.2" stroke="#c9553f" stroke-opacity="0.45999999999999996" stroke-width="1"/><path d="M446.0 117.8 L520.0 110.8 L520.0 310.8 L446.0 317.8 Z" fill="#e8e0d4" fill-opacity="0.152"/><path d="M446.0 117.8 L446.0 317.8" stroke="#e8e0d4" stroke-opacity="0.15294117647058822" stroke-width="1"/><path d="M520.0 110.8 L594.0 105.2 L594.0 305.2 L520.0 310.8 Z" fill="#e8e0d4" fill-opacity="0.259"/><path d="M520.0 110.8 L520.0 310.8" stroke="#c9553f" stroke-opacity="0.4105882352941176" stroke-width="1"/><path d="M594.0 105.2 L668.0 102.7 L668.0 302.7 L594.0 305.2 Z" fill="#e8e0d4" fill-opacity="0.137"/><path d="M594.0 105.2 L594.0 305.2" stroke="#e8e0d4" stroke-opacity="0.1388235294117647" stroke-width="1"/><path d="M668.0 102.7 L742.0 103.9 L742.0 303.9 L668.0 302.7 Z" fill="#e8e0d4" fill-opacity="0.229"/><path d="M668.0 102.7 L668.0 302.7" stroke="#c9553f" stroke-opacity="0.36117647058823527" stroke-width="1"/><path d="M742.0 103.9 L816.0 108.6 L816.0 308.6 L742.0 303.9 Z" fill="#e8e0d4" fill-opacity="0.122"/><path d="M742.0 103.9 L742.0 303.9" stroke="#e8e0d4" stroke-opacity="0.12470588235294117" stroke-width="1"/><path d="M816.0 108.6 L890.0 115.4 L890.0 315.4 L816.0 308.6 Z" fill="#e8e0d4" fill-opacity="0.198"/><path d="M816.0 108.6 L816.0 308.6" stroke="#c9553f" stroke-opacity="0.3117647058823529" stroke-width="1"/><path d="M890.0 115.4 L964.0 122.2 L964.0 322.2 L890.0 315.4 Z" fill="#e8e0d4" fill-opacity="0.106"/><path d="M890.0 115.4 L890.0 315.4" stroke="#e8e0d4" stroke-opacity="0.11058823529411765" stroke-width="1"/><path d="M964.0 122.2 L1038.0 127.1 L1038.0 327.1 L964.0 322.2 Z" fill="#e8e0d4" fill-opacity="0.168"/><path d="M964.0 122.2 L964.0 322.2" stroke="#c9553f" stroke-opacity="0.26235294117647057" stroke-width="1"/><path d="M1038.0 127.1 L1112.0 128.6 L1112.0 328.6 L1038.0 327.1 Z" fill="#e8e0d4" fill-opacity="0.091"/><path d="M1038.0 127.1 L1038.0 327.1" stroke="#e8e0d4" stroke-opacity="0.09647058823529411" stroke-width="1"/><path d="M1112.0 128.6 L1186.0 126.2 L1186.0 326.2 L1112.0 328.6 Z" fill="#e8e0d4" fill-opacity="0.137"/><path d="M1112.0 128.6 L1112.0 328.6" stroke="#c9553f" stroke-opacity="0.21294117647058822" stroke-width="1"/><path d="M1186.0 126.2 L1260.0 120.7 L1260.0 320.7 L1186.0 326.2 Z" fill="#e8e0d4" fill-opacity="0.076"/><path d="M1186.0 126.2 L1186.0 326.2" stroke="#e8e0d4" stroke-opacity="0.08235294117647057" stroke-width="1"/><path d="M1260.0 120.7 L1334.0 113.7 L1334.0 313.7 L1260.0 320.7 Z" fill="#e8e0d4" fill-opacity="0.106"/><path d="M1260.0 120.7 L1260.0 320.7" stroke="#c9553f" stroke-opacity="0.16352941176470587" stroke-width="1"/><path d="M1334.0 113.7 L1408.0 107.3 L1408.0 307.3 L1334.0 313.7 Z" fill="#e8e0d4" fill-opacity="0.061"/><path d="M1334.0 113.7 L1334.0 313.7" stroke="#e8e0d4" stroke-opacity="0.06823529411764706" stroke-width="1"/><path d="M372.0 124.2 L446.0 117.8 L520.0 110.8 L594.0 105.2 L668.0 102.7 L742.0 103.9 L816.0 108.6 L890.0 115.4 L964.0 122.2 L1038.0 127.1 L1112.0 128.6 L1186.0 126.2 L1260.0 120.7 L1334.0 113.7 L1408.0 107.3" fill="none" stroke="#c9553f" stroke-opacity=".34" stroke-width="1.2"/><path d="M1408 107.2872347260041 L1408 307.2872347260041" stroke="#c9553f" stroke-opacity=".2" stroke-width="1"/>
+  <circle cx="755.5" cy="315.2" r="0.81" fill="#c9553f" fill-opacity="0.136"/><circle cx="355.8" cy="319.8" r="1.63" fill="#c9553f" fill-opacity="0.181"/><circle cx="549.7" cy="91.7" r="0.85" fill="#c9553f" fill-opacity="0.081"/><circle cx="642.9" cy="13.7" r="1.10" fill="#c9553f" fill-opacity="0.149"/><circle cx="900.2" cy="28.2" r="1.42" fill="#c9553f" fill-opacity="0.163"/><circle cx="684.8" cy="44.9" r="0.85" fill="#c9553f" fill-opacity="0.144"/><circle cx="259.9" cy="102.2" r="1.05" fill="#c9553f" fill-opacity="0.066"/><circle cx="780.6" cy="17.3" r="1.64" fill="#c9553f" fill-opacity="0.124"/><circle cx="818.8" cy="274.5" r="0.57" fill="#c9553f" fill-opacity="0.154"/><circle cx="252.7" cy="327.6" r="0.60" fill="#c9553f" fill-opacity="0.163"/><circle cx="292.8" cy="75.4" r="0.67" fill="#c9553f" fill-opacity="0.081"/><circle cx="109.2" cy="154.7" r="0.80" fill="#c9553f" fill-opacity="0.102"/><circle cx="255.1" cy="313.8" r="1.43" fill="#c9553f" fill-opacity="0.159"/><circle cx="288.4" cy="208.7" r="1.06" fill="#c9553f" fill-opacity="0.147"/><circle cx="811.6" cy="116.0" r="1.16" fill="#c9553f" fill-opacity="0.145"/><circle cx="693.2" cy="225.7" r="1.28" fill="#c9553f" fill-opacity="0.072"/><circle cx="1152.7" cy="68.6" r="0.75" fill="#c9553f" fill-opacity="0.155"/><circle cx="1034.2" cy="22.7" r="0.94" fill="#c9553f" fill-opacity="0.181"/><circle cx="1150.5" cy="133.4" r="0.52" fill="#c9553f" fill-opacity="0.169"/><circle cx="837.4" cy="267.9" r="0.99" fill="#c9553f" fill-opacity="0.088"/><circle cx="756.9" cy="34.6" r="0.83" fill="#c9553f" fill-opacity="0.088"/><circle cx="681.2" cy="165.3" r="0.78" fill="#c9553f" fill-opacity="0.138"/><circle cx="734.8" cy="100.6" r="0.98" fill="#c9553f" fill-opacity="0.113"/><circle cx="179.2" cy="72.6" r="0.79" fill="#c9553f" fill-opacity="0.137"/><circle cx="36.9" cy="158.1" r="0.80" fill="#c9553f" fill-opacity="0.090"/><circle cx="590.9" cy="80.3" r="0.93" fill="#c9553f" fill-opacity="0.124"/>
+  <rect width="1200" height="340" fill="url(#veil)"/>
+  <rect width="1200" height="340" fill="url(#fade)"/>
+</svg>
+  <div class="wrap hero__in">
+    <div class="hero__kicker"><i></i>13 / 18</div>
+    <h1>美团公司的目标管理实践总结</h1>
+    <div class="hero__meta">
+      <span><b>2023.11.02</b></span>
+      <span>目标管理 · OKR · SMART</span>
+      <span>2,761 字 · 7 分钟</span>
+    </div>
+  </div>
+</section>
+
+<main class="wrap">
+  <article class="prose"><blockquote>
+<p>本文作者：黄泽昊（ZEO AI），前美团到家事业群-到家研发部-闪购技术部-歪马终端组 负责人，负责美图自营酒水业务歪马送酒的前端研发管理工作。</p>
+</blockquote>
+<p>本文概括介绍美团公司的目标管理方法，谨代表个人理解，为个人总结自我提升用，所提及的内容在网络上均有相关公开内容。本人在美团期间所在的部门为美团到家研发部，不同事业群和部门可能会有所不同，欢迎同事朋友们探讨指正。</p>
+<h2>一、前言</h2>
+<p>美团公司在管理文化方面以「亚马逊」公司为学习榜样，自 2022 年起提倡「猛学亚马逊」，因此许多经营管理理念均在学习参考亚马逊公司的基础上，结合美团自身进行优化调整。例如，「领导力原则」、「增长飞轮」、「运营计划（OP）」、「团队目标（Team Goals，简称 TG）」等。其中，与目标管理相关的方法论主要是「运营计划（Operation Plans，简称 OP）」。自 2022 年下半年起，美团开始大力推行 OP，并结合「运营计划」上线了新的目标管理系统。尽管之前的 OKR 及 TG 已不再提及，但末端的执行部门仍会使用 OKR 来追踪组织的目标。</p>
+<p>美团公司内部资料中，中英文混杂现象较为严重，且倾向于使用英文缩写，例如 OP、TG、KP（Key Person） 等。对于新入职的员工而言，起初可能会感到困惑。幸运的是，自23年开始，公司副总裁<a href="https://baike.baidu.com/item/%E7%A9%86%E8%8D%A3%E5%9D%87/23808766" target="_blank" rel="noopener noreferrer">穆荣均</a>发文要求将各种英文简称替换为中文。然而，改变习惯需要一个过程。此外，在 23 年，到家事业群负责人兼公司副总裁<a href="https://baike.baidu.com/item/%E7%8E%8B%E8%8E%86%E4%B8%AD/24572970" target="_blank" rel="noopener noreferrer">王莆中</a>提出实施“管理减法”，认为过去过度模仿亚马逊的管理方法论，需要结合美团自身的实际情况进行优化和简化。此话题可另文探讨。</p>
+<p>总的来说，截止2023年末，美团的目标管理是 运营计划（OP）、团队目标（TG）、OKR 结合着用：</p>
+<ol>
+<li>大部门（如到一级部门「到家研发部」、二级部门「闪购技术部」）以 运营计划 OP 为主；</li>
+<li>末级及个人使用 OKR 拆解运营计划为子目标。</li>
+</ol>
+<p>当然也不排除会有一些三、四级的部门使用运营计划管理团队目标，比如本人当时所在的终端研发组，以及本人所负责的歪马终端组，23 年均在实践运营计划。</p>
+<p>值得一提的是运营计划是自下而上为主，由下级部门的运营计划，逐级往上提炼，最终一级部门的运营计划，再由美团的核心决策层（S-Teams） 评审甄选出全公司最重要的目标，称为 S-Team Goals。</p>
+<h2>二、运营计划（OP）、S-Team Goals &amp; OKR</h2>
+<p>运营计划（OP）一般是年度的，是关于经营指标和资源分配的决策。一个有效的运营计划可以让公司每个事业群与核心管理层（S-Team） 对齐和共识，主要涉及以下两方面的内容：</p>
+<ul>
+<li>下一年的财务计划：包括完整的损益表（P&amp;L）以及员工人数（HC）的详细计划。</li>
+<li>下一年的关键输入&amp;措施：即为了实现财务计划，下一年需要哪些关键输入（如发布新产品、品类扩张等）和关键举措。</li>
+</ul>
+<p>团队目标（Team Goals）、目标关键结果（OKR）、以及公司部分团队在用的KPI 同属【目标管理】工具，但侧重点略有不同。</p>
+<p>根据与亚马逊的实践对标，美团在 2023 年的统一要求是，&quot;事业群/平台部门&quot;层级组织需采用运营计划来管理目标及计划。在此之下的各层级团队，直至个人的目标管理，各业务/平台可结合自身实际情况自行决定采用何种工具。</p>
+<p>自 23 年起，我所负责的歪马终端团队便开始积极响应公司的管理政策，基于运营计划管理团队的工作目标。下属组织（歪马终端一组、二组）与歪马产品团队的末端组织保持一致，采用 OKR 进行目标管理。</p>
+<p>下表为依据本人在美团的管理实践、亚马逊相关管理资料所整理的运营计划、S-Team Goals及OKR的承接关联关系表，在歪马终端组使用，仅供参考：</p>
+<p><em>— MT OP &amp; OKR —</em></p>
+<h2>三、目标管理及过程回顾不搞 PPT</h2>
+<p>美团的目标管理和过程回顾（还包括晋升述职），相较于京东和腾讯公司来说，最大的特点是不用写PPT，均基于叙述性的文档（STAR 原则）进行。一般是：</p>
+<ul>
+<li><strong>会前</strong>：看10-15分钟文档；</li>
+<li><strong>会中</strong>：做提问、讨论陈述；</li>
+<li><strong>会后</strong>：给总结反馈（包括正反面反馈） 。</li>
+</ul>
+<p>因此，美团非常重视员工的写作基本功，其文档系统功能非常强大，堪称笔者所见过的最佳文档系统（可媲美商业化的腾讯文档）。在日常工作中，员工只需专注于本职工作拿好结果，同时过程中不断完善文档的积累和沉淀，提升自身的写作能力，述职晋升时的便会自然轻松。</p>
+<p>注：美团会议材料使用叙述性文档不用 PPT 这一点，也是偷师自亚马逊。但年初和年中的事业群管理层会议上，还是需要用 PPT 秀下成果和计划的。</p>
+<h2>四、运营计划文档的大纲</h2>
+<p>运营计划在进入目标管理系统之前（这里也吐槽下23年上线的目标管理系统，个人觉得没有文档好用，建议可以和文档系统做下结合），它的产出物也是叙述性的文档，内容一般可以包括以下主题，不同的职能部门可以组合使用：</p>
+<p><em>— OP outline —</em></p>
+<p>下面图示为为 2023 年本人所负责组织用的大纲示例，其他部门的可能会不一样：</p>
+<p><em>— OP waima —</em></p>
+<h2>五、OKR 管理要求</h2>
+<p>接下来说说本人在美团工作期间对下属组织使用 OKR 进行目标管理的一些要求，部分内容借鉴自美团歪马业务的产品团队，仅供参考。</p>
+<p>此外，关于 OKR 管理实践的更多知识，推荐《OKR 工作法：谷歌、领英等顶级公司的高绩效秘籍》一书，大家可以根据自身情况活用。</p>
+<h3>5.1 原则</h3>
+<p>关键的三点原则：</p>
+<ol>
+<li>O（Objectives）即目标，需要能反应业务/产品/技术价值，要鼓舞人心，且可执行、可控制。数量控制在3-4个；</li>
+<li>KR 需要符合 SMART 原则，具体、可衡量，同时有挑战性。数量控制在3-4个；</li>
+<li>OKR 的关键在于拉齐同级、上下级对目标和预期结果的共识。</li>
+</ol>
+<p>关于 SMART，它是对 OKR 的基本要求：</p>
+<ul>
+<li>Specific（具体）：目标应该明确、具体，不含模糊性。</li>
+<li>Measurable（可衡量）：目标和关键结果应该可以量化，以便进行跟踪和评估。</li>
+<li>Achievable（可实现）：目标应该现实可行，不过分理想化。</li>
+<li>Relevant（相关）：目标应该与组织或个人的战略方向和需求相关。</li>
+<li>Time-bound（有时间限制）：目标应该设定截止日期，以便跟踪进度。</li>
+</ul>
+<h3>5.2 设定及管理流程</h3>
+<table>
+<thead>
+<tr>
+<th>动作</th>
+<th>时间</th>
+<th>输入</th>
+<th>输出</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>草拟</td>
+<td>每个季度最后2周（如调整提前通知）</td>
+<td>业务阶段性目标、产品阶段性目标（这个阶段目标可能存在变动可能性）</td>
+<td><strong>各组 OKR 初稿</strong><br/>1. 需要同相关方（此时可以优先聚焦在业务内）有一定的讨论。即，不完全是自己的想象；<br/>2. 一些量化数字若存在测算难度可不做强制要求</td>
+<td>OKR 草拟应该是一个主动的动作，业务目标的明确客观会需要一定时间，但各方向负责人要能够站在自己对业务的理解视角启动草拟</td>
+</tr>
+<tr>
+<td>对齐</td>
+<td>从 OKR 初稿提交到下季度开始<br/>（客观上 OKR确定需要一定周期）</td>
+<td>【向上对齐】<br/>个人 OKR初稿<br/>【向下对齐】<br/>主管 OKR初稿</td>
+<td>针对 OKR 的建议与意见，以及修订版的交付时间</td>
+<td>对齐往往需要多次，除了上下对齐外，也应该关注横向拉齐，确保你的关键协同方与你认知一致</td>
+</tr>
+<tr>
+<td>发布</td>
+<td>主管批准 OKR后<br/>（时间普遍在季度的第一个月）</td>
+<td>经批准、确认后的 OKR</td>
+<td>在 OKR 系统上发布</td>
+<td>建议在线文档也备份一份，因为系统有诸多不完善</td>
+</tr>
+<tr>
+<td>月度评估</td>
+<td>次月第一周</td>
+<td>评估如下几个内容<br/>1. 完成度自我打分（按月维度），一般使用红、黄、绿灯表示完成度<br/>2.GAP与目标的差距是什么，为什么？<br/>3. 关键结果与认知分享<br/>4. 下个月的计划与重点<br/>5.需要的支持与姿源</td>
+<td>根据评估修订下个阶段的计划</td>
+<td><strong>红灯</strong>：未完成且完全没有信心完成<br/><strong>黄灯</strong>：未完成但有一定信心能追赶完成<br/><strong>绿灯</strong>：完成<br/>一个挑战性合理的 OKR 应该存在极少数红灯和少数黄灯。</td>
+</tr>
+<tr>
+<td>季度评估</td>
+<td>根据公司考核时间定</td>
+<td>参考季度/半年考核内容进行</td>
+<td>季度/半年绩效自评</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3>5.3 案例</h3>
+<p>以下是一些基于 OKR 和 SMART 的案例，供参考：</p>
+<h4>公司层面的 OKR：</h4>
+<p><strong>目标</strong>：提高公司的市场份额。</p>
+<p><strong>关键结果</strong>：</p>
+<ul>
+<li>增加新客户数量至少 20%。</li>
+<li>提高客户满意度评分至少 10%。</li>
+<li>减少产品开发周期至少 15%。</li>
+</ul>
+<h4>部门层面的 OKR（例如市场部）：</h4>
+<p><strong>目标</strong>：增加品牌知名度。</p>
+<p><strong>关键结果</strong>：</p>
+<ul>
+<li>在社交媒体上的关注度增加 30%。</li>
+<li>提高网站流量至少 25%。</li>
+<li>增加媒体报道次数至少 15%。</li>
+</ul>
+<h3>5.4 OKR 常见问题</h3>
+<h4>Q1：OKR 一旦设定后是否能修改？</h4>
+<p>A：能，但需要走修改流程，阐述修改的背景/原因，并且保留修改前后的记录。原则上，我们更愿意接受因为不可控外因导致的结果，或者是业务方向的调整产生的结果。</p>
+<h4>Q2：OKR 和绩效考核什么关系？</h4>
+<p>A：OKR 的开展情况会在绩效考核中扮演一份重要的角色，但是，完成率并不直接等于绩效，绩效还会受其他维度影响。同时 OKR 完成度需要结合 OKR 的复杂度综合评估。</p>
+</article>
+  <nav class="foot">
+    <a href="/articles/scrum-mvp-pdca/">← 上一篇<br><span style="opacity:.65">京东公司的过程管理实践总结</span></a>
+    <span class="foot__fin">完</span>
+    <a href="/articles/building-your-first-api-with-expressjs-a-beginners-guide/" style="text-align:right">下一篇 →<br><span style="opacity:.65">使用 Express.js 构建你的第一个 API：初学者指南</span></a>
+  </nav>
+</main>
+
+<script>
+(function () {
+  try {
+    if (new URLSearchParams(location.search).get('from') !== 'posts') return;
+    var a = document.querySelector('.bar__back');
+    if (!a) return;
+    a.setAttribute('href', '/posts');
+    a.textContent = document.documentElement.lang === 'en' ? '← Writing' : '← 文稿';
+  } catch (e) { /* 老浏览器：保持指向 /articles/ */ }
+})();
+</script>
+</body>
+</html>

@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import viteCompression from 'vite-plugin-compression';
 import { generateSeoHtml } from './seo-plugin.js';
 import { buildDemosIndex } from './scripts/build-demos-index.mjs';
+import { buildArticles } from './scripts/build-articles.mjs';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -183,6 +184,30 @@ function buildDemosIndexPlugin() {
   };
 }
 
+/**
+ * 构建/启动前把 `content/articles/<locale>/<slug>.md` 编译成 `public/articles/**`。
+ *
+ * 和 `buildDemosIndexPlugin` 同一个理由：必须**早于** Vite 把 public/ 拷进
+ * dist，否则 dist 里躺着的还是上一次的产物。
+ *
+ * 🔴 失败**必须让构建挂掉**（不像 demos 索引只 `warn`）。文章的质量门
+ *    （缺 description、日期不是 YYYY-MM-DD、slug 与文件名不符、正文过短、
+ *    引用了不存在的本地图片、出现 `<script>` / `on*=`）就是靠"构建失败"
+ *    来生效的 —— 稿子是 AI 写的、没人逐篇读，`warn` 等于没拦。
+ */
+function buildArticlesPlugin() {
+  return {
+    name: 'build-articles',
+    buildStart() {
+      try {
+        buildArticles();
+      } catch (err) {
+        this.error(`文章构建失败：\n${err.message}`);
+      }
+    }
+  };
+}
+
 // GitHub Pages SPA fallback: 复制 index.html 为 404.html，
 // 任意深链（如 /?room=ai）都会先落到 SPA 入口。
 function emit404Fallback() {
@@ -236,6 +261,9 @@ export default defineConfig({
     flattenHtmlEntries({ 'src/me/index.html': 'me/index.html' }),
     react(),
     viteCompression(),
+    // 🔴 必须排在 seo 之前：`loadSeoData()` 读的就是它产出的
+    // `public/articles/index.json`，顺序反了会拿到上一次的元数据。
+    buildArticlesPlugin(),
     generateSeoHtml(),
     buildDemosIndexPlugin(),
     emit404Fallback(),

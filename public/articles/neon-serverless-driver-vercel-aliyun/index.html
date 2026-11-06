@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Neon serverless-driver 结合 Vercel、阿里云实战指南 — AISPIN</title>
+<meta name="description" content="本指南将介绍如何利用 Neon（Serverless PostgreSQL）、Vercel（用于前端和 Serverless Functions）以及 阿里云函数计算（FC）（作为另一种 Serverless 函数部署选择）来构建全栈应用。">
+<link rel="canonical" href="https://aispin.github.io/articles/neon-serverless-driver-vercel-aliyun/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Neon serverless-driver 结合 Vercel、阿里云实战指南 — AISPIN">
+<meta property="og:description" content="本指南将介绍如何利用 Neon（Serverless PostgreSQL）、Vercel（用于前端和 Serverless Functions）以及 阿里云函数计算（FC）（作为另一种 Serverless 函数部署选择）来构建全栈应用。">
+<meta property="og:url" content="https://aispin.github.io/articles/neon-serverless-driver-vercel-aliyun/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="/fonts/maple-ui.woff2" as="font" type="font/woff2" crossorigin>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Neon serverless-driver 结合 Vercel、阿里云实战指南","description":"本指南将介绍如何利用 Neon（Serverless PostgreSQL）、Vercel（用于前端和 Serverless Functions）以及 阿里云函数计算（FC）（作为另一种 Serverless 函数部署选择）来构建全栈应用。","datePublished":"2024-08-26","inLanguage":"zh-CN","url":"https://aispin.github.io/articles/neon-serverless-driver-vercel-aliyun/","mainEntityOfPage":"https://aispin.github.io/articles/neon-serverless-driver-vercel-aliyun/","author":{"@type":"Person","name":"Livin AI","url":"https://aispin.github.io"},"keywords":"Serverless, 函数计算, Neon, PostgreSQL"}</script>
+<style>
+:root{--bg:#f4eee2;--paper:#fbf7ee;--ink:#241f1a;--soft:#6d6257;--accent:#b23a2c;--line:rgba(90,74,56,.18)}
+
+@font-face{font-family:'MapleUI';src:url('/fonts/maple-ui.woff2') format('woff2');font-weight:400 500;font-display:swap}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:'MapleUI',ui-monospace,'PingFang SC',monospace;
+  -webkit-font-smoothing:antialiased;line-height:1.8}
+a{color:inherit}
+.wrap{max-width:760px;margin:0 auto;padding:0 32px}
+
+/* 顶栏：滚到哪儿都在 */
+.bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;
+  padding:14px 32px;font-size:10.5px;letter-spacing:.2em;
+  background:color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line)}
+.bar__back{text-decoration:none;color:var(--soft);display:inline-flex;align-items:center;gap:7px;
+  transition:color .2s ease}
+.bar__back:hover{color:var(--ink)}
+.bar__sep{flex:1}
+.bar__lang{display:flex;gap:2px}
+.bar__lang a,.bar__lang span{text-decoration:none;padding:5px 10px;border-radius:999px;color:var(--soft)}
+.bar__lang a:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.bar__lang [aria-current]{color:var(--ink);background:color-mix(in srgb, var(--ink) 8%, transparent)}
+
+/* hero */
+.hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
+.hero__art{position:absolute;inset:0;width:100%;height:100%;display:block}
+/* ⚠️ 只写 padding-top/bottom：.wrap 与 .hero__in 同为单类选择器，这里若用
+   简写 padding 会把 .wrap 的左右内边距清零（手机标题被裁掉左边就是这个）。
+   注意：这段 CSS 在 JS 模板字符串里，注释中不能出现反引号。 */
+.hero__in{position:relative;z-index:2;padding-top:70px;padding-bottom:50px;min-height:clamp(240px,34vw,340px);
+  display:flex;flex-direction:column;justify-content:center}
+.hero__kicker{font-size:10px;letter-spacing:.34em;color:var(--accent);display:flex;align-items:center;gap:10px}
+.hero__kicker i{display:block;width:26px;height:1px;background:currentColor;opacity:.6;font-style:normal}
+.hero h1{margin-top:22px;font-size:clamp(28px,4.4vw,42px);line-height:1.5;font-weight:500;
+  letter-spacing:.01em;max-width:22ch;text-wrap:balance}
+.hero__meta{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px 18px;font-size:10.5px;
+  letter-spacing:.14em;color:var(--soft)}
+.hero__meta b{font-weight:400;color:var(--ink)}
+
+/* 正文 */
+.prose{padding:52px 0 24px;font-size:15px;line-height:2.05;color:var(--ink)}
+.prose>*+*{margin-top:18px}
+.prose h2{margin-top:44px;font-size:21px;line-height:1.7;font-weight:500;letter-spacing:.01em}
+.prose h3{margin-top:34px;font-size:16.5px;line-height:1.7;font-weight:500;color:var(--ink)}
+.prose h4{margin-top:26px;font-size:14.5px;font-weight:500;color:var(--soft)}
+.prose p{color:color-mix(in srgb, var(--ink) 88%, var(--soft))}
+.prose ul,.prose ol{padding-left:1.4em}
+.prose li+li{margin-top:6px}
+.prose li::marker{color:var(--accent)}
+.prose a{color:var(--accent);text-decoration:none;border-bottom:1px solid color-mix(in srgb, var(--accent) 40%, transparent)}
+.prose a:hover{border-bottom-color:var(--accent)}
+.prose strong{font-weight:500;color:var(--ink)}
+.prose code{font-family:inherit;font-size:.92em;padding:.12em .4em;border-radius:3px;
+  background:color-mix(in srgb, var(--ink) 8%, transparent)}
+.prose pre{overflow:auto;padding:18px 20px;border-radius:4px;font-size:12.5px;line-height:1.85;
+  background:color-mix(in srgb, var(--ink) 7%, transparent);border:1px solid var(--line)}
+.prose pre code{padding:0;background:none}
+.prose blockquote{padding:2px 0 2px 18px;border-left:2px solid var(--accent);color:var(--soft)}
+.prose blockquote p{color:var(--soft)}
+.prose img{display:block;max-width:100%;height:auto;border-radius:3px;
+  border:1px solid var(--line);background:var(--paper)}
+.prose hr{border:0;border-top:1px solid var(--line);margin:40px 0}
+.prose table{width:100%;border-collapse:collapse;font-size:12.5px;line-height:1.7;
+  display:block;overflow-x:auto;white-space:normal}
+.prose th,.prose td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+.prose th{background:color-mix(in srgb, var(--ink) 6%, transparent);font-weight:500}
+
+/* 文末 */
+.foot{margin-top:56px;padding:26px 0 70px;border-top:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;gap:18px;
+  font-size:10.5px;letter-spacing:.16em}
+.foot a{text-decoration:none;color:var(--soft);padding:8px 12px;border-radius:999px;
+  transition:color .2s ease,background .2s ease;max-width:46%}
+.foot a:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.foot__fin{color:var(--soft);opacity:.7}
+.foot__spacer{flex:1}
+@media(max-width:640px){
+  .wrap{padding:0 22px}
+  .bar{padding:12px 22px}
+  .hero__in{padding-top:46px;padding-bottom:34px;min-height:230px}
+  /* 窄屏折带会铺满整行、从标题底下穿过：压到 45%，只当纸纹用 */
+  .hero__art{opacity:.45}
+  .prose{font-size:14.5px;line-height:2}
+  .foot a{max-width:48%}
+}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <a class="bar__back" href="/articles/">← 文稿</a>
+  <span class="bar__sep"></span>
+  <div class="bar__lang">
+    <span aria-current="page">中文</span>
+    
+  </div>
+</header>
+
+<section class="hero">
+  <svg class="hero__art" viewBox="0 0 1200 340" preserveAspectRatio="xMaxYMid slice" aria-hidden="true" focusable="false">
+  <defs>
+    <radialGradient id="glow" cx="74%" cy="34%" r="52%">
+      <stop offset="0%" stop-color="#b23a2c" stop-opacity=".13"/>
+      <stop offset="100%" stop-color="#b23a2c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="veil" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f4eee2" stop-opacity="1"/>
+      <stop offset="34%" stop-color="#f4eee2" stop-opacity=".72"/>
+      <stop offset="62%" stop-color="#f4eee2" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f4eee2" stop-opacity="0"/>
+      <stop offset="84%" stop-color="#f4eee2" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#f4eee2" stop-opacity=".85"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="340" fill="url(#glow)"/>
+  <path d="M372.0 103.2 L446.0 103.0 L446.0 303.0 L372.0 303.2 Z" fill="#241f1a" fill-opacity="0.290"/><path d="M372.0 103.2 L372.0 303.2" stroke="#b23a2c" stroke-opacity="0.45999999999999996" stroke-width="1"/><path d="M446.0 103.0 L520.0 106.4 L520.0 306.4 L446.0 303.0 Z" fill="#241f1a" fill-opacity="0.152"/><path d="M446.0 103.0 L446.0 303.0" stroke="#241f1a" stroke-opacity="0.15294117647058822" stroke-width="1"/><path d="M520.0 106.4 L594.0 112.6 L594.0 312.6 L520.0 306.4 Z" fill="#241f1a" fill-opacity="0.259"/><path d="M520.0 106.4 L520.0 306.4" stroke="#b23a2c" stroke-opacity="0.4105882352941176" stroke-width="1"/><path d="M594.0 112.6 L668.0 119.7 L668.0 319.7 L594.0 312.6 Z" fill="#241f1a" fill-opacity="0.137"/><path d="M594.0 112.6 L594.0 312.6" stroke="#241f1a" stroke-opacity="0.1388235294117647" stroke-width="1"/><path d="M668.0 119.7 L742.0 125.5 L742.0 325.5 L668.0 319.7 Z" fill="#241f1a" fill-opacity="0.229"/><path d="M668.0 119.7 L668.0 319.7" stroke="#b23a2c" stroke-opacity="0.36117647058823527" stroke-width="1"/><path d="M742.0 125.5 L816.0 128.4 L816.0 328.4 L742.0 325.5 Z" fill="#241f1a" fill-opacity="0.122"/><path d="M742.0 125.5 L742.0 325.5" stroke="#241f1a" stroke-opacity="0.12470588235294117" stroke-width="1"/><path d="M816.0 128.4 L890.0 127.6 L890.0 327.6 L816.0 328.4 Z" fill="#241f1a" fill-opacity="0.198"/><path d="M816.0 128.4 L816.0 328.4" stroke="#b23a2c" stroke-opacity="0.3117647058823529" stroke-width="1"/><path d="M890.0 127.6 L964.0 123.2 L964.0 323.2 L890.0 327.6 Z" fill="#241f1a" fill-opacity="0.106"/><path d="M890.0 127.6 L890.0 327.6" stroke="#241f1a" stroke-opacity="0.11058823529411765" stroke-width="1"/><path d="M964.0 123.2 L1038.0 116.6 L1038.0 316.6 L964.0 323.2 Z" fill="#241f1a" fill-opacity="0.168"/><path d="M964.0 123.2 L964.0 323.2" stroke="#b23a2c" stroke-opacity="0.26235294117647057" stroke-width="1"/><path d="M1038.0 116.6 L1112.0 109.6 L1112.0 309.6 L1038.0 316.6 Z" fill="#241f1a" fill-opacity="0.091"/><path d="M1038.0 116.6 L1038.0 316.6" stroke="#241f1a" stroke-opacity="0.09647058823529411" stroke-width="1"/><path d="M1112.0 109.6 L1186.0 104.5 L1186.0 304.5 L1112.0 309.6 Z" fill="#241f1a" fill-opacity="0.137"/><path d="M1112.0 109.6 L1112.0 309.6" stroke="#b23a2c" stroke-opacity="0.21294117647058822" stroke-width="1"/><path d="M1186.0 104.5 L1260.0 102.6 L1260.0 302.6 L1186.0 304.5 Z" fill="#241f1a" fill-opacity="0.076"/><path d="M1186.0 104.5 L1186.0 304.5" stroke="#241f1a" stroke-opacity="0.08235294117647057" stroke-width="1"/><path d="M1260.0 102.6 L1334.0 104.6 L1334.0 304.6 L1260.0 302.6 Z" fill="#241f1a" fill-opacity="0.106"/><path d="M1260.0 102.6 L1260.0 302.6" stroke="#b23a2c" stroke-opacity="0.16352941176470587" stroke-width="1"/><path d="M1334.0 104.6 L1408.0 109.8 L1408.0 309.8 L1334.0 304.6 Z" fill="#241f1a" fill-opacity="0.061"/><path d="M1334.0 104.6 L1334.0 304.6" stroke="#241f1a" stroke-opacity="0.06823529411764706" stroke-width="1"/><path d="M372.0 103.2 L446.0 103.0 L520.0 106.4 L594.0 112.6 L668.0 119.7 L742.0 125.5 L816.0 128.4 L890.0 127.6 L964.0 123.2 L1038.0 116.6 L1112.0 109.6 L1186.0 104.5 L1260.0 102.6 L1334.0 104.6 L1408.0 109.8" fill="none" stroke="#b23a2c" stroke-opacity=".34" stroke-width="1.2"/><path d="M1408 109.76617135745681 L1408 309.7661713574568" stroke="#b23a2c" stroke-opacity=".2" stroke-width="1"/>
+  <circle cx="274.8" cy="312.4" r="1.27" fill="#b23a2c" fill-opacity="0.063"/><circle cx="342.1" cy="95.8" r="1.33" fill="#b23a2c" fill-opacity="0.120"/><circle cx="580.1" cy="17.3" r="0.70" fill="#b23a2c" fill-opacity="0.133"/><circle cx="409.8" cy="217.9" r="1.68" fill="#b23a2c" fill-opacity="0.151"/><circle cx="854.7" cy="216.3" r="1.24" fill="#b23a2c" fill-opacity="0.105"/><circle cx="965.9" cy="243.6" r="0.98" fill="#b23a2c" fill-opacity="0.121"/><circle cx="514.8" cy="50.9" r="1.60" fill="#b23a2c" fill-opacity="0.184"/><circle cx="594.7" cy="45.5" r="1.21" fill="#b23a2c" fill-opacity="0.072"/><circle cx="751.1" cy="57.5" r="1.25" fill="#b23a2c" fill-opacity="0.155"/><circle cx="423.7" cy="180.0" r="1.03" fill="#b23a2c" fill-opacity="0.114"/><circle cx="116.5" cy="123.8" r="0.59" fill="#b23a2c" fill-opacity="0.119"/><circle cx="214.2" cy="4.3" r="0.71" fill="#b23a2c" fill-opacity="0.151"/><circle cx="599.5" cy="123.8" r="0.94" fill="#b23a2c" fill-opacity="0.122"/><circle cx="301.9" cy="183.0" r="0.61" fill="#b23a2c" fill-opacity="0.179"/><circle cx="1195.8" cy="296.2" r="1.00" fill="#b23a2c" fill-opacity="0.056"/><circle cx="238.8" cy="111.5" r="0.74" fill="#b23a2c" fill-opacity="0.071"/><circle cx="251.4" cy="222.2" r="0.96" fill="#b23a2c" fill-opacity="0.078"/><circle cx="353.0" cy="296.1" r="0.77" fill="#b23a2c" fill-opacity="0.189"/><circle cx="845.0" cy="8.4" r="1.33" fill="#b23a2c" fill-opacity="0.110"/><circle cx="1028.2" cy="146.0" r="1.50" fill="#b23a2c" fill-opacity="0.117"/><circle cx="1177.4" cy="215.9" r="1.60" fill="#b23a2c" fill-opacity="0.182"/><circle cx="465.1" cy="260.5" r="1.62" fill="#b23a2c" fill-opacity="0.132"/><circle cx="163.1" cy="226.7" r="0.66" fill="#b23a2c" fill-opacity="0.063"/><circle cx="615.8" cy="121.0" r="0.79" fill="#b23a2c" fill-opacity="0.164"/><circle cx="776.0" cy="252.7" r="1.36" fill="#b23a2c" fill-opacity="0.176"/><circle cx="916.0" cy="47.4" r="1.50" fill="#b23a2c" fill-opacity="0.099"/>
+  <rect width="1200" height="340" fill="url(#veil)"/>
+  <rect width="1200" height="340" fill="url(#fade)"/>
+</svg>
+  <div class="wrap hero__in">
+    <div class="hero__kicker"><i></i>02 / 18</div>
+    <h1>Neon serverless-driver 结合 Vercel、阿里云实战指南</h1>
+    <div class="hero__meta">
+      <span><b>2024.08.26</b></span>
+      <span>Serverless · 函数计算 · Neon · PostgreSQL</span>
+      <span>1,801 字 · 5 分钟</span>
+    </div>
+  </div>
+</section>
+
+<main class="wrap">
+  <article class="prose"><h2>概述</h2>
+<p>本指南将介绍如何利用 <strong>Neon</strong>（Serverless PostgreSQL）、<strong>Vercel</strong>（用于前端和 Serverless Functions）以及 <strong>阿里云函数计算（FC）</strong>（作为另一种 Serverless 函数部署选择）来构建全栈应用。我们将探讨 Neon serverless-driver 的使用场景、在不同平台部署 Serverless API 的实践，以及如何安全地连接数据库。</p>
+<p><strong>适合阅读人群</strong>：</p>
+<ul>
+<li>前端开发者（如使用 Vue、React）</li>
+<li>全栈开发者</li>
+<li>对 Serverless 架构和现代 Web 开发感兴趣的人</li>
+</ul>
+<p><strong>核心工具与服务</strong>：</p>
+<ul>
+<li><strong>Neon</strong>: Serverless PostgreSQL 数据库，提供无服务器化的数据库体验。</li>
+<li><strong>Neon serverless-driver (<code>@neondatabase/serverless</code>)</strong>: 为无服务器环境优化的 PostgreSQL 驱动，尤其适合冷启动频繁的场景:cite[2]。</li>
+<li><strong>Vercel</strong>: 用于部署前端静态资源和 Serverless Functions（API Routes）:cite[2]:cite[6]。</li>
+<li><strong>阿里云函数计算 (FC)</strong>: 事件驱动的全托管 Serverless 计算服务，可用于运行后端代码和 API:cite[3]:cite[7]。</li>
+</ul>
+<h2>为什么选择这种组合？</h2>
+<ul>
+<li><strong>性能与优化</strong>: Neon serverless-driver 通过 WebSocket 等协议减少传统 TCP 连接开销，特别适合 Vercel 和阿里云 FC 这种冷启动敏感的无服务器环境。</li>
+<li><strong>开发体验</strong>: Vercel 提供极佳的前端部署和 Git 集成体验:cite[6]，阿里云 FC 与阿里云其他服务集成紧密:cite[3]。</li>
+<li><strong>灵活性</strong>: 前端和轻量 API 可部署于 Vercel，而对国内用户更友好或有特定需求的 API 可部署于阿里云 FC。</li>
+<li><strong>成本效益</strong>: 这些服务大多提供慷慨的免费额度，适合个人项目和小型应用。</li>
+</ul>
+<h2>实战：在 Vercel API Route 中使用 Neon</h2>
+<p>Vercel 允许你在 <code>/api</code> 目录下创建 Serverless Functions:cite[2]:cite[9]。这些函数可以安全地与环境变量（如数据库连接字符串）交互。</p>
+<h3>步骤 1：创建 Neon 数据库并获取连接字符串</h3>
+<ol>
+<li>访问 <a href="https://neon.tech/" target="_blank" rel="noopener noreferrer">Neon</a> 并注册账号。</li>
+<li>创建一个新项目和新数据库。</li>
+<li>在项目的 &quot;Connection Details&quot; 中获取数据库连接字符串（<code>DATABASE_URL</code>），其格式类似于：<pre><code>postgres://user:password@ep-cool-darkness-123456.us-east-2.aws.neon.tech/dbname?sslmode=require
+</code></pre>
+</li>
+</ol>
+<h3>步骤 2：在 Vercel 项目中设置环境变量</h3>
+<p><strong>切勿将 <code>DATABASE_URL</code> 直接硬编码在前端代码或公开的 API 路由中</strong>，否则会导致严重的安全风险。</p>
+<ol>
+<li>在你的 Vercel 项目 Dashboard (或使用 Vercel CLI) 中，找到项目的 &quot;Settings&quot; -&gt; &quot;Environment Variables&quot;。</li>
+<li>添加一个环境变量，例如：
+<ul>
+<li><code>NAME</code>: <code>DATABASE_URL</code></li>
+<li><code>VALUE</code>: 你的 Neon 连接字符串</li>
+</ul>
+</li>
+<li>（可选）如果你计划本地开发，在项目根目录创建 <code>.env.local</code> 文件并同样添加该环境变量（确保该文件已在 <code>.gitignore</code> 中）。</li>
+</ol>
+<h3>步骤 3：创建 Vercel API Route 并查询 Neon</h3>
+<p>假设你有一个 Next.js 项目（其他框架类似）。</p>
+<ol>
+<li>
+<p><strong>安装驱动</strong>：</p>
+<pre><code class="language-bash">npm install @neondatabase/serverless
+</code></pre>
+</li>
+<li>
+<p><strong>创建 API 路由</strong>：在 <code>pages/api</code> 或 <code>app/api</code> 目录下创建文件，例如 <code>pages/api/users.js</code>：</p>
+<pre><code class="language-javascript">// pages/api/users.js
+import { neon } from '@neondatabase/serverless'
+
+/**
+ * @param {import('next').NextApiRequest} req
+ * @param {import('next').NextApiResponse} res
+ */
+export default async function handler(req, res) {
+  // 从环境变量读取连接字符串
+  const databaseUrl = process.env.DATABASE_URL
+
+  if (!databaseUrl) {
+    return res.status(500).json({ error: 'DATABASE_URL environment variable is not set.' })
+  }
+
+  // 初始化 Neon client
+  const sql = neon(databaseUrl)
+
+  try {
+    // 执行查询
+    const users = await sql`SELECT id, name, email FROM users LIMIT 10`
+    // 返回 JSON 响应
+    res.status(200).json({ users })
+  }
+  catch (error) {
+    console.error('Database error:', error)
+    res.status(500).json({ error: 'Internal Server Error' })
+  }
+}
+
+// 配置运行时环境（可选，但推荐用于边缘环境）
+export const config = {
+  runtime: 'edge', // 使用 Vercel 的边缘运行时以获得更佳性能
+}
+</code></pre>
+</li>
+<li>
+<p><strong>部署到 Vercel</strong>：将代码推送到你的 Git 仓库，Vercel 会自动部署。你的 API 端点将是 <code>https://your-app.vercel.app/api/users</code>。</p>
+</li>
+</ol>
+<h2>实战：在阿里云函数计算中使用 Neon</h2>
+<p>阿里云函数计算 (FC) 是另一个部署 Serverless 函数的强大平台:cite[3]:cite[7]。</p>
+<h3>步骤 1：创建函数并配置环境变量</h3>
+<ol>
+<li><strong>创建服务与函数</strong>：登录阿里云控制台，进入函数计算。首先创建一个服务（用于逻辑分组和环境隔离），然后在该服务下创建一个 HTTP 函数:cite[3]。</li>
+<li><strong>配置环境变量</strong>：在函数配置中，添加环境变量 <code>DATABASE_URL</code>，值为你的 Neon 连接字符串。</li>
+</ol>
+<h3>步骤 2：编写函数代码</h3>
+<p>你可以使用 <strong>Serverless Devs</strong> 工具进行本地开发和部署:cite[3]。</p>
+<ol>
+<li>
+<p><strong>初始化项目</strong>（如果尚未）：</p>
+<pre><code class="language-bash">s init start-fc-http-nodejs -d my-neon-app
+cd my-neon-app
+</code></pre>
+</li>
+<li>
+<p><strong>安装依赖</strong>和<strong>编写代码</strong> (<code>index.js</code>)：</p>
+<pre><code class="language-javascript">// index.js
+const { neon } = require('@neondatabase/serverless')
+
+exports.handler = async (req, res) =&gt; {
+  // 从环境变量获取连接字符串
+  const databaseUrl = process.env.DATABASE_URL
+
+  if (!databaseUrl) {
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: 'DATABASE_URL environment variable is not set.' }),
+    }
+  }
+
+  const sql = neon(databaseUrl)
+
+  try {
+    const users = await sql`SELECT id, name, email FROM users LIMIT 10`
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*', // 根据需要配置 CORS
+      },
+      body: JSON.stringify({ users }),
+    }
+  }
+  catch (error) {
+    console.error('Database error:', error)
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: 'Internal Server Error' }),
+    }
+  }
+}
+</code></pre>
+<p>更新 <code>package.json</code> 中的 <code>dependencies</code> 以包含 <code>@neondatabase/serverless</code>。</p>
+</li>
+<li>
+<p><strong>部署到阿里云 FC</strong>：</p>
+<pre><code class="language-bash">s deploy
+</code></pre>
+</li>
+<li>
+<p><strong>触发函数</strong>：部署成功后，你会获得一个 HTTP 触发器 URL，用于访问你的函数。</p>
+</li>
+</ol>
+<h2>安全性与最佳实践</h2>
+<ol>
+<li>
+<p><strong>永远保护凭证</strong>：</p>
+<ul>
+<li><strong>绝对不要</strong>在前端代码或公开的客户端中嵌入数据库连接字符串。</li>
+<li>始终通过环境变量在 Serverless 函数中传递敏感信息。</li>
+<li>利用 Vercel 和阿里云提供的安全环境变量配置功能。</li>
+</ul>
+</li>
+<li>
+<p><strong>连接管理</strong>：</p>
+<ul>
+<li>Neon serverless-driver 旨在高效处理无服务器环境的连接。避免在函数中创建传统的长时连接池。</li>
+<li>考虑启用 Neon 的 <strong>连接池</strong>（Connection Pooling）功能，它可以更好地处理大量并发连接，与 serverless-driver 搭配使用效果更佳。</li>
+</ul>
+</li>
+<li>
+<p><strong>网络与性能</strong>：</p>
+<ul>
+<li>你的 Neon 数据库、Vercel 函数和阿里云函数可能分布在不同的地理区域。尽量让它们的地域靠近，以减少网络延迟。</li>
+<li>注意 Vercel 免费计划的 Serverless Function 执行超时限制（Hobby 计划为 5秒）:cite[2]:cite[9]，优化数据库查询以避免超时。</li>
+</ul>
+</li>
+<li>
+<p><strong>监控与日志</strong>：</p>
+<ul>
+<li><strong>Vercel</strong>: 使用 <code>vercel logs</code> 命令行或 Dashboard 查看函数日志:cite[6]。</li>
+<li><strong>阿里云 FC</strong>: 在控制台查看函数执行的日志和指标:cite[3]:cite[7]。</li>
+<li><strong>Neon</strong>: 在 Neon Dashboard 中监控数据库查询性能和资源使用情况。</li>
+</ul>
+</li>
+</ol>
+<h2>总结与决策</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">场景/需求</th>
+<th style="text-align:left">推荐部署平台</th>
+<th style="text-align:left">注意事项</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>项目主体用户在国内，要求 API 访问低延迟</strong></td>
+<td style="text-align:left"><strong>阿里云函数计算 (FC)</strong></td>
+<td style="text-align:left">需备案域名（如果提供 Web 服务），利用阿里云国内生态。</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>项目面向全球用户，或前端与 API 紧密耦合，追求极致的开发部署体验</strong></td>
+<td style="text-align:left"><strong>Vercel API Routes</strong></td>
+<td style="text-align:left">注意免费计划的限制（如超时时间、出口流量）:cite[6]。Vercel 对 <code>api</code> 目录下的路由有内置支持:cite[2]:cite[9]。</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>需要同时满足国内外用户访问，或将不同功能的 API 部署到不同平台</strong></td>
+<td style="text-align:left"><strong>混合部署 (Vercel + FC)</strong></td>
+<td style="text-align:left">前端可放在 Vercel，部分 API 在 Vercel，另一部分在 FC。需统一管理环境变量和 CORS 配置。</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>数据库操作非常简单，且冷启动速度是最高优先级</strong></td>
+<td style="text-align:left"><strong>Neon serverless-driver</strong></td>
+<td style="text-align:left">其协议优化有助于减少连接建立时间。</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>需要执行复杂事务或长时间运行的数据库操作</strong></td>
+<td style="text-align:left">需仔细设计</td>
+<td style="text-align:left">Vercel 免费计划函数超时时间较短（5秒）:cite[2]:cite[9]，阿里云 FC 默认超时时间可配置更长:cite[3]。可能需要拆解任务或选择其他后台作业方案。</td>
+</tr>
+</tbody>
+</table>
+<p><strong>核心原则</strong>：</p>
+<ul>
+<li><strong>前端静态资源</strong>、<strong>与前端强相关的轻量 API</strong> -&gt; <strong>Vercel</strong> 是不错的选择。</li>
+<li><strong>数据密集型 API</strong>、<strong>主要服务国内用户的 API</strong>、<strong>需要与阿里云其他服务深度集成的后端逻辑</strong> -&gt; <strong>阿里云函数计算</strong>值得考虑。</li>
+<li><strong>数据库连接与操作</strong> -&gt; 无论在哪个平台，<strong>Neon serverless-driver</strong> 都能为无服务器环境提供优化的体验。</li>
+</ul>
+<p>通过结合 Neon、Vercel 和阿里云函数计算的优势，你可以构建出高性能、可扩展且成本效益高的现代全栈应用程序。始终将安全性放在首位，并充分利用各平台提供的监控工具来优化你的应用。</p>
+</article>
+  <nav class="foot">
+    <a href="/articles/semantic-release-with-github-workflow/">← 上一篇<br><span style="opacity:.65">使用 Semantic-Release 和 Github Workflow 实现</span></a>
+    <span class="foot__fin">完</span>
+    <a href="/articles/vitest-mock-guide/" style="text-align:right">下一篇 →<br><span style="opacity:.65">Vitest 模拟第三方模块指南</span></a>
+  </nav>
+</main>
+
+<script>
+(function () {
+  try {
+    if (new URLSearchParams(location.search).get('from') !== 'posts') return;
+    var a = document.querySelector('.bar__back');
+    if (!a) return;
+    a.setAttribute('href', '/posts');
+    a.textContent = document.documentElement.lang === 'en' ? '← Writing' : '← 文稿';
+  } catch (e) { /* 老浏览器：保持指向 /articles/ */ }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,411 @@
+[
+  {
+    "id": "zh:vitest-mock-guide",
+    "locale": "zh",
+    "slug": "vitest-mock-guide",
+    "title": "Vitest 模拟第三方模块指南",
+    "description": "本指南将介绍如何利用 Vitest 模拟（mock）第三方模块。建议在 `cursor` 等编辑器中将本文添加为 AI 编程的引用文档。",
+    "publishedAt": "2025-08-26",
+    "tags": [
+      "Vitest",
+      "Mock",
+      "Unit Test"
+    ],
+    "author": {
+      "name": "Livin AI"
+    },
+    "theme": "paper",
+    "words": 228,
+    "minutes": 1,
+    "url": "/articles/vitest-mock-guide/",
+    "pair": {
+      "zh": "/articles/vitest-mock-guide/"
+    }
+  },
+  {
+    "id": "zh:neon-serverless-driver-vercel-aliyun",
+    "locale": "zh",
+    "slug": "neon-serverless-driver-vercel-aliyun",
+    "title": "Neon serverless-driver 结合 Vercel、阿里云实战指南",
+    "description": "本指南将介绍如何利用 Neon（Serverless PostgreSQL）、Vercel（用于前端和 Serverless Functions）以及 阿里云函数计算（FC）（作为另一种 Serverless 函数部署选择）来构建全栈应用。",
+    "publishedAt": "2024-08-26",
+    "tags": [
+      "Serverless",
+      "函数计算",
+      "Neon",
+      "PostgreSQL"
+    ],
+    "author": {
+      "name": "Livin AI"
+    },
+    "theme": "paper",
+    "words": 1801,
+    "minutes": 5,
+    "url": "/articles/neon-serverless-driver-vercel-aliyun/",
+    "pair": {
+      "zh": "/articles/neon-serverless-driver-vercel-aliyun/"
+    }
+  },
+  {
+    "id": "zh:semantic-release-with-github-workflow",
+    "locale": "zh",
+    "slug": "semantic-release-with-github-workflow",
+    "title": "使用 Semantic-Release 和 Github Workflow 实现自动化版本发布",
+    "description": "本文介绍了如何使用 Semantic-Release 和 GitHub Actions 实现自动化版本发布，包括安装相关包、创建个人访问令牌、配置发布文件和 GitHub 工作流，以及测试和触发发布过程的详细步骤。",
+    "publishedAt": "2024-08-10",
+    "tags": [
+      "CICD",
+      "Semantic-Release",
+      "Github Workflow",
+      "Github Actions",
+      "自动化发布"
+    ],
+    "author": {
+      "name": "ZEO AI"
+    },
+    "theme": "neon",
+    "words": 381,
+    "minutes": 1,
+    "url": "/articles/semantic-release-with-github-workflow/",
+    "pair": {
+      "zh": "/articles/semantic-release-with-github-workflow/",
+      "en": "/articles/en/semantic-release-with-github-workflow/"
+    }
+  },
+  {
+    "id": "en:semantic-release-with-github-workflow",
+    "locale": "en",
+    "slug": "semantic-release-with-github-workflow",
+    "title": "Automating Releases with Semantic-Release and GitHub Actions",
+    "description": "This article explains how to automate releases using Semantic-Release and GitHub Actions. It covers installing necessary packages, creating a personal access token, configuring release files and GitHub workflows, and testing and triggering the release process.",
+    "publishedAt": "2024-08-10",
+    "tags": [
+      "CICD",
+      "Semantic-Release",
+      "Github Workflow",
+      "Github Actions",
+      "Automated Release"
+    ],
+    "author": {
+      "name": "ZEO AI"
+    },
+    "theme": "neon",
+    "words": 413,
+    "minutes": 1,
+    "url": "/articles/en/semantic-release-with-github-workflow/",
+    "pair": {
+      "zh": "/articles/semantic-release-with-github-workflow/",
+      "en": "/articles/en/semantic-release-with-github-workflow/"
+    }
+  },
+  {
+    "id": "zh:intuitive-understanding-of-docker",
+    "locale": "zh",
+    "slug": "intuitive-understanding-of-docker",
+    "title": "教大家更直观的理解 Docker",
+    "description": "Docker（容器技术） 就像集装箱，而 OS（操作系统）是码头",
+    "publishedAt": "2024-08-05",
+    "tags": [
+      "Docker",
+      "容器技术"
+    ],
+    "author": {
+      "name": "Livin AI"
+    },
+    "theme": "paper",
+    "words": 2961,
+    "minutes": 7,
+    "url": "/articles/intuitive-understanding-of-docker/",
+    "pair": {
+      "zh": "/articles/intuitive-understanding-of-docker/",
+      "en": "/articles/en/intuitive-understanding-of-docker/"
+    }
+  },
+  {
+    "id": "en:intuitive-understanding-of-docker",
+    "locale": "en",
+    "slug": "intuitive-understanding-of-docker",
+    "title": "A more intuitive understanding of Docker",
+    "description": "A more intuitive understanding of Docker",
+    "publishedAt": "2024-08-05",
+    "tags": [
+      "Docker"
+    ],
+    "author": {
+      "name": "ZEO AI"
+    },
+    "theme": "paper",
+    "words": 1848,
+    "minutes": 5,
+    "url": "/articles/en/intuitive-understanding-of-docker/",
+    "pair": {
+      "zh": "/articles/intuitive-understanding-of-docker/",
+      "en": "/articles/en/intuitive-understanding-of-docker/"
+    }
+  },
+  {
+    "id": "zh:leadership-principles",
+    "locale": "zh",
+    "slug": "leadership-principles",
+    "title": "亚马逊和美团的领导力原则",
+    "description": "亚马逊领导力原则定义了亚马逊如何开展业务、如何领导、如何决策，是确保亚马逊整个公司健康运行及成功的文化体系，值得每一家公司和个人借鉴学习。",
+    "publishedAt": "2024-03-06",
+    "tags": [
+      "领导力原则"
+    ],
+    "author": {
+      "name": "ZEO AI"
+    },
+    "theme": "paper",
+    "words": 2927,
+    "minutes": 7,
+    "url": "/articles/leadership-principles/",
+    "pair": {
+      "zh": "/articles/leadership-principles/",
+      "en": "/articles/en/leadership-principles/"
+    }
+  },
+  {
+    "id": "en:leadership-principles",
+    "locale": "en",
+    "slug": "leadership-principles",
+    "title": "Leadership Principles of Amazon and Meituan",
+    "description": "The Amazon Leadership Principles define how Amazon conducts business, leads, and makes decisions. It is a cultural system that ensures the healthy operation and success of the entire company, and is worth learning and emulating for every company and individual.",
+    "publishedAt": "2024-03-06",
+    "tags": [
+      "Leadership Principles"
+    ],
+    "author": {
+      "name": "ZEO AI"
+    },
+    "theme": "paper",
+    "words": 1762,
+    "minutes": 4,
+    "url": "/articles/en/leadership-principles/",
+    "pair": {
+      "zh": "/articles/leadership-principles/",
+      "en": "/articles/en/leadership-principles/"
+    }
+  },
+  {
+    "id": "zh:how-to-convert-a-svg-to-png-using-canvas",
+    "locale": "zh",
+    "slug": "how-to-convert-a-svg-to-png-using-canvas",
+    "title": "如何使用 Canvas 将 SVG 转换为 PNG",
+    "description": "使用 Canvas 将 SVG 转换为 PNG 的简单方法",
+    "publishedAt": "2023-11-22",
+    "tags": [],
+    "author": {
+      "name": "ZEO AI"
+    },
+    "theme": "paper",
+    "words": 609,
+    "minutes": 2,
+    "url": "/articles/how-to-convert-a-svg-to-png-using-canvas/",
+    "pair": {
+      "zh": "/articles/how-to-convert-a-svg-to-png-using-canvas/",
+      "en": "/articles/en/how-to-convert-a-svg-to-png-using-canvas/"
+    }
+  },
+  {
+    "id": "en:how-to-convert-a-svg-to-png-using-canvas",
+    "locale": "en",
+    "slug": "how-to-convert-a-svg-to-png-using-canvas",
+    "title": "How to convert a SVG to PNG using Canvas",
+    "description": "A simple way to convert a SVG to PNG using Canvas",
+    "publishedAt": "2023-11-22",
+    "tags": [],
+    "author": {
+      "name": "ZEO AI"
+    },
+    "theme": "paper",
+    "words": 396,
+    "minutes": 1,
+    "url": "/articles/en/how-to-convert-a-svg-to-png-using-canvas/",
+    "pair": {
+      "zh": "/articles/how-to-convert-a-svg-to-png-using-canvas/",
+      "en": "/articles/en/how-to-convert-a-svg-to-png-using-canvas/"
+    }
+  },
+  {
+    "id": "zh:building-your-first-api-with-expressjs-a-beginners-guide",
+    "locale": "zh",
+    "slug": "building-your-first-api-with-expressjs-a-beginners-guide",
+    "title": "使用 Express.js 构建你的第一个 API：初学者指南",
+    "description": "使用 Express.js 构建你的第一个 API 的初学者友好指南",
+    "publishedAt": "2023-11-02",
+    "tags": [],
+    "author": {
+      "name": "ZEO AI"
+    },
+    "theme": "paper",
+    "words": 600,
+    "minutes": 2,
+    "url": "/articles/building-your-first-api-with-expressjs-a-beginners-guide/",
+    "pair": {
+      "zh": "/articles/building-your-first-api-with-expressjs-a-beginners-guide/",
+      "en": "/articles/en/building-your-first-api-with-expressjs-a-beginners-guide/"
+    }
+  },
+  {
+    "id": "en:building-your-first-api-with-expressjs-a-beginners-guide",
+    "locale": "en",
+    "slug": "building-your-first-api-with-expressjs-a-beginners-guide",
+    "title": "Building Your First API with Express.js: A Beginner's Guide",
+    "description": "A beginner-friendly guide to building your first API with Express.js",
+    "publishedAt": "2023-11-02",
+    "tags": [],
+    "author": {
+      "name": "ZEO AI"
+    },
+    "theme": "paper",
+    "words": 368,
+    "minutes": 1,
+    "url": "/articles/en/building-your-first-api-with-expressjs-a-beginners-guide/",
+    "pair": {
+      "zh": "/articles/building-your-first-api-with-expressjs-a-beginners-guide/",
+      "en": "/articles/en/building-your-first-api-with-expressjs-a-beginners-guide/"
+    }
+  },
+  {
+    "id": "zh:management-by-objectives",
+    "locale": "zh",
+    "slug": "management-by-objectives",
+    "title": "美团公司的目标管理实践总结",
+    "description": "美团公司在管理文化方面以「亚马逊」公司为学习榜样，自 2022 年起提倡「猛学亚马逊」，因此许多经营管理理念均在学习参考亚马逊公司的基础上，结合美团自身进行优化调整。例如，「领导力原则」、「增长飞轮」、「运营计划（OP）」、「团队目标（Team Goals，简称 TG）」等。",
+    "publishedAt": "2023-11-02",
+    "tags": [
+      "目标管理",
+      "OKR",
+      "SMART"
+    ],
+    "author": {
+      "name": "ZEO AI"
+    },
+    "theme": "ink",
+    "words": 2761,
+    "minutes": 7,
+    "url": "/articles/management-by-objectives/",
+    "pair": {
+      "zh": "/articles/management-by-objectives/",
+      "en": "/articles/en/management-by-objectives/"
+    }
+  },
+  {
+    "id": "en:management-by-objectives",
+    "locale": "en",
+    "slug": "management-by-objectives",
+    "title": "Summary of Meituan's Goal Management Practices",
+    "description": "Meituan takes Amazon as a learning benchmark in terms of management culture and has been advocating for `Learning from Amazon` since 2022. Therefore, many management concepts are learned and adapted from Amazon, combined with Meituan's own optimization and adjustments. For example, `Leadership Principles`, `Growth Flywheel`, `Operation Plans (OP)`, `Team Goals (TG)`, etc.",
+    "publishedAt": "2023-11-02",
+    "tags": [
+      "Goal Management",
+      "OKR",
+      "SMART"
+    ],
+    "author": {
+      "name": "ZEO AI"
+    },
+    "theme": "ink",
+    "words": 1771,
+    "minutes": 4,
+    "url": "/articles/en/management-by-objectives/",
+    "pair": {
+      "zh": "/articles/management-by-objectives/",
+      "en": "/articles/en/management-by-objectives/"
+    }
+  },
+  {
+    "id": "zh:scrum-mvp-pdca",
+    "locale": "zh",
+    "slug": "scrum-mvp-pdca",
+    "title": "京东公司的过程管理实践总结",
+    "description": "敏捷开发（Scrum）、最小可行产品（MVP）、“计划-执行-检查-行动”（PDCA）循环，三者为在京东公司 2016 年带领不足 10 人研发团队孵化羚珑智能设计平台的关键思路和过程管理方法论及工具。",
+    "publishedAt": "2022-05-06",
+    "tags": [
+      "过程管理",
+      "敏捷开发",
+      "MVP"
+    ],
+    "author": {
+      "name": "ZEO AI"
+    },
+    "theme": "neon",
+    "words": 527,
+    "minutes": 1,
+    "url": "/articles/scrum-mvp-pdca/",
+    "pair": {
+      "zh": "/articles/scrum-mvp-pdca/",
+      "en": "/articles/en/scrum-mvp-pdca/"
+    }
+  },
+  {
+    "id": "en:scrum-mvp-pdca",
+    "locale": "en",
+    "slug": "scrum-mvp-pdca",
+    "title": "Summary of Process Management Practices at JD.com",
+    "description": "Agile Development (Scrum), Minimum Viable Product (MVP), and Plan-Do-Check-Act (PDCA) cycle, these three are the key ideas and process management methodologies and tools used by a team of less than 10 people at JD.com to incubate the Linglong Intelligent Design Platform in 2016.",
+    "publishedAt": "2022-05-06",
+    "tags": [
+      "Process Management",
+      "Agile Development",
+      "MVP"
+    ],
+    "author": {
+      "name": "ZEO AI"
+    },
+    "theme": "neon",
+    "words": 334,
+    "minutes": 1,
+    "url": "/articles/en/scrum-mvp-pdca/",
+    "pair": {
+      "zh": "/articles/scrum-mvp-pdca/",
+      "en": "/articles/en/scrum-mvp-pdca/"
+    }
+  },
+  {
+    "id": "zh:management-by-swot",
+    "locale": "zh",
+    "slug": "management-by-swot",
+    "title": "SWOT 在业务策划及组织管理中的应用",
+    "description": "SWOT 分析是一种强有力的战略规划工具，它可以帮助管理者识别和利用组织的优势和机会，同时识别和减轻潜在的弱点和威胁。2015～2022 年在京东工作期间，我曾尝试在组织管理过程应用 SWOT 分析，发现团队、个人的优缺点、机遇及挑战，帮助组织及员工制定发展计划",
+    "publishedAt": "2021-11-11",
+    "tags": [
+      "SWOT",
+      "分析策略"
+    ],
+    "author": {
+      "name": "ZEO AI"
+    },
+    "theme": "ink",
+    "words": 1119,
+    "minutes": 3,
+    "url": "/articles/management-by-swot/",
+    "pair": {
+      "zh": "/articles/management-by-swot/",
+      "en": "/articles/en/management-by-swot/"
+    }
+  },
+  {
+    "id": "en:management-by-swot",
+    "locale": "en",
+    "slug": "management-by-swot",
+    "title": "SWOT in Business Planning and Organizational Management",
+    "description": "SWOT analysis is a powerful strategic planning tool that helps managers identify and leverage an organization's strengths and opportunities, while identifying and mitigating potential weaknesses and threats. During my tenure at JD.com from 2015 to 2022, I have applied SWOT analysis in the organizational management process to identify the strengths, weaknesses, opportunities, and challenges of teams and individuals, helping the organization and employees develop plans for growth.",
+    "publishedAt": "2021-11-11",
+    "tags": [
+      "SWOT"
+    ],
+    "author": {
+      "name": "ZEO AI"
+    },
+    "theme": "ink",
+    "words": 695,
+    "minutes": 2,
+    "url": "/articles/en/management-by-swot/",
+    "pair": {
+      "zh": "/articles/management-by-swot/",
+      "en": "/articles/en/management-by-swot/"
+    }
+  }
+]
