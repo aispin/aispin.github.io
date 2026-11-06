@@ -206,22 +206,46 @@ body{
 }
 .hud__tl p b{font-weight:400;color:#b9ac9b}
 
-.hud__tr{
-  position:absolute;right:48px;top:56px;display:flex;gap:2px;pointer-events:auto;
+/* ---------- 底部控制条 ---------- */
+/* 页码 / 语言 / 搜索全压到底边中点。3D 房子顶部已经有站级菜单，
+   这间再往右上角堆一排，视线就得在画面上下两个角之间来回跳。 */
+.hud__bc{
+  /* 不能写 left:50% + translateX(-50%)：绝对定位元素的收缩宽度上限是
+     "容器宽 − left"，窄屏上只剩半屏，按钮会被压成竖排（中文 竖着写）。
+     left:0;right:0;margin:0 auto;width:max-content 才是真居中。 */
+  position:absolute;left:0;right:0;margin:0 auto;width:max-content;max-width:calc(100% - 32px);
+  bottom:calc(24px + env(safe-area-inset-bottom));
+  display:flex;align-items:center;gap:2px;pointer-events:auto;
+  padding:4px;border-radius:999px;
+  background:rgba(20,16,13,.62);
+  border:1px solid rgba(200,186,168,.19);
+  box-shadow:0 16px 40px -22px rgba(0,0,0,.95);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
 }
-.hud__tr button{
+.hud__bc button{
   appearance:none;border:0;background:transparent;cursor:pointer;
-  font-family:inherit;font-size:11px;letter-spacing:.18em;
-  color:#6d6257;padding:6px 12px;border-radius:2px;transition:color .25s,background .25s;
+  font-family:inherit;font-size:10.5px;letter-spacing:.18em;
+  color:#7d7266;padding:6px 11px;border-radius:999px;white-space:nowrap;
+  transition:color .22s ease,background .22s ease;
 }
-.hud__tr button[aria-pressed="true"]{color:#efe7db;background:rgba(255,255,255,.07)}
-.hud__tr button:hover{color:#cfc3b3}
-.hud__loc{display:flex;gap:2px}
+.hud__bc button:hover{color:#cfc3b3}
+.hud__bc button[aria-pressed="true"]{color:#efe7db;background:rgba(255,255,255,.07)}
+.hud__pos{
+  padding:0 2px 0 10px;font-size:10.5px;letter-spacing:.18em;color:#9a8d7e;
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+.hud__sep{width:1px;height:11px;background:rgba(200,186,168,.16);margin:0 4px}
+.hud__loc{display:flex;gap:1px}
+/* 房间版带 ?loc= 进来：语言跟随房子，这一组连分隔线一起摘掉。
+   不能只靠 [hidden] —— .hud__loc 自己声明了 display:flex，会压过 UA 的 [hidden]。 */
+.hud__bc.is-locked .hud__loc,
+.hud__bc.is-locked .hud__sep{display:none}
 
-.menu-btn{display:inline-flex;align-items:center;gap:8px;padding:6px 12px}
-.menu-btn svg{display:block;opacity:.8}
-.menu-btn span{font-size:11px;letter-spacing:.18em}
-.menu-btn[aria-expanded="true"]{color:var(--vermilion)}
+/* 搜索图标：放大镜，32×26 的点击区 */
+.menu-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:26px;padding:0}
+.menu-btn svg{display:block;opacity:.85}
+.menu-btn:hover svg{opacity:1}
+.menu-btn[aria-expanded="true"]{color:var(--vermilion);background:rgba(178,58,44,.1)}
 .menu-btn[aria-expanded="true"] svg{opacity:1}
 
 /* ---------- 目录 ---------- */
@@ -280,30 +304,74 @@ body{
 .row.is-current .row__t{color:#fff}
 .menu__empty{padding:38px 48px;font-size:12px;letter-spacing:.06em;color:#6d6257}
 
+/* 左下只剩操作提示（页码已经移进底部控制条） */
 .hud__bl{
-  position:absolute;left:48px;bottom:40px;
-  font-size:11px;letter-spacing:.14em;color:#6d6257;line-height:2;
+  position:absolute;left:48px;bottom:30px;
+  font-size:10.5px;letter-spacing:.14em;color:#6d6257;line-height:2;
 }
 .hud__bl b{font-weight:400;color:#a99d8d}
 
 /* ---------- reader ---------- */
 .reader{
-  position:fixed;inset:0;z-index:40;display:grid;place-items:center;
+  position:fixed;inset:0;z-index:40;
+  /* 上下各留 24px：纸直接撑满视窗高度，读长文不用在一个小框里滚。
+     不用 100vh —— fixed + inset:0 本来就是布局视窗，移动端地址栏伸缩时更稳。 */
+  /* 用 flex 而不是 grid：grid 的 auto 行只会"有富余时撑高"，内容超了照样
+     按内容长（纸被撑到两千多像素、页眉滚出视窗）。flex 的交叉轴 stretch
+     是硬的：子项高度 = 容器高 - 上下 padding。 */
+  padding:24px;display:flex;align-items:stretch;justify-content:center;
   background:rgba(8,6,5,.72);backdrop-filter:blur(6px);
   opacity:0;pointer-events:none;transition:opacity .45s ease;
 }
 .reader.is-open{opacity:1;pointer-events:auto}
 .sheet{
-  width:min(720px,86vw);max-height:82vh;overflow:auto;
+  --pad:58px;
+  width:min(720px,100%);
+  display:flex;flex-direction:column;
   background:linear-gradient(180deg,#f4eee2,#eae2d3);
   color:var(--text);border-radius:3px;
   border-left:2px solid var(--vermilion);
-  padding:54px 58px 62px;
   box-shadow:0 40px 120px -30px rgba(0,0,0,.9);
   transform:translateY(18px) scale(.985);
   transition:transform .5s cubic-bezier(.22,.61,.36,1);
 }
 .reader.is-open .sheet{transform:none}
+/* 页眉固定、正文滚动：滚到一半，「ESC 关闭」还在原地。
+   以前关闭按钮绝对定位在视窗右上角，纸一撑满就会压到标题上。 */
+.sheet__bar{
+  flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:13px var(--pad);
+  border-bottom:1px solid rgba(90,74,56,.16);
+  background:linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0));
+}
+.sheet__pos{
+  font-size:10px;letter-spacing:.2em;color:#9a8b78;
+  font-variant-numeric:tabular-nums;
+}
+.sheet__body{
+  /* min-height:0 是必须的：flex 子项的自动最小尺寸默认是内容高度，
+     不写它 overflow:auto 永远不触发，正文会把纸撑破而不是自己滚 */
+  flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;
+  display:flex;flex-direction:column;
+  padding:34px var(--pad) 34px;
+  scrollbar-width:thin;scrollbar-color:rgba(90,74,56,.28) transparent;
+}
+/* 文末：短稿时用 margin-top:auto 钉在纸底，否则纸下面会空一大片；
+   长稿就正常跟在正文后面。 */
+.sheet__foot{
+  margin-top:auto;padding-top:30px;
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  font-size:10.5px;letter-spacing:.16em;
+}
+.sheet__foot .fin{color:#b3a692}
+.sheet__foot .nav{
+  appearance:none;border:0;background:transparent;cursor:pointer;
+  font-family:inherit;font-size:10.5px;letter-spacing:.16em;
+  color:#8a7f72;padding:7px 10px;border-radius:999px;
+  transition:color .2s ease,background .2s ease;
+}
+.sheet__foot .nav:hover{color:#3a332c;background:rgba(90,74,56,.09)}
+.sheet__foot .nav[disabled]{color:#c2b8a8;cursor:default;background:none}
 .sheet h2{font-size:26px;line-height:1.6;font-weight:500;letter-spacing:.01em}
 .sheet .sub{margin-top:14px;font-size:11px;letter-spacing:.14em;color:var(--text-soft)}
 .sheet hr{border:0;border-top:1px solid rgba(90,74,56,.2);margin:26px 0}
@@ -313,10 +381,12 @@ body{
   border-left:2px solid var(--vermilion);font-size:11px;line-height:2;color:#7a4a3f;
 }
 .close{
-  position:absolute;right:40px;top:34px;appearance:none;border:0;background:transparent;
-  color:#8a7f72;font-family:inherit;font-size:11px;letter-spacing:.2em;cursor:pointer;padding:8px;
+  appearance:none;border:0;background:transparent;
+  color:#8a7f72;font-family:inherit;font-size:10px;letter-spacing:.2em;cursor:pointer;
+  padding:6px 10px;border-radius:999px;
+  transition:color .2s ease,background .2s ease;
 }
-.close:hover{color:#efe7db}
+.close:hover{color:#3a332c;background:rgba(90,74,56,.09)}
 
 @media (max-width:900px){
   :root{--w:300px;--h:420px}
@@ -339,12 +409,16 @@ body{
   .row__d{grid-column:2;grid-row:2;font-size:10px}
   .row__t{font-size:13.5px}
   .menu__empty{padding:30px 24px}
-  .hud__tl{left:24px;top:26px}
-  .hud__tr{right:24px;top:26px}
-  .hud__bl{left:24px;bottom:24px}
+  /* 胶囊占第一行，标题让到它下面 —— 原来两边都落在 top 20~26，直接叠字 */
+  .lab-back{left:24px;top:16px}
+  .hud__tl{left:24px;top:50px}
+  .hud__bc{bottom:calc(16px + env(safe-area-inset-bottom))}
+  /* 窄屏藏掉左下提示：它会和居中的控制条撞在一起 */
+  .hud__bl{display:none}
   .title{font-size:19px}
   .pad{padding:28px 24px 24px}
-  .sheet{padding:38px 28px 44px}
+  .sheet{--pad:26px}
+  .sheet__body{padding:26px var(--pad) 40px}
 }
 @media (prefers-reduced-motion:reduce){
   .fold,.reader,.sheet,.cta{transition-duration:.01s}
@@ -375,23 +449,30 @@ body{
   <a class="lab-back" href="/demos/">← Demos</a>
   <div class="hud__tl">
     <h1>文稿 · POSTS</h1>
-    <p>经折 · <b>18</b> 篇 · 中英双语</p>
+    <p>经折 · <b id="count">10</b> 篇<span id="dual"> · 中英双语</span></p>
   </div>
-  <div class="hud__tr">
-    <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="menu" title="目录（/）">
-      <svg viewBox="0 0 18 12" width="15" height="10" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
-        <path d="M0 1h18M0 6h18M0 11h11"/>
-      </svg>
-      <span>目录</span>
-    </button>
-    <!-- 语言按钮单独包一层：菜单按钮不能落在 #locale 里，
-         否则那边的 click 处理器会把它当成语言按钮（dataset.loc 是空的） -->
+
+  <div class="hud__bc" id="bc">
+    <span class="hud__pos" id="pos">01 / 10</span>
+    <span class="hud__sep"></span>
+    <!-- 语言按钮单独包一层：搜索按钮不能落在 #locale 里，
+         否则那边的 click 处理器会把它当成语言按钮（dataset.loc 是空的）。
+         房间版带 ?loc= 进来时，这一组和两条分隔线一起摘掉。 -->
     <div class="hud__loc" id="locale">
       <button data-loc="zh" aria-pressed="true">中文</button>
       <button data-loc="en" aria-pressed="false">EN</button>
     </div>
+    <span class="hud__sep"></span>
+    <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="menu"
+            aria-label="搜索目录" title="搜索目录（/）">
+      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor"
+           stroke-width="1.35" stroke-linecap="round" aria-hidden="true">
+        <circle cx="6.9" cy="6.9" r="4.5"/>
+        <path d="M10.2 10.2 14 14"/>
+      </svg>
+    </button>
   </div>
-  <div class="hud__bl"><span id="pos">01 / 10</span> · 滚轮 / 拖拽 翻阅 · 点击展开 · <b>/</b> 目录</div>
+  <div class="hud__bl">滚轮 / 拖拽 翻阅 · 点击展开 · <b>/</b> 搜索</div>
 </div>
 
 <!-- 目录：从顶部滑下来的一整条，带搜索。翻一百篇也不靠一格一格滚。 -->
@@ -408,8 +489,13 @@ body{
 </div>
 
 <div class="reader" id="reader">
-  <button class="close" id="close">ESC 关闭</button>
-  <article class="sheet" id="sheet"></article>
+  <article class="sheet" id="sheet">
+    <div class="sheet__bar">
+      <span class="sheet__pos" id="spos"></span>
+      <button class="close" id="close">ESC 关闭</button>
+    </div>
+    <div class="sheet__body" id="sbody"></div>
+  </article>
 </div>
 
 <!-- 一格一页的输入层（滚轮 / 拖动 / 方向键），判据与 craft 房间同一套 -->
@@ -458,9 +544,18 @@ document.documentElement.style.setProperty('--w', W + 'px');
 document.documentElement.style.setProperty('--h', H + 'px');
 const stage = document.getElementById('stage');
 const reader = document.getElementById('reader');
-const sheet = document.getElementById('sheet');
+const sheetBody = document.getElementById('sbody');
+const spos = document.getElementById('spos');
 
-let loc = 'zh';
+/* 房间版：语言跟随房子，不再自带切换。
+   带 ?loc=zh|en 进来就锁死这一种，并把控制条里的语言组整个摘掉
+   （房子那边切语言会换参数重建这一页，不需要两个切换器打架）。 */
+const LOCK_LOC = (() => {
+  const v = (Q.get('loc') || '').toLowerCase();
+  return v === 'zh' || v === 'en' ? v : null;
+})();
+
+let loc = LOCK_LOC || 'zh';
 let k = 0;
 let folds = [];
 let open = false;
@@ -471,6 +566,7 @@ const pad2 = (n) => String(n + 1).padStart(2, '0');
 function build() {
   const list = DATA[loc];
   k = Math.min(k, list.length - 1);
+  document.getElementById('count').textContent = list.length;
   ribbon.innerHTML = '';
   folds = list.map((a, i) => {
     const el = document.createElement('div');
@@ -545,18 +641,33 @@ function go(n) {
   render();
 }
 
+/* 版式示意用的占位正文。真接入后这一段由构建期从 md 渲成 HTML 片段，
+   静态页与这层共用同一份。 */
+const BODY = [
+  '这一层是版式示意，不是真正文。折页上四个位置——标题、摘要、日期 / 标签 / 字数、朱砂色「阅读全文」——就是 frontmatter 里 <code>title / description / date / tags</code> 的去处。',
+  '折带的好处是它不挑长度：一折一篇，篇数涨到 100，带子只是更长，不用改设计。这也是它取代 4×N 卡片墙的理由——卡墙到 20 张就开始挤。',
+  '纸撑满视窗高度、上下各留 24px，是为了让长文不必在一个小框里滚。页眉（序号 / 日期 / 关闭）不参与滚动，滚到一半仍然在。',
+  '排版只认一条规则：一栏，最大宽度 720px，行高 2.05。中文正文在这个行高下最舒服——再紧会挤，再松就散了。',
+  '文末那块用 <code>margin-top:auto</code> 钉在纸底：短稿时它落在最下面，纸不会显得空；长稿时它老老实实跟在正文后面。'
+];
+
 function openReader() {
   const a = DATA[loc][k];
-  sheet.innerHTML =
+  spos.textContent = pad2(k) + ' / ' + pad2(DATA[loc].length - 1) + ' · ' + a.d;
+  /* 换一篇要回到开头，否则会继承上一篇的滚动位置 */
+  sheetBody.scrollTop = 0;
+  sheetBody.innerHTML =
     '<h2>' + a.t + '</h2>' +
-    '<div class="sub">' + pad2(k) + ' · ' + a.d + ' · ' + a.g + ' · ' + a.n + '</div>' +
+    '<div class="sub">' + a.g + ' · ' + a.n + '</div>' +
     '<hr>' +
-    '<p>这一层是版式示意，不是真正文。折页上四个位置——标题、摘要、日期/标签/字数、' +
-    '朱砂色「阅读全文」——就是 frontmatter 里 <code>title / description / date / tags</code> 的去处。</p>' +
-    '<p>折带的好处是它不挑长度：一折一篇，篇数涨到 100，带子只是更长，不用改设计。' +
-    '这也是它取代 4×N 卡片墙的理由——卡墙到 20 张就开始挤。</p>' +
+    BODY.map((t) => '<p>' + t + '</p>').join('') +
     '<div class="note">为什么用 CSS 3D 而不是 three：折页上是中文标题与正文，走 three 就得把字渲成纹理——' +
-    '缩放会糊、不能选中、读屏软件读不到。平面用 <code>translate3d</code> 和 three 的 plane 视觉上几乎无差别。</div>';
+    '缩放会糊、不能选中、读屏软件读不到。平面用 <code>translate3d</code> 和 three 的 plane 视觉上几乎无差别。</div>' +
+    '<div class="sheet__foot">' +
+      '<button class="nav" data-dir="-1"' + (k === 0 ? ' disabled' : '') + '>← 上一篇</button>' +
+      '<span class="fin">完</span>' +
+      '<button class="nav" data-dir="1"' + (k === DATA[loc].length - 1 ? ' disabled' : '') + '>下一篇 →</button>' +
+    '</div>';
   reader.classList.add('is-open');
   open = true;
 }
@@ -592,7 +703,23 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+if (LOCK_LOC) {
+  document.documentElement.lang = LOCK_LOC === 'zh' ? 'zh-CN' : 'en';
+  document.getElementById('bc').classList.add('is-locked');
+  document.getElementById('dual').remove();
+}
+document.getElementById('count').textContent = DATA[loc].length;
+
 document.getElementById('close').addEventListener('click', closeReader);
+/* 文末翻篇：留在阅读层里直接换稿，不用退出去再点折页 */
+sheetBody.addEventListener('click', (e) => {
+  const btn = e.target.closest('.nav');
+  if (!btn || btn.disabled) return;
+  const n = k + Number(btn.dataset.dir);
+  if (n < 0 || n >= DATA[loc].length) return;
+  go(n);
+  openReader();
+});
 reader.addEventListener('click', (e) => { if (e.target === reader) closeReader(); });
 
 document.getElementById('locale').addEventListener('click', (e) => {

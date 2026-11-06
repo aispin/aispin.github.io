@@ -12,8 +12,19 @@
 | 拖拽 | 连续翻，每 140px 一格 |
 | 点任意折 | 翻到它 |
 | 点**当前这一折** | 打开阅读层（`Esc` / 点空白关） |
-| 点右上角 `目录` 或按 `/`、`⌘K` | 顶部滑下目录：搜索标题 / 标签 / 日期，`↑↓` 选、`Enter` 跳 |
-| 右上角 `中文` / `EN` | 切换语料 |
+| 点底部中间的 🔍 或按 `/`、`⌘K` | 顶部滑下目录：搜索标题 / 标签 / 日期，`↑↓` 选、`Enter` 跳 |
+| 底部中间的 `中文` / `EN` | 切换语料（房间版没有这一组，见下） |
+| 阅读层文末 `← 上一篇` / `下一篇 →` | 不退出阅读层直接翻篇 |
+
+## HUD 为什么全在底边
+
+3D 房子的顶部已经有站级菜单（房间切换、语言、关于），房间再往右上角堆一排控件，视线就得在画面上下两个角之间来回跳。所以这间的东西全压在**底部中间的一条胶囊**里：页码 · 语言 · 搜索。
+
+**房间版的语言跟随房子**：带 `?loc=zh` / `?loc=en` 进来就锁死那一种，并把语言组和两条分隔线一起摘掉（`#bc.is-locked`）。房子切语言时换参数重建这一页即可 —— 两个切换器并存只会互相打架。
+
+```js
+const LOCK_LOC = (Q.get('loc') || '').toLowerCase();   // 'zh' | 'en' | null
+```
 
 ## 输入层是共用的：`public/demos/_pager.js`
 
@@ -36,10 +47,18 @@
 
 背景只有暖黑底、一束极淡的顶光、64 颗上浮的尘埃——全程序化，没有位图（守全站红线）。
 
+## 阅读层
+
+纸**撑满视窗高度**，上下各留 24px（`position:fixed;inset:0` + `padding:24px`，不用 `100vh`——移动端地址栏伸缩时更稳）。页眉（序号 / 日期 / 关闭）不参与滚动，正文自己滚。
+
+🔴 这里必须是 `display:flex; align-items:stretch`，**不能**用 `display:grid; place-items:center`：grid 的 auto 行只在"有富余"时撑高，内容一超就按内容长 —— 长文会把纸撑到 2400px，页眉跟着滚出视窗。同理 `.sheet__body` 要写 `min-height:0`，否则 `overflow:auto` 永远不触发。
+
+文末那块用 `margin-top:auto` 钉在纸底：短稿时落在最下面（纸不会空一大片），长稿时正常跟在正文后。
+
 ## 待办
 
 - 接入真实数据：一折 = 一篇 = `content/articles/<locale>/<slug>.md`，frontmatter 的 `title / description / date / tags` 就是折页上那四个位置。
 - 阅读层改为 iframe 或构建期 HTML 片段（与静态页 `/articles/<slug>/` 共用一份渲染结果）。
-- 房间正式落地时接 `?from=posts` 的胶囊回路（`_from.js` 里加一行 `posts` 即可）。
+- 房间正式落地时接 `?from=posts` 的胶囊回路（`_from.js` 里加一行 `posts` 即可），并用 `?loc=` 把语言交给房子。
 
 数据在页面内联（`DATA`），改文案直接改 `index.html`；缩略图由 `.workbuddy-ai/harness/make-demo-thumbs.mjs` 生成到 `public/demos/thumbs/web3d/posts-fold.webp`。
