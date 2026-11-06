@@ -105,6 +105,30 @@ function readmeDescription(abs) {
 
 const titleize = (s) => s.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 
+/* ------------------------------------------------------------ 缩略图 */
+
+/**
+ * 展板上那张 hover 预览图的地址，没有就 null。
+ *
+ * 图片放在 `public/demos/thumbs/<id>.<ext>`，**扩展名不写死**：按磁盘上真实
+ * 存在的那个取（webp → jpg → jpeg → png）。这样重拍成别的格式不用改代码，
+ * 删掉某个文件就等于"这个 demo 不要预览"。
+ * 拍图脚本是 `.workbuddy-ai/harness/make-demo-thumbs.mjs`（不进仓库，绑死本机
+ * 的 Chrome 路径与 cwebp；产物入库）。
+ *
+ * ⚠️ `thumbs/` 会被下面的 walkDirs 当成一个 demo 目录扫到 —— 它没有 .html，
+ *    `htmlFilesIn` 返回空，自然跳过。别在那里放 index.html。
+ */
+const THUMB_EXTS = ['webp', 'jpg', 'jpeg', 'png']
+
+function thumbOf(id) {
+  for (const ext of THUMB_EXTS) {
+    const rel = `thumbs/${id}.${ext}`
+    if (existsSync(join(DEMOS_DIR, rel))) return `/demos/${rel}`
+  }
+  return null
+}
+
 /* ------------------------------------------------------------ 收集 demo */
 
 function collect() {
@@ -116,11 +140,13 @@ function collect() {
     if (!statSync(abs).isFile() || !f.toLowerCase().endsWith('.html')) continue
     if (f === 'index.html') continue          // 那就是本脚本自己生成的列表页
     const meta = readMeta(abs)
+    const id = f.replace(/\.html$/i, '')
     demos.push({
-      id: f.replace(/\.html$/i, ''),
-      title: meta.title || titleize(f.replace(/\.html$/i, '')),
+      id,
+      title: meta.title || titleize(id),
       description: meta.description || '',
       url: `/demos/${f}`,
+      thumb: thumbOf(id),
       dir: 'public/demos',
       entry: f,
       readme: false,
@@ -147,6 +173,7 @@ function collect() {
       title: meta.title || titleize(fallbackName),
       description: meta.description || readmeDescription(readmeAbs) || '',
       url: `/demos/${rel}/${entry === 'index.html' ? '' : entry}`,
+      thumb: thumbOf(rel),
       dir: `public/demos/${rel}`,
       entry,
       readme: hasReadme,

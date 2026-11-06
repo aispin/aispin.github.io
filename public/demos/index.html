@@ -184,6 +184,43 @@ body {
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
+/* 缩略图 = 展板的 hover 预览（来源是 `demos.json` 的 `thumb`，
+   由 `scripts/build-demos-index.mjs` 按 `demos/thumbs/<id>.<ext>` 有没有推导）。
+   画在玻璃底色之上、glow / 色条 / 文字之下 —— 所以它必须是 __clip 的**第一个**子元素。
+   🔴 淡入带 0.28s 延迟：转动时板子会从指针底下路过，没有这个延迟就会一路闪。 */
+.panel__thumb {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: 50% 50%;
+    opacity: 0;
+    transform: scale(1.08);
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.5s ease;
+}
+
+/* 下重上轻的暗罩：图上的标题和类别名还得读得出来 */
+.panel__thumb::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg,
+        rgba(8, 10, 16, 0.06) 0%,
+        rgba(8, 10, 16, 0.62) 55%,
+        rgba(8, 10, 16, 0.94) 100%);
+}
+
+.panel:hover .panel__thumb {
+    opacity: 0.86;
+    transform: scale(1);
+    transition: opacity 0.4s ease 0.28s, transform 0.8s ease 0.28s;
+}
+
+/* 触摸设备没有 hover ⇒ 焦点板常显一张淡的，否则手机上预览永远是空的 */
+@media (hover: none) {
+    .panel.is-focus .panel__thumb { opacity: 0.62; transform: scale(1); }
+}
+
 /* 右上角那团类别色 */
 .panel__glow {
     position: absolute;
@@ -264,6 +301,9 @@ body {
     font-weight: 600;
     line-height: 1.32;
     color: #f2f5fb;
+    /* 缩略图亮的时候（白卡片、浅色页面）光靠暗罩不够，再加一圈黑晕。
+       在原来的纯深色玻璃上这圈晕看不出来，等于零副作用。 */
+    text-shadow: 0 1px 2px rgba(4, 6, 12, 0.85), 0 0 10px rgba(4, 6, 12, 0.55);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
@@ -279,6 +319,7 @@ body {
     letter-spacing: 0.2em;
     text-transform: uppercase;
     color: color-mix(in srgb, var(--c) 72%, #8792a6);
+    text-shadow: 0 1px 2px rgba(4, 6, 12, 0.85);
 }
 
 /* 焦点板上扫过的一道高光：让它"活着"，也标出哪块能直接点 */
@@ -1253,6 +1294,10 @@ function buildPanels() {
         // 所以它不会被裁掉，也能跟着面板的 transform 一起动。
         el.innerHTML =
             '<span class="panel__clip">' +
+                // 缩略图放最前：后面的 glow / 色条 / 文字要压在它上面
+                (item.thumb
+                    ? '<span class="panel__thumb" style="background-image:url(\'' + escapeHtml(item.thumb) + '\')"></span>'
+                    : '') +
                 '<span class="panel__glow"></span>' +
                 '<span class="panel__bar"></span>' +
                 '<span class="panel__sweep"></span>' +
@@ -1695,6 +1740,7 @@ function buildLab(rawDemos) {
                 title: demo.title || demo.id,
                 description: demo.description || '',
                 url: demo.url || ('/demos/' + demo.id + '/'),
+                thumb: demo.thumb || '',
                 group: g.id,
                 groupZh: g.zh,
                 groupEn: g.en,

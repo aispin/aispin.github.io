@@ -112,6 +112,7 @@ function buildLab(rawDemos) {
                 title: demo.title || demo.id,
                 description: demo.description || '',
                 url: demo.url || `/demos/${demo.id}/`,
+                thumb: demo.thumb || '',
                 group: g.id,
                 groupZh: g.zh,
                 groupEn: g.en,
@@ -166,6 +167,13 @@ const RingPanels = memo(function RingPanels({ items, panelRefs, onPick }) {
                     aria-label={`${item.title} — ${item.groupZh}`}
                 >
                     <span className="panel__clip">
+                        {/* 缩略图放最前：glow / 色条 / 文字都要压在它上面 */}
+                        {item.thumb ? (
+                            <span
+                                className="panel__thumb"
+                                style={{ backgroundImage: `url("${item.thumb}")` }}
+                            />
+                        ) : null}
                         <span className="panel__glow" />
                         <span className="panel__bar" />
                         <span className="panel__sweep" />

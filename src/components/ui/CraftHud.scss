@@ -156,6 +156,38 @@
         transition: border-color 0.3s ease, box-shadow 0.3s ease;
     }
 
+    /* 缩略图 = 展板的 hover 预览（`demos.json` 的 `thumb`，图在
+       `public/demos/thumbs/`）。画在玻璃底色之上、glow / 色条 / 文字之下 ——
+       所以它必须是 `__clip` 的**第一个**子元素。
+       🔴 淡入带 0.28s 延迟：转动时板子会从指针底下路过，没有这个延迟就会一路闪。 */
+    .panel__thumb {
+        position: absolute;
+        inset: 0;
+        background-size: cover;
+        background-position: 50% 50%;
+        opacity: 0;
+        transform: scale(1.08);
+        pointer-events: none;
+        transition: opacity 0.2s ease, transform 0.5s ease;
+    }
+
+    /* 下重上轻的暗罩：图上的标题和类别名还得读得出来 */
+    .panel__thumb::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg,
+            rgba(8, 10, 16, 0.06) 0%,
+            rgba(8, 10, 16, 0.62) 55%,
+            rgba(8, 10, 16, 0.94) 100%);
+    }
+
+    .panel:hover .panel__thumb {
+        opacity: 0.86;
+        transform: scale(1);
+        transition: opacity 0.4s ease 0.28s, transform 0.8s ease 0.28s;
+    }
+
     /* 右上角那团类别色 */
     .panel__glow {
         position: absolute;
@@ -236,6 +268,9 @@
         font-weight: 600;
         line-height: 1.32;
         color: #f2f5fb;
+        /* 缩略图亮的时候（白卡片、浅色页面）光靠暗罩不够，再加一圈黑晕。
+           在原来的纯深色玻璃上这圈晕看不出来，等于零副作用。 */
+        text-shadow: 0 1px 2px rgba(4, 6, 12, 0.85), 0 0 10px rgba(4, 6, 12, 0.55);
         display: -webkit-box;
         -webkit-line-clamp: 2;
         line-clamp: 2;
@@ -251,6 +286,7 @@
         letter-spacing: 0.2em;
         text-transform: uppercase;
         color: color-mix(in srgb, var(--c) 72%, #8792a6);
+        text-shadow: 0 1px 2px rgba(4, 6, 12, 0.85);
     }
 
     /* 焦点板上扫过的一道高光：让它"活着"，也标出哪块能直接点 */
@@ -758,6 +794,12 @@
         .spinner { animation: none; }
     }
 
+    /* 触摸设备没有 hover ⇒ 缩略图永远不出现。让焦点板常显一张淡的：
+       手机上焦点板几乎占满一屏，光靠标题认不出这是什么。 */
+    @media (hover: none) {
+        .panel.is-focus .panel__thumb { opacity: 0.62; transform: scale(1); }
+    }
+
     /* ── 搬家新增 ──────────────────────────────────────────────────────
        只有一处：进出场。环的 DOM 层比星云晚 0.1s 淡入 —— 星云先出来，
        展板再浮上来；退场时和星云一起淡掉。
@@ -766,8 +808,8 @@
        搬进房间后一度换成"← 退出房间"胶囊，但它和站内那颗返回图标
        （`.hud-cluster--left`，top 18 / left 18）叠在同一处 —— 用户
        2026-11-05 报的"重复"。房间和 `career` 一样，退出只走站内那颗：
-       它在本层（z 950）下面，但 `.stage` 左右各 22% 的 mask 不带指针，
-       左上角正好在透明带里，所以看得见也点得到。 */
+       本层在 z 90（见文件开头的层级说明），站内导航 100 在它**上面**，
+       所以左上角那颗看得见也点得到。 */
 }
 
 /* 🔴 这两条必须写在 `.craft-room` **外面**：写在里面会被 SCSS 拼成
