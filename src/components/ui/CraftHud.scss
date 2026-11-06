@@ -794,6 +794,7 @@
         .spinner { animation: none; }
     }
 
+
     /* 触摸设备没有 hover ⇒ 缩略图永远不出现。让焦点板常显一张淡的：
        手机上焦点板几乎占满一屏，光靠标题认不出这是什么。 */
     @media (hover: none) {
@@ -815,12 +816,21 @@
 /* 🔴 这两条必须写在 `.craft-room` **外面**：写在里面会被 SCSS 拼成
    `.craft-room .craft-room.is-in`，永远匹配不到（自己套自己）。 */
 .craft-room.is-in { opacity: 1; }
-.craft-room.is-exiting { opacity: 0; transition-duration: 0.42s; }
+/* 退场：展板比星云先走。星云那层由 `rooms/CraftRing.jsx` 的
+   EXIT_HOLD + EXIT_FADE 控制（按住 0.45s 再抹 1.75s），这里 1.1s 收干净，
+   于是"板子先散、天再亮"，走廊和关上的门在底下露出来。 */
+.craft-room.is-exiting { opacity: 0; transition-duration: 1.1s; }
+
+/* 减少动态效果时整段退场是 0.12×（`DoorSection` 的 TRANSITION_SCALE），
+   展板这边也要跟着收，否则门早关完了板子还挂在半空。 */
+@media (prefers-reduced-motion: reduce) {
+    .craft-room.is-exiting { transition-duration: 0.12s; }
+}
 
 /* 浮层打开时把整层抬到 1500 —— 和 `CareerProjectModal` 同一个高度。
-   原因：本层是 950，而右上角那排站内控件是 `.hud-cluster` 1000 /
+   原因：本层是 90（低于站内导航），而右上角那排控件是 `.hud-cluster` 1000 /
    `.site-controls__update-wrap` 1001 ⇒ 它们会**浮在浮层上面**，浮层只盖住了
-   画布和左上角那颗返回键（它在 `.navigation-ui` 的 z 100 里，被 950 关住），
-   看起来像"只盖住了一半"。浮层是模态的，这一帧本来就该盖住全部控件。
-   关掉浮层立刻退回 950，房间里的站内控件照旧可见、可点。 */
+   画布和左上角那颗返回键（它在 `.navigation-ui` 的 z 100 里，本来就在本层
+   之上，看起来像"只盖住了一半"）。浮层是模态的，这一帧本来就该盖住全部控件。
+   关掉浮层立刻退回 90，房间里的站内控件照旧可见、可点。 */
 .craft-room.is-viewing { z-index: 1500; }
