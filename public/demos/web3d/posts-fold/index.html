@@ -54,11 +54,6 @@ body{
   will-change:transform;
 }
 
-.thread{
-  position:absolute;left:0;top:-236px;height:1px;
-  background:linear-gradient(90deg, rgba(178,58,44,.85) 0%, rgba(178,58,44,.5) 55%, rgba(178,58,44,0) 100%);
-  transform-origin:0 50%;
-}
 .fold{
   position:absolute;
   left:calc(var(--w) / -2);
@@ -221,21 +216,69 @@ body{
 }
 .hud__tr button[aria-pressed="true"]{color:#efe7db;background:rgba(255,255,255,.07)}
 .hud__tr button:hover{color:#cfc3b3}
+.hud__loc{display:flex;gap:2px}
 
-.rail{
-  position:absolute;left:48px;top:50%;transform:translateY(-50%);
-  display:flex;flex-direction:column;gap:9px;align-items:flex-start;pointer-events:auto;
+.menu-btn{display:inline-flex;align-items:center;gap:8px;padding:6px 12px}
+.menu-btn svg{display:block;opacity:.8}
+.menu-btn span{font-size:11px;letter-spacing:.18em}
+.menu-btn[aria-expanded="true"]{color:var(--vermilion)}
+.menu-btn[aria-expanded="true"] svg{opacity:1}
+
+/* ---------- 目录 ---------- */
+.menu{position:fixed;inset:0;z-index:60;pointer-events:none}
+.menu__scrim{
+  position:absolute;inset:0;background:rgba(8,6,5,.6);
+  opacity:0;transition:opacity .42s ease;
 }
-.rail button{
-  appearance:none;border:0;background:transparent;padding:0;cursor:pointer;
-  display:flex;align-items:center;gap:8px;height:6px;
+.menu__panel{
+  position:absolute;left:0;right:0;top:0;
+  max-height:min(66vh,640px);
+  display:flex;flex-direction:column;
+  background:linear-gradient(180deg, rgba(32,27,22,.985), rgba(19,16,13,.975));
+  border-bottom:1px solid rgba(178,58,44,.3);
+  box-shadow:0 34px 90px -34px rgba(0,0,0,.92);
+  transform:translateY(-100%);
+  transition:transform .52s cubic-bezier(.22,.61,.36,1);
 }
-.rail i{display:block;width:14px;height:1px;background:#6b6155;transition:all .35s ease}
-.rail button[aria-current="true"] i{width:30px;height:2px;background:var(--vermilion)}
-.rail span{
-  font-size:9px;letter-spacing:.1em;color:#6d6257;opacity:0;transition:opacity .3s;
+.menu.is-open{pointer-events:auto}
+.menu.is-open .menu__scrim{opacity:1}
+.menu.is-open .menu__panel{transform:none}
+
+.menu__head{
+  display:flex;align-items:center;gap:22px;flex-wrap:wrap;
+  padding:26px 48px 16px;
+  border-bottom:1px solid rgba(255,255,255,.07);
 }
-.rail button:hover span,.rail button[aria-current="true"] span{opacity:1}
+.menu__label{font-size:10px;letter-spacing:.3em;color:var(--vermilion);white-space:nowrap}
+.menu__q{
+  flex:1;min-width:180px;appearance:none;background:transparent;border:0;outline:0;
+  font-family:inherit;font-size:15px;letter-spacing:.02em;color:#efe7db;
+  padding:5px 0;border-bottom:1px solid rgba(200,186,168,.18);
+  transition:border-color .25s ease;
+}
+.menu__q::placeholder{color:#5f564c}
+.menu__q:focus{border-bottom-color:rgba(178,58,44,.7)}
+.menu__q::-webkit-search-cancel-button{filter:grayscale(1) opacity(.5)}
+.menu__count{font-size:10px;letter-spacing:.16em;color:#6d6257;white-space:nowrap}
+
+.menu__list{
+  list-style:none;margin:0;padding:6px 0 20px;
+  overflow-y:auto;overscroll-behavior:contain;
+  scrollbar-width:thin;scrollbar-color:rgba(200,186,168,.22) transparent;
+}
+.row{
+  display:grid;grid-template-columns:54px 1fr auto;gap:18px;align-items:baseline;
+  padding:12px 48px;cursor:pointer;
+  border-left:2px solid transparent;
+  transition:background .2s ease,border-color .2s ease;
+}
+.row:hover,.row.is-active{background:rgba(255,255,255,.045);border-left-color:var(--vermilion)}
+.row__n{font-size:10px;letter-spacing:.16em;color:#6d6257}
+.row__t{font-size:14.5px;line-height:1.55;color:#d5cabb;min-width:0}
+.row__d{font-size:10.5px;letter-spacing:.1em;color:#6d6257;white-space:nowrap}
+.row.is-current .row__n{color:var(--vermilion)}
+.row.is-current .row__t{color:#fff}
+.menu__empty{padding:38px 48px;font-size:12px;letter-spacing:.06em;color:#6d6257}
 
 .hud__bl{
   position:absolute;left:48px;bottom:40px;
@@ -277,10 +320,28 @@ body{
 
 @media (max-width:900px){
   :root{--w:300px;--h:420px}
+  /* 窄屏把表头改成两行：第一行「目录 · INDEX … 10 篇」，第二行搜索框通栏。
+     用 flex-wrap 让它自己折会把"10 篇"甩到第三行左边，很脏。 */
+  .menu__head{
+    display:grid;grid-template-columns:1fr auto;
+    gap:9px 12px;padding:18px 24px 12px;
+  }
+  .menu__label{grid-column:1;grid-row:1}
+  .menu__count{grid-column:2;grid-row:1;justify-self:end}
+  .menu__q{grid-column:1 / -1;grid-row:2;min-width:0}
+  /* 窄屏把日期挪到标题下面：三列挤在 342px 里，标题只剩 13 个字，
+     "使用 Semantic-Release 和 Github Workflow…" 要折三行。 */
+  .row{
+    grid-template-columns:28px 1fr;gap:3px 12px;padding:11px 24px 12px;
+  }
+  .row__n{grid-column:1;grid-row:1}
+  .row__t{grid-column:2;grid-row:1}
+  .row__d{grid-column:2;grid-row:2;font-size:10px}
+  .row__t{font-size:13.5px}
+  .menu__empty{padding:30px 24px}
   .hud__tl{left:24px;top:26px}
   .hud__tr{right:24px;top:26px}
   .hud__bl{left:24px;bottom:24px}
-  .rail{right:22px}
   .title{font-size:19px}
   .pad{padding:28px 24px 24px}
   .sheet{padding:38px 28px 44px}
@@ -293,7 +354,7 @@ body{
    用 !important 是因为过渡分散在 .fold / .fold.is-focus .title / .reader 上，
    逐条覆盖会漏；这里只有"停掉"一个意图，压过优先级是合理的。 */
 @media (prefers-reduced-motion: reduce) {
-  .fold, .fold *, .reader, .sheet {
+  .fold, .fold *, .reader, .sheet, .menu__panel, .menu__scrim {
     transition-duration: 0s !important;
     transition-delay: 0s !important;
   }
@@ -316,11 +377,34 @@ body{
     <h1>文稿 · POSTS</h1>
     <p>经折 · <b>18</b> 篇 · 中英双语</p>
   </div>
-  <div class="hud__tr" id="locale">
-    <button data-loc="zh" aria-pressed="true">中文</button>
-    <button data-loc="en" aria-pressed="false">EN</button>
+  <div class="hud__tr">
+    <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="menu" title="目录（/）">
+      <svg viewBox="0 0 18 12" width="15" height="10" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
+        <path d="M0 1h18M0 6h18M0 11h11"/>
+      </svg>
+      <span>目录</span>
+    </button>
+    <!-- 语言按钮单独包一层：菜单按钮不能落在 #locale 里，
+         否则那边的 click 处理器会把它当成语言按钮（dataset.loc 是空的） -->
+    <div class="hud__loc" id="locale">
+      <button data-loc="zh" aria-pressed="true">中文</button>
+      <button data-loc="en" aria-pressed="false">EN</button>
+    </div>
   </div>
-  <div class="hud__bl"><span id="pos">01 / 10</span> · 滚轮 / 拖拽 翻阅 · 点击展开</div>
+  <div class="hud__bl"><span id="pos">01 / 10</span> · 滚轮 / 拖拽 翻阅 · 点击展开 · <b>/</b> 目录</div>
+</div>
+
+<!-- 目录：从顶部滑下来的一整条，带搜索。翻一百篇也不靠一格一格滚。 -->
+<div class="menu" id="menu" aria-hidden="true">
+  <div class="menu__scrim" id="menuScrim"></div>
+  <section class="menu__panel" role="dialog" aria-modal="true" aria-label="文章目录">
+    <div class="menu__head">
+      <span class="menu__label">目录 · INDEX</span>
+      <input id="q" class="menu__q" type="search" placeholder="搜索标题 / 标签 / 日期" autocomplete="off" spellcheck="false" />
+      <span class="menu__count" id="mcount"></span>
+    </div>
+    <ul class="menu__list" id="mlist"></ul>
+  </section>
 </div>
 
 <div class="reader" id="reader">
@@ -328,6 +412,8 @@ body{
   <article class="sheet" id="sheet"></article>
 </div>
 
+<!-- 一格一页的输入层（滚轮 / 拖动 / 方向键），判据与 craft 房间同一套 -->
+<script src="../../_pager.js"></script>
 <script>
 const DATA = {
   zh: [
@@ -370,7 +456,6 @@ const ribbon = document.getElementById('ribbon');
 ribbon.style.setProperty('--sx', SHIFT + '%');
 document.documentElement.style.setProperty('--w', W + 'px');
 document.documentElement.style.setProperty('--h', H + 'px');
-const rail = document.getElementById('rail');
 const stage = document.getElementById('stage');
 const reader = document.getElementById('reader');
 const sheet = document.getElementById('sheet');
@@ -379,6 +464,7 @@ let loc = 'zh';
 let k = 0;
 let folds = [];
 let open = false;
+let menuOpen = false;
 
 const pad2 = (n) => String(n + 1).padStart(2, '0');
 
@@ -401,6 +487,8 @@ function build() {
       '<div class="folio">' + pad2(i) + ' / ' + pad2(list.length - 1) + '</div>';
     el.addEventListener('click', (e) => {
       e.stopPropagation();
+      /* 拖完松手浏览器会补一次 click —— 不拦就会"手滑点错"变成翻页或弹窗 */
+      if (pager.wasDragged()) return;
       if (i === k) openReader(); else go(i);
     });
     ribbon.appendChild(el);
@@ -475,40 +563,33 @@ function openReader() {
 function closeReader() { reader.classList.remove('is-open'); open = false; }
 
 /* ---------- 输入 ---------- */
-let acc = 0, lock = 0;
-window.addEventListener('wheel', (e) => {
-  if (open) return;
-  e.preventDefault();
-  acc += e.deltaY;
-  const now = performance.now();
-  if (Math.abs(acc) >= 42 && now - lock > 260) {
-    go(k + Math.sign(acc));
-    acc = 0;
-    lock = now;
-  }
-}, { passive: false });
-
-let drag = null;
-stage.addEventListener('pointerdown', (e) => {
-  if (open) return;
-  drag = { x: e.clientX, k };
-  stage.classList.add('dragging');
-  stage.setPointerCapture(e.pointerId);
+/* 滚轮 / 拖动 / 方向键全交给 `_pager.js`（判据与 craft 房间逐字相同）。
+   原来这里是自己写的：`deltaY` 累积到 42 就翻，触控板惯性一划就是 2~3 篇；
+   而且 `stage.setPointerCapture()` 会把随后的 click 派发到 stage 上，
+   `.fold` 的点击永远收不到 —— "点了没反应"就是这个。 */
+const pager = createPager({
+  target: stage,
+  dragSelector: '.stage',
+  enabled: () => !open && !menuOpen,
+  onStep: (dir) => go(k + dir),
+  onDragStart: () => stage.classList.add('dragging'),
+  onDragEnd: () => stage.classList.remove('dragging'),
 });
-stage.addEventListener('pointermove', (e) => {
-  if (!drag) return;
-  const d = Math.round((drag.x - e.clientX) / 150);
-  if (d !== 0) { go(drag.k + d); }
-});
-const endDrag = () => { drag = null; stage.classList.remove('dragging'); };
-stage.addEventListener('pointerup', endDrag);
-stage.addEventListener('pointercancel', endDrag);
 
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { closeReader(); return; }
-  if (open) return;
-  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') go(k + 1);
-  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') go(k - 1);
+  if (e.key === 'Escape') {
+    if (menuOpen) { closeMenu(); return; }
+    closeReader();
+    return;
+  }
+  if (menuOpen) return;
+  const t = e.target;
+  const tag = t && t.tagName ? t.tagName.toLowerCase() : '';
+  if (tag === 'input' || tag === 'textarea') return;
+  if (e.key === '/' || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k')) {
+    e.preventDefault();
+    openMenu();
+  }
 });
 
 document.getElementById('close').addEventListener('click', closeReader);
@@ -521,6 +602,98 @@ document.getElementById('locale').addEventListener('click', (e) => {
   k = 0;
   [...e.currentTarget.children].forEach((x) => x.setAttribute('aria-pressed', x === b));
   build();
+});
+
+/* ---------- 目录 ---------- */
+const menu = document.getElementById('menu');
+const menuBtn = document.getElementById('menuBtn');
+const mlist = document.getElementById('mlist');
+const mcount = document.getElementById('mcount');
+const q = document.getElementById('q');
+
+let mHits = [];   // 过滤后的 [{ a, i }]，i 是原文序号
+let mAct = 0;     // 键盘高亮的那一行（在 mHits 里的下标）
+
+const esc = (str) => String(str).replace(/[&<>"]/g, (c) => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function renderMenu() {
+  const list = DATA[loc];
+  const kw = q.value.trim().toLowerCase();
+  mHits = list.map((a, i) => ({ a, i })).filter(({ a }) =>
+    !kw || (a.t + ' ' + a.g + ' ' + a.d).toLowerCase().indexOf(kw) >= 0);
+  mAct = Math.max(0, Math.min(mAct, mHits.length - 1));
+  mcount.textContent = kw ? mHits.length + ' / ' + list.length : list.length + ' 篇';
+  mlist.innerHTML = mHits.length
+    ? mHits.map(({ a, i }, n) =>
+        '<li class="row' + (i === k ? ' is-current' : '') + (n === mAct ? ' is-active' : '') +
+        '" data-i="' + i + '">' +
+          '<span class="row__n">' + pad2(i) + '</span>' +
+          '<span class="row__t">' + esc(a.t) + '</span>' +
+          '<span class="row__d">' + esc(a.d) + '</span>' +
+        '</li>').join('')
+    : '<li class="menu__empty">没有匹配「' + esc(q.value.trim()) + '」的文章</li>';
+}
+
+function openMenu() {
+  if (menuOpen) return;
+  closeReader();
+  menuOpen = true;
+  q.value = '';
+  renderMenu();
+  /* 光标落在"当前这篇"上：↑↓ 从你在的位置开始走，而不是从第一行重新数 */
+  const here = mHits.findIndex((h) => h.i === k);
+  if (here > 0) { mAct = here; renderMenu(); }
+  menu.classList.add('is-open');
+  menu.setAttribute('aria-hidden', 'false');
+  menuBtn.setAttribute('aria-expanded', 'true');
+  /* 等面板滑下来再聚焦：太早聚焦，移动端键盘会顶上来把面板挤掉一半 */
+  setTimeout(() => {
+    if (!menuOpen) return;
+    q.focus();
+    const el = mlist.querySelector('.is-active');
+    if (el) el.scrollIntoView({ block: 'nearest' });
+  }, 120);
+}
+
+function closeMenu() {
+  if (!menuOpen) return;
+  menuOpen = false;
+  menu.classList.remove('is-open');
+  menu.setAttribute('aria-hidden', 'true');
+  menuBtn.setAttribute('aria-expanded', 'false');
+  q.blur();
+}
+
+/* 点一行 = 翻到它。折带自己会滑过去（go → render 带 0.66s 过渡）。 */
+function pickRow(i) {
+  closeMenu();
+  go(i);
+}
+
+menuBtn.addEventListener('click', () => (menuOpen ? closeMenu() : openMenu()));
+document.getElementById('menuScrim').addEventListener('click', closeMenu);
+q.addEventListener('input', () => { mAct = 0; renderMenu(); });
+mlist.addEventListener('click', (e) => {
+  const row = e.target.closest('.row');
+  if (row) pickRow(+row.dataset.i);
+});
+
+/* 面板自己的键盘：↑↓ 走、Enter 跳、Esc 关。
+   Esc 要 stopPropagation —— window 上还有一个关阅读层的同名处理。 */
+menu.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { e.stopPropagation(); closeMenu(); return; }
+  if (!mHits.length) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    mAct = (mAct + (e.key === 'ArrowDown' ? 1 : -1) + mHits.length) % mHits.length;
+    renderMenu();
+    const el = mlist.querySelector('.is-active');
+    if (el) el.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    pickRow(mHits[mAct].i);
+  }
 });
 
 /* ---------- 尘埃 ---------- */

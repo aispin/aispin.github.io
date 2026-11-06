@@ -161,6 +161,11 @@
     视觉几乎无差别。代价是没有真光照/真阴影（现在是 `box-shadow` + 手绘明暗）。
   - 还没接的：真实数据（`content/articles/<locale>/<slug>.md` 的 frontmatter）、
     阅读层换成与静态页共用的 HTML 片段、`_from.js` 里加 `posts` 一行。
+  - **交互层已抽出公共件 `public/demos/_pager.js`**：滚轮（判据与 craft 房间逐字相同）/
+    拖动（含触屏）/ 方向键，一次手势只走一格。房间落地时直接复用同一套判据，
+    别再写第二份。🔴 拖动**不能用** `setPointerCapture`（会吞掉子元素的 click）。
+  - 目录面板（`/` 或 `⌘K` 唤出，搜索 + ↑↓ + Enter）也已在原型里跑通，
+    房间版按同一交互接。
 - **分期**（每期单独 commit）：
   - **P1 止血**：正文搬出主包（md 文件 + 房间按需 fetch）⇒ 主包 gzip 94.7 → ~50KB；
     顺手修 `seo-plugin` 的字段错配。
