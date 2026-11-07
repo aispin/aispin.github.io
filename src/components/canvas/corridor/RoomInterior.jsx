@@ -92,6 +92,16 @@ const RoomInterior = ({ label, roomId, showRoom, onReady, isExiting }) => {
             roomCeiling: new THREE.MeshBasicMaterial({ color: '#fbf7ef', side: THREE.DoubleSide }),
             roomWall: new THREE.MeshBasicMaterial({ color: '#f7f1e6', side: THREE.DoubleSide }),
             roomBackWall: new THREE.MeshBasicMaterial({ color: '#f4ede0', side: THREE.DoubleSide }),
+
+            // 经折房间（posts）的「屋子壳」。接管渲染的房间本来没有屋子几何，
+            // 相机穿过门厅就是一片天空 —— 以前被满屏暖黑底盖着看不出来，
+            // 2026-11-07 让进场先画走廊之后就露馅了。
+            // 🔴 `toneMapped: false`：接管层是 ShaderMaterial，gl_FragColor 里
+            //    的颜色**不过色调映射**；这几个要是走 ACES，同一个 #241d18 出来
+            //    会比经折的底暗一大截，穿门那一下就成了"门后是个黑洞"。
+            postsFloor: new THREE.MeshBasicMaterial({ color: '#2b221b', side: THREE.DoubleSide, toneMapped: false }),
+            postsCeiling: new THREE.MeshBasicMaterial({ color: '#1b1511', side: THREE.DoubleSide, toneMapped: false }),
+            postsWall: new THREE.MeshBasicMaterial({ color: '#3a2e25', side: THREE.DoubleSide, toneMapped: false }),
         };
     }, [corridorWidth, corridorDepth, corridorHeight]);
 
@@ -218,11 +228,50 @@ const RoomInterior = ({ label, roomId, showRoom, onReady, isExiting }) => {
                         </Suspense>
                     ) : roomId === 'posts' ? (
                         // === 文稿：一条经折 ===
-                        // 同上：自带 Scene + Camera + 接管渲染（rooms/PostsFold.jsx），
-                        // 折页与阅读层是 DOM（ui/PostsHud.jsx），这里只搭暖黑底。
-                        <Suspense fallback={null}>
-                            <PostsFold onReady={onReady} isExiting={isExiting} />
-                        </Suspense>
+                        // 自带 Scene + Camera + 接管渲染（rooms/PostsFold.jsx），
+                        // 折页与阅读层是 DOM（ui/PostsHud.jsx）。
+                        <>
+                            {/* 门后那间屋子的**壳**。接管渲染的房间（career / craft）
+                                原本都没有屋子几何 —— 相机穿过门厅就是一片天空。
+                                以前看不出来，因为接管层从第一帧就把整屏盖住了；
+                                现在进场先画走廊（门扇转开 0.7s + 穿门 1.5s），
+                                "门开了，后面是天"就会露出来。
+                                不放标题 Text：进屋那一秒不该冒出第二套标题。 */}
+                            <group position={[0, roomHeight / 2 - corridorHeight / 2, roomZ]}>
+                                <mesh
+                                    position={[0, -roomHeight / 2, 0]}
+                                    rotation={[-Math.PI / 2, 0, 0]}
+                                    geometry={geometries.roomFloorCeiling}
+                                    material={materials.postsFloor}
+                                />
+                                <mesh
+                                    position={[0, roomHeight / 2, 0]}
+                                    rotation={[Math.PI / 2, 0, 0]}
+                                    geometry={geometries.roomFloorCeiling}
+                                    material={materials.postsCeiling}
+                                />
+                                <mesh
+                                    position={[0, 0, -roomDepth / 2]}
+                                    geometry={geometries.roomBackWall}
+                                    material={materials.postsWall}
+                                />
+                                <mesh
+                                    position={[-roomWidth / 2, 0, 0]}
+                                    rotation={[0, Math.PI / 2, 0]}
+                                    geometry={geometries.roomSideWall}
+                                    material={materials.postsWall}
+                                />
+                                <mesh
+                                    position={[roomWidth / 2, 0, 0]}
+                                    rotation={[0, -Math.PI / 2, 0]}
+                                    geometry={geometries.roomSideWall}
+                                    material={materials.postsWall}
+                                />
+                            </group>
+                            <Suspense fallback={null}>
+                                <PostsFold onReady={onReady} isExiting={isExiting} />
+                            </Suspense>
+                        </>
                     ) : CONTENT_ROOM_IDS.includes(roomId) ? (
                         <ContentRoom roomId={roomId} showRoom={roomVisible} onReady={onReady} />
                     ) : (

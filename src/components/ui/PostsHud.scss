@@ -365,12 +365,23 @@
     z-index: 10;
 }
 
-/* 标题让出站内返回键那一行（胶囊在 top 20 / 高 26 ⇒ 从 56 起）。
+/* 标题**居中**（2026-11-07 用户要求：原来贴在左上角，和站内那颗返回键挤在
+   同一个角上，两行字都在角落、画面重心整个偏左）。
+   横向用 `left:0;right:0;margin:0 auto;width:max-content` 居中 —— 和
+   `.hud__bc` 同一个原因，`left:50% + translateX(-50%)` 在窄屏上会把
+   收缩宽度卡在「容器宽 − left」。
+   纵向仍是 56：站内返回键在 top 20 / 高 26，标题从 56 起就不和它抢那一行。
    🔴 这里**没有** `.lab-back`：退出房间走站内导航那颗（和 craft / career 一致）。 */
 .posts-room .hud__tl {
     position: absolute;
-    left: 48px;
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    /* 让开左上返回键与右上那排控件，别在窄屏上顶到它们 */
+    width: max-content;
+    max-width: calc(100% - 168px);
     top: 56px;
+    text-align: center;
     pointer-events: auto;
 }
 
@@ -923,8 +934,9 @@
     .posts-room .row__d { grid-column: 2; grid-row: 2; font-size: 10px; }
     .posts-room .menu__empty { padding: 30px 24px; }
 
-    /* 站内返回键在左上 18/18，标题让到它下面 —— 两边都落在 top 20~26 会叠字 */
-    .posts-room .hud__tl { left: 24px; top: 50px; }
+    /* 标题仍然居中（见上面那条的说明）；窄屏左右各让 84px 给返回键与控件列，
+       再窄就只剩标题自己换行，不会再和谁叠字。 */
+    .posts-room .hud__tl { top: 50px; max-width: calc(100% - 168px); }
     .posts-room .hud__bc { bottom: calc(16px + env(safe-area-inset-bottom)); }
     /* 窄屏藏掉左下提示：它会和居中的控制条撞在一起 */
     .posts-room .hud__bl { display: none; }

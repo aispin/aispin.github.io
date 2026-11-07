@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { useScene } from '../../../context/SceneContext'
 import { reducedMotion } from '../../../hooks/useReducedMotion'
 
 /**
@@ -20,6 +21,22 @@ import { reducedMotion } from '../../../hooks/useReducedMotion'
  *    子组件 `FoldRenderer` 里，且只在真正进房间时挂载 —— 预热副本绝不能挂
  *    第二份（`RoomWarmup` 里挂的是 posts，见那边的注释）。
  *
+ * ── 进场：先让门开完，再暗下来 ────────────────────────────────────────
+ * 🔴 2026-11-07 用户报「点房门没有开门的效果了」。原因是接管层在
+ *    `shouldRenderRoom` 一翻真（相机刚对准门）就把满屏暖黑压上去了 ——
+ *    门扇转开 0.7s、相机穿过门厅 1.5s，全被盖在黑底下，看起来像"点一下
+ *    就跳进房间"。摄影房间（gallery）没这问题，因为它的屋子就在走廊场景里。
+ *
+ * 现在的节奏和 `DoorSection.openDoor()` 对齐：
+ *   · `0 → ENTRY_HOLD`：**只画走廊**（门扇在转、相机在飞），
+ *   · `ENTRY_HOLD → +ENTRY_FADE`：先画走廊，再把暖黑底按 alpha 叠上去，
+ *   · 之后：只画房间。
+ * 门后那间屋子的**壳**在 `RoomInterior` 里补了（暖黑色，见那边的注释），
+ * 所以穿门那一下看到的是"一间暗屋"，而不是一片天空。
+ *
+ * 传送（地图 / 深链）和探针 `snap` 走的是瞬开门，等 1.35s 只会让人盯着
+ * 走廊发呆 ⇒ 这两条路径 `skipEntry`，第一帧就是房间。
+ *
  * ── 退场 ──────────────────────────────────────────────────────────────
  * 节奏与 `CraftRing` 完全一致（`EXIT_HOLD` / `EXIT_FADE`），因为它必须和
  * `DoorSection.exitRoom()` 的 1.5s + 1.0s + 0.6s 对上：按住 0.45s 让"点了
@@ -34,6 +51,20 @@ import { reducedMotion } from '../../../hooks/useReducedMotion'
 /** 底色。与 demo 的 body 渐变末端同色，进场不会闪。 */
 const BASE = 0x0b0908
 
+/**
+ * 进场：门扇 0.7s + 相机穿过门厅 1.5s。按住 1.35s（= 门开完 + 飞了一半）
+ * 再花 1.0s 把暖黑底叠上来，正好落在相机落地（2.2s）前后 ——
+ * 于是"跨过门槛的同时灯暗下来"，而不是"站在门口先黑一下"。
+ */
+const ENTRY_HOLD = 1.35
+const ENTRY_FADE = 1.0
+
+/**
+ * 退场：先**按住** `EXIT_HOLD`，再用 `EXIT_FADE` 把暖黑底抹掉。
+ *
+ * ⚠️ 这两个数和 `DoorSection.exitRoom()` 的 1.5s（退回门前）+ 1.0s（退回原位）
+ *    + 0.6s（关门）是一套的。改那边要回来对一眼。
+ */
 const EXIT_HOLD = 0.45
 const EXIT_FADE = 1.75
 
@@ -76,7 +107,9 @@ void main() {
 }
 `
 
-function FoldRenderer({ sceneRef, cameraRef, quadRef, fadeRef, exitingRef, exitElapsedRef }) {
+const smooth = (t) => t * t * (3 - 2 * t)
+
+function FoldRenderer({ sceneRef, cameraRef, quadRef, exitingRef, exitElapsedRef, entryRef, entryElapsedRef }) {
     useFrame((state, delta) => {
         /* 用 `state.gl` 而不是 `useThree(s => s.gl)`：后者被 lint 判成
            "不可修改的值"，而这里要临时改 autoClear。 */
@@ -92,38 +125,43 @@ function FoldRenderer({ sceneRef, cameraRef, quadRef, fadeRef, exitingRef, exitE
 
         const d = Math.min(delta, 0.1)
         const mat = quad.material
-        const fade = fadeRef.current
+
+        /* 尺寸兜底：`uRes` 初值是 1×1，正常由那个 resize effect 同步。
+           万一第一帧抢在 effect 前面（传送/深链时 alpha 直接是 1），
+           这一帧就会用 1×1 算渐变 ⇒ 整屏一个色。 */
+        if (mat.uniforms.uRes.value.x < 2) gl.getDrawingBufferSize(mat.uniforms.uRes.value)
+
+        /* `prefers-reduced-motion` 下 DoorSection 把整段动画缩到 0.12×，
+           这边必须跟着缩，否则门早就开完了、暖黑底还在原地等着。 */
+        const k = reducedMotion() ? 0.12 : 1
 
         if (exitingRef.current) {
             exitElapsedRef.current += d
-            /* `prefers-reduced-motion` 下 DoorSection 把整段退场缩到 0.12×，
-               这边必须跟着缩，否则门早就关完了、暖黑底还盖着走廊两秒。 */
-            const k = reducedMotion() ? 0.12 : 1
             const t = Math.min(Math.max((exitElapsedRef.current - EXIT_HOLD * k) / (EXIT_FADE * k), 0), 1)
-            mat.uniforms.uOpacity.value = 1 - t * t * (3 - 2 * t)
-            if (fade) fade.material.opacity = 0
-            // three 的 WebGLBackground 只要 background 是 Color 就强制清屏
-            // （不看 autoClear）⇒ 退场这一趟必须让开，否则走廊被纯色擦掉
-            if (scene.background) scene.background = null
-        } else if (fade) {
-            fade.material.opacity += (0 - fade.material.opacity) * (1 - Math.exp(-8 * d))
+            /* `Math.min` 而不是直接赋值：万一进场还没走完就点了返回
+               （uOpacity 才 0.3），直接写 1 会先"闪"一下全黑再开始退。
+               取小值 ⇒ 从当前那个透明度接着往下走。 */
+            mat.uniforms.uOpacity.value = Math.min(mat.uniforms.uOpacity.value, 1 - smooth(t))
+        } else if (entryRef.current.skip) {
+            // 传送 / 探针：门是瞬开的，第一帧就该是房间
             mat.uniforms.uOpacity.value = 1
+        } else {
+            entryElapsedRef.current += d
+            const t = Math.min(Math.max((entryElapsedRef.current - ENTRY_HOLD * k) / (ENTRY_FADE * k), 0), 1)
+            mat.uniforms.uOpacity.value = smooth(t)
         }
 
-        if (!exitingRef.current) {
+        const a = mat.uniforms.uOpacity.value
+
+        // 完全不透明：只画房间（稳态走的就是这条，最便宜）
+        if (a >= 0.999) {
             gl.render(scene, cam)
-            if (fade && fade.material.opacity > 0.002) {
-                const prev = gl.autoClear
-                gl.autoClear = false
-                gl.render(fade.scene, fade.camera)
-                gl.autoClear = prev
-            }
             return
         }
 
-        // ── 退场：先画走廊，再把暖黑底整体溶掉 ──
+        // 半透明 / 全透明：先画走廊（门、相机、屋子都在那儿），再叠房间
         gl.render(state.scene, state.camera)
-        if (mat.uniforms.uOpacity.value < 0.002) return
+        if (a <= 0.002) return
 
         const prev = gl.autoClear
         gl.autoClear = false
@@ -136,22 +174,30 @@ function FoldRenderer({ sceneRef, cameraRef, quadRef, fadeRef, exitingRef, exitE
 }
 
 const PostsFold = ({ onReady, isExiting = false }) => {
+    const { currentRoom, isTeleporting } = useScene()
     const sceneRef = useRef(null)
     const cameraRef = useRef(null)
     const quadRef = useRef(null)
-    const fadeRef = useRef(null)
-    /* 幕布与底图的透明度都靠帧循环推，用 ref 转一道 —— 免得 isExiting 一变
-       整个场景重建。`exitElapsedRef` 存的是**退场已经跑了多少秒**（不是 0~1
-       的进度），因为退场要"先按住再抹"。 */
+    /* 两个计时器都靠帧循环推，用 ref 转一道 —— 免得状态一变整个场景重建。
+       `exitElapsedRef` / `entryElapsedRef` 存的是**已经跑了多少秒**（不是
+       0~1 的进度），因为两头都要"先按住再抹"。 */
     const exitingRef = useRef(isExiting)
     const exitElapsedRef = useRef(0)
+    const entryElapsedRef = useRef(0)
+    /* 只在挂载那一帧决定一次（`useRef` 的初值就是这么用的）：
+       正常从走廊推门进来时 `currentRoom` 还是 null ⇒ 要等门开；
+       传送 / 深链 / 探针 snap 时门是瞬开的 ⇒ 不等。 */
+    const entryRef = useRef({ skip: Boolean(isTeleporting) || currentRoom === 'posts' })
     const readySent = useRef(false)
 
     useEffect(() => { exitingRef.current = isExiting }, [isExiting])
 
     useEffect(() => {
         const scene = new THREE.Scene()
-        scene.background = new THREE.Color(BASE)
+        /* 🔴 不设 `scene.background`：three 的 WebGLBackground 只要 background
+           是 Color 就**强制清屏**（不看 autoClear），进场/退场那趟需要先画
+           走廊再叠房间，一清就把走廊擦掉了。满屏 quad 自己就是背景。 */
+        scene.background = null
 
         // 满屏正交相机 + 2×2 平面：gl_FragCoord 与屏幕像素一一对应
         const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
@@ -161,7 +207,7 @@ const PostsFold = ({ onReady, isExiting = false }) => {
             fragmentShader: FRAG,
             uniforms: {
                 uRes: { value: new THREE.Vector2(1, 1) },
-                uOpacity: { value: 1 },
+                uOpacity: { value: 0 },
             },
             transparent: true,
             depthTest: false,
@@ -172,26 +218,9 @@ const PostsFold = ({ onReady, isExiting = false }) => {
         quad.frustumCulled = false
         scene.add(quad)
 
-        // 幕布：一层纯色，进场时压在底图上面淡出
-        const fadeScene = new THREE.Scene()
-        const fadeCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
-        const fadeMaterial = new THREE.MeshBasicMaterial({
-            color: BASE,
-            transparent: true,
-            opacity: 1,
-            depthTest: false,
-            depthWrite: false,
-            toneMapped: false,
-        })
-        const fadeQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), fadeMaterial)
-        fadeQuad.position.z = -0.5
-        fadeQuad.frustumCulled = false
-        fadeScene.add(fadeQuad)
-
         sceneRef.current = scene
         cameraRef.current = camera
         quadRef.current = quad
-        fadeRef.current = { scene: fadeScene, camera: fadeCamera, material: fadeMaterial }
 
         if (!readySent.current) {
             readySent.current = true
@@ -204,13 +233,11 @@ const PostsFold = ({ onReady, isExiting = false }) => {
                 if (o.geometry) o.geometry.dispose()
                 if (o.material) o.material.dispose()
             })
-            fadeQuad.geometry.dispose()
-            fadeMaterial.dispose()
             sceneRef.current = null
             cameraRef.current = null
             quadRef.current = null
-            fadeRef.current = null
             exitElapsedRef.current = 0
+            entryElapsedRef.current = 0
         }
     }, [onReady])
 
@@ -235,9 +262,10 @@ const PostsFold = ({ onReady, isExiting = false }) => {
             sceneRef={sceneRef}
             cameraRef={cameraRef}
             quadRef={quadRef}
-            fadeRef={fadeRef}
             exitingRef={exitingRef}
             exitElapsedRef={exitElapsedRef}
+            entryRef={entryRef}
+            entryElapsedRef={entryElapsedRef}
         />
     )
 }

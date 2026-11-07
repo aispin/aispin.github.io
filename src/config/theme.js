@@ -246,7 +246,9 @@ export const ROOM_COPY = {
   career: { zh: '一路走来的经历与在意的方向', en: 'Where I have been, and what I care about' },
   gallery: { zh: '摄影作品', en: 'Photography' },
   craft: { zh: '做过的实验，与还能跑起来的小东西', en: 'Experiments I have shipped, and toys that still run' },
-  posts: { zh: '随笔、笔记，以及站外连载的小说', en: 'Notes, essays and novels published elsewhere' },
+  // 2026-11-07：小说卡下架，这里也不再提"站外连载的小说" —— 菜单里写着
+  // 一句房间里根本看不到的东西，比不写更糟。连载发布后再改回来。
+  posts: { zh: '随笔、笔记与长文', en: 'Notes, essays and long reads' },
   videos: { zh: '短片与日常记录', en: 'Short films and everyday records' },
   music: { zh: '自己写的曲子与配乐', en: 'Tunes and scores I wrote myself' },
   ai: { zh: '自己做的 Skills、工具与应用', en: 'Skills, tools and apps I built' },
@@ -254,9 +256,19 @@ export const ROOM_COPY = {
 }
 
 /**
- * Novels — previously a corridor wall hanging (drei <Html transform>, which
- * repainted a matrix3d-transformed DOM card every frame and stuttered). They
- * are now plain cards inside the posts room and link out to the novels site.
+ * Novels —— **当前没有挂在任何房间里**（2026-11-07 下架）。
+ *
+ * 来龙去脉：先是走廊里的 `drei <Html transform>` 匾（每帧重刷 matrix3d 变换 +
+ * 260px 投影，卡），后来搬进 posts 房间和文章卡混排在 4×N 卡墙上；2026-11-06
+ * posts 换成经折，那条卡墙分支随之失效 ⇒ 小说在站上不可达。
+ *
+ * 用户 2026-11-07 的决定：「移除小说卡。目前小说还在撰写，发布后再加上。」
+ * 所以**只摘掉挂载点，数据留在这里**：`ContentRoom` 的 posts 分支已删，
+ * 这段不再是死代码里"藏着内容"，而是一份待挂回的配置。
+ *
+ * 挂回来的做法：连载发布后，在经折里加一种折页（`ui/PostsHud.jsx` 的
+ * `list` 后面追 `NOVELS.items`，点开走 `href` 外链），或者另起一间房 ——
+ * 两条路都比塞回卡墙合适。`href` 记得先 `curl` 一遍，别挂一条 404。
  */
 export const NOVELS = {
   id: 'novels',

@@ -5,7 +5,7 @@ import gsap from 'gsap'
 import { useScene } from '../../../context/SceneContext'
 import { useSitePreferences } from '../../../context/SitePreferences'
 import { getLocalizedCollection } from '../../../hooks/useContentData'
-import { NOVELS, PALETTE, ROOM_COPY, SCENE_FONTS, TEXT } from '../../../config/theme'
+import { PALETTE, ROOM_COPY, SCENE_FONTS, TEXT } from '../../../config/theme'
 import { setGuitarCursor } from '../../../utils/guitarCursor'
 import { texturalCanvas } from '../../../utils/texturalArt'
 import './ContentRoom.scss'
@@ -836,24 +836,6 @@ export default function ContentRoom({ roomId, showRoom, onReady }) {
         }
       })
     }
-    if (roomId === 'posts') {
-      // ⚠️ 2026-11-06 起这条路**走不到了**：posts 房间换成了经折
-      // （`rooms/PostsFold.jsx` + `ui/PostsHud.jsx`），`RoomInterior` 不再把
-      // posts 交给 ContentRoom，`RoomWarmup` 也换成了 videos。
-      // 留着是因为**小说卡只挂在这里**（`NOVELS`），删掉等于把小说从站上抹掉。
-      // 小说的去处是待定项，不是"顺手删干净"能解决的 —— 见 WORKPLAN。
-      const novelCards = (NOVELS.items || []).map((novel) => ({
-        id: novel.id,
-        title: language === 'zh' ? novel.zh : novel.en,
-        description: language === 'zh' ? novel.descZh : novel.descEn,
-        url: NOVELS.href,
-        external: true,
-        tag: language === 'zh' ? novel.tagZh : novel.tagEn,
-        accent: novel.accent,
-        category: 'novel',
-      }))
-      return [...getLocalizedCollection('articles', language), ...novelCards]
-    }
     if (roomId === 'videos') return getLocalizedCollection('videos', language)
     if (roomId === 'music') return getLocalizedCollection('music', language)
     if (roomId === 'ai') return getLocalizedCollection('aiProjects', language)
@@ -909,9 +891,9 @@ export default function ContentRoom({ roomId, showRoom, onReady }) {
   // Defined before the effects that reference them, so the screen-reader mirror
   // below reuses the exact same activation path as a click on a card.
   const kindFor = useCallback((item) => {
-    if (item.category === 'novel') return 'articles'
+    // 小说卡 2026-11-07 下架（`NOVELS` 还在 `config/theme.js` 里留着，等连载
+    // 发布后再挂回来）⇒ 这里不再有 `category === 'novel'` 这一档。
     if (item.category === 'experience') return 'experience'
-    if (roomId === 'posts') return 'articles'
     if (roomId === 'music') return 'music'
     if (roomId === 'videos') return 'videos'
     if (roomId === 'ai') return 'aiProjects'

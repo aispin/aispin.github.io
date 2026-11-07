@@ -197,7 +197,13 @@ body{
 .lab-back:hover{color:#efe7db;border-color:rgba(200,186,168,.34)}
 
 /* 标题让出胶囊那一行（top 20 + 高 26 ⇒ 从 56 起） */
-.hud__tl{position:absolute;left:48px;top:56px;pointer-events:auto}
+/* 标题居中（房间版 `ui/PostsHud.scss` 同步改了）。原来贴左上角，和站内那颗
+   返回键挤在同一个角上，画面重心整个偏左。横向用
+   left:0;right:0;margin:0 auto;width:max-content 才是真居中。 */
+.hud__tl{
+  position:absolute;left:0;right:0;margin:0 auto;width:max-content;
+  max-width:calc(100% - 168px);top:56px;text-align:center;pointer-events:auto;
+}
 .hud__tl h1{
   font-size:12px;font-weight:500;letter-spacing:.34em;color:#efe7db;
 }
@@ -411,7 +417,7 @@ body{
   .menu__empty{padding:30px 24px}
   /* 胶囊占第一行，标题让到它下面 —— 原来两边都落在 top 20~26，直接叠字 */
   .lab-back{left:24px;top:16px}
-  .hud__tl{left:24px;top:50px}
+  .hud__tl{top:50px;max-width:calc(100% - 168px)}
   .hud__bc{bottom:calc(16px + env(safe-area-inset-bottom))}
   /* 窄屏藏掉左下提示：它会和居中的控制条撞在一起 */
   .hud__bl{display:none}
