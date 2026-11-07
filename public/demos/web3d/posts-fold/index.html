@@ -426,6 +426,13 @@ body{
   .sheet{--pad:26px}
   .sheet__body{padding:26px var(--pad) 40px}
 }
+/* 矮视口：标题整块让到折带上面（折带垂直居中，720 高时顶边 ~80，
+   而居中的标题块从 56 排到 ~103 —— 第二行会被纸压住）。
+   必须写在上一个 max-width 块**后面**：两段都设 top，靠顺序取胜。 */
+@media (max-height:820px){
+  .hud__tl{top:26px}
+  .hud__tl p{margin-top:6px;line-height:1.5}
+}
 @media (prefers-reduced-motion:reduce){
   .fold,.reader,.sheet,.cta{transition-duration:.01s}
 }
