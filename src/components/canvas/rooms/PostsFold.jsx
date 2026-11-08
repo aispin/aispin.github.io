@@ -1,8 +1,13 @@
 import { useEffect, useRef } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
-import * as THREE from 'three'
+import { useFrame } from '@react-three/fiber'
 import { useScene } from '../../../context/SceneContext'
-import { reducedMotion } from '../../../hooks/useReducedMotion'
+import {
+    createScreenQuad,
+    drawTakeover,
+    ensureQuadResolution,
+    useDrawingBufferSize,
+    useTakeoverStage,
+} from './takeover'
 
 /**
  * 文稿房间 —— 「经折」的**环境层**。
@@ -21,59 +26,15 @@ import { reducedMotion } from '../../../hooks/useReducedMotion'
  *    子组件 `FoldRenderer` 里，且只在真正进房间时挂载 —— 预热副本绝不能挂
  *    第二份（`RoomWarmup` 里挂的是 posts，见那边的注释）。
  *
- * ── 进场：先让门开完，再暗下来 ────────────────────────────────────────
- * 🔴 2026-11-07 用户报「点房门没有开门的效果了」。原因是接管层在
- *    `shouldRenderRoom` 一翻真（相机刚对准门）就把满屏暖黑压上去了 ——
- *    门扇转开 0.7s、相机穿过门厅 1.5s，全被盖在黑底下，看起来像"点一下
- *    就跳进房间"。摄影房间（gallery）没这问题，因为它的屋子就在走廊场景里。
- *
- * 现在的节奏和 `DoorSection.openDoor()` 对齐：
- *   · `0 → ENTRY_HOLD`：**只画走廊**（门扇在转、相机在飞），
- *   · `ENTRY_HOLD → +ENTRY_FADE`：先画走廊，再把暖黑底按 alpha 叠上去，
- *   · 之后：只画房间。
- * 门后那间屋子的**壳**在 `RoomInterior` 里补了（暖黑色，见那边的注释），
+ * ── 进场 / 退场 ───────────────────────────────────────────────────────
+ * 三段式节奏在 `./takeover`（三个接管房间共用一份）：先让门开完、相机飞
+ * 一半，再把暖黑底叠上来。门后那间屋子的**壳**在 `RoomInterior` 里补了，
  * 所以穿门那一下看到的是"一间暗屋"，而不是一片天空。
- *
- * 传送（地图 / 深链）和探针 `snap` 走的是瞬开门，等 1.35s 只会让人盯着
- * 走廊发呆 ⇒ 这两条路径 `skipEntry`，第一帧就是房间。
- *
- * ── 退场 ──────────────────────────────────────────────────────────────
- * 节奏与 `CraftRing` 完全一致（`EXIT_HOLD` / `EXIT_FADE`），因为它必须和
- * `DoorSection.exitRoom()` 的 1.5s + 1.0s + 0.6s 对上：按住 0.45s 让"点了
- * 返回"立刻有反应，抹完约 2.2s —— 正好是门开始合上的时候，于是"门在身后
- * 关上"是看得见的。
- *
- * 🔴 alpha 走 `uOpacity` uniform，不能用 `material.opacity`：ShaderMaterial
- *    的 fragmentShader 原样编译，three 不会把 opacity 乘进 gl_FragColor。
- *    （这条是 2026-11-06 在 craft 上踩出来的，别在新房间重犯。）
  */
 
-/** 底色。与 demo 的 body 渐变末端同色，进场不会闪。 */
-const BASE = 0x0b0908
-
 /**
- * 进场：门扇 0.7s + 相机穿过门厅 1.5s。按住 1.35s（= 门开完 + 飞了一半）
- * 再花 1.0s 把暖黑底叠上来，正好落在相机落地（2.2s）前后 ——
- * 于是"跨过门槛的同时灯暗下来"，而不是"站在门口先黑一下"。
- */
-const ENTRY_HOLD = 1.35
-const ENTRY_FADE = 1.0
-
-/**
- * 退场：先**按住** `EXIT_HOLD`，再用 `EXIT_FADE` 把暖黑底抹掉。
- *
- * ⚠️ 这两个数和 `DoorSection.exitRoom()` 的 1.5s（退回门前）+ 1.0s（退回原位）
- *    + 0.6s（关门）是一套的。改那边要回来对一眼。
- */
-const EXIT_HOLD = 0.45
-const EXIT_FADE = 1.75
-
-const VERT = `
-void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }
-`
-
-/**
- * 逐字翻译 demo 的 CSS 渐变：
+ * 逐字翻译 demo 的 CSS 渐变（底色 #0b0908 与 demo 的 body 渐变末端同色，
+ * 进场不会闪）：
  *   radial-gradient(60% 46% at 76% 58%, rgba(126,86,52,.13), transparent 70%)
  *   radial-gradient(1200px 820px at 26% 18%, #241d18, #171311 46%, #0b0908 100%)
  * 用两段 smoothstep 拼出"近处暖、远处黑"，再加一层暗角。
@@ -107,9 +68,7 @@ void main() {
 }
 `
 
-const smooth = (t) => t * t * (3 - 2 * t)
-
-function FoldRenderer({ sceneRef, cameraRef, quadRef, exitingRef, exitElapsedRef, entryRef, entryElapsedRef }) {
+function FoldRenderer({ sceneRef, cameraRef, quadRef, stage }) {
     useFrame((state, delta) => {
         /* 用 `state.gl` 而不是 `useThree(s => s.gl)`：后者被 lint 判成
            "不可修改的值"，而这里要临时改 autoClear。 */
@@ -123,51 +82,10 @@ function FoldRenderer({ sceneRef, cameraRef, quadRef, exitingRef, exitElapsedRef
             return
         }
 
-        const d = Math.min(delta, 0.1)
-        const mat = quad.material
-
-        /* 尺寸兜底：`uRes` 初值是 1×1，正常由那个 resize effect 同步。
-           万一第一帧抢在 effect 前面（传送/深链时 alpha 直接是 1），
-           这一帧就会用 1×1 算渐变 ⇒ 整屏一个色。 */
-        if (mat.uniforms.uRes.value.x < 2) gl.getDrawingBufferSize(mat.uniforms.uRes.value)
-
-        /* `prefers-reduced-motion` 下 DoorSection 把整段动画缩到 0.12×，
-           这边必须跟着缩，否则门早就开完了、暖黑底还在原地等着。 */
-        const k = reducedMotion() ? 0.12 : 1
-
-        if (exitingRef.current) {
-            exitElapsedRef.current += d
-            const t = Math.min(Math.max((exitElapsedRef.current - EXIT_HOLD * k) / (EXIT_FADE * k), 0), 1)
-            /* `Math.min` 而不是直接赋值：万一进场还没走完就点了返回
-               （uOpacity 才 0.3），直接写 1 会先"闪"一下全黑再开始退。
-               取小值 ⇒ 从当前那个透明度接着往下走。 */
-            mat.uniforms.uOpacity.value = Math.min(mat.uniforms.uOpacity.value, 1 - smooth(t))
-        } else if (entryRef.current.skip) {
-            // 传送 / 探针：门是瞬开的，第一帧就该是房间
-            mat.uniforms.uOpacity.value = 1
-        } else {
-            entryElapsedRef.current += d
-            const t = Math.min(Math.max((entryElapsedRef.current - ENTRY_HOLD * k) / (ENTRY_FADE * k), 0), 1)
-            mat.uniforms.uOpacity.value = smooth(t)
-        }
-
-        const a = mat.uniforms.uOpacity.value
-
-        // 完全不透明：只画房间（稳态走的就是这条，最便宜）
-        if (a >= 0.999) {
-            gl.render(scene, cam)
-            return
-        }
-
-        // 半透明 / 全透明：先画走廊（门、相机、屋子都在那儿），再叠房间
-        gl.render(state.scene, state.camera)
-        if (a <= 0.002) return
-
-        const prev = gl.autoClear
-        gl.autoClear = false
-        gl.clearDepth()
-        gl.render(scene, cam)
-        gl.autoClear = prev
+        ensureQuadResolution(gl, quad.material)
+        const alpha = stage.advance(Math.min(delta, 0.1))
+        quad.material.uniforms.uOpacity.value = alpha
+        drawTakeover(gl, state, { scene, camera: cam, alpha })
     }, 1)
 
     return null
@@ -175,52 +93,22 @@ function FoldRenderer({ sceneRef, cameraRef, quadRef, exitingRef, exitElapsedRef
 
 const PostsFold = ({ onReady, isExiting = false }) => {
     const { currentRoom, isTeleporting } = useScene()
+    const quadRef = useRef(null)
     const sceneRef = useRef(null)
     const cameraRef = useRef(null)
-    const quadRef = useRef(null)
-    /* 两个计时器都靠帧循环推，用 ref 转一道 —— 免得状态一变整个场景重建。
-       `exitElapsedRef` / `entryElapsedRef` 存的是**已经跑了多少秒**（不是
-       0~1 的进度），因为两头都要"先按住再抹"。 */
-    const exitingRef = useRef(isExiting)
-    const exitElapsedRef = useRef(0)
-    const entryElapsedRef = useRef(0)
-    /* 只在挂载那一帧决定一次（`useRef` 的初值就是这么用的）：
-       正常从走廊推门进来时 `currentRoom` 还是 null ⇒ 要等门开；
+    /* 正常从走廊推门进来时 `currentRoom` 还是 null ⇒ 要等门开；
        传送 / 深链 / 探针 snap 时门是瞬开的 ⇒ 不等。 */
-    const entryRef = useRef({ skip: Boolean(isTeleporting) || currentRoom === 'posts' })
+    const stage = useTakeoverStage({
+        isExiting,
+        skipEntry: Boolean(isTeleporting) || currentRoom === 'posts',
+    })
     const readySent = useRef(false)
 
-    useEffect(() => { exitingRef.current = isExiting }, [isExiting])
-
     useEffect(() => {
-        const scene = new THREE.Scene()
-        /* 🔴 不设 `scene.background`：three 的 WebGLBackground 只要 background
-           是 Color 就**强制清屏**（不看 autoClear），进场/退场那趟需要先画
-           走廊再叠房间，一清就把走廊擦掉了。满屏 quad 自己就是背景。 */
-        scene.background = null
-
-        // 满屏正交相机 + 2×2 平面：gl_FragCoord 与屏幕像素一一对应
-        const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
-
-        const material = new THREE.ShaderMaterial({
-            vertexShader: VERT,
-            fragmentShader: FRAG,
-            uniforms: {
-                uRes: { value: new THREE.Vector2(1, 1) },
-                uOpacity: { value: 0 },
-            },
-            transparent: true,
-            depthTest: false,
-            depthWrite: false,
-        })
-        const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material)
-        quad.position.z = -0.5
-        quad.frustumCulled = false
-        scene.add(quad)
-
-        sceneRef.current = scene
-        cameraRef.current = camera
-        quadRef.current = quad
+        const screen = createScreenQuad({ fragmentShader: FRAG })
+        sceneRef.current = screen.scene
+        cameraRef.current = screen.camera
+        quadRef.current = screen.quad
 
         if (!readySent.current) {
             readySent.current = true
@@ -229,43 +117,21 @@ const PostsFold = ({ onReady, isExiting = false }) => {
         }
 
         return () => {
-            scene.traverse((o) => {
-                if (o.geometry) o.geometry.dispose()
-                if (o.material) o.material.dispose()
-            })
+            screen.dispose()
             sceneRef.current = null
             cameraRef.current = null
             quadRef.current = null
-            exitElapsedRef.current = 0
-            entryElapsedRef.current = 0
         }
     }, [onReady])
 
-    // 尺寸：uRes 用**绘制缓冲**尺寸（不是 CSS 像素），否则 2x 屏上渐变的
-    // 过渡带会出现明显的色带
-    const gl = useThree((s) => s.gl)
-    useEffect(() => {
-        const quad = quadRef.current
-        if (!quad) return undefined
-        const sync = () => {
-            const size = new THREE.Vector2()
-            gl.getDrawingBufferSize(size)
-            quad.material.uniforms.uRes.value.copy(size)
-        }
-        sync()
-        window.addEventListener('resize', sync)
-        return () => window.removeEventListener('resize', sync)
-    }, [gl])
+    useDrawingBufferSize(quadRef)
 
     return (
         <FoldRenderer
             sceneRef={sceneRef}
             cameraRef={cameraRef}
             quadRef={quadRef}
-            exitingRef={exitingRef}
-            exitElapsedRef={exitElapsedRef}
-            entryRef={entryRef}
-            entryElapsedRef={entryElapsedRef}
+            stage={stage}
         />
     )
 }

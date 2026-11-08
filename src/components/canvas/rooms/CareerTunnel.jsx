@@ -7,6 +7,7 @@ import { usePerformance } from '../../../context/PerformanceContext'
 import { getLocalizedCollection } from '../../../hooks/useContentData'
 import { ensureFontsReady, texturalCanvas } from '../../../utils/texturalArt'
 import { setTunnelArmed, setTunnelCount, setTunnelProgress, isTunnelLocked, tunnelRequest, tunnelCardZ, tunnelTargetZ, TUNNEL_SPACING, TUNNEL_CAM_OFFSET, TUNNEL_MOUTH_Z, TUNNEL_ENTRY_Z } from '../../../state/careerTunnel'
+import { createVeil, drawTakeover, useTakeoverStage } from './takeover'
 
 /**
  * 履历房间 —— 「时空隧道」。
@@ -24,6 +25,12 @@ import { setTunnelArmed, setTunnelCount, setTunnelProgress, isTunnelLocked, tunn
  * ⚠️ `useFrame(cb, 1)` 一旦注册，R3F 就**不再**自动渲染主场景。所以接管
  *    放在子组件 `TunnelRenderer` 里、且只在真正进房间时挂载 —— 预热副本
  *    （`RoomWarmup` 会挂一份）绝不能注册它，否则两份接管互相覆盖。
+ *
+ * ── 进场 / 退场 ───────────────────────────────────────────────────────
+ * 节奏在 `./takeover`（三个接管房间共用一份）。这一间额外要一层**幕布**
+ * （`createVeil`）：隧道不是满屏的（深空 + 卡片 + 星点），过渡期间
+ * `scene.background` 必须让开（Color 型 background 会强制清屏、把走廊擦掉），
+ * 底色只能由那块屏来给。它画在卡片**之前**，位置等价于 background。
  */
 
 /* 与 demo 逐字相同的一几何组数（世界单位）。改这几个数要重新看螺旋是否咬合。
@@ -35,6 +42,9 @@ const RADIUS = 3.2
 const TURN = 1.15 // 每张卡转过的弧度
 
 const FOG_COLOR = 0x06070c
+
+/** 稳态时隧道场景自己的底色（过渡期间由幕布代劳，见文件头）。 */
+const BASE_COLOR = new THREE.Color(FOG_COLOR)
 
 /* 贴图尺寸按档位分：8 张 680×960 的 canvas 在 LOW 档是纯浪费。
    🔴 canvas 是**惰性光栅化**的，真正的成本在第一次读像素/上传时（§42）。 */
@@ -206,7 +216,7 @@ function useExperiences(language) {
 }
 
 /** 只在"真的进了房间"时挂载 —— 见文件头关于接管的说明。 */
-function TunnelRenderer({ sceneRef, cameraRef, controlsRef, fadeRef, exitingRef }) {
+function TunnelRenderer({ sceneRef, cameraRef, controlsRef, veilRef, stage }) {
     const size = useThree((s) => s.size)
 
     useEffect(() => {
@@ -227,43 +237,18 @@ function TunnelRenderer({ sceneRef, cameraRef, controlsRef, fadeRef, exitingRef 
             return
         }
 
-        controls.step(delta)
+        /* 时钟只在这里走：场景没搭好就早退 ⇒ 计时天然对齐"门开"那一刻
+           （career 要等字体 + 8 张 canvas 光栅化，几百毫秒）。 */
+        const alpha = stage.advance(Math.min(delta, 0.1))
+        controls.step(delta, alpha)
 
-        const gl = state.gl
-        const fade = fadeRef.current
-
-        if (!exitingRef.current) {
-            // ── 在隧道里：整屏归隧道，幕布压在最后把"硬切"变成一次呼吸 ──
-            gl.render(scene, cam)
-            if (fade && fade.material.opacity > 0.002) {
-                const prev = gl.autoClear
-                gl.autoClear = false
-                gl.render(fade.scene, fade.camera)
-                gl.autoClear = prev
-            }
-            return
-        }
-
-        // ── 退场：**先把走廊画出来**，再把隧道整体溶掉叠在上面 ──────────
-        //
-        // 以前这里只画隧道、幕布一路拉满到隧道底色 ⇒ 用户点后退看到的是
-        // 一片黑，等门关完才"啪"地换成走廊。那不是卡顿，是**整段退场
-        // 动画根本没被渲染**（接管期间主场景一帧都没画）。
-        //
-        // 现在三趟：走廊（自带清屏）→ 空间底色（把走廊压住）→ 卡片/星点。
-        // 后两者的透明度由 frameRef 按同一个 t 从 1 降到 0 ⇒ 隧道像一层
-        // 墨在走廊上化开，门在底下关、相机在底下退。
-        gl.render(state.scene, state.camera)
-
-        const prev = gl.autoClear
-        gl.autoClear = false
-        // 🔴 走廊那一趟把深度缓冲也写满了。隧道有自己的相机和世界坐标，
-        //    接着用这份深度去测，卡片会被走廊的墙/地面按错误的 z 剔掉。
-        //    clearDepth() 不受 autoClear 影响（three 里它就是一次 gl.clear）。
-        gl.clearDepth()
-        if (fade && fade.material.opacity > 0.002) gl.render(fade.scene, fade.camera)
-        gl.render(scene, cam)
-        gl.autoClear = prev
+        drawTakeover(state.gl, state, {
+            scene,
+            camera: cam,
+            alpha,
+            veil: veilRef.current,
+            base: BASE_COLOR,
+        })
     }, 1)
 
     return null
@@ -272,7 +257,7 @@ function TunnelRenderer({ sceneRef, cameraRef, controlsRef, fadeRef, exitingRef 
 const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
     const { language } = useSitePreferences()
     const { tier } = usePerformance()
-    const { requestExit } = useScene()
+    const { requestExit, currentRoom, isTeleporting } = useScene()
     const gl = useThree((s) => s.gl)
     const experiences = useExperiences(language)
 
@@ -286,19 +271,20 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
     const sceneRef = useRef(null)
     const cameraRef = useRef(null)
     const cardsRef = useRef([])
-    /* 幕布：一趟正交覆盖屏，颜色 = 隧道底色。接管渲染是**瞬时**的 ——
-       门还关着的那一帧就整个换成星空了，硬切很难看。进场从底色淡入、
-       退场淡回底色，中间那一下就成了"呼吸"而不是"啪"。 */
-    const fadeRef = useRef(null)
+    /* 幕布：一趟正交覆盖屏，颜色 = 隧道底色。过渡期间 `scene.background`
+       必须让开（Color 型 background 不看 autoClear、直接清屏），底色由它代劳。 */
+    const veilRef = useRef(null)
     /* 场景搭好后由 build effect 填进来的"每帧动作"。单独放一个 ref，是为了
        让下面的 `controls.step` 只**读**它 —— 每帧要改的东西不能挂在 useMemo
        的返回值上（`react-hooks/immutability` 会直接报 error）。 */
     const frameRef = useRef(null)
 
-    // 退场动画期间把幕布拉上。用 ref 转一道，免得 build effect 因为 isExiting
-    // 变化整个重建场景。
-    const exitingRef = useRef(isExiting)
-    useEffect(() => { exitingRef.current = isExiting }, [isExiting])
+    /* 进场/退场节奏（三个接管房间共用一份）。传送 / 深链 / 探针 snap 的门
+       是瞬开的 ⇒ 不等，第一帧就是隧道。 */
+    const stage = useTakeoverStage({
+        isExiting,
+        skipEntry: Boolean(isTeleporting) || currentRoom === 'career',
+    })
 
     // 门要等隧道搭好再开 —— 否则门先开到一片空白，几百毫秒后星空才"啪"地出现。
     // 只发一次：换语言/换档位会重建场景，但门已经开了，不需要再喊。
@@ -325,14 +311,14 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
         controlsRef.current = {
             st,
             clamp,
-            step: (delta) => {
+            step: (delta, alpha) => {
                 if (tunnelRequest.z !== null) {
                     st.targetZ = clamp(tunnelRequest.z)
                     tunnelRequest.z = null
                 }
                 // 指数趋近 + 帧时间归一：60fps 与 30fps 手感一致
                 st.camZ += (st.targetZ - st.camZ) * (1 - Math.exp(-8 * delta))
-                frameRef.current?.(st.camZ, delta)
+                frameRef.current?.(st.camZ, delta, alpha)
             },
         }
     }, [experiences.length])
@@ -349,7 +335,7 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
 
         const tex = TEX[tier] || TEX.HIGH
         const scene = new THREE.Scene()
-        scene.background = new THREE.Color(FOG_COLOR)
+        scene.background = BASE_COLOR
         scene.fog = new THREE.FogExp2(FOG_COLOR, 0.028)
 
         const camera = new THREE.PerspectiveCamera(58, 16 / 9, 0.1, 300)
@@ -357,28 +343,9 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
         // 在 6 上渲一帧再跳过来。
         camera.position.set(0, 0, TUNNEL_ENTRY_Z)
 
-        // ---- 幕布（一趟正交覆盖屏）----
-        const fadeScene = new THREE.Scene()
-        const fadeCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
-        const fadeMaterial = new THREE.MeshBasicMaterial({
-            color: FOG_COLOR,
-            transparent: true,
-            opacity: 1,
-            depthTest: false,
-            depthWrite: false,
-            // 🔴 这块屏原来摆在 z=0，而正交相机也在 z=0、near=0 —— 它正好落在
-            //    **近平面上**，被裁掉，于是一帧都没画出来过（进场那个"呼吸"
-            //    其实一直是硬切）。挪到相机前方半格就好。
-            //    ⚠️ 别用 DoubleSide 救：透明双面会被拆成**两趟**画，
-            //    alpha 变成 1-(1-a)²，淡入淡出的曲线整个被拉歪。
-            toneMapped: false,
-        })
-        const fadeQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), fadeMaterial)
-        fadeQuad.position.z = -0.5
-        fadeQuad.frustumCulled = false
-        fadeScene.add(fadeQuad)
-        fadeRef.current = { scene: fadeScene, camera: fadeCamera, material: fadeMaterial }
-        let fadeOpacity = 1
+        // ---- 幕布（一趟正交覆盖屏，颜色 = 隧道底色）----
+        const veil = createVeil(FOG_COLOR)
+        veilRef.current = veil
 
         const cards = []
         const geometries = []
@@ -533,48 +500,25 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
            改成同一个真源之后，"HUD 说第 3 张、转正的是第 4 张"这类漂移在
            结构上就不可能发生。 */
         const focusDist = (cardZ, camZ) => Math.abs(camZ - (cardZ + TUNNEL_CAM_OFFSET))
-        // 进场：幕布 1→0（k=8 ⇒ 0.45s 时约 3%），卡片始终不透明 —— 星空从
-        //       底色里浮出来。
-        // 退场：exitT 0→1（k=6.5 ⇒ 0.46s 到 95%）。幕布按 a 降、卡片按 a² 降 ——
-        //       两者都得降（只降幕布会露出一张张悬在走廊上的卡；只降卡片会被
-        //       幕布压成一片纯色），但**卡片必须先走**，否则深灰卡片会残留在
-        //       已经亮起来的走廊上。
-        const FADE_IN_K = 8
-        const DISSOLVE_K = 6.5
-        /* 退场时幕布**不拉满**：0.92 就够压住走廊，留 8% 让第一帧和上一帧
-           （纯星空）几乎无缝 —— 拉满再降会闪一下。 */
-        const EXIT_VEIL = 0.92
-        let exitT = 0
         /* 每帧复用的临时对象（逐帧 new 会制造 GC 抖动）。 */
         const lookDummy = new THREE.Object3D()
         const qTarget = new THREE.Quaternion()
         const qSide = new THREE.Quaternion()
         const AXIS_Y = new THREE.Vector3(0, 1, 0)
-        frameRef.current = (camZ, delta) => {
+        frameRef.current = (camZ, delta, alpha) => {
             camera.position.set(0, 0, camZ)
             camera.lookAt(0, 0, camZ - 10)
             dots.position.z = camZ * 0.5
             far.position.z = camZ * 0.15
 
-            if (exitingRef.current) {
-                exitT += (1 - exitT) * (1 - Math.exp(-DISSOLVE_K * delta))
-                const a = 1 - exitT
-                fadeMaterial.opacity = a * EXIT_VEIL
-                // 卡片/星点用 a²，幕布用 a：**幕布是最后消失的那层**。
-                // 同为线性的话，卡片会以 20~30% 的深灰矩形悬在已经亮起来的
-                // 走廊上（逐帧截图 f52/f64 就是这个症状），看着像残影而不是
-                // 化开。让内容先走、底色后走，观感才是一层墨被抹掉。
-                const c = a * a
-                materials.forEach((m) => { m.opacity = c })
-                dotMat.opacity = c * 0.7
-                farMat.opacity = c * 0.5
-                // three 的 WebGLBackground 只要 background 是 Color 就**强制清屏**
-                // （不看 autoClear）⇒ 退场这一趟必须让开，否则走廊被纯色擦掉。
-                if (scene.background) scene.background = null
-            } else {
-                fadeOpacity += (0 - fadeOpacity) * (1 - Math.exp(-FADE_IN_K * delta))
-                fadeMaterial.opacity = fadeOpacity
-            }
+            /* 整条隧道跟着 alpha 走（幕布的透明度由 `drawTakeover` 设）。
+               进场：从走廊里淡出来；退场：化回走廊 —— 两边都是同一个
+               crossfade，不会出现"深灰卡片残留在亮起来的走廊上"（那是
+               只降卡片、或只降幕布时的症状）。
+               星点本来就只有 0.7 / 0.5 的不透明度，跟着 alpha 乘一遍。 */
+            materials.forEach((m) => { m.opacity = alpha })
+            dotMat.opacity = alpha * 0.7
+            farMat.opacity = alpha * 0.5
 
             let closest = 0
             let best = Infinity
@@ -636,8 +580,8 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
             materials.forEach((m) => m.dispose())
             textures.forEach((t) => t.dispose())
             dotGeom.dispose(); dotMat.dispose(); farGeom.dispose(); farMat.dispose()
-            fadeQuad.geometry.dispose(); fadeMaterial.dispose()
-            fadeRef.current = null
+            veil.dispose()
+            veilRef.current = null
             sceneRef.current = null
             cameraRef.current = null
             cardsRef.current = []
@@ -789,8 +733,8 @@ const CareerTunnel = ({ warmup = false, onReady, isExiting = false }) => {
             sceneRef={sceneRef}
             cameraRef={cameraRef}
             controlsRef={controlsRef}
-            fadeRef={fadeRef}
-            exitingRef={exitingRef}
+            veilRef={veilRef}
+            stage={stage}
         />
     )
 }

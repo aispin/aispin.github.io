@@ -31,7 +31,7 @@
 ## 执行注意（常驻，细节在 memory）
 
 - **分支** `feat/v1.2.0-island-courtyard`，**不推 `main`**（推 `main` = 上线）。
-- **质量门** `env -u NODE_OPTIONS npm run lint` → **0 error / 32 warning**；不跑 React Compiler。
+- **质量门** `env -u NODE_OPTIONS npm run lint` → **0 error / 43 warning**；不跑 React Compiler。
 - **构建前** `mv dist .workbuddy-ai/dist-prev-<ts>`；**https push 不通就换 SSH**
   （`git push git@github.com:aispin/aispin.github.io.git <branch>`），
   判据 `gh api .../commits/<branch> --jq .sha`。
@@ -44,7 +44,26 @@
 
 # 📋 待办 WO
 
-> **空。** 「创意实验房间换成实验环」已于 2026-11-05 提交（`b922f06`）：
+### WO-1 · `prefers-reduced-motion` 下点履历的门进不去
+
+- **现象**：系统开「减少动态效果」后，走到 `career` 门前点门，相机对上门就
+  停住 —— 门不开、也不进房间；等到 9s 仍是走廊（亮度 234 恒定）。
+  `gallery` / `craft` / `posts` 在同样条件下 0.6s 内就进屋了。
+- **已排除**：**不是**本轮「三个房间共用进场节奏」改出来的。同一支用例在
+  改之前的产物（`.workbuddy-ai/dist-prev-1793978071`，`python3 -m http.server`
+  起在 4299）上结果一模一样。
+- **方向**：`TRANSITION_SCALE = 0.12` 把 `alignDuration` 压到 ~0.18s，
+  `openDoor` 的 `onComplete`（以及它里面那个 8s 兜底定时器）似乎没跑到 ——
+  相机被 `useInfiniteCamera` 重新接管回走廊就是证据。而 career 是唯一一个
+  `onReady` 要等字体 + 8 张 canvas 光栅化（~1s）的房间，这个 1s 的空窗
+  大概率和 0.18s 的过场错位。**待查**，不要只看「门开没开」，要看
+  `alignDuration` 那条 tween 是否被 kill。
+- **判据**：`emulateMediaFeatures({name:'prefers-reduced-motion',value:'reduce'})`
+  下点 career 门，1.5s 内 `currentRoom === 'career'` 且画面亮度 < 20。
+- **复现脚本**：`/tmp/rm.mjs` 那套（滚到 z ≤ 14 → 找门 → 点 → 采样），
+  也可以直接照 `harness/probe-room-door.mjs career` 加 `emulateMediaFeatures`。
+
+> 「创意实验房间换成实验环」已于 2026-11-05 提交（`b922f06`）：
 > 房间 `studio` → `craft`，`CraftRing` 接管渲染 + `CraftHud` 25 块玻璃展板，
 > 深链/别名/滚轮/浮层/返回全部验过（`.workbuddy-ai/harness/probe-craft-room.mjs`）。
 

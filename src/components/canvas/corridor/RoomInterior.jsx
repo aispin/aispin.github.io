@@ -50,6 +50,66 @@ const CONTENT_ROOM_IDS = ['videos', 'music', 'ai'];
 const SELF_READY_IDS = ['gallery', 'contact', 'career', 'craft', 'posts', ...CONTENT_ROOM_IDS];
 
 /**
+ * 接管渲染房间的「屋子壳」（floor / ceiling / 背墙 / 左右墙，正面敞开）。
+ *
+ * career / craft / posts 三个房间都自带 Scene + Camera，主场景里**没有**它们
+ * 的屋子几何 —— 相机穿过门厅就是一片天空。以前看不出来，因为接管层从第一帧
+ * 就把整屏盖住了；现在进场先画走廊（门扇 0.7s + 穿门 1.5s），"门开了、后面
+ * 是天"就会露出来（2026-11-07 posts 上先补的，2026-11-08 三间共用）。
+ *
+ * 🔴 `toneMapped: false` 在 `shellMaterials()` 里统一设：接管层是 ShaderMaterial，
+ *    gl_FragColor 里的颜色**不过色调映射**；这几个要是走 ACES，同一个色出来
+ *    会比房间底色暗一大截，穿门那一下就成了"门后是个黑洞"。
+ *
+ * 壳只在"门开到房间暗下来"的那 1.35s 里看得见 ⇒ 颜色取各自底色稍亮一档就够，
+ * 别把它做成第二个视觉。
+ */
+const RoomShell = ({ geometries, shell }) => {
+    const { roomWidth, roomHeight, roomDepth, corridorHeight, corridorDepth } = ROOM_CONFIG;
+    const roomZ = -corridorDepth - roomDepth / 2;
+    return (
+        <group position={[0, roomHeight / 2 - corridorHeight / 2, roomZ]}>
+            <mesh
+                position={[0, -roomHeight / 2, 0]}
+                rotation={[-Math.PI / 2, 0, 0]}
+                geometry={geometries.roomFloorCeiling}
+                material={shell.floor}
+            />
+            <mesh
+                position={[0, roomHeight / 2, 0]}
+                rotation={[Math.PI / 2, 0, 0]}
+                geometry={geometries.roomFloorCeiling}
+                material={shell.ceiling}
+            />
+            <mesh
+                position={[0, 0, -roomDepth / 2]}
+                geometry={geometries.roomBackWall}
+                material={shell.wall}
+            />
+            <mesh
+                position={[-roomWidth / 2, 0, 0]}
+                rotation={[0, Math.PI / 2, 0]}
+                geometry={geometries.roomSideWall}
+                material={shell.wall}
+            />
+            <mesh
+                position={[roomWidth / 2, 0, 0]}
+                rotation={[0, -Math.PI / 2, 0]}
+                geometry={geometries.roomSideWall}
+                material={shell.wall}
+            />
+        </group>
+    );
+};
+
+/** 一组壳材质。见 `RoomShell` 上关于 `toneMapped` 的那条。 */
+const shellMaterials = (floor, ceiling, wall) => ({
+    floor: new THREE.MeshBasicMaterial({ color: floor, side: THREE.DoubleSide, toneMapped: false }),
+    ceiling: new THREE.MeshBasicMaterial({ color: ceiling, side: THREE.DoubleSide, toneMapped: false }),
+    wall: new THREE.MeshBasicMaterial({ color: wall, side: THREE.DoubleSide, toneMapped: false }),
+});
+
+/**
  * RoomInterior Component
  *
  * Memoized room geometry to prevent re-renders and improve performance.
@@ -93,15 +153,13 @@ const RoomInterior = ({ label, roomId, showRoom, onReady, isExiting }) => {
             roomWall: new THREE.MeshBasicMaterial({ color: '#f7f1e6', side: THREE.DoubleSide }),
             roomBackWall: new THREE.MeshBasicMaterial({ color: '#f4ede0', side: THREE.DoubleSide }),
 
-            // 经折房间（posts）的「屋子壳」。接管渲染的房间本来没有屋子几何，
-            // 相机穿过门厅就是一片天空 —— 以前被满屏暖黑底盖着看不出来，
-            // 2026-11-07 让进场先画走廊之后就露馅了。
-            // 🔴 `toneMapped: false`：接管层是 ShaderMaterial，gl_FragColor 里
-            //    的颜色**不过色调映射**；这几个要是走 ACES，同一个 #241d18 出来
-            //    会比经折的底暗一大截，穿门那一下就成了"门后是个黑洞"。
-            postsFloor: new THREE.MeshBasicMaterial({ color: '#2b221b', side: THREE.DoubleSide, toneMapped: false }),
-            postsCeiling: new THREE.MeshBasicMaterial({ color: '#1b1511', side: THREE.DoubleSide, toneMapped: false }),
-            postsWall: new THREE.MeshBasicMaterial({ color: '#3a2e25', side: THREE.DoubleSide, toneMapped: false }),
+            // 三个接管渲染房间的「屋子壳」配色（见 `RoomShell`）。
+            // 壳只在门开到房间暗下来的那 1.35s 里看得见 ⇒ 取各自底色稍亮一档。
+            shells: {
+                posts: shellMaterials('#2b221b', '#1b1511', '#3a2e25'),
+                career: shellMaterials('#0c0f19', '#05060b', '#151a28'),
+                craft: shellMaterials('#0b0e17', '#04060a', '#131827'),
+            },
         };
     }, [corridorWidth, corridorDepth, corridorHeight]);
 
@@ -216,16 +274,23 @@ const RoomInterior = ({ label, roomId, showRoom, onReady, isExiting }) => {
                         // === 时空隧道 ===
                         // 它自带 Scene + Camera，并**接管渲染**（见文件头）。
                         // 所以这里不能包 `<group position=…>`：那个变换对它是死的。
-                        <Suspense fallback={null}>
-                            <CareerTunnel onReady={onReady} isExiting={isExiting} />
-                        </Suspense>
+                        // 屋子壳必须**另放**：接管层只画隧道，壳是主场景的一部分。
+                        <>
+                            <RoomShell geometries={geometries} shell={materials.shells.career} />
+                            <Suspense fallback={null}>
+                                <CareerTunnel onReady={onReady} isExiting={isExiting} />
+                            </Suspense>
+                        </>
                     ) : roomId === 'craft' ? (
                         // === 创意实验：一圈展板 ===
                         // 同样自带 Scene + Camera + 接管渲染（rooms/CraftRing.jsx）。
                         // 展板本身是 DOM（ui/CraftHud.jsx），所以这里只搭星云背景。
-                        <Suspense fallback={null}>
-                            <CraftRing onReady={onReady} isExiting={isExiting} />
-                        </Suspense>
+                        <>
+                            <RoomShell geometries={geometries} shell={materials.shells.craft} />
+                            <Suspense fallback={null}>
+                                <CraftRing onReady={onReady} isExiting={isExiting} />
+                            </Suspense>
+                        </>
                     ) : roomId === 'posts' ? (
                         // === 文稿：一条经折 ===
                         // 自带 Scene + Camera + 接管渲染（rooms/PostsFold.jsx），
@@ -237,37 +302,7 @@ const RoomInterior = ({ label, roomId, showRoom, onReady, isExiting }) => {
                                 现在进场先画走廊（门扇转开 0.7s + 穿门 1.5s），
                                 "门开了，后面是天"就会露出来。
                                 不放标题 Text：进屋那一秒不该冒出第二套标题。 */}
-                            <group position={[0, roomHeight / 2 - corridorHeight / 2, roomZ]}>
-                                <mesh
-                                    position={[0, -roomHeight / 2, 0]}
-                                    rotation={[-Math.PI / 2, 0, 0]}
-                                    geometry={geometries.roomFloorCeiling}
-                                    material={materials.postsFloor}
-                                />
-                                <mesh
-                                    position={[0, roomHeight / 2, 0]}
-                                    rotation={[Math.PI / 2, 0, 0]}
-                                    geometry={geometries.roomFloorCeiling}
-                                    material={materials.postsCeiling}
-                                />
-                                <mesh
-                                    position={[0, 0, -roomDepth / 2]}
-                                    geometry={geometries.roomBackWall}
-                                    material={materials.postsWall}
-                                />
-                                <mesh
-                                    position={[-roomWidth / 2, 0, 0]}
-                                    rotation={[0, Math.PI / 2, 0]}
-                                    geometry={geometries.roomSideWall}
-                                    material={materials.postsWall}
-                                />
-                                <mesh
-                                    position={[roomWidth / 2, 0, 0]}
-                                    rotation={[0, -Math.PI / 2, 0]}
-                                    geometry={geometries.roomSideWall}
-                                    material={materials.postsWall}
-                                />
-                            </group>
+                            <RoomShell geometries={geometries} shell={materials.shells.posts} />
                             <Suspense fallback={null}>
                                 <PostsFold onReady={onReady} isExiting={isExiting} />
                             </Suspense>
