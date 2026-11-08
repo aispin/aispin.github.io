@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="../../_from.js" defer></script>
+<title>共生 · Symbiosis — 生成式房间原型</title>
+<meta name="description" content="AI 房间的空间语言：一片潜空间里的一只活体。每换一件作品，它就散成噪声、再长成另一个形态——机器负责生成，你负责出题。纯 WebGL 程序化，没有一张位图。">
+<style>
+@font-face{
+  font-family:'MapleUI';
+  src:url('/fonts/maple-ui.woff2') format('woff2');
+  font-weight:400 500;font-display:swap;
+}
+:root{
+  --bg:#05070c;
+  --ink:#eef3f8;
+  --dim:#7f8b9e;
+  --dim-2:#5a6577;
+  --accent:#5ef0c8;
+  --line:rgba(150,175,205,.16);
+  --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --sans:'MapleUI',ui-sans-serif,system-ui,'PingFang SC','Hiragino Sans GB',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--sans);
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+#gl{position:fixed;inset:0;display:block;width:100%;height:100%}
+.stage{position:fixed;inset:0;cursor:grab}
+.stage.is-dragging{cursor:grabbing}
+
+/* ── HUD：整层不吃事件，只有按钮和刻度收回来 ───────────────────── */
+.hud{position:fixed;inset:0;pointer-events:none;z-index:4}
+.hud a,.hud button,.hud .specimen,.rail{pointer-events:auto}
+
+.lab-back{
+  position:absolute;left:18px;top:16px;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 12px;border-radius:999px;
+  border:1px solid var(--line);
+  color:var(--dim);text-decoration:none;
+  font:400 12px/1 var(--sans);letter-spacing:.04em;
+  background:rgba(10,14,20,.45);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  transition:color .22s ease,border-color .22s ease;
+}
+.lab-back:hover{color:var(--ink);border-color:rgba(160,190,220,.34)}
+
+.brand{position:absolute;right:26px;top:22px;text-align:right}
+.brand__name{
+  font:500 15px/1.2 var(--sans);
+  letter-spacing:.14em;
+  color:var(--ink);
+  text-shadow:0 0 22px rgba(0,0,0,.7);
+}
+.brand__name i{font-style:normal;color:var(--dim-2);margin:0 8px;font-size:11px;letter-spacing:0}
+.brand__meta{
+  margin-top:9px;display:flex;align-items:center;justify-content:flex-end;gap:7px;
+  font:400 10px/1 var(--mono);letter-spacing:.2em;color:var(--dim-2);text-transform:uppercase;
+}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent)}
+.dot.is-busy{animation:pulse .9s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+
+/* ── 左栏：这件东西是什么 ──────────────────────────────────── */
+.readout{
+  position:absolute;left:56px;top:50%;transform:translateY(-50%);
+  width:min(400px,34vw);
+  text-shadow:0 1px 18px rgba(0,0,0,.85);
+}
+.idx{
+  font:400 11px/1 var(--mono);letter-spacing:.22em;color:var(--dim-2);
+  text-transform:uppercase;margin-bottom:20px;
+  transition:opacity .26s ease;
+}
+.idx b{color:var(--accent);font-weight:500;font-size:13px}
+.idx i{font-style:normal;margin:0 5px;opacity:.5}
+.idx em{font-style:normal;color:var(--dim)}
+.readout h1{
+  font:500 clamp(22px,2.3vw,32px)/1.2 var(--mono);
+  letter-spacing:-.012em;
+  color:var(--ink);
+  transition:opacity .26s ease,transform .26s ease;
+}
+.readout h1 .pfx{color:var(--dim-2)}
+.readout .desc{
+  margin-top:16px;
+  font:400 14px/1.78 var(--sans);
+  color:#c2cddb;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+  transition:opacity .26s ease;
+}
+.readout .meta{
+  margin-top:16px;
+  font:400 10px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;
+  color:var(--dim);
+  transition:opacity .26s ease;
+}
+.readout.is-swap .idx,.readout.is-swap h1,.readout.is-swap .meta,.readout.is-swap .desc{
+  opacity:0;transform:translateY(5px);
+}
+
+/* 系列：这六件本来是一套（数据里就写着 1/6 … 6/6） */
+.series{display:none;margin-top:22px;align-items:center;gap:6px}
+.series.on{display:flex}
+.series button{
+  appearance:none;border:0;padding:0;cursor:pointer;
+  width:22px;height:3px;border-radius:2px;
+  background:rgba(170,195,220,.24);
+  transition:background .25s ease,box-shadow .25s ease;
+}
+.series button:hover{background:rgba(200,225,245,.5)}
+.series button.on{background:var(--accent);box-shadow:0 0 10px var(--accent)}
+.series span{
+  font:400 9px/1 var(--mono);letter-spacing:.16em;color:var(--dim-2);
+  text-transform:uppercase;margin-left:8px;
+}
+
+.actions{margin-top:26px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:9px 16px;border-radius:999px;
+  border:1px solid var(--line);
+  background:rgba(10,14,20,.5);
+  color:var(--dim);
+  font:400 12px/1 var(--sans);letter-spacing:.04em;
+  text-decoration:none;cursor:pointer;
+  appearance:none;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  transition:color .2s ease,border-color .2s ease,background .2s ease;
+}
+.btn:hover{color:var(--ink);border-color:rgba(160,190,220,.36)}
+.btn--primary{
+  color:#04120f;background:var(--accent);border-color:transparent;font-weight:500;
+}
+.btn--primary:hover{color:#04120f;background:#eafffa;border-color:transparent}
+
+/* ── 右：正在跑的那一页（主角）───────────────────────────── */
+.specimen{
+  position:absolute;right:52px;top:50%;transform:translateY(-50%);
+  width:min(760px,48vw);aspect-ratio:16/9;
+  border-radius:14px;overflow:hidden;cursor:zoom-in;
+  border:1px solid rgba(150,200,225,.18);
+  background:#05080c;
+  box-shadow:0 40px 120px -40px rgba(0,0,0,.95),0 0 70px -24px var(--accent);
+  transition:border-color .3s ease,box-shadow .3s ease;
+}
+.specimen:hover{border-color:rgba(150,225,225,.42)}
+.specimen iframe{
+  position:absolute;left:0;top:0;border:0;
+  width:1440px;height:810px;
+  transform-origin:0 0;
+  pointer-events:none;
+  opacity:0;transition:opacity .55s ease;
+}
+.specimen.is-ready iframe{opacity:1}
+/* 换页时 iframe 会先白/黑一下 —— 用一层极淡的流光盖住，
+   比"卡片突然变黑"像是"正在载入"，也正好和炸开动画同时发生 */
+.specimen__load{
+  position:absolute;inset:0;z-index:1;
+  background:linear-gradient(100deg,#070b10 0%,#0c141b 46%,#070b10 100%);
+  background-size:220% 100%;
+  animation:sheen 1.5s linear infinite;
+  transition:opacity .45s ease;
+}
+.specimen.is-ready .specimen__load{opacity:0}
+@keyframes sheen{0%{background-position:130% 0}100%{background-position:-45% 0}}
+.specimen__veil{
+  position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(120% 90% at 50% 0%,rgba(94,240,200,.06),transparent 62%),
+    linear-gradient(180deg,rgba(4,7,11,.22),transparent 20%);
+}
+.specimen__tag{
+  position:absolute;left:12px;top:11px;z-index:2;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:4px 9px;border-radius:999px;
+  background:rgba(4,8,12,.72);border:1px solid rgba(150,200,225,.18);
+  font:400 9px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--dim);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  opacity:0;transform:translateY(-3px);
+  transition:opacity .25s ease,transform .25s ease;
+}
+.specimen:hover .specimen__tag{opacity:1;transform:none}
+.specimen__tag i{
+  width:4px;height:4px;border-radius:50%;font-style:normal;
+  background:var(--accent);box-shadow:0 0 8px var(--accent);
+}
+.specimen__hint{
+  position:absolute;right:12px;bottom:11px;z-index:2;
+  padding:5px 10px;border-radius:999px;
+  background:rgba(4,8,12,.74);border:1px solid rgba(150,200,225,.18);
+  font:400 10px/1 var(--sans);color:var(--dim);
+  opacity:0;transform:translateY(4px);
+  transition:opacity .25s ease,transform .25s ease;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+}
+.specimen:hover .specimen__hint{opacity:1;transform:none}
+
+/* ── 全屏试玩：同源 iframe，进来就能点 ──────────────────────── */
+.overlay{
+  position:fixed;inset:0;z-index:60;display:none;
+  align-items:center;justify-content:center;
+  background:rgba(3,6,10,.9);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+.overlay.is-open{display:flex}
+.overlay iframe{
+  width:min(1180px,92vw);height:min(760px,84vh);
+  border:1px solid rgba(150,200,225,.2);border-radius:12px;background:#0b0e13;
+}
+.overlay__x{
+  position:absolute;right:26px;top:22px;
+  appearance:none;cursor:pointer;
+  padding:8px 14px;border-radius:999px;
+  border:1px solid var(--line);background:rgba(10,14,20,.6);color:var(--dim);
+  font:400 12px/1 var(--sans);
+  transition:color .2s ease;
+}
+.overlay__x:hover{color:var(--ink)}
+
+/* ── 底部：24 格刻度 ─────────────────────────────────────────── */
+.rail{
+  position:absolute;left:50%;bottom:60px;transform:translateX(-50%);
+  display:flex;align-items:flex-end;gap:8px;height:22px;
+  padding:0 2px;
+}
+.rail button{
+  appearance:none;border:0;padding:0;cursor:pointer;
+  width:2px;height:10px;border-radius:1px;
+  background:rgba(170,195,220,.28);
+  transition:height .32s cubic-bezier(.3,1.4,.5,1),background .32s ease,box-shadow .32s ease;
+}
+.rail button:hover{background:rgba(200,225,245,.6)}
+.rail button.on{
+  height:20px;background:var(--accent);
+  box-shadow:0 0 12px var(--accent);
+}
+
+.hint{
+  position:absolute;left:50%;bottom:24px;transform:translateX(-50%);
+  font:400 10px/1 var(--mono);letter-spacing:.18em;color:var(--dim-2);
+  white-space:nowrap;
+}
+.hint kbd{
+  font:inherit;border:1px solid var(--line);border-radius:3px;
+  padding:1px 5px;margin:0 2px;color:var(--dim);
+}
+
+/* 过渡期间整屏压一层极淡的扫描 —— 纯 CSS，不额外开 canvas */
+.scan{
+  position:fixed;inset:0;z-index:3;pointer-events:none;
+  background:repeating-linear-gradient(180deg,rgba(255,255,255,.014) 0 1px,transparent 1px 3px);
+  mix-blend-mode:screen;opacity:.5;
+}
+
+@media (max-width:820px){
+  .brand{right:16px;top:14px}
+  .brand__name{font-size:13px}
+  .specimen{left:16px;right:16px;top:92px;transform:none;width:auto;aspect-ratio:16/9}
+  .readout{left:20px;right:20px;top:auto;bottom:104px;transform:none;width:auto}
+  .readout h1{font-size:20px}
+  .readout .desc{font-size:12.5px;-webkit-line-clamp:3;max-width:none}
+  .idx{margin-bottom:12px}
+  .actions{margin-top:16px}
+  .series{margin-top:14px}
+  .hint{font-size:9px;letter-spacing:.12em;bottom:20px}
+  .rail{bottom:52px;gap:4px}
+  .rail button{width:2px}
+  .overlay iframe{height:min(680px,72vh)}
+}
+@media (max-height:620px) and (min-width:821px){
+  .readout .desc{-webkit-line-clamp:2}
+  .readout h1{font-size:clamp(20px,2.2vw,28px)}
+}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div class="stage" id="stage"></div>
+<div class="scan" aria-hidden="true"></div>
+
+<div class="hud">
+  <a class="lab-back" href="/demos/">← Demos</a>
+
+  <header class="brand">
+    <div class="brand__name">共生<i>/</i>SYMBIOSIS</div>
+    <div class="brand__meta"><span class="dot" id="dot"></span><span id="status">就绪</span></div>
+  </header>
+
+  <section class="readout" id="readout">
+    <div class="idx"><b id="cur">01</b><i>/</i><span id="tot">24</span> · <em id="kind">SKILL</em></div>
+    <h1 id="title" aria-live="polite"></h1>
+    <p class="desc" id="desc"></p>
+    <div class="meta" id="meta"></div>
+    <nav class="series" id="series" aria-label="系列步骤"></nav>
+    <div class="actions">
+      <button class="btn btn--primary" id="try" type="button">▶ 在线试玩</button>
+      <a class="btn" id="link" href="#" target="_blank" rel="noopener">GitHub ↗</a>
+    </div>
+  </section>
+
+  <figure class="specimen" id="specimen" title="点开在线页面">
+    <iframe id="frame" title="项目页面预览" scrolling="no" tabindex="-1" aria-hidden="true"></iframe>
+    <div class="specimen__load"></div>
+    <div class="specimen__veil"></div>
+    <div class="specimen__tag"><i></i>在线页面</div>
+    <div class="specimen__hint">点开 · 可交互</div>
+  </figure>
+
+  <nav class="rail" id="rail" aria-label="索引"></nav>
+
+  <div class="hint">滚动 / 拖动 换一个 · 点预览可试玩</div>
+</div>
+
+<div class="overlay" id="overlay">
+  <button class="overlay__x" id="close" type="button">关闭 ✕</button>
+  <iframe id="live" title="在线试玩"></iframe>
+</div>
+
+<script src="../../_pager.js"></script>
+<script>
+/* =============================================================================
+ * 共生 · SYMBIOSIS —— AI 房间的空间语言原型
+ *
+ * 一句话：**每件作品一只活体，活体里装着它自己的页面**。左边说清"这是什么"，
+ * 右边直接跑真页面（24 件全都有落地页，2026-11-08 逐条 curl 过），点开就能试。
+ * 换一件时膜炸成粒子、按新的种子长成另一个形态 —— 那 1.15s 同时盖住 iframe 的
+ * 加载空窗，酷是拿来用的，不是拿来炫的。
+ *
+ * 为什么不是又一片星云
+ * --------------------
+ * career 是纵向隧道（序列），craft 是环形展板（并列），posts 是一条经折（长度）。
+ * 三个都靠"排布"讲故事。这一间**不排布**：一件作品一只活体，形态由这件作品
+ * 自己决定。于是四间房的空间语法互不重叠，也不会有人说"怎么又是星空"。
+ *
+ * 🔴 内容优先（用户 2026-11-08）：「核心目标是项目介绍+项目演示，用户需要一眼
+ *    看到项目名称、描述，点击可以去演示页、github。不能为了酷而酷。」
+ *    所以活体退成**包住预览卡的场**，永远不占中心；中心永远是那一页。
+ *    「重新生成」这类只有视觉意义的功能已删（只留换作品时的炸开）。
+ *
+ * 为什么是裸 WebGL，不是 three
+ * ---------------------------
+ * 整个画面只有三趟 draw call（背景全屏、线框、点），没有光照、没有材质、
+ * 没有拾取 —— 引 600KB 的 three 换不来任何东西。相机是一个手写基向量，
+ * 投影就是两行除法。数学全部在顶点着色器里，每帧只更新十来个 uniform。
+ *
+ * 🔴 红线：**零位图**。膜、尘、辉光、颗粒全是算出来的。
+ * ========================================================================== */
+(() => {
+'use strict'
+
+/* ---------------------------------------------------------------- 数据 */
+/* 由 src/data/aiProjects.json 生成（24 条），改文案直接改这里。 */
+const DATA = [
+  {"id": "iskill-video-clipper", "name": "iskill-video-clipper", "description": "实拍素材短视频剪辑——ffmpeg 快出片+剪映草稿双引擎（爆款短视频工作流 6/6）", "url": "https://github.com/aispin/iskill-video-clipper", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-03"},
+  {"id": "iskill-content-precheck", "name": "iskill-content-precheck", "description": "发布预检——违禁词扫描+四维爆款评估（爆款短视频工作流 5/6）", "url": "https://github.com/aispin/iskill-content-precheck", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-03"},
+  {"id": "iskill-viral-teardown", "name": "iskill-viral-teardown", "description": "爆款短视频拆解——下载转写+五维拆解（爆款短视频工作流 2/6）", "url": "https://github.com/aispin/iskill-viral-teardown", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-03"},
+  {"id": "iskill-hot-topic-scout", "name": "iskill-hot-topic-scout", "description": "每日热点选题——多平台热点搜集+画像打分+选题卡（爆款短视频工作流 1/6）", "url": "https://github.com/aispin/iskill-hot-topic-scout", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-03"},
+  {"id": "iskill-viral-copywriter", "name": "iskill-viral-copywriter", "description": "爆款文案生成——四段式口播稿（爆款短视频工作流 3/6）", "url": "https://github.com/aispin/iskill-viral-copywriter", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-03"},
+  {"id": "iskill-promo-page", "name": "iskill-promo-page", "description": "给 AI skill / 开源项目一键生成落地推广页：零依赖零构建、可插拔槽位、支持 GitHub Pages 部署", "url": "https://github.com/aispin/iskill-promo-page", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-03"},
+  {"id": "iskill-pipeline-dashboard", "name": "iskill-pipeline-dashboard", "description": "短视频操盘可视化交互台——专家团六步流水线实时看板（JSONL 事件流 + React/Tailwind/Vite，底层技能）", "url": "https://github.com/aispin/iskill-pipeline-dashboard", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-03"},
+  {"id": "iskill-ui-verify", "name": "iskill-ui-verify", "description": "无头浏览器截图与断言薄封装：UI 验收批量截图 / 多视口断言 / 视觉回归", "url": "https://github.com/aispin/iskill-ui-verify", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-02"},
+  {"id": "iskill-app-icon", "name": "iskill-app-icon", "description": "零依赖图标生成器：几何手绘矢量图形 → SVG/PNG 全套图标（favicon / apple-touch-icon / maskable / PWA）", "url": "https://github.com/aispin/iskill-app-icon", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-02"},
+  {"id": "iskill-generate-sponsors", "name": "iskill-generate-sponsors", "description": "收款码 → 一整套可直接用的赞助页：FUNDING.yml + Markdown 区块 + 响应式双语 html + 零依赖 React/Vue 组件。One QR image → a full sponsor kit.", "url": "https://github.com/aispin/iskill-generate-sponsors", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-02"},
+  {"id": "iskill-workbuddy-deepseek", "name": "iskill-workbuddy-deepseek", "description": "在 WorkBuddy 内置浏览器里用免费的 DeepSeek 网页版做讨论，一句话把对话交给 agent 执行 —— 不用外部 Chrome，不用切应用。", "url": "https://github.com/aispin/iskill-workbuddy-deepseek", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-02"},
+  {"id": "iskill-headroom-workbuddy2api", "name": "iskill-headroom-workbuddy2api", "description": "把 WorkBuddy 桌面端内置模型接成 OpenAI 兼容 API（hub 负责能用、headroom 负责耐用）；跨平台双击启动器 + 本机控制台", "url": "https://github.com/aispin/iskill-headroom-workbuddy2api", "category": "skill", "language": "Python", "updatedAt": "2026-10-02"},
+  {"id": "iskill-github-publisher", "name": "iskill-github-publisher", "description": "WorkBuddy 技能：把本地 AI skill 一键发布到 GitHub（iskill- 前缀 + SSH 推送 + SkillHub 认领）。", "url": "https://github.com/aispin/iskill-github-publisher", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-02"},
+  {"id": "iskill-super-mark", "name": "iskill-super-mark", "description": "个人收藏册：把微信转发/收藏的短视频与链接，变成可检索、可分类、有深度解读的 Web 应用", "url": "https://github.com/aispin/iskill-super-mark", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-02"},
+  {"id": "iskill-pwa-guideline", "name": "iskill-pwa-guideline", "description": "PWA 更新感知 skill：Vite + vite-plugin-pwa 项目的版本检测/静默提醒/一键清缓存更新", "url": "https://github.com/aispin/iskill-pwa-guideline", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-02"},
+  {"id": "iskill-music-beats", "name": "iskill-music-beats", "description": "音乐节拍点分析——BPM/节拍时间轴/强节拍 → beats.json，供视频剪辑卡点转场（librosa）", "url": "https://github.com/aispin/iskill-music-beats", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-02"},
+  {"id": "iskill-media-transcribe", "name": "iskill-media-transcribe", "description": "视频/音频 → mp4 + mp3 + srt + json 三件套：yt-dlp 下载（含微信视频号元宝桥接）+ ffmpeg 抽音轨 + 本地 Whisper 转写，全程离线", "url": "https://github.com/aispin/iskill-media-transcribe", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-02"},
+  {"id": "iskill-huggingface-ext", "name": "iskill-huggingface-ext", "description": "将 HuggingFace hub 缓存迁移到指定目录并软链回去，跨 macOS/Windows（iskill- 技能）", "url": "https://github.com/aispin/iskill-huggingface-ext", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-02"},
+  {"id": "iskill-geometric-bg", "name": "iskill-geometric-bg", "description": "Geometric background image generator — seeded, deterministic, zero-dependency SVG (6 styles × 8 palettes × dark/light)", "url": "https://github.com/aispin/iskill-geometric-bg", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-02"},
+  {"id": "iskill-generative-bgm", "name": "iskill-generative-bgm", "description": "纯前端生成式 BGM 引擎：Web Audio 实时合成，ABC 记谱定义主题，零素材离线", "url": "https://github.com/aispin/iskill-generative-bgm", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-02"},
+  {"id": "iskill-dig-media", "name": "iskill-dig-media", "description": "网络素材与 BGM 挖掘——Pixabay 视频 + Wikimedia Commons 音乐，manifest 溯源", "url": "https://github.com/aispin/iskill-dig-media", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-02"},
+  {"id": "iskill-crop-qrcode", "name": "iskill-crop-qrcode", "description": "二维码自动裁剪 CLI —— 零依赖定位码主体并裁成统一正方形（macOS sips，Node ≥18）", "url": "https://github.com/aispin/iskill-crop-qrcode", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-02"},
+  {"id": "iskill-copy-deslop", "name": "iskill-copy-deslop", "description": "口播文案去AI味+三视角真人点评（爆款短视频工作流 4/6）", "url": "https://github.com/aispin/iskill-copy-deslop", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-02"},
+  {"id": "iskill-script-launcher", "name": "iskill-script-launcher", "description": "写给用户双击运行的跨平台脚本（macOS .command / Windows .ps1+.cmd）：一份 Python 真源 + 各平台薄壳，附按症状归档的真机踩坑与可抄骨架", "url": "https://github.com/aispin/iskill-script-launcher", "category": "skill", "language": "JavaScript", "updatedAt": "2026-10-02"},
+]
+
+/* ---------------------------------------------------------------- 常量 */
+const DUR = 1.15                 // 一次「去噪」的时长（秒）
+const FOV = 42 * Math.PI / 180
+const TAN_HALF = Math.tan(FOV / 2)
+const IS_SMALL = matchMedia('(max-width: 820px)').matches
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches
+/* 相机半径（膜的平均半径 = 1）。竖屏的水平视角只有 ~11°，
+   而活体自身的半角有 ~18° —— 不后退就直接出画。 */
+const CAM_R = IS_SMALL ? 7.5 : 3.4
+/* 距离衰减的截断点原本是按 4.05 写死的，相机一退整只活体就被判成"太远"而变暗，
+   所以改成跟着 CAM_R 走；SIZE_K 把点径按同样的比例补回来。 */
+const FADE_LINE = 1.5 - 4.05 * 0.22 + CAM_R * 0.22
+const FADE_DOT = 1.55 - 4.05 * 0.24 + CAM_R * 0.24
+const SIZE_K = IS_SMALL ? CAM_R / 4.05 : 1
+
+const SURFACE_N = IS_SMALL ? 13000 : 26000
+const DUST_N = IS_SMALL ? 4200 : 9000
+const LAT = 18, MER = 32, SEG = IS_SMALL ? 64 : 96
+
+/* 活体在画面上的落位（NDC）。桌面让到右边，左下留给文案；
+   手机竖屏把活体顶上去，文案在底下 —— 两者都不该压在文字上。 */
+const SHIFT = IS_SMALL ? [0.0, 0.52] : [0.40, 0.0]
+
+/* ---------------------------------------------------------------- 小工具 */
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v)
+const ease = (t) => t * t * (3 - 2 * t)
+const smooth01 = (t) => clamp(t, 0, 1)
+
+/** FNV-1a：同一个 id 永远得到同一个形态（换语言/刷新都不该变脸）。 */
+function hash32(s) {
+  let h = 2166136261 >>> 0
+  for (let i = 0; i < s.length; i += 1) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0 }
+  return h >>> 0
+}
+
+/** 形态种子：喂给 shape() 的相位。范围 0~2π，差别足够大又不会自交。 */
+const seedOf = (id) => (hash32(id) % 100000) / 100000 * 6.28318
+
+/** 每件作品一个色相：薄荷 → 青 → 天蓝（152°~200°）。刻意避开 career 的紫。 */
+function accentOf(id) {
+  const h = 152 + (hash32(id + '|hue') % 49)
+  return `hsl(${h} 92% 66%)`
+}
+function hslToRgb(h, s, l) {
+  const c = (1 - Math.abs(2 * l - 1)) * s
+  const hp = (h % 360) / 60
+  const x = c * (1 - Math.abs((hp % 2) - 1))
+  let r = 0, g = 0, b = 0
+  if (hp < 1) [r, g, b] = [c, x, 0]
+  else if (hp < 2) [r, g, b] = [x, c, 0]
+  else if (hp < 3) [r, g, b] = [0, c, x]
+  else if (hp < 4) [r, g, b] = [0, x, c]
+  else if (hp < 5) [r, g, b] = [x, 0, c]
+  else [r, g, b] = [c, 0, x]
+  const m = l - c / 2
+  return [r + m, g + m, b + m]
+}
+const accentRgb = (id) => {
+  const h = 152 + (hash32(id + '|hue') % 49)
+  return hslToRgb(h, 0.92, 0.66)
+}
+
+/* ---------------------------------------------------------------- WebGL */
+const canvas = document.getElementById('gl')
+const gl = canvas.getContext('webgl', {
+  alpha: false, antialias: true, depth: false, stencil: false,
+  powerPreference: 'high-performance', preserveDrawingBuffer: false,
+})
+if (!gl) {
+  document.body.innerHTML = '<p style="padding:40px;font:14px/1.6 sans-serif;color:#889">这台设备的浏览器没有开启 WebGL。</p>'
+  return
+}
+
+/* 共用的形变函数：**线框、表面点、内核必须用同一份**，否则三者会错开。
+   d = 单位方向；seed = 形态相位；返回值是撑开后的位置。 */
+const SHAPE = `
+vec3 rotY(vec3 p, float a){
+  float s = sin(a), c = cos(a);
+  return vec3(p.x*c + p.z*s, p.y, -p.x*s + p.z*c);
+}
+vec3 shape(vec3 d, float seed){
+  float lon = atan(d.z, d.x);
+  float lat = asin(clamp(d.y, -1.0, 1.0));
+
+  /* 三组驻波：低频定轮廓（3~5 个瓣），中频给褶皱，高频给毛刺。
+     纯 dot-product 噪声会长成"土豆"，换成经纬参数后轮廓可控得多。 */
+  float n = 0.0;
+  n += sin(lon*3.0 + seed*1.7) * cos(lat*2.0 - seed*0.9) * 0.40;
+  n += sin(lon*5.0 - seed*2.1) * cos(lat*4.0 + seed*1.3) * 0.18;
+  n += sin(lat*8.0 + seed*3.7) * sin(lon*2.0 + seed*0.5) * 0.10;
+  n += sin(lon*11.0 + lat*7.0 + seed*5.1) * 0.05;
+
+  float r = 1.0 + n * 0.62;
+  r *= 1.0 + 0.022 * sin(uTime*1.05 + seed*3.0);   // 呼吸
+
+  vec3 p = d * r;
+  /* 每件作品的身材不同：按种子拉长/压扁，八张不会是一个模子 */
+  p.xz *= 1.0 + 0.16 * sin(seed * 1.9);
+  p.y  *= 1.0 + 0.20 * cos(seed * 2.3);
+  return p;
+}
+`
+
+/* 相机基向量 + 投影，两个顶点着色器共用。没有矩阵，就三行点积。 */
+const PROJECT = `
+uniform vec3 uCam, uRight, uUp, uFwd;
+uniform vec2 uView, uShift;
+vec4 project(vec3 p, out float z){
+  vec3 v = p - uCam;
+  z = dot(v, uFwd);
+  if (z < 0.25) { z = 0.25; return vec4(9.0, 9.0, 0.0, 1.0); }
+  vec2 ndc = vec2(dot(v, uRight) / (z * uView.x), dot(v, uUp) / (z * uView.y));
+  return vec4(ndc + uShift, 0.0, 1.0);
+}
+`
+
+const VS_BG = `
+attribute vec2 aPos;
+void main(){ gl_Position = vec4(aPos, 0.0, 1.0); }
+`
+
+const FS_BG = `
+precision highp float;
+uniform vec2 uRes;
+uniform float uTime, uEnergy, uRing;
+uniform vec3 uAccent;
+uniform vec2 uGlow;
+
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123); }
+float noise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  f = f*f*(3.0-2.0*f);
+  return mix(mix(hash(i), hash(i+vec2(1.0,0.0)), f.x),
+             mix(hash(i+vec2(0.0,1.0)), hash(i+vec2(1.0,1.0)), f.x), f.y);
+}
+float fbm(vec2 p){
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 4; i++) { v += a * noise(p); p *= 2.03; a *= 0.5; }
+  return v;
+}
+
+void main(){
+  vec2 p = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
+  float t = uTime * 0.028;
+
+  /* ① 底：极深的蓝黑，中间略亮（像一口井） */
+  vec3 col = vec3(0.014, 0.017, 0.028);
+  float n = fbm(p * 1.7 + vec2(t, -t * 0.6));
+  col += uAccent * smoothstep(0.40, 1.0, n) * 0.085;
+
+  /* ② 中心辉光：活体自己在发光，过渡时更亮。
+       位置跟着活体在画面上的偏移走（uGlow），否则光晕会脱离主体。 */
+  float d = length(p - uGlow);
+  col += uAccent * exp(-d * d * 4.2) * (0.20 + uEnergy * 0.26);
+  col += uAccent * exp(-d * d * 26.0) * 0.16;
+
+  /* ③ 极淡的横向光带（anamorphic），只在过渡时明显 */
+  col += uAccent * exp(-abs(p.y - uGlow.y) * 26.0) * 0.05 * (0.5 + uEnergy * 1.4);
+
+  /* ④ 冲击环：换作品时从膜的边缘荡开两圈，给"生成"一个明确的瞬间。
+       起点故意不从 0 开始 —— 圆心是最亮的地方，从 0 起步的环永远看不见。 */
+  if (uRing >= 0.0) {
+    float rr = 0.22 + uRing * 0.86;
+    /* 一道锐的波前 + 一圈宽的光晕，合起来才像"冲击波"而不是 UI 里的圈。
+       smoothstep 的 edge0 必须 < edge1，反过来写是 UB（实测整条环被算成 0）。 */
+    float front = 1.0 - smoothstep(0.0, 0.050, abs(d - rr));
+    float halo = 1.0 - smoothstep(0.0, 0.150, abs(d - rr));
+    col += uAccent * (front + halo * 0.16) * pow(1.0 - uRing, 1.4) * 1.0;
+  }
+
+  /* ⑤ 暗角 */
+  col *= 1.0 - smoothstep(0.52, 1.32, length(p)) * 0.8;
+
+  /* ⑥ 颗粒：给纯色区域一点"底片"质感，不然大平面会显出 banding */
+  col += (hash(gl_FragCoord.xy + fract(uTime) * 91.0) - 0.5) * 0.014;
+
+  gl_FragColor = vec4(max(col, 0.0), 1.0);
+}
+`
+
+const VS_LINE = `
+attribute vec3 aPos;
+attribute float aRand;
+uniform float uTime, uSeedA, uSeedB, uMix, uBurst;
+uniform vec3 uAccent;
+uniform float uOpacity, uFadeK;
+varying vec3 vColor;
+varying float vA;
+${PROJECT}
+${SHAPE}
+void main(){
+  /* 逐顶点的错峰：远处先动、近处后动，看起来才像"重新长出来"而不是整体缩放 */
+  float m = clamp((uMix - aRand * 0.42) / 0.58, 0.0, 1.0);
+  m = m*m*(3.0-2.0*m);
+  vec3 p = mix(shape(aPos, uSeedA), shape(aPos, uSeedB), m);
+
+  /* 过渡时整体炸开：沿法向外推 + 一点点乱序抖动 */
+  float b = uBurst * (0.45 + aRand * 0.9);
+  p += normalize(p) * b * 0.95;
+
+  /* 菲涅尔：正对镜头的网格压暗、侧对镜头（轮廓）提亮。
+     没有光照也能一眼看出这是**壳**，而不是一团线。 */
+  vec3 vd = normalize(uCam - p);
+  float fres = 1.0 - abs(dot(normalize(p), vd));
+
+  float z;
+  gl_Position = project(p, z);
+  float fade = clamp(uFadeK - z * 0.22, 0.04, 1.0) * mix(0.42, 1.0, fres);
+  vA = fade * uOpacity;
+  vColor = mix(uAccent, vec3(1.0), 0.30);
+}
+`
+
+const FS_LINE = `
+precision mediump float;
+varying vec3 vColor;
+varying float vA;
+void main(){ gl_FragColor = vec4(vColor * vA, 1.0); }
+`
+
+const VS_DOT = `
+attribute vec3 aPos;
+attribute vec3 aRand;
+uniform float uTime, uSeedA, uSeedB, uMix, uBurst, uKind, uPxScale, uSize, uFadeK;
+uniform vec3 uAccent;
+varying vec3 vColor;
+varying float vA;
+${PROJECT}
+${SHAPE}
+void main(){
+  vec3 p;
+  float m = clamp((uMix - aRand.x * 0.42) / 0.58, 0.0, 1.0);
+  m = m*m*(3.0-2.0*m);
+
+  float rim = 1.0;      // 1 = 只吃菲涅尔（壳），0 = 均匀（核/尘）
+  float hot = 0.42;     // 混向白色的比例
+
+  if (uKind < 0.5) {
+    /* 膜上的点：和线框走同一份形变，再加一层极薄的厚度 */
+    p = mix(shape(aPos, uSeedA), shape(aPos, uSeedB), m);
+    p *= 1.0 + (aRand.y - 0.5) * 0.028;
+  } else if (uKind < 1.5) {
+    /* 浮尘：不跟着形变，慢慢自转 + 呼吸 */
+    p = rotY(aPos, uTime * 0.018 + aRand.x * 0.4);
+    p *= 1.0 + 0.035 * sin(uTime * 0.6 + aRand.y * 6.28318);
+    rim = 0.0;
+  } else {
+    /* 内核：一只更小、更热的东西在里面跳 —— 壳才有"活着"的感觉 */
+    p = shape(aPos, uSeedB * 2.7 + uSeedA * 0.3) * 0.34;
+    p *= 1.0 + 0.045 * sin(uTime * 2.2 + aRand.x * 6.28318);
+    rim = 0.0;
+    hot = 0.9;
+  }
+
+  float b = uBurst * (0.35 + aRand.z * 0.85) * (uKind < 0.5 ? 1.0 : 0.45);
+  p += normalize(p) * b * 0.95;
+
+  vec3 vd = normalize(uCam - p);
+  float fres = 1.0 - abs(dot(normalize(p), vd));
+  float fresK = mix(1.0, mix(0.32, 1.18, fres), rim);
+
+  float z;
+  gl_Position = project(p, z);
+  gl_PointSize = clamp(uPxScale * uSize * (0.6 + aRand.z * 0.9) / z, 1.0, 26.0);
+
+  /* 闪：每个点自己的相位，像被采样中的点云（还没"去噪"完） */
+  float flick = 0.62 + 0.38 * sin(uTime * 2.1 + aRand.y * 43.0);
+  float fade = clamp(uFadeK - z * 0.24, 0.03, 1.0);
+  vA = fade * flick * fresK * (uKind < 0.5 ? 1.0 : (uKind < 1.5 ? 0.5 : 1.6));
+  vColor = mix(uAccent, vec3(1.0), hot * (0.4 + aRand.x * 0.6));
+}
+`
+
+const FS_DOT = `
+precision mediump float;
+varying vec3 vColor;
+varying float vA;
+void main(){
+  float d = length(gl_PointCoord - 0.5);
+  float a = smoothstep(0.5, 0.0, d);
+  a = pow(a, 2.3);
+  gl_FragColor = vec4(vColor * a * vA, 1.0);
+}
+`
+
+/* ---------------------------------------------------------------- 程序 */
+function build(vsSrc, fsSrc) {
+  const mk = (type, src) => {
+    const s = gl.createShader(type)
+    gl.shaderSource(s, src)
+    gl.compileShader(s)
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      throw new Error(gl.getShaderInfoLog(s) + '\n' + src)
+    }
+    return s
+  }
+  const p = gl.createProgram()
+  gl.attachShader(p, mk(gl.VERTEX_SHADER, vsSrc))
+  gl.attachShader(p, mk(gl.FRAGMENT_SHADER, fsSrc))
+  gl.linkProgram(p)
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p))
+
+  const loc = {}
+  for (let i = 0, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS); i < n; i += 1) {
+    const info = gl.getActiveUniform(p, i)
+    loc[info.name] = gl.getUniformLocation(p, info.name)
+  }
+  return { p, loc }
+}
+
+const progBg = build(VS_BG, FS_BG)
+const progLine = build(VS_LINE, FS_LINE)
+const progDot = build(VS_DOT, FS_DOT)
+
+/* 属性槽一次问清楚 —— 每帧再问一遍只是白白多几趟 GL 调用 */
+const ATTR = {
+  bg: gl.getAttribLocation(progBg.p, 'aPos'),
+  linePos: gl.getAttribLocation(progLine.p, 'aPos'),
+  lineRand: gl.getAttribLocation(progLine.p, 'aRand'),
+  dotPos: gl.getAttribLocation(progDot.p, 'aPos'),
+  dotRand: gl.getAttribLocation(progDot.p, 'aRand'),
+}
+
+const buf = (data) => {
+  const b = gl.createBuffer()
+  gl.bindBuffer(gl.ARRAY_BUFFER, b)
+  gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW)
+  return b
+}
+
+/* 全屏三角（比两个三角形的 quad 少一次光栅化接缝） */
+const bgBuf = buf(new Float32Array([-1, -1, 3, -1, -1, 3]))
+
+/* ---- 线框：经纬网。和表面点共用 shape()，所以点永远贴在网上 ---- */
+function buildWire() {
+  const out = []
+  const push = (x, y, z, r) => { out.push(x, y, z, r) }
+  for (let i = 1; i < LAT; i += 1) {
+    const th = Math.PI * i / LAT
+    const sy = Math.cos(th), sr = Math.sin(th)
+    for (let j = 0; j < SEG; j += 1) {
+      const a0 = 2 * Math.PI * j / SEG
+      const a1 = 2 * Math.PI * (j + 1) / SEG
+      const r = (i * SEG + j) / (LAT * SEG)
+      push(Math.cos(a0) * sr, sy, Math.sin(a0) * sr, r)
+      push(Math.cos(a1) * sr, sy, Math.sin(a1) * sr, r)
+    }
+  }
+  for (let m = 0; m < MER; m += 1) {
+    const a = 2 * Math.PI * m / MER
+    const ca = Math.cos(a), sa = Math.sin(a)
+    for (let i = 0; i < LAT; i += 1) {
+      const t0 = Math.PI * i / LAT
+      const t1 = Math.PI * (i + 1) / LAT
+      const r = (m * LAT + i) / (MER * LAT)
+      push(ca * Math.sin(t0), Math.cos(t0), sa * Math.sin(t0), r)
+      push(ca * Math.sin(t1), Math.cos(t1), sa * Math.sin(t1), r)
+    }
+  }
+  return new Float32Array(out)
+}
+
+/* ---- 表面点：斐波那契球（均匀、无极点堆积） ---- */
+function buildSurface(n) {
+  const a = new Float32Array(n * 6)
+  const ga = Math.PI * (3 - Math.sqrt(5))
+  for (let i = 0; i < n; i += 1) {
+    const y = 1 - (i + 0.5) * 2 / n
+    const r = Math.sqrt(Math.max(0, 1 - y * y))
+    const th = ga * i
+    a[i * 6] = Math.cos(th) * r
+    a[i * 6 + 1] = y
+    a[i * 6 + 2] = Math.sin(th) * r
+    a[i * 6 + 3] = Math.random()
+    a[i * 6 + 4] = Math.random()
+    a[i * 6 + 5] = Math.random()
+  }
+  return a
+}
+
+/* ---- 浮尘：1.35~2.7 半径的壳里 ---- */
+function buildDust(n) {
+  const a = new Float32Array(n * 6)
+  for (let i = 0; i < n; i += 1) {
+    const u = Math.random() * 2 - 1
+    const th = Math.random() * Math.PI * 2
+    const s = Math.sqrt(Math.max(0, 1 - u * u))
+    const r = 1.35 + Math.pow(Math.random(), 0.55) * 1.35
+    a[i * 6] = Math.cos(th) * s * r
+    a[i * 6 + 1] = u * r
+    a[i * 6 + 2] = Math.sin(th) * s * r
+    a[i * 6 + 3] = Math.random()
+    a[i * 6 + 4] = Math.random()
+    a[i * 6 + 5] = Math.random()
+  }
+  return a
+}
+
+const wireData = buildWire()
+const surfaceData = buildSurface(SURFACE_N)
+const dustData = buildDust(DUST_N)
+
+const wireBuf = buf(wireData)
+const surfaceBuf = buf(surfaceData)
+const dustBuf = buf(dustData)
+
+const wireCount = wireData.length / 4
+const surfaceCount = SURFACE_N
+const dustCount = DUST_N
+
+/* ---------------------------------------------------------------- 状态 */
+const S = {
+  i: 0,
+  seedA: 0,
+  seedB: 0,
+  mix: 1,
+  burst: 0,
+  energy: 0,
+  trans: -1,          // <0 = 静止
+  ring: -1,           // <0 = 没有冲击环；0~1 = 正在荡开
+  accent: [0.37, 0.94, 0.78],
+  mx: 0, my: 0,       // 平滑后的指针（-1~1）
+  tx: 0, ty: 0,       // 目标
+}
+
+const el = {
+  stage: document.getElementById('stage'),
+  readout: document.getElementById('readout'),
+  title: document.getElementById('title'),
+  meta: document.getElementById('meta'),
+  desc: document.getElementById('desc'),
+  kind: document.getElementById('kind'),
+  link: document.getElementById('link'),
+  try: document.getElementById('try'),
+  series: document.getElementById('series'),
+  specimen: document.getElementById('specimen'),
+  frame: document.getElementById('frame'),
+  overlay: document.getElementById('overlay'),
+  live: document.getElementById('live'),
+  close: document.getElementById('close'),
+  rail: document.getElementById('rail'),
+  cur: document.getElementById('cur'),
+  tot: document.getElementById('tot'),
+  status: document.getElementById('status'),
+  dot: document.getElementById('dot'),
+}
+
+el.tot.textContent = String(DATA.length).padStart(2, '0')
+
+/* 24 件全部有落地页（2026-11-08 逐条 curl 过，都是 200） */
+const demoOf = (id) => `https://aispin.github.io/${id}/`
+
+/* ---------------------------------------------------------------- 尺寸 */
+let vw = 1, vh = 1, dpr = 1
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, IS_SMALL ? 2 : 2)
+  vw = Math.round(window.innerWidth * dpr)
+  vh = Math.round(window.innerHeight * dpr)
+  canvas.width = vw
+  canvas.height = vh
+  canvas.style.width = window.innerWidth + 'px'
+  canvas.style.height = window.innerHeight + 'px'
+  gl.viewport(0, 0, vw, vh)
+  if (el && el.specimen) fitFrame()
+}
+resize()
+window.addEventListener('resize', resize)
+
+/* ---------------------------------------------------------------- DOM */
+
+/* 系列：六件是一套流水线，数据里就写着 1/6 … 6/6，别让它散在 24 格里 */
+const SERIES = (() => {
+  const re = /爆款短视频工作流\s*(\d+)\s*\/\s*(\d+)/
+  const hits = []
+  DATA.forEach((it, i) => {
+    const m = re.exec(it.description || '')
+    if (m) hits.push({ i, step: +m[1] })
+  })
+  if (hits.length < 3) return null
+  hits.sort((a, b) => a.step - b.step)
+  return hits
+})()
+const SERIES_STEP = new Map(SERIES ? SERIES.map((s) => [s.i, s.step]) : [])
+
+function paint(i) {
+  const it = DATA[i]
+  document.documentElement.style.setProperty('--accent', accentOf(it.id))
+  S.accent = accentRgb(it.id)
+
+  const name = it.name || it.title
+  const m = name.match(/^([a-z]+-)(.*)$/)
+  el.title.innerHTML = m ? `<span class="pfx">${m[1]}</span>${m[2]}` : name
+  el.kind.textContent = it.category || 'project'
+  el.meta.textContent = [it.language, it.updatedAt && it.updatedAt.slice(0, 7).replace('-', '.')]
+    .filter(Boolean).join('  ·  ')
+  el.desc.textContent = it.description || ''
+  el.cur.textContent = String(i + 1).padStart(2, '0')
+
+  el.link.href = it.url || it.repository || '#'
+  el.link.textContent = /github/i.test(el.link.href) ? 'GitHub ↗' : '打开 ↗'
+
+  /* 系列指示：只在属于那条流水线时才出现 */
+  const step = SERIES_STEP.get(i)
+  el.series.classList.toggle('on', Boolean(step))
+  if (step) {
+    ;[...el.series.querySelectorAll('button')].forEach((b, k) => {
+      b.classList.toggle('on', SERIES[k].i === i)
+    })
+  }
+
+  loadPreview(it)
+  ;[...el.rail.children].forEach((b, k) => b.classList.toggle('on', k === i))
+}
+
+/* 预览：同源 iframe，一次只挂一个（换页就换 src，不叠 24 个） */
+let previewSrc = ''
+function loadPreview(it) {
+  const src = demoOf(it.id)
+  if (src === previewSrc) return
+  previewSrc = src
+  el.specimen.classList.remove('is-ready')
+  el.frame.onload = () => {
+    if (previewSrc === src) el.specimen.classList.add('is-ready')
+  }
+  el.frame.src = src
+}
+
+/* 1440×810 渲染再缩进卡片 —— 拿的是桌面版的样子，不是被卡片挤窄的响应式版 */
+function fitFrame() {
+  el.frame.style.transform = `scale(${el.specimen.clientWidth / 1440})`
+}
+
+let swapTimer = 0
+function swapTo(i) {
+  el.readout.classList.add('is-swap')
+  clearTimeout(swapTimer)
+  swapTimer = setTimeout(() => {
+    paint(i)
+    fitFrame()
+    el.readout.classList.remove('is-swap')
+  }, REDUCED ? 0 : 300)
+}
+
+/* ---------------------------------------------------------------- 切题 */
+function go(n) {
+  const next = clamp(n, 0, DATA.length - 1)
+  if (next === S.i || overlayOpen) return
+  S.i = next
+  S.seedA = S.seedB
+  S.seedB = seedOf(DATA[next].id)
+  S.mix = 0
+  S.trans = 0
+  S.ring = REDUCED ? -1 : 0
+  el.dot.classList.add('is-busy')
+  el.status.textContent = '加载中'
+  swapTo(next)
+}
+
+for (let i = 0; i < DATA.length; i += 1) {
+  const b = document.createElement('button')
+  b.type = 'button'
+  b.setAttribute('aria-label', `第 ${i + 1} 件`)
+  b.addEventListener('click', () => go(i))
+  el.rail.appendChild(b)
+}
+
+if (SERIES) {
+  SERIES.forEach((s) => {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.setAttribute('aria-label', `第 ${s.step} 步`)
+    b.addEventListener('click', () => go(s.i))
+    el.series.appendChild(b)
+  })
+  const lab = document.createElement('span')
+  lab.textContent = `爆款短视频工作流 ${SERIES.length} 步`
+  el.series.appendChild(lab)
+}
+
+/* ---------------------------------------------------------------- 试玩 */
+let overlayOpen = false
+function openLive() {
+  const it = DATA[S.i]
+  overlayOpen = true
+  el.live.src = demoOf(it.id)
+  el.overlay.classList.add('is-open')
+  el.close.focus()
+}
+function closeLive() {
+  if (!overlayOpen) return
+  overlayOpen = false
+  el.overlay.classList.remove('is-open')
+  el.live.src = 'about:blank'
+}
+el.try.addEventListener('click', openLive)
+el.specimen.addEventListener('click', openLive)
+el.close.addEventListener('click', closeLive)
+el.overlay.addEventListener('click', (e) => { if (e.target === el.overlay) closeLive() })
+
+/* 输入层走公共件：滚轮/拖动的判据和 craft、posts 完全同一套。
+   🔴 target 给 body 而不是 .stage：预览卡盖住了半屏，滚轮落进卡片里
+   就收不到 .stage 的监听了（表现为"在卡片上滚滚不动"）。
+   拖动仍只从 .stage 起手 —— 卡片上的按下要留给"点开试玩"。 */
+const pager = createPager({
+  target: document.body,
+  dragSelector: '.stage',
+  enabled: () => !overlayOpen,
+  onStep: (dir) => go(S.i + dir),
+  onDragStart: () => el.stage.classList.add('is-dragging'),
+  onDragEnd: () => el.stage.classList.remove('is-dragging'),
+})
+
+/* 🔴 不接 stage 的 click：拖动结束浏览器会补一次 click，
+   而 .readout 那片没有 pointer-events，点文字会穿透到 stage ⇒ 误开浮层。
+   入口只留两个：预览卡本身、以及「在线试玩」按钮。 */
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeLive()
+})
+
+window.addEventListener('pointermove', (e) => {
+  if (e.pointerType === 'touch') return
+  S.tx = (e.clientX / window.innerWidth) * 2 - 1
+  S.ty = (e.clientY / window.innerHeight) * 2 - 1
+})
+
+/* ---------------------------------------------------------------- 每帧 */
+let t0 = performance.now()
+let prev = t0
+
+function frame(now) {
+  const dt = Math.min((now - prev) / 1000, 0.06)
+  prev = now
+  const t = (now - t0) / 1000
+
+  /* 过渡进度 */
+  if (S.trans >= 0) {
+    S.trans += dt
+    const p = smooth01(S.trans / DUR)
+    S.mix = ease(p)
+    S.burst = REDUCED ? 0 : Math.sin(Math.PI * p) * 1.05
+    S.energy = Math.sin(Math.PI * p)
+    if (p >= 1) {
+      S.trans = -1
+      S.burst = 0
+      S.energy = 0
+      el.dot.classList.remove('is-busy')
+      el.status.textContent = '就绪'
+    }
+  }
+
+  /* 冲击环：和"去噪"同步荡开，比过渡短一点，收尾时已经散尽 */
+  if (S.ring >= 0) {
+    S.ring += dt / 0.8
+    if (S.ring >= 1) S.ring = -1
+  }
+
+  /* 指针平滑：慢速跟随，别跟着指针抖 */
+  S.mx += (S.tx - S.mx) * (1 - Math.exp(-3.5 * dt))
+  S.my += (S.ty - S.my) * (1 - Math.exp(-3.5 * dt))
+
+  /* 相机：极慢自转 + 指针视差 */
+  const ang = t * (REDUCED ? 0.012 : 0.055) + S.mx * 0.28
+  const camY = 0.42 - S.my * 0.42
+  const cx = Math.sin(ang) * CAM_R
+  const cz = Math.cos(ang) * CAM_R
+  const fl = Math.hypot(cx, camY, cz)
+  const fx = -cx / fl, fy = -camY / fl, fz = -cz / fl
+  // right = normalize(cross(fwd, up0))，up0 = (0,1,0) ⇒ cross(f, u) = (-fz, 0, fx)
+  let rx = -fz, ry = 0, rz = fx
+  const rl = Math.hypot(rx, ry, rz) || 1
+  rx /= rl; ry /= rl; rz /= rl
+  // up = cross(right, fwd)
+  const ux = ry * fz - rz * fy
+  const uy = rz * fx - rx * fz
+  const uz = rx * fy - ry * fx
+
+  const aspect = vw / vh
+  const pxScale = vh / (2 * TAN_HALF)
+
+  gl.disable(gl.DEPTH_TEST)
+  gl.enable(gl.BLEND)
+  gl.blendFunc(gl.ONE, gl.ONE)
+  gl.clearColor(0.016, 0.02, 0.03, 1)
+  gl.clear(gl.COLOR_BUFFER_BIT)
+
+  /* ① 背景 */
+  gl.useProgram(progBg.p)
+  gl.bindBuffer(gl.ARRAY_BUFFER, bgBuf)
+  gl.enableVertexAttribArray(ATTR.bg)
+  gl.vertexAttribPointer(ATTR.bg, 2, gl.FLOAT, false, 0, 0)
+  gl.uniform2f(progBg.loc.uRes, vw, vh)
+  gl.uniform1f(progBg.loc.uTime, t)
+  gl.uniform1f(progBg.loc.uEnergy, S.energy)
+  gl.uniform1f(progBg.loc.uRing, S.ring)
+  gl.uniform3fv(progBg.loc.uAccent, S.accent)
+  gl.uniform2f(progBg.loc.uGlow, SHIFT[0] * 0.5 * aspect, SHIFT[1] * 0.5)
+  gl.drawArrays(gl.TRIANGLES, 0, 3)
+
+  /* ② 线框 */
+  gl.useProgram(progLine.p)
+  gl.bindBuffer(gl.ARRAY_BUFFER, wireBuf)
+  gl.enableVertexAttribArray(ATTR.linePos)
+  gl.vertexAttribPointer(ATTR.linePos, 3, gl.FLOAT, false, 16, 0)
+  gl.enableVertexAttribArray(ATTR.lineRand)
+  gl.vertexAttribPointer(ATTR.lineRand, 1, gl.FLOAT, false, 16, 12)
+  setCameraUniforms(progLine.loc, { cx, camY, cz, fx, fy, fz, rx, ry, rz, ux, uy, uz, aspect, pxScale, t })
+  gl.uniform1f(progLine.loc.uOpacity, 0.5)
+  gl.uniform1f(progLine.loc.uFadeK, FADE_LINE)
+  gl.drawArrays(gl.LINES, 0, wireCount)
+
+  /* ③ 膜上的点 + 浮尘（同一个程序，靠 uKind 分） */
+  gl.useProgram(progDot.p)
+  setCameraUniforms(progDot.loc, { cx, camY, cz, fx, fy, fz, rx, ry, rz, ux, uy, uz, aspect, pxScale, t })
+  gl.uniform1f(progDot.loc.uPxScale, pxScale)
+  gl.uniform1f(progDot.loc.uFadeK, FADE_DOT)
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, surfaceBuf)
+  gl.enableVertexAttribArray(ATTR.dotPos)
+  gl.vertexAttribPointer(ATTR.dotPos, 3, gl.FLOAT, false, 24, 0)
+  gl.enableVertexAttribArray(ATTR.dotRand)
+  gl.vertexAttribPointer(ATTR.dotRand, 3, gl.FLOAT, false, 24, 12)
+  gl.uniform1f(progDot.loc.uKind, 0)
+  gl.uniform1f(progDot.loc.uSize, 0.0112 * SIZE_K)
+  gl.drawArrays(gl.POINTS, 0, surfaceCount)
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, dustBuf)
+  gl.enableVertexAttribArray(ATTR.dotPos)
+  gl.vertexAttribPointer(ATTR.dotPos, 3, gl.FLOAT, false, 24, 0)
+  gl.enableVertexAttribArray(ATTR.dotRand)
+  gl.vertexAttribPointer(ATTR.dotRand, 3, gl.FLOAT, false, 24, 12)
+  gl.uniform1f(progDot.loc.uKind, 1)
+  gl.uniform1f(progDot.loc.uSize, 0.0085 * SIZE_K)
+  gl.drawArrays(gl.POINTS, 0, dustCount)
+
+  /* 内核：复用表面缓冲，形变里缩到 0.34 —— 不另造一份几何 */
+  gl.bindBuffer(gl.ARRAY_BUFFER, surfaceBuf)
+  gl.enableVertexAttribArray(ATTR.dotPos)
+  gl.vertexAttribPointer(ATTR.dotPos, 3, gl.FLOAT, false, 24, 0)
+  gl.enableVertexAttribArray(ATTR.dotRand)
+  gl.vertexAttribPointer(ATTR.dotRand, 3, gl.FLOAT, false, 24, 12)
+  gl.uniform1f(progDot.loc.uKind, 2)
+  gl.uniform1f(progDot.loc.uSize, 0.0125 * SIZE_K)
+  gl.drawArrays(gl.POINTS, 0, surfaceCount)
+
+  requestAnimationFrame(frame)
+}
+
+function setCameraUniforms(L, c) {
+  gl.uniform3f(L.uCam, c.cx, c.camY, c.cz)
+  gl.uniform3f(L.uFwd, c.fx, c.fy, c.fz)
+  gl.uniform3f(L.uRight, c.rx, c.ry, c.rz)
+  gl.uniform3f(L.uUp, c.ux, c.uy, c.uz)
+  gl.uniform2f(L.uView, TAN_HALF * c.aspect, TAN_HALF)
+  gl.uniform2f(L.uShift, SHIFT[0], SHIFT[1])
+  gl.uniform1f(L.uTime, c.t)
+  gl.uniform1f(L.uSeedA, S.seedA)
+  gl.uniform1f(L.uSeedB, S.seedB)
+  gl.uniform1f(L.uMix, S.mix)
+  gl.uniform1f(L.uBurst, S.burst)
+  gl.uniform3fv(L.uAccent, S.accent)
+}
+
+/* ---------------------------------------------------------------- 启动 */
+S.seedB = seedOf(DATA[0].id)
+S.seedA = S.seedB
+S.mix = 1
+paint(0)
+fitFrame()
+requestAnimationFrame(frame)
+})()
+</script>
+</body>
+</html>
