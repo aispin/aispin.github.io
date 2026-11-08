@@ -44,6 +44,27 @@
 
 # 📋 待办 WO
 
+### WO-2 · AI 房间改版（原型已出，**等你确认**再进 3D）
+
+- **需求原文**：「对这个房间进行重新改版，结合 AI 主题，力求酷炫屌炸天。沿用文稿房间的
+  改版思路：先在 `demos/web3d` 下创建适合这个房间的 demo 原型，我确认后再在 3D 房间中编码实现。」
+- **现状**：原型 `public/demos/web3d/ai-symbiosis/index.html` 已可跑
+  （`http://localhost:5199/demos/web3d/ai-symbiosis/`，0 console error，桌面 1440×900 与
+  手机 390×844 两版都验过）。**尚未进 3D 房间**，也没进 `demos.json`（确认后再生成缩略图）。
+- **原型讲的是什么**：一团在潜空间里「长」出来的活体 —— 噪声起伏的膜（线框 + 2.6 万点）
+  + 一颗更热的内核；换作品时整只炸成粒子再重新长成另一个形状（一次「去噪」1.15s），
+  背景荡开一圈冲击波。滚轮/拖动 = 下一件，空格 = 换种子重生成。
+  24 条真数据直接取自 `src/data/aiProjects.json`。
+- **技术**：裸 WebGL（不引 three），3 个 draw call；相机基向量在 CPU 算、投影写在顶点着色器；
+  输入层复用 `public/demos/_pager.js`（和 craft / posts 同一套判据）。
+- **确认后要做**：`RoomInterior` 加 `roomId === 'ai'` 分支 + 新建 `rooms/AiSymbiosis.jsx`
+  （走 `rooms/takeover.js` 那套进场节奏，别复制三份）+ `ui/AiHud.jsx` + `.scss`
+  + `ROOM_COPY.ai` 改文案 + `_from.js` 的 ROOMS 加 `ai` + 缩略图 + `build-demos-index.mjs` 重跑。
+- **判据**：`node .workbuddy-ai/harness/probe-room-door.mjs ai` 进场/退场亮度表与
+  career / craft / posts 同形（走廊 ~220 → 房间 ≤20，退场反向），深链 `/ai?noloader=1` 3.2s 内进屋。
+
+---
+
 ### WO-1 · `prefers-reduced-motion` 下点履历的门进不去
 
 - **现象**：系统开「减少动态效果」后，走到 `career` 门前点门，相机对上门就
@@ -77,6 +98,23 @@
 ---
 
 # 🙋 待你拍板的 DR
+
+### DR-A · AI 房间叫什么名字（现名「AI+」）
+
+- **为什么问**：房间里装的是 AI 相关项目 / AIGC / 人机共创，现名「AI+」是**技术标签**，
+  不是这间房在做的事 —— 而且 `+` 在门匾、菜单、`<title>` 里都不好看。
+- **候选**（都能对上 WO-2 那只活体，副标题 `ROOM_COPY.ai` 负责把「AI」讲清楚）：
+
+  | 名称 | 英文 | 好在哪 | 风险 |
+  | --- | --- | --- | --- |
+  | **共生**（推荐） | SYMBIOSIS | 人机共创本来就是共生；一词、好记、和原型里那只活体是一件事 | 名字里没有「AI」，靠副标题点明 |
+  | 共创 | CO-CREATION | 最直白准确 | 平淡，像部门 OKR |
+  | 潜空间 | LATENT | 模型内部的空间，酷 | 圈内术语，普通访客不懂 |
+  | 造物 | FABRICATION | 造出来的东西，配活体 | 略生僻，容易读成「造物主」 |
+
+- **当前状态**：等你选。**默认按「共生」**；URL 仍保持 `/ai`（不换路由，免得外链失效）。
+- **选定后要改**：`theme.js` 的 `{ id:'ai', zh:'AI+' }`、`useDocumentMeta.js` 的 title/description、
+  `ROOM_COPY.ai`、门匾与菜单、`index.html` / `manifest.webmanifest` 里的站点描述。
 
 ### DR-F · 其余 5 个内容房间要不要也换成「隧道」这种空间？
 
