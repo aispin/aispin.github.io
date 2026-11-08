@@ -48,18 +48,24 @@
 
 - **需求原文**：「对这个房间进行重新改版，结合 AI 主题，力求酷炫屌炸天。沿用文稿房间的
   改版思路：先在 `demos/web3d` 下创建适合这个房间的 demo 原型，我确认后再在 3D 房间中编码实现。」
+- **2026-11-08 追加（用户定调）**：「核心目标是项目介绍+项目演示（如有 demoUrl），用户需要
+  一眼看到项目名称、描述，点击可以去演示页、github。**不能为了酷而酷**。」
+  ⇒ 原型按此重做：活体退成包住预览卡的场，中心永远是那一页。
 - **现状**：原型 `public/demos/web3d/ai-symbiosis/index.html` 已可跑
   （`http://localhost:5199/demos/web3d/ai-symbiosis/`，0 console error，桌面 1440×900 与
   手机 390×844 两版都验过）。**尚未进 3D 房间**，也没进 `demos.json`（确认后再生成缩略图）。
-- **原型讲的是什么**：一团在潜空间里「长」出来的活体 —— 噪声起伏的膜（线框 + 2.6 万点）
-  + 一颗更热的内核；换作品时整只炸成粒子再重新长成另一个形状（一次「去噪」1.15s），
-  背景荡开一圈冲击波。滚轮/拖动 = 下一件，空格 = 换种子重生成。
-  24 条真数据直接取自 `src/data/aiProjects.json`。
+- **现在长什么样**：左栏「序号 / 名称 / 描述 / 语言·日期 / 系列六步 / 两个按钮」，
+  右边一张 16:9 卡里**真的在跑这个项目的落地页**（同源 iframe，1440×810 渲染后缩放）。
+  点卡片或「在线试玩」→ 全屏浮层里可交互，Esc 关闭。换一件时活体炸开、卡片换成新页面，
+  炸开那 1.15s 正好盖住 iframe 的加载空窗。
+- **数据事实**（别再过一遍）：24 件**全部**有 `demoUrl`，2026-11-08 逐条 curl 全 200；
+  `爆款短视频工作流 1/6…6/6` 是**六件有顺序的套件**，正好排在 #1–#6。
 - **技术**：裸 WebGL（不引 three），3 个 draw call；相机基向量在 CPU 算、投影写在顶点着色器；
-  输入层复用 `public/demos/_pager.js`（和 craft / posts 同一套判据）。
+  输入层复用 `public/demos/_pager.js`（target 给 `body`，否则滚轮落进卡片里收不到）。
 - **确认后要做**：`RoomInterior` 加 `roomId === 'ai'` 分支 + 新建 `rooms/AiSymbiosis.jsx`
   （走 `rooms/takeover.js` 那套进场节奏，别复制三份）+ `ui/AiHud.jsx` + `.scss`
   + `ROOM_COPY.ai` 改文案 + `_from.js` 的 ROOMS 加 `ai` + 缩略图 + `build-demos-index.mjs` 重跑。
+  ⚠️ 3D 房间里 iframe 必须放 DOM 层（和 craft 的浮层同一套），不能塞进 WebGL。
 - **判据**：`node .workbuddy-ai/harness/probe-room-door.mjs ai` 进场/退场亮度表与
   career / craft / posts 同形（走廊 ~220 → 房间 ≤20，退场反向），深链 `/ai?noloader=1` 3.2s 内进屋。
 
