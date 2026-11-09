@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-06T12:23:49.815Z",
-  "count": 27,
+  "generatedAt": "2026-11-09T12:27:46.775Z",
+  "count": 29,
   "demos": [
     {
       "id": "door",
@@ -227,12 +227,34 @@
       "variants": []
     },
     {
+      "id": "web3d/ai-atlas",
+      "title": "图鉴 · ATLAS — 24 件工具卡片墙",
+      "description": "24 件 iskill 工具的卡片墙：一面围着观众的弧形展墙，卡片随滚动在深度里移动，点开就是该项目自己的页面（全屏浮层，四边 24px）。纯 CSS 3D + WebGL 背景，没有一张位图。",
+      "url": "/demos/web3d/ai-atlas/",
+      "thumb": "/demos/thumbs/web3d/ai-atlas.webp",
+      "dir": "public/demos/web3d/ai-atlas",
+      "entry": "index.html",
+      "readme": true,
+      "variants": []
+    },
+    {
       "id": "web3d/ai-concepts",
       "title": "AI Agent 全景图 · 星球与星系",
       "description": "把 AI Agent 画成星球与星系：用户、Harness、推理、能力、连接、生态六个星系，可拖拽旋转、点星球看解释，也能切 2D 星图。",
       "url": "/demos/web3d/ai-concepts/",
       "thumb": "/demos/thumbs/web3d/ai-concepts.webp",
       "dir": "public/demos/web3d/ai-concepts",
+      "entry": "index.html",
+      "readme": true,
+      "variants": []
+    },
+    {
+      "id": "web3d/ai-symbiosis",
+      "title": "共生 · Symbiosis — 一只会重生的活体",
+      "description": "潜空间里的一只活体：噪声撑起来的膜、更热的内核，每换一件作品就散成粒子、再长成另一个形态。纯 WebGL 程序化，三个 draw call，没有一张位图。",
+      "url": "/demos/web3d/ai-symbiosis/",
+      "thumb": "/demos/thumbs/web3d/ai-symbiosis.webp",
+      "dir": "public/demos/web3d/ai-symbiosis",
       "entry": "index.html",
       "readme": true,
       "variants": []
