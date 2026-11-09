@@ -38,17 +38,21 @@
     var room = ROOMS[from];
     if (!room) return;
 
-    /* 语言跟站点一致：站点把选择存在 `aispin-language`（见
-       `src/context/SitePreferences.jsx`），localStorage 读不到（隐私模式）
-       时退回浏览器语言。 */
+    /* 语言跟站点一致：优先问 `_env.js`（它已经按系统/宿主定好了，见 `_env.js`），
+       它不在时才退回 localStorage 的 `aispin-language`（主站的选择存在这里，
+       见 `src/context/SitePreferences.jsx`），再退回浏览器语言。 */
     var lang = 'zh';
-    try {
-        lang = localStorage.getItem('aispin-language') || lang;
-    } catch {
-        /* 读不到就用默认值 */
-    }
-    if (lang !== 'zh' && lang !== 'en') {
-        lang = /^zh/i.test(navigator.language || '') ? 'zh' : 'en';
+    if (window.stageEnv) {
+        lang = window.stageEnv.lang;
+    } else {
+        try {
+            lang = localStorage.getItem('aispin-language') || lang;
+        } catch {
+            /* 读不到就用默认值 */
+        }
+        if (lang !== 'zh' && lang !== 'en') {
+            lang = /^zh/i.test(navigator.language || '') ? 'zh' : 'en';
+        }
     }
 
     var label = '← ' + (lang === 'en' ? room.en : room.zh);

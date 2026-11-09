@@ -55,6 +55,25 @@
   3. 「把这个版本当作 web3d 的其中一个 demo。**但它不适合做 AI 项目展示**。」
   4. 「重新设计一个 web3d demo，在实用的基础上结合 3D 技术，展示**项目卡片墙**，
      如有 demoUrl，点击卡片 iframe 全屏（**边距 24px**）展示。」
+- **2026-11-09 二轮（进 3D 前最后四条，已落）**：
+  1. 右上角的文案（图鉴 / ATLAS + 件数）移到**顶部中间** —— 右上角要留给 3D 场景的图标栈；
+  2. 浮层的「关闭 Esc」**与详情页自己的顶栏垂直居中**（原来落在 58px、中心 71px，
+     比顶栏中心 55px 低了 16px，看着像"挂在下面"）；
+  3. **浅色模式**，默认随系统；4. **中英双语**，默认随系统。
+  🔴 主题与语言**是房子的**（`SitePreferences` 写 `html[data-theme]` / `html[lang]`），
+  原型里**不许**出现任何切换图标；`public/demos/_env.js` 只负责让独立页面能模拟这套
+  环境（`?theme=`/`?lang=` > 宿主预写的 `data-*` > 系统），并盯住三处变化。
+- **🔴 `_env.js` 自激死循环（实测卡死浏览器）**：`apply()` 原来无条件
+  `root.dataset.theme = next.theme`，而 `setAttribute` 写**同值也会**派发
+  MutationRecord ⇒ observer 再调 `apply` ⇒ 无限循环，切一次主题页面就冻结
+  （无头浏览器直接被 SIGKILL，退出码 137，一开始被误判成"工具挂了"）。
+  判据：写属性前先判等；改了 `_env.js` 必须用「宿主改 `data-theme`」这条路验一遍。
+- **浅色不是把深色反相**：① 墙要比纸再深一档（墙 `#F7EDDE` / 卡 `#FFFDF8`）——
+  全用 `#FFF6E9` 的话 24 张卡糊成一片（第一版整面墙发雾）；② 封面「信号图」要换成
+  墨色（`26% 52%`）并把 alpha 提 2.1 倍，否则 1px 细线在纸上直接消失；
+  ③ 亮青 `74% 62%` 的卡片色相在纸上等于没有，压到 `58% 33%`；
+  ④ WebGL 底色的暗角要收到 13%（82% 会变成一圈脏边），颗粒减半。
+
 - **现在有两只原型，都已在 `demos.json` 里（含缩略图）**：
 
   | 目录 | 是什么 | 定位 |
@@ -68,6 +87,12 @@
   画出来的六种「信号图」，24 张各不相同（零位图）。
 - **共用件** `public/demos/_overlay.js`：全屏 iframe 浮层，`inset:24px` 是唯一常量，
   FLIP 从卡片矩形展开、Esc、加载条、焦点归位。两个 demo 共用一份。
+  关闭胶囊落在一条 `--so-head`（默认 62px，= 详情页 `--topbar-h`）高的右侧条带里居中；
+  皮和文案**读** `<html data-theme>` 与 `<html lang>` —— 所以没接主题的页面（如
+  `ai-symbiosis`）拿到的仍是原来的深色浮层，不会被系统浅色误伤。
+- **共用件** `public/demos/_env.js`：只给独立页面用（进 3D 后房间直接读
+  `useSitePreferences()`，**不加载它**）。它把「我现在该长什么样」写进
+  `html[data-theme]` / `data-lang` / `lang` / `color-scheme`。
 - **🔴 3D 里最坑的一条（进房间前必读）**：`.wall` 是 `inset:0` 且 `preserve-3d`，
   卡片被 `translateZ` 推到 z<0（墙平面之后）⇒ **命中测试认深度，墙把所有点击吃光**
   （`elementFromPoint` 永远返回 `.wall`，桌面手机都一样）。修法：`.wall{pointer-events:none}`
@@ -75,10 +100,18 @@
 - **确认后要做**：`RoomInterior` 加 `roomId === 'ai'` 分支 + 新建 `rooms/AiAtlas.jsx`
   （走 `rooms/takeover.js` 那套进场节奏，别复制三份）+ `ui/AiHud.jsx` + `.scss`
   + `ROOM_COPY.ai` 改文案 + 缩略图与 `demos.json` 已就绪。
+  🔴 主题/语言用房间里的 `useSitePreferences()`（`theme` / `language`），**不要**
+  在 HUD 里加第二个切换按钮 —— 房子顶上已经有一套；原型里的 `_env.js` 不进房间。
+  🔴 卡片数据的中英两套在原型里是内联的（英文描述抓自各项目落地页
+  `assets/content.js` 的 `lang.en.meta.description`），进房间时应落成
+  `src/data/` 下的数据文件，别在 JSX 里内联 24 条长句。
   ⚠️ 3D 房间里的 iframe 必须放 DOM 层（和 craft 的浮层同一套），不能塞进 WebGL。
 - **判据**：`node .workbuddy-ai/harness/probe-room-door.mjs ai` 进场/退场亮度表与
   career / craft / posts 同形（走廊 ~220 → 房间 ≤20，退场反向），深链 `/ai?noloader=1` 3.2s 内进屋；
   房间里点卡片 → 浮层四边 24px（`getBoundingClientRect` 量）。
+  原型侧另加三条：① `?theme=light|dark` × `?lang=zh|en` 四张定妆照都不许出现
+  「深色卡 + 浅色墙」这种混搭；② 关闭胶囊 `rect.top + height/2` = 面板 `top + 31`（±2px）；
+  ③ 右上角 `elementFromPoint` 不许命中任何文案节点（留给房子的图标栈）。
 
 ---
 

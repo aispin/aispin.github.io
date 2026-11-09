@@ -13,6 +13,18 @@
  * iframe 铺满整个面板（不设顶栏），项目页拿到的就是完整的可视区；关闭按钮和
  * 标题做成浮在页面上的两颗胶囊，压住的通常是页面自己的页头，代价最小。
  *
+ * 关闭胶囊的落点
+ * --------------
+ * 详情页自己的顶栏是 62px 高（`--topbar-h`）的 sticky 条，所以胶囊放在一条
+ * 同高的右侧条带里**垂直居中**，和顶栏的文字齐平。别的模板可以用
+ * `createStageOverlay({ head: 56 })` 改条带高度（→ CSS 变量 `--so-head`）。
+ *
+ * 主题 / 语言
+ * -----------
+ * 都**不**由调用方传：读 `<html data-theme>` 与 `<html lang>`（宿主/房子写的，
+ * 见 `_env.js`）。没有 `data-theme="light"` 就是深色皮 —— 所以一个还没接主题的
+ * 页面拿到的仍是原来的深色浮层，不会被系统浅色误伤。
+ *
  * FLIP
  * ----
  * 从卡片打开时把面板先缩到卡片矩形、再展开 —— 视线不用重新找目标。
@@ -31,6 +43,10 @@
     'use strict'
 
     var MARGIN = 24
+
+    /* 详情页自己的顶栏高度。iskill-promo-page 那套模板是 `--topbar-h: 62px` 的
+       sticky 条，贴在面板顶边；关闭胶囊要跟它**垂直居中**，就得知道这个数。 */
+    var HEAD = 62
 
     var CSS = `
 .so-root{position:fixed;inset:0;z-index:80;display:none}
@@ -60,9 +76,16 @@
 }
 .so-panel.is-ready .so-bar{opacity:0}
 @keyframes so-sweep{0%{background-position:-50% 0}100%{background-position:150% 0}}
+/* 关闭胶囊：放在一条**和详情页顶栏同高**的右侧条带里垂直居中。
+   以前是 top:34px（相对面板），落点 58px、中心 71px，比顶栏中心（24+31=55）
+   低了 16px —— 看着像"挂在下面"。现在条带从面板顶边起算 62px，中心恰好对齐。
+   条带自己不吃指针（pointer-events:none），只有按钮吃。 */
+.so-xwrap{
+  position:absolute;right:${MARGIN + 10}px;top:0;height:var(--so-head,${HEAD}px);z-index:3;
+  display:flex;align-items:center;pointer-events:none;
+}
 .so-x{
-  position:absolute;right:${MARGIN + 10}px;top:${MARGIN + 10}px;z-index:3;
-  appearance:none;cursor:pointer;
+  appearance:none;cursor:pointer;pointer-events:auto;
   display:inline-flex;align-items:center;gap:7px;
   padding:7px 13px;border-radius:999px;
   border:1px solid rgba(150,200,225,.24);
@@ -87,11 +110,32 @@
 .so-name:hover{opacity:1}
 .so-name b{font-weight:500;color:#eef3f8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .so-name i{font-style:normal;opacity:.55;white-space:nowrap}
+
+/* ── 浅色：跟着宿主（房子）写在 <html data-theme="light"> 上的主题走 ──────
+   浮层自己也有一圈可见的皮（24px 缝、两颗胶囊），深色皮贴在奶油色墙面上会很脏。 */
+html[data-theme="light"] .so-scrim{background:rgba(255,246,233,.82)}
+html[data-theme="light"] .so-panel{
+  background:#fffbf3;border-color:rgba(120,92,66,.22);
+  box-shadow:0 60px 160px -60px rgba(90,70,52,.55),0 0 90px -40px var(--so-accent,#5ef0c8);
+}
+html[data-theme="light"] .so-frame{background:#fff6e9}
+html[data-theme="light"] .so-x{
+  border-color:rgba(120,92,66,.22);background:rgba(255,250,242,.82);color:#6f6257;
+}
+html[data-theme="light"] .so-x:hover{
+  color:#211d1a;border-color:rgba(120,92,66,.45);background:rgba(255,252,246,.96);
+}
+html[data-theme="light"] .so-name{
+  border-color:rgba(120,92,66,.18);background:rgba(255,250,242,.78);color:#6f6257;
+}
+html[data-theme="light"] .so-name b{color:#211d1a}
+
 @media (max-width:640px){
   .so-name{display:none}
   /* 手机上页面自己的顶栏（语言/主题/仓库）就在右上角，关闭按钮压上去会挡操作 ——
-     挪到右下角，拇指也够得着 */
-  .so-x{right:${MARGIN + 8}px;bottom:${MARGIN + 8}px;top:auto;padding:8px 12px}
+     挪到右下角，拇指也够得着。条带高度自然失效，改成贴底。 */
+  .so-xwrap{right:${MARGIN}px;top:auto;bottom:${MARGIN}px;height:auto}
+  .so-x{padding:8px 12px}
 }
 `
 
@@ -117,7 +161,7 @@
             '<iframe class="so-frame" title="项目页面" allow="fullscreen; clipboard-write"></iframe>' +
             '<div class="so-bar"></div>' +
             '<a class="so-name" target="_blank" rel="noopener"><b></b><i>↗</i></a>' +
-            '<button class="so-x" type="button">关闭 <kbd>Esc</kbd></button>' +
+            '<div class="so-xwrap"><button class="so-x" type="button"></button></div>' +
             '</div>'
         document.body.appendChild(root)
 
@@ -134,6 +178,16 @@
         var closeTimer = 0
 
         if (opts.accent) root.style.setProperty('--so-accent', opts.accent)
+        if (opts.head) root.style.setProperty('--so-head', opts.head + 'px')
+
+        /* 文案跟着文档语言走（`_env.js` 把结果写在 <html lang> 上），
+           所以调用方不用传 lang，浮层也不会出现"英文页面 + 关闭"的混搭。 */
+        function syncLabel() {
+            var en = /^en\b/i.test(document.documentElement.lang || '')
+            closeBtn.innerHTML = (en ? 'Close' : '关闭') + ' <kbd>Esc</kbd>'
+            closeBtn.setAttribute('aria-label', en ? 'Close' : '关闭')
+        }
+        syncLabel()
 
         function setRect(r) {
             /* 面板自身尺寸（未变换时）—— 先清干净再量 */
@@ -180,6 +234,7 @@
             lastFocus = document.activeElement
             lastRect = o.rect || null
             if (o.accent) root.style.setProperty('--so-accent', o.accent)
+            syncLabel()
 
             nameEl.textContent = o.title || ''
             nameBox.href = url

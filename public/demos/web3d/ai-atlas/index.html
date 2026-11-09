@@ -1,8 +1,11 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- 主题/语言：默认随系统，宿主（3D 房子）可用 <html data-theme> / ?lang= 覆盖。
+     必须放在样式之前 —— 它同步写 data-theme，首帧就是对的颜色，不会闪一下。 -->
+<script src="../../_env.js"></script>
 <script src="../../_from.js" defer></script>
 <title>图鉴 · ATLAS — 24 件工具卡片墙</title>
 <meta name="description" content="24 件 iskill 工具的卡片墙：一面围着观众的弧形展墙，卡片随滚动在深度里移动，点开就是该项目自己的页面（全屏浮层，四边 24px）。纯 CSS 3D + WebGL 背景，没有一张位图。">
@@ -19,8 +22,43 @@
   --dim-2:#5a6577;
   --accent:#5ef0c8;
   --line:rgba(150,175,205,.16);
+  /* 卡片的"皮"也进变量：浅色只换变量，不动结构（下面 24 张卡共用一套规则） */
+  --card-a:rgba(17,23,32,.96);
+  --card-b:rgba(9,13,19,.98);
+  --card-line:rgba(150,190,220,.13);
+  --card-name:#e9eff7;
+  --card-desc:#9aa8bb;
+  --plate:#080b11;
+  --plate-veil:rgba(7,10,15,.88);
+  --veil:5,7,12;
+  --chip:rgba(10,14,20,.5);
+  --track:rgba(150,190,220,.1);
   --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
   --sans:'MapleUI',ui-sans-serif,system-ui,'PingFang SC','Hiragino Sans GB',sans-serif;
+}
+/* ── 浅色 ─────────────────────────────────────────────────────────────
+   取自主站的暖纸（纸 #FFF6E9 / 墨 #211D1A / 木色线 #9B755A，见
+   `NavigationUI.scss` 的地图、`SitePreferences` 的 theme-color），但**墙比纸再深
+   一档**：深色版里卡片比底亮一截才立得住，浅色版同理 —— 全是 #FFF6E9 的话
+   24 张卡就糊成一片（第一版就是这样，整面墙发雾）。
+   🔴 主题由 `<html data-theme>` 决定，值由 `_env.js` 写（随系统或听宿主的）。 */
+html[data-theme="light"]{
+  --bg:#F7EDDE;
+  --ink:#211D1A;
+  --dim:#6a5c4f;
+  --dim-2:#8a7a69;
+  --accent:#0b6e56;
+  --line:rgba(120,92,66,.3);
+  --card-a:rgba(255,253,248,.99);
+  --card-b:rgba(251,243,231,.99);
+  --card-line:rgba(120,92,66,.26);
+  --card-name:#241f1a;
+  --card-desc:#5d5145;
+  --plate:#f6ecdc;
+  --plate-veil:rgba(252,245,234,.9);
+  --veil:247,237,222;
+  --chip:rgba(255,250,242,.72);
+  --track:rgba(120,92,66,.2);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -71,8 +109,8 @@ body{
   position:relative;width:100%;height:100%;
   display:flex;flex-direction:column;
   border-radius:13px;overflow:hidden;
-  background:linear-gradient(180deg,rgba(17,23,32,.96),rgba(9,13,19,.98));
-  border:1px solid rgba(150,190,220,.13);
+  background:linear-gradient(180deg,var(--card-a),var(--card-b));
+  border:1px solid var(--card-line);
   box-shadow:0 22px 60px -30px rgba(0,0,0,.9);
   transform:translateZ(0);
   transition:transform .38s cubic-bezier(.22,1,.28,1),
@@ -86,16 +124,23 @@ body{
   filter:brightness(1.1);
   box-shadow:0 50px 100px -34px rgba(0,0,0,.95),0 0 60px -16px var(--c);
 }
+html[data-theme="light"] .card__in{box-shadow:0 16px 38px -22px rgba(120,92,66,.5)}
+html[data-theme="light"] .card:hover .card__in,
+html[data-theme="light"] .card:focus-visible .card__in{
+  /* 纸上再"提亮"就洗白了：改用木色投影 + 卡片自己的色晕来抬 */
+  filter:none;
+  box-shadow:0 36px 70px -30px rgba(120,92,66,.55),0 0 50px -14px var(--c);
+}
 .card:focus-visible .card__in{outline:1px solid var(--c);outline-offset:0}
 
 /* 封面：程序化「信号图」，按 id 哈希长出来，24 张各不相同 */
 .card__plate{
-  position:relative;flex:0 0 50%;overflow:hidden;background:#080b11;
+  position:relative;flex:0 0 50%;overflow:hidden;background:var(--plate);
 }
 .card__plate canvas{display:block;width:100%;height:100%;transition:filter .38s ease}
 .card__plate::after{
   content:'';position:absolute;inset:0;
-  background:linear-gradient(180deg,transparent 64%,rgba(7,10,15,.88) 100%);
+  background:linear-gradient(180deg,transparent 64%,var(--plate-veil) 100%);
 }
 .card__badge{
   position:absolute;right:9px;top:9px;z-index:2;
@@ -106,8 +151,13 @@ body{
   color:var(--dim);text-transform:uppercase;
   transition:color .3s ease,border-color .3s ease,background .3s ease;
 }
+html[data-theme="light"] .card__badge{
+  background:rgba(255,252,246,.8);border-color:rgba(120,92,66,.2);
+}
 .card:hover .card__badge{color:var(--c);border-color:var(--c-dim);background:rgba(4,8,12,.85)}
+html[data-theme="light"] .card:hover .card__badge{background:rgba(255,253,249,.95)}
 .card:hover .card__plate canvas{filter:brightness(1.18) saturate(1.1)}
+html[data-theme="light"] .card:hover .card__plate canvas{filter:saturate(1.06)}
 
 .card__body{
   flex:1;min-height:0;
@@ -122,12 +172,12 @@ body{
 .card__no{color:var(--c);letter-spacing:.14em}
 .card__name{
   font:500 14px/1.24 var(--mono);
-  letter-spacing:-.012em;color:#e9eff7;
+  letter-spacing:-.012em;color:var(--card-name);
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
 .card__desc{
   font:400 11.5px/1.58 var(--sans);
-  color:#9aa8bb;
+  color:var(--card-desc);
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
 .card__foot{
@@ -141,8 +191,8 @@ body{
 
 /* ── 上下压边：卡片滚到边上就化进背景里（配合 JS 的透明度衰减）──── */
 .veil{position:fixed;left:0;right:0;height:108px;pointer-events:none;z-index:3}
-.veil--top{top:0;background:linear-gradient(180deg,rgba(5,7,12,.97) 0%,rgba(5,7,12,.6) 48%,transparent 100%)}
-.veil--bot{bottom:0;background:linear-gradient(0deg,rgba(5,7,12,.99) 0%,rgba(5,7,12,.92) 26%,rgba(5,7,12,.5) 62%,transparent 100%)}
+.veil--top{top:0;background:linear-gradient(180deg,rgba(var(--veil),.97) 0%,rgba(var(--veil),.6) 48%,transparent 100%)}
+.veil--bot{bottom:0;background:linear-gradient(0deg,rgba(var(--veil),.99) 0%,rgba(var(--veil),.92) 26%,rgba(var(--veil),.5) 62%,transparent 100%)}
 
 /* ── HUD ───────────────────────────────────────────────────────── */
 .hud{position:fixed;inset:0;z-index:5;pointer-events:none}
@@ -155,17 +205,23 @@ body{
   border:1px solid var(--line);
   color:var(--dim);text-decoration:none;
   font:400 12px/1 var(--sans);letter-spacing:.04em;
-  background:rgba(10,14,20,.5);
+  background:var(--chip);
   backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
   transition:color .22s ease,border-color .22s ease;
 }
-.lab-back:hover{color:var(--ink);border-color:rgba(160,190,220,.34)}
+.lab-back:hover{color:var(--ink);border-color:var(--dim-2)}
 
-.brand{position:absolute;right:26px;top:20px;text-align:right}
+/* 标题在**顶部中间**：右上角留给 3D 场景的图标栈（音量 / 地图 / 主题…由房子
+   统一挂），这里不许占位。 */
+.brand{
+  position:absolute;left:50%;top:18px;transform:translateX(-50%);
+  text-align:center;pointer-events:none;
+}
 .brand__name{
   font:500 15px/1.2 var(--sans);letter-spacing:.14em;color:var(--ink);
   text-shadow:0 0 22px rgba(0,0,0,.7);
 }
+html[data-theme="light"] .brand__name{text-shadow:none}
 .brand__name i{font-style:normal;color:var(--dim-2);margin:0 8px;font-size:11px;letter-spacing:0}
 .brand__meta{
   margin-top:8px;
@@ -186,7 +242,7 @@ body{
 /* 右缘滚动条：自己画的，和墙的进度绑在一起 */
 .scroll{
   position:fixed;right:9px;top:150px;bottom:120px;width:2px;
-  background:rgba(150,190,220,.1);border-radius:2px;z-index:5;
+  background:var(--track);border-radius:2px;z-index:5;
 }
 .scroll i{
   position:absolute;left:0;top:0;width:2px;border-radius:2px;
@@ -195,12 +251,14 @@ body{
 }
 
 @media (max-width:720px){
-  .brand{right:16px;top:14px}
+  .brand{top:12px}
   .brand__name{font-size:13px}
   .brand__meta{font-size:9px;letter-spacing:.14em;margin-top:6px}
   .veil{height:78px}
   .hint{font-size:9px;letter-spacing:.1em;bottom:18px}
   .scroll{right:6px;top:110px;bottom:96px}
+  /* 手机上"← Demos"和居中标题会挤：把返回胶囊压到标题下方那一行 */
+  .lab-back{top:12px;font-size:11px;padding:5px 10px}
 }
 </style>
 </head>
@@ -217,10 +275,10 @@ body{
 <div class="hud">
   <a class="lab-back" href="/demos/">← Demos</a>
   <header class="brand">
-    <div class="brand__name">图鉴<i>/</i>ATLAS</div>
-    <div class="brand__meta"><b id="tot">24</b> 件 · 全部可运行</div>
+    <div class="brand__name" id="brandName">图鉴<i>/</i>ATLAS</div>
+    <div class="brand__meta" id="brandMeta"><b>24</b> 件 · 全部可运行</div>
   </header>
-  <div class="hint">滚动浏览 · 点卡片查看详情 · <kbd>Esc</kbd> 关闭</div>
+  <div class="hint" id="hint">滚动浏览 · 点卡片查看详情 · <kbd>Esc</kbd> 关闭</div>
 </div>
 
 <div class="scroll" aria-hidden="true"><i id="thumb"></i></div>
@@ -327,30 +385,39 @@ function hsl2rgb(h, s, l) {
 const esc = (s) =>
   String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 
-/* 每件一个色相：152°–204° 的青绿带，和站点其他房间同族，但每张卡认得出自己 */
+/* 每件一个色相：152°–204° 的青绿带，和站点其他房间同族，但每张卡认得出自己。
+   🔴 明度/饱和度和主题绑：62% 的亮青在纸上等于没颜色，浅色必须压到 33% 才读得出，
+      否则 24 张卡的编号、箭头、hover 边框会一起消失。 */
 const hueOf = (id) => 152 + (hash32(id + '|hue') % 53)
-const accentOf = (id) => `hsl(${hueOf(id)} 74% 62%)`
-const accentDim = (id) => `hsl(${hueOf(id)} 74% 62% / .42)`
+const accentOf = (id, light) => `hsl(${hueOf(id)} ${light ? '58% 33%' : '74% 62%'})`
+const accentDim = (id, light) =>
+  `hsl(${hueOf(id)} ${light ? '58% 33%' : '74% 62%'} / ${light ? '.32' : '.42'})`
+const accentRGB = (id, light) => hsl2rgb(hueOf(id), light ? 58 : 74, light ? 33 : 62)
 
 /* ---------------------------------------------------------------- 封面 */
 /* 24 张「信号图」：六种母题 × 每件自己的种子。它们不是装饰 —— 是同族的证据：
    同一套底、同一套四角刻度、同一条基线，只有中间那张图不一样。 */
-function paintPlate(cv, it) {
+function paintPlate(cv, it, light) {
   const W = cv.width
   const H = cv.height
   const g = cv.getContext('2d')
   const hue = hueOf(it.id)
   const rnd = mulberry32(hash32(it.id + '|plate'))
-  const acc = (a) => `hsla(${hue},78%,64%,${a})`
+  /* 纸上的线要更深、更实：同一条 0.09 的线在深底上看得见，在奶油纸上就没了。
+     所以浅色用更深的墨 + 把 alpha 提上来（boost），母题的相对层次不变。 */
+  const ink = light ? 26 : 64
+  const sat = light ? 52 : 78
+  const boost = light ? 2.1 : 1
+  const acc = (a) => `hsla(${hue},${sat}%,${ink}%,${Math.min(1, a * boost)})`
 
   const bg = g.createLinearGradient(0, 0, W * 0.7, H)
-  bg.addColorStop(0, '#0b1017')
-  bg.addColorStop(1, '#070a0f')
+  bg.addColorStop(0, light ? '#fcf4e6' : '#0b1017')
+  bg.addColorStop(1, light ? '#f1e2cc' : '#070a0f')
   g.fillStyle = bg
   g.fillRect(0, 0, W, H)
 
   const halo = g.createRadialGradient(W * 0.74, H * 0.16, 0, W * 0.74, H * 0.16, W * 0.78)
-  halo.addColorStop(0, `hsla(${hue},76%,58%,.18)`)
+  halo.addColorStop(0, `hsla(${hue},${light ? 56 : 76}%,${light ? 42 : 58}%,${light ? 0.14 : 0.18})`)
   halo.addColorStop(1, 'hsla(0,0%,0%,0)')
   g.fillStyle = halo
   g.fillRect(0, 0, W, H)
@@ -455,7 +522,7 @@ function paintPlate(cv, it) {
   }
 
   /* 同族标记：一条基线 + 四角刻度 —— 24 张都长这个样，才像一册图鉴 */
-  g.strokeStyle = 'rgba(150,190,220,.13)'
+  g.strokeStyle = light ? 'rgba(120,92,66,.24)' : 'rgba(150,190,220,.13)'
   g.lineWidth = 1
   g.beginPath()
   g.moveTo(0, H - 0.5)
@@ -476,6 +543,107 @@ function paintPlate(cv, it) {
   }
 }
 
+/* ---------------------------------------------------------------- 文案 */
+/* 中英两套只写在这里。**语言不由页面自己选** —— `_env.js` 已经按系统（或宿主）
+   把结果写进 `<html lang>` / `data-lang`，这里只是查表。
+   搬进 3D 房子后，房子的语言状态一改，`data-lang` 变 → `applyEnv()` 重跑，
+   文案跟着换。所以这个页面**没有**、也不需要语言切换图标。 */
+const I18N = {
+  zh: {
+    title: '图鉴 · ATLAS — 24 件工具卡片墙',
+    desc: '24 件 iskill 工具的卡片墙：一面围着观众的弧形展墙，卡片随滚动在深度里移动，点开就是该项目自己的页面（全屏浮层，四边 24px）。纯 CSS 3D + WebGL 背景，没有一张位图。',
+    brandName: '图鉴<i>/</i>ATLAS',
+    brandMeta: (n) => `<b>${n}</b> 件 · 全部可运行`,
+    hint: '滚动浏览 · 点卡片查看详情 · <kbd>Esc</kbd> 关闭',
+    badgeDetail: '↗ 详情',
+    badgeGitHub: '↗ GitHub',
+    goDetail: '详情',
+    ariaDetail: (n) => `查看详情：${n}`,
+    ariaGitHub: (n) => `打开 GitHub：${n}`,
+  },
+  en: {
+    title: 'ATLAS — a wall of 24 tools',
+    desc: "A wall of 24 iskill tools: a curved exhibition wall around the viewer, cards moving through depth as you scroll, and any card opens that project's own page in a fullscreen overlay (24px on every side). Pure CSS 3D with a WebGL backdrop — not a single bitmap.",
+    brandName: 'ATLAS',
+    brandMeta: (n) => `<b>${n}</b> tools · all runnable`,
+    hint: 'Scroll to browse · click a card for details · <kbd>Esc</kbd> to close',
+    badgeDetail: '↗ Details',
+    badgeGitHub: '↗ GitHub',
+    goDetail: 'Details',
+    ariaDetail: (n) => `Open details: ${n}`,
+    ariaGitHub: (n) => `Open on GitHub: ${n}`,
+  },
+}
+const t = () => I18N[stageEnv.lang] || I18N.zh
+
+/* 英文描述不是另译的：抓的是每个项目自己落地页 `assets/content.js` 里的
+   `lang.en.meta.description` —— 同一句话、同一个作者，改项目时跟它一起变。
+   有两张卡的原站 en 段还是中文（作者没译），这里补译，别再自动抓。 */
+const EN = {
+  'iskill-video-clipper':
+    'Photos plus video into a 15–60s cut or a JianYing draft: source engines local / aigc-mix / aigc-full plus an mpt fast-draft tier, automatic beat detection to land cuts on the beat, free commercial fonts bundled, all local ffmpeg.',
+  'iskill-content-precheck':
+    'Scan against five banned-word categories, then score hook / resonance / delivery / compliance on a four-axis scale and return a clear pass / fix-then-pass / reject verdict; with the four-platform sets each one gets its own report and independent rating, never merged.',
+  'iskill-viral-teardown':
+    'Drop in a viral video link (WeChat Channels included), a share snippet, or a screen recording — it gets the transcript, then returns a structured teardown: opening hook, structure, why it went viral, replicable tactics and a fill-in template. A cross-day teardown library means a video already analysed is reused, not rerun.',
+  'iskill-hot-topic-scout':
+    'Daily topic scouting: multi-platform gathering → de-dupe against the topic library → persona filtering → three-axis scoring → Top3 topic cards, feeding the downstream viral-copy workflow. A cross-day topic library keeps the same trend from recurring. Pure prompt skill, no scripts.',
+  'iskill-viral-copywriter':
+    'Give it a topic card and get four platform-specific spoken scripts in one pass (generic / Xiaohongshu / WeChat Channels / Douyin), built on the four-part viral structure: a golden three-second hook, conversational throughout, a mini-hook every 10–15s, each with its own platform publish copy.',
+  'iskill-promo-page':
+    'Generate a local promo page for any skill / tool / OSS project: bilingual, follows the system theme, fully static and self-contained, zero deps and zero build — plus four GitHub Pages deploy modes and pluggable slots.',
+  'iskill-pipeline-dashboard':
+    'A bottom-layer skill (not meant to be invoked by users directly): a universal workflow dashboard. Declare name/stages/members/artifact dirs in manifest.json and watch progress, member status and artifacts live, with decisions closed in the page.',
+  'iskill-ui-verify':
+    'Let agents verify web UI in one command: variant matrix shots, element crops, DOM assertions, meaningful exit codes. Built on agent-browser — zero npm dependencies.',
+  'iskill-app-icon':
+    'Zero-dependency Python emits a squircle base + hand-drawn vector SVG, then headless Chromium renders the favicon / apple-touch-icon / PWA PNG set and manifest.',
+  'iskill-generate-sponsors':
+    'One QR image (WeChat / Alipay / PayPal) becomes a full sponsor kit: FUNDING.yml, a README block, a sponsor page, embeddable snippets and React/Vue components. Zero deps, zero build.',
+  'iskill-workbuddy-deepseek':
+    "Chat with the free DeepSeek web app inside WorkBuddy's built-in browser, then hand the whole conversation to an agent in one line — no external Chrome, no app switching.",
+  'iskill-headroom-workbuddy2api':
+    'WorkBuddy desktop models → an OpenAI-compatible API anyone can use. The hub makes them usable: protocol translation, dashboard OAuth for accounts, dual-region scheduling, daily keep-alive. Headroom makes them last: it keeps the upstream cache warm and compresses only the newest delta.',
+  'iskill-github-publisher':
+    'Unified iskill- prefix, privacy-email commits, gh repo creation and HTTPS+token pushes, ready for SkillHub claiming — with a real publish post-mortem baked in. macOS only.',
+  'iskill-super-mark':
+    'Parse the items you forward and save in WeChat (Channels / Official Accounts) into a searchable personal library: 11 commands cover ingest, tagging, audio fetch, local transcription, deep reading and build — all data stays local.',
+  'iskill-pwa-guideline':
+    'A standard recipe extracted from a production e-book PWA: manifest and install, programmatic icons, offline caching strategy, update awareness, and pure-client access gating. Decision tables, build steps, a pitfalls list and copy-ready reference code.',
+  'iskill-music-beats':
+    "Detect a BGM's BPM and beat timeline and emit machine-readable beats.json (beats + strength + cut candidates) so editing skills can snap transitions to the beat.",
+  'iskill-media-transcribe':
+    'Turn a video URL, local video, or local audio into an mp3 track plus timestamped srt/json subtitles. WeChat Channels is first-class; transcription runs entirely on-device.',
+  'iskill-huggingface-ext':
+    'Migrate ~/.cache/huggingface/hub anywhere and symlink it back, invisibly to HuggingFace. migrate.sh on macOS/Linux, migrate.ps1 on Windows, with automatic Junction fallback.',
+  'iskill-geometric-bg':
+    'A seeded geometric background generator: six styles × eight palettes × light/dark, reproducible per seed, output as lightweight SVG with zero third-party deps.',
+  'iskill-generative-bgm':
+    'A front-end generative BGM engine: Web Audio synthesis with five instrument voices, six themes and four ambience presets — no audio files, no deps, fully offline.',
+  'iskill-dig-media':
+    'One command digs free stock from Pixabay (commercial use, no attribution), generates shots with ImageGen / VideoGen, or aggregates Pexels/Coverr and 6+ AI text-to-video providers via MoneyPrinterTurbo; everything lands in dig-media/ with a manifest.json for provenance.',
+  'iskill-crop-qrcode':
+    'Feed it any image with a QR code; it zero-dependently locates the code and crops a square of the code body plus quiet zone. Batch, --dry-run and idempotent, built on macOS sips.',
+  'iskill-copy-deslop':
+    "First de-slop the script against spoken-word rules, then review it line by line through three real audience lenses: can't understand, don't believe, about to swipe away.",
+  'iskill-script-launcher':
+    'One Python implementation plus thin per-platform shells: .command on macOS, .cmd on Windows, .sh on Linux. Ships 15 symptom-indexed pitfalls from real machines and copy-paste skeletons.',
+}
+
+/* 卡片只放得下两行，而英文原句常 200+ 字符。按**第一个从句**截断，让可见的两行
+   是一个完整的意思（"Photos plus video into a 15–60s cut or a JianYing draft"），
+   而不是切在单词中间；全文挂在 `title` 上，悬停可看。 */
+function brief(s, lang) {
+  if (lang !== 'en') return s
+  const m = s.match(/^(.{40,}?)(?::\s| — |\.\s|;\s)/)
+  return m ? m[1] : s
+}
+function descOf(it) {
+  const lang = stageEnv.lang
+  const raw = (lang === 'en' && EN[it.id]) || it.desc || ''
+  return brief(raw, lang)
+}
+
 /* ---------------------------------------------------------------- 卡片 */
 const wall = document.getElementById('wall')
 const stage = document.getElementById('stage')
@@ -485,30 +653,47 @@ const cards = DATA.map((it, i) => {
   el.className = 'card'
   el.tabIndex = 0
   el.setAttribute('role', 'button')
-  const full = it.name
-  const short = full.replace(/^iskill-/, '')
+  wall.appendChild(el)
+  return {
+    el,
+    it,
+    i,
+    short: it.name.replace(/^iskill-/, ''),
+    cx: 0,
+    cy: 0,
+    rot: 0,
+    z: 0,
+    vis: false,
+  }
+})
+
+/* 一张卡的全部内容（文案 + 色相 + 封面）都在这里生成，所以切主题/切语言时
+   只要重跑一遍即可 —— 没有第二处需要跟着改。 */
+function paintCard(c) {
+  const L = stageEnv.isLight()
+  const T = t()
+  const it = c.it
   const hasDemo = Boolean(it.demo)
-  el.setAttribute('aria-label', `${hasDemo ? '查看详情' : '打开 GitHub'}：${short}`)
-  el.style.setProperty('--c', accentOf(it.id))
-  el.style.setProperty('--c-dim', accentDim(it.id))
-  el.innerHTML =
+  c.el.setAttribute('aria-label', hasDemo ? T.ariaDetail(c.short) : T.ariaGitHub(c.short))
+  c.el.title = (stageEnv.lang === 'en' && EN[it.id]) || it.desc || ''
+  c.el.style.setProperty('--c', accentOf(it.id, L))
+  c.el.style.setProperty('--c-dim', accentDim(it.id, L))
+  c.el.innerHTML =
     '<div class="card__in">' +
     '<div class="card__plate">' +
     '<canvas width="480" height="264" aria-hidden="true"></canvas>' +
-    '<span class="card__badge">' + (hasDemo ? '↗ 详情' : '↗ GitHub') + '</span>' +
+    '<span class="card__badge">' + (hasDemo ? T.badgeDetail : T.badgeGitHub) + '</span>' +
     '</div>' +
     '<div class="card__body">' +
-    '<div class="card__top"><span class="card__no">' + String(i + 1).padStart(2, '0') +
+    '<div class="card__top"><span class="card__no">' + String(c.i + 1).padStart(2, '0') +
     '</span><span>' + esc(it.lang || 'skill') + '</span></div>' +
-    '<h3 class="card__name">' + esc(short) + '</h3>' +
-    '<p class="card__desc">' + esc(it.desc || '') + '</p>' +
+    '<h3 class="card__name">' + esc(c.short) + '</h3>' +
+    '<p class="card__desc">' + esc(descOf(it)) + '</p>' +
     '<div class="card__foot"><span>' + esc(it.date || '') + '</span>' +
-    '<span class="card__go">' + (hasDemo ? '详情' : 'GitHub') + ' →</span></div>' +
+    '<span class="card__go">' + (hasDemo ? T.goDetail : 'GitHub') + ' →</span></div>' +
     '</div></div>'
-  wall.appendChild(el)
-  paintPlate(el.querySelector('canvas'), it)
-  return { el, it, cx: 0, cy: 0, rot: 0, z: 0, vis: false, short }
-})
+  paintPlate(c.el.querySelector('canvas'), it, L)
+}
 
 /* ---------------------------------------------------------------- 浮层 */
 const overlay = createStageOverlay({ accent: '#5ef0c8' })
@@ -524,7 +709,30 @@ let side = 76
 let topPad = 132
 let contentH = 0
 let maxScroll = 0
-const S = { y: 0, target: 0, mx: 0, my: 0, tx: 0, ty: 0, acc: [0.37, 0.94, 0.78] }
+const S = { y: 0, target: 0, mx: 0, my: 0, tx: 0, ty: 0, acc: accentRGB('atlas', stageEnv.isLight()) }
+
+/* 最近 hover 的卡片：背景那团冷光跟着它换色，切主题时也要按它重算 */
+let hoverId = null
+
+/* ---------------------------------------------------------------- 环境 */
+/* 主题/语言一变就整页重来一遍：文案、封面、色相、背景底。这是**唯一**的切换
+   入口 —— 页面里没有开关，值来自 `_env.js`（随系统，或听 3D 房子的）。
+   🔴 重跑 `paintCard` 会重建卡片 DOM，所以事件必须绑在 `el` 上（它不被替换），
+      不能绑在 innerHTML 里的节点上。 */
+function applyEnv() {
+  const L = stageEnv.isLight()
+  const T = t()
+  document.title = T.title
+  const md = document.querySelector('meta[name="description"]')
+  if (md) md.content = T.desc
+  document.getElementById('brandName').innerHTML = T.brandName
+  document.getElementById('brandMeta').innerHTML = T.brandMeta(DATA.length)
+  document.getElementById('hint').innerHTML = T.hint
+  cards.forEach(paintCard)
+  S.acc = accentRGB(hoverId || 'atlas', L)
+  dirty = true
+}
+stageEnv.onChange(applyEnv)
 
 function measure() {
   W = window.innerWidth
@@ -647,7 +855,7 @@ function openCard(c) {
   if (c.it.demo) {
     overlay.open(c.it.demo, {
       title: c.short,
-      accent: accentOf(c.it.id),
+      accent: accentOf(c.it.id, stageEnv.isLight()),
       rect: c.el.getBoundingClientRect(),
     })
   } else if (c.it.url) {
@@ -673,7 +881,8 @@ cards.forEach((c) => {
     S.target = clamp(c.cy - H / 2, 0, maxScroll)
   })
   c.el.addEventListener('pointerenter', () => {
-    S.acc = hsl2rgb(hueOf(c.it.id), 74, 62)
+    hoverId = c.it.id
+    S.acc = accentRGB(hoverId, stageEnv.isLight())
   })
 })
 
@@ -682,24 +891,28 @@ const canvas = document.getElementById('gl')
 const gl = canvas.getContext('webgl', { antialias: false, alpha: false, depth: false })
 
 const VS = 'attribute vec2 p;void main(){gl_Position=vec4(p,0.0,1.0);}'
+/* uLight: 0=冷黑房间，1=暖纸房间。**不是**简单地反相 —— 浅色下"暗角"要改成
+   极轻的压边（把整块压暗 82% 会变成一圈脏边），颗粒也要减半，否则纸上全是噪点。 */
 const FS = [
   'precision highp float;',
-  'uniform vec2 uRes;uniform float uTime;uniform vec3 uAccent;',
+  'uniform vec2 uRes;uniform float uTime;uniform vec3 uAccent;uniform float uLight;',
   'float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}',
   'void main(){',
   '  vec2 p=(gl_FragCoord.xy-0.5*uRes)/uRes.y;',
-  /* 竖向底色：上深下更深的"房间" */
-  '  vec3 col=mix(vec3(0.020,0.026,0.037),vec3(0.008,0.011,0.017),smoothstep(-0.55,0.62,p.y));',
+  /* 竖向底色：上浅下深的"房间" */
+  '  vec3 cA=mix(vec3(0.020,0.026,0.037),vec3(0.969,0.929,0.871),uLight);',
+  '  vec3 cB=mix(vec3(0.008,0.011,0.017),vec3(0.937,0.882,0.796),uLight);',
+  '  vec3 col=mix(cA,cB,smoothstep(-0.55,0.62,p.y));',
   /* 一团冷光：位置跟着视口中心偏上，卡片 hover 时换色 */
   '  float d=length(p*vec2(0.82,1.0)-vec2(0.0,0.06));',
-  '  col+=uAccent*0.085*smoothstep(0.95,0.0,d);',
-  '  col+=uAccent*0.05*smoothstep(0.42,0.0,length(p-vec2(0.0,0.14)));',
+  '  col+=uAccent*mix(0.085,0.055,uLight)*smoothstep(0.95,0.0,d);',
+  '  col+=uAccent*mix(0.05,0.035,uLight)*smoothstep(0.42,0.0,length(p-vec2(0.0,0.14)));',
   /* 极淡的横向扫描线：让大片纯色不至于显出 banding */
   '  col+=uAccent*0.012*sin(p.y*420.0+uTime*0.6);',
   /* 暗角 */
-  '  col*=1.0-smoothstep(0.5,1.3,length(p))*0.82;',
+  '  col*=1.0-smoothstep(0.5,1.3,length(p))*mix(0.82,0.13,uLight);',
   /* 颗粒 */
-  '  col+=(hash(gl_FragCoord.xy+fract(uTime)*97.0)-0.5)*0.012;',
+  '  col+=(hash(gl_FragCoord.xy+fract(uTime)*97.0)-0.5)*mix(0.012,0.008,uLight);',
   '  gl_FragColor=vec4(col,1.0);',
   '}',
 ].join('\n')
@@ -816,6 +1029,7 @@ function frame(now) {
     gl.uniform2f(progBg.loc.uRes, canvas.width, canvas.height)
     gl.uniform1f(progBg.loc.uTime, t)
     gl.uniform3f(progBg.loc.uAccent, S.acc[0], S.acc[1], S.acc[2])
+    gl.uniform1f(progBg.loc.uLight, stageEnv.theme === 'light' ? 1 : 0)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
   }
 
@@ -825,6 +1039,7 @@ function frame(now) {
 /* ---------------------------------------------------------------- 启动 */
 resizeGL()
 measure()
+applyEnv()
 window.addEventListener('resize', () => {
   resizeGL()
   measure()
