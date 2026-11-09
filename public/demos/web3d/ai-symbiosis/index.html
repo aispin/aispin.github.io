@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <script src="../../_from.js" defer></script>
-<title>共生 · Symbiosis — 生成式房间原型</title>
-<meta name="description" content="AI 房间的空间语言：一片潜空间里的一只活体。每换一件作品，它就散成噪声、再长成另一个形态——机器负责生成，你负责出题。纯 WebGL 程序化，没有一张位图。">
+<title>共生 · Symbiosis — 一只会重生的活体</title>
+<meta name="description" content="潜空间里的一只活体：噪声撑起来的膜、更热的内核，每换一件作品就散成粒子、再长成另一个形态。纯 WebGL 程序化，三个 draw call，没有一张位图。">
 <style>
 @font-face{
   font-family:'MapleUI';
@@ -37,7 +37,7 @@ body{
 
 /* ── HUD：整层不吃事件，只有按钮和刻度收回来 ───────────────────── */
 .hud{position:fixed;inset:0;pointer-events:none;z-index:4}
-.hud a,.hud button,.hud .specimen,.rail{pointer-events:auto}
+.hud a,.hud button,.rail{pointer-events:auto}
 
 .lab-back{
   position:absolute;left:18px;top:16px;
@@ -141,90 +141,6 @@ body{
 }
 .btn--primary:hover{color:#04120f;background:#eafffa;border-color:transparent}
 
-/* ── 右：正在跑的那一页（主角）───────────────────────────── */
-.specimen{
-  position:absolute;right:52px;top:50%;transform:translateY(-50%);
-  width:min(760px,48vw);aspect-ratio:16/9;
-  border-radius:14px;overflow:hidden;cursor:zoom-in;
-  border:1px solid rgba(150,200,225,.18);
-  background:#05080c;
-  box-shadow:0 40px 120px -40px rgba(0,0,0,.95),0 0 70px -24px var(--accent);
-  transition:border-color .3s ease,box-shadow .3s ease;
-}
-.specimen:hover{border-color:rgba(150,225,225,.42)}
-.specimen iframe{
-  position:absolute;left:0;top:0;border:0;
-  width:1440px;height:810px;
-  transform-origin:0 0;
-  pointer-events:none;
-  opacity:0;transition:opacity .55s ease;
-}
-.specimen.is-ready iframe{opacity:1}
-/* 换页时 iframe 会先白/黑一下 —— 用一层极淡的流光盖住，
-   比"卡片突然变黑"像是"正在载入"，也正好和炸开动画同时发生 */
-.specimen__load{
-  position:absolute;inset:0;z-index:1;
-  background:linear-gradient(100deg,#070b10 0%,#0c141b 46%,#070b10 100%);
-  background-size:220% 100%;
-  animation:sheen 1.5s linear infinite;
-  transition:opacity .45s ease;
-}
-.specimen.is-ready .specimen__load{opacity:0}
-@keyframes sheen{0%{background-position:130% 0}100%{background-position:-45% 0}}
-.specimen__veil{
-  position:absolute;inset:0;pointer-events:none;
-  background:
-    radial-gradient(120% 90% at 50% 0%,rgba(94,240,200,.06),transparent 62%),
-    linear-gradient(180deg,rgba(4,7,11,.22),transparent 20%);
-}
-.specimen__tag{
-  position:absolute;left:12px;top:11px;z-index:2;
-  display:inline-flex;align-items:center;gap:6px;
-  padding:4px 9px;border-radius:999px;
-  background:rgba(4,8,12,.72);border:1px solid rgba(150,200,225,.18);
-  font:400 9px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--dim);
-  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-  opacity:0;transform:translateY(-3px);
-  transition:opacity .25s ease,transform .25s ease;
-}
-.specimen:hover .specimen__tag{opacity:1;transform:none}
-.specimen__tag i{
-  width:4px;height:4px;border-radius:50%;font-style:normal;
-  background:var(--accent);box-shadow:0 0 8px var(--accent);
-}
-.specimen__hint{
-  position:absolute;right:12px;bottom:11px;z-index:2;
-  padding:5px 10px;border-radius:999px;
-  background:rgba(4,8,12,.74);border:1px solid rgba(150,200,225,.18);
-  font:400 10px/1 var(--sans);color:var(--dim);
-  opacity:0;transform:translateY(4px);
-  transition:opacity .25s ease,transform .25s ease;
-  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-}
-.specimen:hover .specimen__hint{opacity:1;transform:none}
-
-/* ── 全屏试玩：同源 iframe，进来就能点 ──────────────────────── */
-.overlay{
-  position:fixed;inset:0;z-index:60;display:none;
-  align-items:center;justify-content:center;
-  background:rgba(3,6,10,.9);
-  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-}
-.overlay.is-open{display:flex}
-.overlay iframe{
-  width:min(1180px,92vw);height:min(760px,84vh);
-  border:1px solid rgba(150,200,225,.2);border-radius:12px;background:#0b0e13;
-}
-.overlay__x{
-  position:absolute;right:26px;top:22px;
-  appearance:none;cursor:pointer;
-  padding:8px 14px;border-radius:999px;
-  border:1px solid var(--line);background:rgba(10,14,20,.6);color:var(--dim);
-  font:400 12px/1 var(--sans);
-  transition:color .2s ease;
-}
-.overlay__x:hover{color:var(--ink)}
-
 /* ── 底部：24 格刻度 ─────────────────────────────────────────── */
 .rail{
   position:absolute;left:50%;bottom:60px;transform:translateX(-50%);
@@ -263,7 +179,6 @@ body{
 @media (max-width:820px){
   .brand{right:16px;top:14px}
   .brand__name{font-size:13px}
-  .specimen{left:16px;right:16px;top:92px;transform:none;width:auto;aspect-ratio:16/9}
   .readout{left:20px;right:20px;top:auto;bottom:104px;transform:none;width:auto}
   .readout h1{font-size:20px}
   .readout .desc{font-size:12.5px;-webkit-line-clamp:3;max-width:none}
@@ -273,7 +188,6 @@ body{
   .hint{font-size:9px;letter-spacing:.12em;bottom:20px}
   .rail{bottom:52px;gap:4px}
   .rail button{width:2px}
-  .overlay iframe{height:min(680px,72vh)}
 }
 @media (max-height:620px) and (min-width:821px){
   .readout .desc{-webkit-line-clamp:2}
@@ -301,49 +215,36 @@ body{
     <div class="meta" id="meta"></div>
     <nav class="series" id="series" aria-label="系列步骤"></nav>
     <div class="actions">
-      <button class="btn btn--primary" id="try" type="button">▶ 在线试玩</button>
+      <button class="btn btn--primary" id="try" type="button">查看详情</button>
       <a class="btn" id="link" href="#" target="_blank" rel="noopener">GitHub ↗</a>
     </div>
   </section>
 
-  <figure class="specimen" id="specimen" title="点开在线页面">
-    <iframe id="frame" title="项目页面预览" scrolling="no" tabindex="-1" aria-hidden="true"></iframe>
-    <div class="specimen__load"></div>
-    <div class="specimen__veil"></div>
-    <div class="specimen__tag"><i></i>在线页面</div>
-    <div class="specimen__hint">点开 · 可交互</div>
-  </figure>
-
   <nav class="rail" id="rail" aria-label="索引"></nav>
 
-  <div class="hint">滚动 / 拖动 换一个 · 点预览可试玩</div>
+  <div class="hint">滚动 / 拖动 换一个 · 点「查看详情」打开项目页</div>
 </div>
 
-<div class="overlay" id="overlay">
-  <button class="overlay__x" id="close" type="button">关闭 ✕</button>
-  <iframe id="live" title="在线试玩"></iframe>
-</div>
-
+<script src="../../_overlay.js"></script>
 <script src="../../_pager.js"></script>
 <script>
 /* =============================================================================
- * 共生 · SYMBIOSIS —— AI 房间的空间语言原型
+ * 共生 · SYMBIOSIS —— 一只活在潜空间里的东西（web3d 原型，**不做项目陈列**）
  *
- * 一句话：**每件作品一只活体，活体里装着它自己的页面**。左边说清"这是什么"，
- * 右边直接跑真页面（24 件全都有落地页，2026-11-08 逐条 curl 过），点开就能试。
- * 换一件时膜炸成粒子、按新的种子长成另一个形态 —— 那 1.15s 同时盖住 iframe 的
- * 加载空窗，酷是拿来用的，不是拿来炫的。
+ * 一句话：一件作品一只活体。换一件时膜炸成粒子、按新的种子长成另一个形态。
+ * 左下角只讲"这是什么"，「查看详情」把落地页放进全屏浮层（公共件 `_overlay.js`）。
+ *
+ * ⚠️ 定位（用户 2026-11-09）：「把这个版本当作 web3d 的其中一个 demo。但它不适合
+ *    做 AI 项目展示。」—— 之前那版把项目页当成常驻主角（右侧 16:9 卡里跑真页面），
+ *    结论是**活体和内容互相抢**：页面一进来视线全被 iframe 吸走，活体只剩一圈边。
+ *    所以这里退回纯视觉：形态本身就是内容，作品信息退到一栏文字。
+ *    项目陈列另起一只 demo（`web3d/ai-atlas/`，卡片墙）。
  *
  * 为什么不是又一片星云
  * --------------------
  * career 是纵向隧道（序列），craft 是环形展板（并列），posts 是一条经折（长度）。
- * 三个都靠"排布"讲故事。这一间**不排布**：一件作品一只活体，形态由这件作品
- * 自己决定。于是四间房的空间语法互不重叠，也不会有人说"怎么又是星空"。
- *
- * 🔴 内容优先（用户 2026-11-08）：「核心目标是项目介绍+项目演示，用户需要一眼
- *    看到项目名称、描述，点击可以去演示页、github。不能为了酷而酷。」
- *    所以活体退成**包住预览卡的场**，永远不占中心；中心永远是那一页。
- *    「重新生成」这类只有视觉意义的功能已删（只留换作品时的炸开）。
+ * 三个都靠"排布"讲故事。这一间**不排布**：一件作品一只活体，形态由种子决定。
+ * 于是空间语法互不重叠，也不会有人说"怎么又是星空"。
  *
  * 为什么是裸 WebGL，不是 three
  * ---------------------------
@@ -393,7 +294,7 @@ const IS_SMALL = matchMedia('(max-width: 820px)').matches
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches
 /* 相机半径（膜的平均半径 = 1）。竖屏的水平视角只有 ~11°，
    而活体自身的半角有 ~18° —— 不后退就直接出画。 */
-const CAM_R = IS_SMALL ? 7.5 : 3.4
+const CAM_R = IS_SMALL ? 7.5 : 4.35
 /* 距离衰减的截断点原本是按 4.05 写死的，相机一退整只活体就被判成"太远"而变暗，
    所以改成跟着 CAM_R 走；SIZE_K 把点径按同样的比例补回来。 */
 const FADE_LINE = 1.5 - 4.05 * 0.22 + CAM_R * 0.22
@@ -406,7 +307,7 @@ const LAT = 18, MER = 32, SEG = IS_SMALL ? 64 : 96
 
 /* 活体在画面上的落位（NDC）。桌面让到右边，左下留给文案；
    手机竖屏把活体顶上去，文案在底下 —— 两者都不该压在文字上。 */
-const SHIFT = IS_SMALL ? [0.0, 0.52] : [0.40, 0.0]
+const SHIFT = IS_SMALL ? [0.0, 0.34] : [0.33, 0.0]
 
 /* ---------------------------------------------------------------- 小工具 */
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v)
@@ -820,11 +721,6 @@ const el = {
   link: document.getElementById('link'),
   try: document.getElementById('try'),
   series: document.getElementById('series'),
-  specimen: document.getElementById('specimen'),
-  frame: document.getElementById('frame'),
-  overlay: document.getElementById('overlay'),
-  live: document.getElementById('live'),
-  close: document.getElementById('close'),
   rail: document.getElementById('rail'),
   cur: document.getElementById('cur'),
   tot: document.getElementById('tot'),
@@ -837,6 +733,9 @@ el.tot.textContent = String(DATA.length).padStart(2, '0')
 /* 24 件全部有落地页（2026-11-08 逐条 curl 过，都是 200） */
 const demoOf = (id) => `https://aispin.github.io/${id}/`
 
+/* 全屏 iframe 浮层走公共件：24px 边距、Esc、加载态只定义一次 */
+const overlay = createStageOverlay({ accent: '#5ef0c8' })
+
 /* ---------------------------------------------------------------- 尺寸 */
 let vw = 1, vh = 1, dpr = 1
 function resize() {
@@ -848,7 +747,6 @@ function resize() {
   canvas.style.width = window.innerWidth + 'px'
   canvas.style.height = window.innerHeight + 'px'
   gl.viewport(0, 0, vw, vh)
-  if (el && el.specimen) fitFrame()
 }
 resize()
 window.addEventListener('resize', resize)
@@ -895,26 +793,7 @@ function paint(i) {
     })
   }
 
-  loadPreview(it)
   ;[...el.rail.children].forEach((b, k) => b.classList.toggle('on', k === i))
-}
-
-/* 预览：同源 iframe，一次只挂一个（换页就换 src，不叠 24 个） */
-let previewSrc = ''
-function loadPreview(it) {
-  const src = demoOf(it.id)
-  if (src === previewSrc) return
-  previewSrc = src
-  el.specimen.classList.remove('is-ready')
-  el.frame.onload = () => {
-    if (previewSrc === src) el.specimen.classList.add('is-ready')
-  }
-  el.frame.src = src
-}
-
-/* 1440×810 渲染再缩进卡片 —— 拿的是桌面版的样子，不是被卡片挤窄的响应式版 */
-function fitFrame() {
-  el.frame.style.transform = `scale(${el.specimen.clientWidth / 1440})`
 }
 
 let swapTimer = 0
@@ -923,7 +802,6 @@ function swapTo(i) {
   clearTimeout(swapTimer)
   swapTimer = setTimeout(() => {
     paint(i)
-    fitFrame()
     el.readout.classList.remove('is-swap')
   }, REDUCED ? 0 : 300)
 }
@@ -931,7 +809,7 @@ function swapTo(i) {
 /* ---------------------------------------------------------------- 切题 */
 function go(n) {
   const next = clamp(n, 0, DATA.length - 1)
-  if (next === S.i || overlayOpen) return
+  if (next === S.i || overlay.isOpen()) return
   S.i = next
   S.seedA = S.seedB
   S.seedB = seedOf(DATA[next].id)
@@ -964,34 +842,27 @@ if (SERIES) {
   el.series.appendChild(lab)
 }
 
-/* ---------------------------------------------------------------- 试玩 */
-let overlayOpen = false
-function openLive() {
+/* ---------------------------------------------------------------- 查看详情 */
+function openDetail() {
   const it = DATA[S.i]
-  overlayOpen = true
-  el.live.src = demoOf(it.id)
-  el.overlay.classList.add('is-open')
-  el.close.focus()
+  /* 🔴 DATA 里没有 demoUrl 字段（原型是从 aiProjects.json 抄的，只留了 url）——
+     以前靠 demoOf(id) 拼出来，别在这里直接读 it.demoUrl，否则会当成"没有落地页"
+     直接 window.open 跳走（页面被 GitHub 顶掉，浮层根本没开）。 */
+  const url = it.demoUrl || demoOf(it.id)
+  overlay.open(url, {
+    title: it.name || it.title,
+    accent: accentOf(it.id),
+    rect: el.try.getBoundingClientRect(),
+  })
 }
-function closeLive() {
-  if (!overlayOpen) return
-  overlayOpen = false
-  el.overlay.classList.remove('is-open')
-  el.live.src = 'about:blank'
-}
-el.try.addEventListener('click', openLive)
-el.specimen.addEventListener('click', openLive)
-el.close.addEventListener('click', closeLive)
-el.overlay.addEventListener('click', (e) => { if (e.target === el.overlay) closeLive() })
+el.try.addEventListener('click', openDetail)
 
 /* 输入层走公共件：滚轮/拖动的判据和 craft、posts 完全同一套。
-   🔴 target 给 body 而不是 .stage：预览卡盖住了半屏，滚轮落进卡片里
-   就收不到 .stage 的监听了（表现为"在卡片上滚滚不动"）。
-   拖动仍只从 .stage 起手 —— 卡片上的按下要留给"点开试玩"。 */
-const pager = createPager({
+   浮层开着就把输入交还给它（`enabled`），否则滚轮会穿透去换作品。 */
+createPager({
   target: document.body,
   dragSelector: '.stage',
-  enabled: () => !overlayOpen,
+  enabled: () => !overlay.isOpen(),
   onStep: (dir) => go(S.i + dir),
   onDragStart: () => el.stage.classList.add('is-dragging'),
   onDragEnd: () => el.stage.classList.remove('is-dragging'),
@@ -999,11 +870,7 @@ const pager = createPager({
 
 /* 🔴 不接 stage 的 click：拖动结束浏览器会补一次 click，
    而 .readout 那片没有 pointer-events，点文字会穿透到 stage ⇒ 误开浮层。
-   入口只留两个：预览卡本身、以及「在线试玩」按钮。 */
-
-window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeLive()
-})
+   入口只留一个：「查看详情」按钮。 */
 
 window.addEventListener('pointermove', (e) => {
   if (e.pointerType === 'touch') return
@@ -1153,7 +1020,6 @@ S.seedB = seedOf(DATA[0].id)
 S.seedA = S.seedB
 S.mix = 1
 paint(0)
-fitFrame()
 requestAnimationFrame(frame)
 })()
 </script>
