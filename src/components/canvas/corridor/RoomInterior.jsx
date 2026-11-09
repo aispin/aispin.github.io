@@ -17,6 +17,7 @@ import ContentRoom from '../rooms/ContentRoom';
 import CareerTunnel from '../rooms/CareerTunnel';
 import CraftRing from '../rooms/CraftRing';
 import PostsFold from '../rooms/PostsFold';
+import AiAtlas from '../rooms/AiAtlas';
 import { SCENE_FONTS } from '../../../config/theme';
 
 // Room configurations
@@ -42,20 +43,23 @@ const SUBTITLES = {
 // `craft` 同理：它是一圈**接管渲染**的展板环（rooms/CraftRing.jsx），
 // 也不再是贴卡墙。2026-11-05 从 ContentRoom 里摘出来。
 // `posts` 同理：2026-11-06 换成一条**接管渲染**的经折（rooms/PostsFold.jsx），
-// 折页与 HUD 是 DOM（ui/PostsHud.jsx）。至此 8 个房间里有 3 个是独立空间。
-const CONTENT_ROOM_IDS = ['videos', 'music', 'ai'];
+// 折页与 HUD 是 DOM（ui/PostsHud.jsx）。
+// `ai` 同理：2026-11-09 换成一面**接管渲染**的卡片墙（rooms/AiAtlas.jsx），
+// 24 张卡与 iframe 浮层是 DOM（ui/AiAtlasHud.jsx）。至此 8 个房间里有 4 个是
+// 独立空间，只剩 videos / music 还走 ContentRoom。
+const CONTENT_ROOM_IDS = ['videos', 'music'];
 
 // 自己会喊 `onReady` 的房间。必须在下面的兜底里排除掉，否则门会在房间还没
 // 搭好时就打开 —— 隧道尤其明显：先开到一片空白，再"啪"地出现。
-const SELF_READY_IDS = ['gallery', 'contact', 'career', 'craft', 'posts', ...CONTENT_ROOM_IDS];
+const SELF_READY_IDS = ['gallery', 'contact', 'career', 'craft', 'posts', 'ai', ...CONTENT_ROOM_IDS];
 
 /**
  * 接管渲染房间的「屋子壳」（floor / ceiling / 背墙 / 左右墙，正面敞开）。
  *
- * career / craft / posts 三个房间都自带 Scene + Camera，主场景里**没有**它们
+ * career / craft / posts / ai 四个房间都自带 Scene + Camera，主场景里**没有**它们
  * 的屋子几何 —— 相机穿过门厅就是一片天空。以前看不出来，因为接管层从第一帧
  * 就把整屏盖住了；现在进场先画走廊（门扇 0.7s + 穿门 1.5s），"门开了、后面
- * 是天"就会露出来（2026-11-07 posts 上先补的，2026-11-08 三间共用）。
+ * 是天"就会露出来（2026-11-07 posts 上先补的，2026-11-08 三间共用，2026-11-09 加上 ai）。
  *
  * 🔴 `toneMapped: false` 在 `shellMaterials()` 里统一设：接管层是 ShaderMaterial，
  *    gl_FragColor 里的颜色**不过色调映射**；这几个要是走 ACES，同一个色出来
@@ -159,6 +163,8 @@ const RoomInterior = ({ label, roomId, showRoom, onReady, isExiting }) => {
                 posts: shellMaterials('#2b221b', '#1b1511', '#3a2e25'),
                 career: shellMaterials('#0c0f19', '#05060b', '#151a28'),
                 craft: shellMaterials('#0b0e17', '#04060a', '#131827'),
+                // 图鉴：冷黑底（#05070c）+ 一团青绿冷光 ⇒ 壳取底色的稍亮一档
+                ai: shellMaterials('#0a0f17', '#04060a', '#0d131c'),
             },
         };
     }, [corridorWidth, corridorDepth, corridorHeight]);
@@ -305,6 +311,16 @@ const RoomInterior = ({ label, roomId, showRoom, onReady, isExiting }) => {
                             <RoomShell geometries={geometries} shell={materials.shells.posts} />
                             <Suspense fallback={null}>
                                 <PostsFold onReady={onReady} isExiting={isExiting} />
+                            </Suspense>
+                        </>
+                    ) : roomId === 'ai' ? (
+                        // === 图鉴 · ATLAS：一面卡片墙 ===
+                        // 自带 Scene + Camera + 接管渲染（rooms/AiAtlas.jsx），
+                        // 24 张卡与 iframe 浮层是 DOM（ui/AiAtlasHud.jsx）。
+                        <>
+                            <RoomShell geometries={geometries} shell={materials.shells.ai} />
+                            <Suspense fallback={null}>
+                                <AiAtlas onReady={onReady} isExiting={isExiting} />
                             </Suspense>
                         </>
                     ) : CONTENT_ROOM_IDS.includes(roomId) ? (

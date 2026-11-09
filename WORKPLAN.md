@@ -44,77 +44,6 @@
 
 # 📋 待办 WO
 
-### WO-2 · AI 房间改版（两只原型已出，**等你选**再进 3D）
-
-- **需求原文**：「对这个房间进行重新改版，结合 AI 主题，力求酷炫屌炸天。沿用文稿房间的
-  改版思路：先在 `demos/web3d` 下创建适合这个房间的 demo 原型，我确认后再在 3D 房间中编码实现。」
-- **2026-11-08 追加**：「核心目标是项目介绍+项目演示（如有 demoUrl），用户需要一眼看到
-  项目名称、描述，点击可以去演示页、github。**不能为了酷而酷**。」
-- **2026-11-09 追加（推翻上一版形态）**：
-  1. 「在线试玩」改「查看详情」；2. **移除右边的真页面**（常驻 iframe 预览卡）；
-  3. 「把这个版本当作 web3d 的其中一个 demo。**但它不适合做 AI 项目展示**。」
-  4. 「重新设计一个 web3d demo，在实用的基础上结合 3D 技术，展示**项目卡片墙**，
-     如有 demoUrl，点击卡片 iframe 全屏（**边距 24px**）展示。」
-- **2026-11-09 二轮（进 3D 前最后四条，已落）**：
-  1. 右上角的文案（图鉴 / ATLAS + 件数）移到**顶部中间** —— 右上角要留给 3D 场景的图标栈；
-  2. 浮层的「关闭 Esc」**与详情页自己的顶栏垂直居中**（原来落在 58px、中心 71px，
-     比顶栏中心 55px 低了 16px，看着像"挂在下面"）；
-  3. **浅色模式**，默认随系统；4. **中英双语**，默认随系统。
-  🔴 主题与语言**是房子的**（`SitePreferences` 写 `html[data-theme]` / `html[lang]`），
-  原型里**不许**出现任何切换图标；`public/demos/_env.js` 只负责让独立页面能模拟这套
-  环境（`?theme=`/`?lang=` > 宿主预写的 `data-*` > 系统），并盯住三处变化。
-- **🔴 `_env.js` 自激死循环（实测卡死浏览器）**：`apply()` 原来无条件
-  `root.dataset.theme = next.theme`，而 `setAttribute` 写**同值也会**派发
-  MutationRecord ⇒ observer 再调 `apply` ⇒ 无限循环，切一次主题页面就冻结
-  （无头浏览器直接被 SIGKILL，退出码 137，一开始被误判成"工具挂了"）。
-  判据：写属性前先判等；改了 `_env.js` 必须用「宿主改 `data-theme`」这条路验一遍。
-- **浅色不是把深色反相**：① 墙要比纸再深一档（墙 `#F7EDDE` / 卡 `#FFFDF8`）——
-  全用 `#FFF6E9` 的话 24 张卡糊成一片（第一版整面墙发雾）；② 封面「信号图」要换成
-  墨色（`26% 52%`）并把 alpha 提 2.1 倍，否则 1px 细线在纸上直接消失；
-  ③ 亮青 `74% 62%` 的卡片色相在纸上等于没有，压到 `58% 33%`；
-  ④ WebGL 底色的暗角要收到 13%（82% 会变成一圈脏边），颗粒减半。
-
-- **现在有两只原型，都已在 `demos.json` 里（含缩略图）**：
-
-  | 目录 | 是什么 | 定位 |
-  | --- | --- | --- |
-  | `web3d/ai-symbiosis` | 潜空间里的活体，换作品就炸开重组；左栏文字 + 「查看详情」 | **纯视觉 demo**，不做陈列 |
-  | `web3d/ai-atlas` | 弧形卡片墙，24 件一格一件；点卡片 → 全屏 iframe（24px） | **AI 房间的候选空间语言** |
-
-- **`ai-atlas` 怎么做的**：4/3/2 列网格 → 每列按离视线的横向距离绕 Y 轴转 + 退到后面
-  （柱面）；滚动 = 整面墙在深度里平移；指针视差 ±1.1°；hover 卡片沿 Z 抬 78px。
-  文字是**真 DOM**（CSS 3D 排布，不贴图）⇒ 任何分辨率都清晰；封面是 canvas 按 id 哈希
-  画出来的六种「信号图」，24 张各不相同（零位图）。
-- **共用件** `public/demos/_overlay.js`：全屏 iframe 浮层，`inset:24px` 是唯一常量，
-  FLIP 从卡片矩形展开、Esc、加载条、焦点归位。两个 demo 共用一份。
-  关闭胶囊落在一条 `--so-head`（默认 62px，= 详情页 `--topbar-h`）高的右侧条带里居中；
-  皮和文案**读** `<html data-theme>` 与 `<html lang>` —— 所以没接主题的页面（如
-  `ai-symbiosis`）拿到的仍是原来的深色浮层，不会被系统浅色误伤。
-- **共用件** `public/demos/_env.js`：只给独立页面用（进 3D 后房间直接读
-  `useSitePreferences()`，**不加载它**）。它把「我现在该长什么样」写进
-  `html[data-theme]` / `data-lang` / `lang` / `color-scheme`。
-- **🔴 3D 里最坑的一条（进房间前必读）**：`.wall` 是 `inset:0` 且 `preserve-3d`，
-  卡片被 `translateZ` 推到 z<0（墙平面之后）⇒ **命中测试认深度，墙把所有点击吃光**
-  （`elementFromPoint` 永远返回 `.wall`，桌面手机都一样）。修法：`.wall{pointer-events:none}`
-  + `.card{pointer-events:auto}`。
-- **确认后要做**：`RoomInterior` 加 `roomId === 'ai'` 分支 + 新建 `rooms/AiAtlas.jsx`
-  （走 `rooms/takeover.js` 那套进场节奏，别复制三份）+ `ui/AiHud.jsx` + `.scss`
-  + `ROOM_COPY.ai` 改文案 + 缩略图与 `demos.json` 已就绪。
-  🔴 主题/语言用房间里的 `useSitePreferences()`（`theme` / `language`），**不要**
-  在 HUD 里加第二个切换按钮 —— 房子顶上已经有一套；原型里的 `_env.js` 不进房间。
-  🔴 卡片数据的中英两套在原型里是内联的（英文描述抓自各项目落地页
-  `assets/content.js` 的 `lang.en.meta.description`），进房间时应落成
-  `src/data/` 下的数据文件，别在 JSX 里内联 24 条长句。
-  ⚠️ 3D 房间里的 iframe 必须放 DOM 层（和 craft 的浮层同一套），不能塞进 WebGL。
-- **判据**：`node .workbuddy-ai/harness/probe-room-door.mjs ai` 进场/退场亮度表与
-  career / craft / posts 同形（走廊 ~220 → 房间 ≤20，退场反向），深链 `/ai?noloader=1` 3.2s 内进屋；
-  房间里点卡片 → 浮层四边 24px（`getBoundingClientRect` 量）。
-  原型侧另加三条：① `?theme=light|dark` × `?lang=zh|en` 四张定妆照都不许出现
-  「深色卡 + 浅色墙」这种混搭；② 关闭胶囊 `rect.top + height/2` = 面板 `top + 31`（±2px）；
-  ③ 右上角 `elementFromPoint` 不许命中任何文案节点（留给房子的图标栈）。
-
----
-
 ### WO-1 · `prefers-reduced-motion` 下点履历的门进不去
 
 - **现象**：系统开「减少动态效果」后，走到 `career` 门前点门，相机对上门就
@@ -137,6 +66,26 @@
 > 「创意实验房间换成实验环」已于 2026-11-05 提交（`b922f06`）：
 > 房间 `studio` → `craft`，`CraftRing` 接管渲染 + `CraftHud` 25 块玻璃展板，
 > 深链/别名/滚轮/浮层/返回全部验过（`.workbuddy-ai/harness/probe-craft-room.mjs`）。
+
+---
+
+### WO-3 · 手机上几乎点不到房门（走廊，**8 个房间都受影响**）
+
+- **怎么发现的**：验 AI 房间的点门链时，`probe-room-door.mjs ai … 390x844` 一路
+  `luma=135` 恒定、`room=null` —— 点了个空气。
+- **根因**（两条约束刚好错开）：
+  1. `DoorSection.handleClick` 有 `|camZ − doorZ| > TILT_START(15)` 就 `return`
+     ⇒ 必须走到门前 **15 单位内**才点得动；
+  2. 390 宽时水平 FOV 只有 **~30°**（1440 宽是 85°），而走廊会左右轻摆
+     （yaw ±0.11 rad）⇒ 走到 15 单位内时门心已经贴到左边缘。
+     实测投影：`dz 20.3 → sx −3`、`dz 17.3 → sx −28`、`dz 14.3 → sx −14`、
+     `dz 11.3 → sx 0`。门扇约 72px 宽，所以只有**内侧半扇**能点。
+- **不是本轮引入的**：所有门的 x 都在 ±2.3~3.5，`TILT_START` 也是老的。
+- **可选方向**：窄屏把相机 FOV 按宽高比补到等效 ~55° 水平（`fov = 2·atan(tan(h/2)/aspect)` 反过来算），
+  或窄屏把 `TILT_START` 放宽到 22，或窄屏给门加一块跟随相机的 DOM 热区。
+  ⚠️ 动 FOV 会影响**整个走廊的构图**（门匾、装饰、院子外观），要先量再改。
+- **临时结论**：`probe-room-door.mjs` 窄视口停在 `doorZ + 13` 并把点击点夹进
+  `[3, W−3]`，能过；真机上"贴边点"的体验仍是问题。
 
 ---
 
@@ -164,6 +113,8 @@
 
 - **当前状态**：等你选。**默认按「图鉴」**（`ai-atlas` 已经按这个名字做了，品牌行是
   `图鉴 / ATLAS`）；URL 仍保持 `/ai`（不换路由，免得外链失效）。
+  ⚠️ **2026-11-09 起这个不一致是"看得见"的**：房间已经按图鉴实现，进房间抬头就是
+  `图鉴 / ATLAS`，而门匾、菜单、`<title>` 还写着「AI+」。没拍板前不动房子那几处。
 - **选定后要改**：`theme.js` 的 `{ id:'ai', zh:'AI+' }`、`useDocumentMeta.js` 的 title/description、
   `ROOM_COPY.ai`、门匾与菜单、`index.html` / `manifest.webmanifest` 里的站点描述。
 

@@ -1,0 +1,771 @@
+/**
+ * AI 房间 · 图鉴 ATLAS 的 DOM 层。
+ *
+ * 🔴 这份样式**不是重新设计的**，是从 `public/demos/web3d/ai-atlas/index.html`
+ *    的 <style> 块 + `public/demos/_overlay.js` 的 CSS 搬过来的 —— 用户
+ *    2026-11-09 确认的就是那一版视觉。搬家时只做了五件事，别的都没动：
+ *      1. 所有规则嵌进 `.ai-atlas`（原来是全局的，`.stage` / `.wall` / `.card`
+ *         这些类名会污染整个站）
+ *      2. 丢掉页面级的 `:root` / `*` / `html,body` / `body` / `#gl`
+ *         （冷黑底由 3D 那一层画，见 `canvas/rooms/AiAtlas.jsx`）
+ *      3. 变量从 `:root` 挪到 `.ai-atlas` 上；浅色改成 `html[data-theme="light"]`
+ *         前缀（房子统一控制主题，本层没有切换器）
+ *      4. 删掉 `.lab-back`（站内导航左上角那颗返回键就是它）与 `#locale`
+ *      5. `.scroll` → `.scrollbar`：`.scroll` 在站内是全局类名
+ *    改视觉请**两边一起改**，或者干脆改完 demo 再搬一次。
+ *
+ * ── 浅色不是深色反相 ─────────────────────────────────────────────────
+ * 取自主站的暖纸（纸 #FFF6E9 / 墨 #211D1A / 木色线 #9B755A），但**墙比纸再深
+ * 一档**：深色版里卡片比底亮一截才立得住，浅色版同理 —— 全是 #FFF6E9 的话
+ * 24 张卡就糊成一片（第一版就是这样，整面墙发雾）。
+ */
+
+.ai-atlas,
+.ai-atlas * {
+    box-sizing: border-box;
+}
+
+.ai-atlas h1,
+.ai-atlas h3,
+.ai-atlas p {
+    margin: 0;
+    padding: 0;
+}
+
+.ai-atlas {
+    --bg: #05070c;
+    --ink: #eef3f8;
+    --dim: #8b97a9;
+    --dim-2: #5a6577;
+    --accent: #5ef0c8;
+    --line: rgba(150, 175, 205, 0.16);
+    /* 卡片的"皮"也进变量：浅色只换变量，不动结构（24 张卡共用一套规则） */
+    --card-a: rgba(17, 23, 32, 0.96);
+    --card-b: rgba(9, 13, 19, 0.98);
+    --card-line: rgba(150, 190, 220, 0.13);
+    --card-name: #e9eff7;
+    --card-desc: #9aa8bb;
+    --plate: #080b11;
+    --plate-veil: rgba(7, 10, 15, 0.88);
+    --veil: 5, 7, 12;
+    --chip: rgba(10, 14, 20, 0.5);
+    --track: rgba(150, 190, 220, 0.1);
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: "MapleUI", ui-sans-serif, system-ui, "PingFang SC", "Hiragino Sans GB", sans-serif;
+
+    position: fixed;
+    inset: 0;
+    /* 和 `CraftHud` / `PostsHud` 一致：**低于**站内导航（`.navigation-ui` 100），
+       退出房间只走站内那颗返回键，本层不再自己画一颗。浮层打开时临时抬到
+       1500（见文件末尾 `.is-modal`），因为右上角那排控件是 1000 / 1001。 */
+    z-index: 90;
+    overflow: hidden;
+    color: var(--ink);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    /* 底色由 `rooms/AiAtlas.jsx` 画。这里透明是**故意的**：着色器第一帧还没
+       出来时露出走廊，比闪一块纯色好。 */
+    background: transparent;
+    /* 默认不吃指针 —— 舞台 / 浮层各自打开 */
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+/* 🔴 这两条必须写在 `.ai-atlas` **外面**：写在里面会被 SCSS 拼成
+   `.ai-atlas .ai-atlas.is-in`，永远匹配不到（自己套自己）。
+   `CraftHud.scss` 那里踩过一次。 */
+.ai-atlas.is-in {
+    opacity: 1;
+}
+
+/* 退场：卡片先走。冷黑底由 AiAtlas 的 EXIT_HOLD + EXIT_FADE 控制
+   （按住 0.45s 再抹 1.75s），这里 1.1s 收干净 ⇒「墙先散、天再亮」。 */
+.ai-atlas.is-exiting {
+    opacity: 0;
+    transition-duration: 1.1s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    /* `DoorSection` 的 TRANSITION_SCALE 是 0.12，这里跟着收 */
+    .ai-atlas.is-exiting {
+        transition-duration: 0.12s;
+    }
+}
+
+/* 浮层打开时把整层抬到 1500 —— 和 `CareerProjectModal` 同高。本层是 90，
+   而右上角那排控件是 1000 / 1001 ⇒ 不抬的话浮层只盖住画布和左上角那颗返回键。 */
+.ai-atlas.is-modal {
+    z-index: 1500;
+}
+
+/* ==========================================================================
+   舞台 / 弧墙
+   ========================================================================== */
+
+.ai-atlas .stage {
+    position: fixed;
+    inset: 0;
+    /* perspective 在这一层，卡片才有真正的深度 */
+    perspective: 1600px;
+    perspective-origin: 50% 50%;
+    /* 触屏：不设 touch-action，浏览器会先吃掉手势去滚动页面 */
+    touch-action: none;
+    cursor: grab;
+    pointer-events: auto;
+}
+
+.ai-atlas .stage.is-drag {
+    cursor: grabbing;
+}
+
+.ai-atlas .wall {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    transform-origin: 50% 50%;
+    /* 🔴 必须不接收指针：墙是 inset:0 的一整块，而卡片被 translateZ 推到
+       z<0（墙平面之后）。在 preserve-3d 的上下文里命中测试**认深度**，
+       墙自己就把所有点击吃掉了 —— 表现为"卡片点不动、elementFromPoint
+       永远返回 .wall"。桌面和手机都一样，只是 JS 的 .click() 兜底把它盖住了。 */
+    pointer-events: none;
+    will-change: transform;
+}
+
+/* ==========================================================================
+   卡片
+   ========================================================================== */
+
+.ai-atlas .card {
+    position: absolute;
+    left: 0;
+    top: 0;
+    pointer-events: auto;
+    transform-origin: 50% 50%;
+    transform-style: preserve-3d;
+    cursor: pointer;
+    outline: none;
+    opacity: 0;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.ai-atlas .card__in {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border-radius: 13px;
+    overflow: hidden;
+    background: linear-gradient(180deg, var(--card-a), var(--card-b));
+    border: 1px solid var(--card-line);
+    box-shadow: 0 22px 60px -30px rgba(0, 0, 0, 0.9);
+    transform: translateZ(0);
+    transition:
+        transform 0.38s cubic-bezier(0.22, 1, 0.28, 1),
+        border-color 0.38s ease,
+        box-shadow 0.38s ease;
+}
+
+.ai-atlas .card:hover .card__in,
+.ai-atlas .card:focus-visible .card__in {
+    transform: translateZ(78px);
+    border-color: var(--c-dim);
+    filter: brightness(1.1);
+    box-shadow:
+        0 50px 100px -34px rgba(0, 0, 0, 0.95),
+        0 0 60px -16px var(--c);
+}
+
+.ai-atlas .card:focus-visible .card__in {
+    outline: 1px solid var(--c);
+    outline-offset: 0;
+}
+
+/* 封面：程序化「信号图」，按 id 哈希长出来，24 张各不相同 */
+.ai-atlas .card__plate {
+    position: relative;
+    flex: 0 0 50%;
+    overflow: hidden;
+    background: var(--plate);
+}
+
+.ai-atlas .card__plate canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    transition: filter 0.38s ease;
+}
+
+.ai-atlas .card__plate::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 64%, var(--plate-veil) 100%);
+}
+
+.ai-atlas .card__badge {
+    position: absolute;
+    right: 9px;
+    top: 9px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(4, 8, 12, 0.66);
+    border: 1px solid rgba(150, 200, 225, 0.16);
+    font: 400 9px/1 var(--mono);
+    letter-spacing: 0.12em;
+    color: var(--dim);
+    text-transform: uppercase;
+    transition:
+        color 0.3s ease,
+        border-color 0.3s ease,
+        background 0.3s ease;
+}
+
+.ai-atlas .card:hover .card__badge {
+    color: var(--c);
+    border-color: var(--c-dim);
+    background: rgba(4, 8, 12, 0.85);
+}
+
+.ai-atlas .card:hover .card__plate canvas {
+    filter: brightness(1.18) saturate(1.1);
+}
+
+.ai-atlas .card__body {
+    flex: 1;
+    min-height: 0;
+    padding: 11px 13px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.ai-atlas .card__top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font: 400 8.5px/1 var(--mono);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--dim-2);
+}
+
+.ai-atlas .card__no {
+    color: var(--c);
+    letter-spacing: 0.14em;
+}
+
+.ai-atlas .card__name {
+    font: 500 14px/1.24 var(--mono);
+    letter-spacing: -0.012em;
+    color: var(--card-name);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.ai-atlas .card__desc {
+    font: 400 11.5px/1.58 var(--sans);
+    color: var(--card-desc);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.ai-atlas .card__foot {
+    margin-top: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font: 400 8.5px/1 var(--mono);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--dim-2);
+}
+
+.ai-atlas .card__go {
+    color: var(--c);
+    opacity: 0.72;
+    transition:
+        opacity 0.3s ease,
+        transform 0.3s ease;
+}
+
+.ai-atlas .card:hover .card__go {
+    opacity: 1;
+    transform: translateX(2px);
+}
+
+/* ==========================================================================
+   上下压边 / HUD
+   ========================================================================== */
+
+.ai-atlas .veil {
+    position: fixed;
+    left: 0;
+    right: 0;
+    height: 108px;
+    pointer-events: none;
+    z-index: 3;
+}
+
+.ai-atlas .veil--top {
+    top: 0;
+    background: linear-gradient(
+        180deg,
+        rgba(var(--veil), 0.97) 0%,
+        rgba(var(--veil), 0.6) 48%,
+        transparent 100%
+    );
+}
+
+.ai-atlas .veil--bot {
+    bottom: 0;
+    background: linear-gradient(
+        0deg,
+        rgba(var(--veil), 0.99) 0%,
+        rgba(var(--veil), 0.92) 26%,
+        rgba(var(--veil), 0.5) 62%,
+        transparent 100%
+    );
+}
+
+/* 标题在**顶部中间**：左上角是返回键、右上角是房子的控件栈（音量 / 地图 /
+   主题…），这里不许占位。`top` 取 20px 是为了和那两颗 42px 的按钮同一条中线。 */
+.ai-atlas .brand {
+    position: absolute;
+    left: 50%;
+    top: 20px;
+    transform: translateX(-50%);
+    text-align: center;
+    pointer-events: none;
+    z-index: 5;
+    width: max-content;
+    max-width: calc(100% - 168px);
+}
+
+.ai-atlas .brand__name {
+    font: 500 15px/1.2 var(--sans);
+    letter-spacing: 0.14em;
+    color: var(--ink);
+    text-shadow: 0 0 22px rgba(0, 0, 0, 0.7);
+    white-space: nowrap;
+}
+
+.ai-atlas .brand__name i {
+    font-style: normal;
+    color: var(--dim-2);
+    margin: 0 8px;
+    font-size: 11px;
+    letter-spacing: 0;
+}
+
+.ai-atlas .brand__meta {
+    margin-top: 8px;
+    font: 400 10px/1 var(--mono);
+    letter-spacing: 0.2em;
+    color: var(--dim-2);
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.ai-atlas .hint {
+    position: absolute;
+    left: 50%;
+    bottom: 26px;
+    transform: translateX(-50%);
+    z-index: 5;
+    font: 400 10px/1 var(--mono);
+    letter-spacing: 0.18em;
+    color: var(--dim-2);
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+/* 右缘滚动条：自己画的，和墙的进度绑在一起 */
+.ai-atlas .scrollbar {
+    position: fixed;
+    right: 9px;
+    top: 150px;
+    bottom: 120px;
+    width: 2px;
+    background: var(--track);
+    border-radius: 2px;
+    z-index: 5;
+    pointer-events: none;
+}
+
+.ai-atlas .scrollbar i {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--accent);
+    opacity: 0.6;
+    box-shadow: 0 0 10px var(--accent);
+}
+
+/* ==========================================================================
+   全屏浮层（四边 24px）—— 移植自 `public/demos/_overlay.js`
+   ========================================================================== */
+
+.ai-atlas .so {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    pointer-events: auto;
+}
+
+.ai-atlas .so__scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(3, 6, 10, 0.84);
+    -webkit-backdrop-filter: blur(9px);
+    backdrop-filter: blur(9px);
+}
+
+.ai-atlas .so__panel {
+    position: absolute;
+    inset: 24px;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #070a0f;
+    border: 1px solid rgba(150, 200, 225, 0.22);
+    box-shadow:
+        0 60px 160px -60px #000,
+        0 0 90px -40px var(--accent);
+    will-change: transform, opacity;
+}
+
+.ai-atlas .so__frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: #0b0e13;
+    display: block;
+}
+
+/* 载入条：2px，压在面板顶边，load 之后淡出 */
+.ai-atlas .so__bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 2px;
+    width: 100%;
+    z-index: 2;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    background-size: 42% 100%;
+    background-repeat: no-repeat;
+    animation: atlas-sweep 1.1s linear infinite;
+    transition: opacity 0.45s ease;
+}
+
+.ai-atlas .so.is-ready .so__bar {
+    opacity: 0;
+}
+
+@keyframes atlas-sweep {
+    0% {
+        background-position: -50% 0;
+    }
+    100% {
+        background-position: 150% 0;
+    }
+}
+
+/* 关闭胶囊：放在一条**和落地页顶栏同高**的右侧条带里垂直居中。
+   以前是 top:34px（相对面板），落点 58px、中心 71px，比顶栏中心（24+31=55）
+   低了 16px —— 看着像"挂在下面"。现在条带从面板顶边起算 62px，中心恰好对齐。
+   条带自己不吃指针，只有按钮吃。 */
+.ai-atlas .so__xwrap {
+    position: absolute;
+    right: 34px;
+    top: 0;
+    height: 62px;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+}
+
+.ai-atlas .so__x {
+    appearance: none;
+    cursor: pointer;
+    pointer-events: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 13px;
+    border-radius: 999px;
+    border: 1px solid rgba(150, 200, 225, 0.24);
+    background: rgba(6, 10, 15, 0.78);
+    color: #aab6c6;
+    font: 400 11px/1 var(--mono);
+    letter-spacing: 0.1em;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    transition:
+        color 0.2s ease,
+        border-color 0.2s ease,
+        background 0.2s ease,
+        opacity 0.3s ease;
+    opacity: 0.72;
+}
+
+.ai-atlas .so__x:hover,
+.ai-atlas .so__x:focus-visible {
+    color: #eef3f8;
+    border-color: rgba(150, 200, 225, 0.45);
+    background: rgba(6, 10, 15, 0.92);
+    opacity: 1;
+}
+
+.ai-atlas .so__x kbd {
+    font: inherit;
+    opacity: 0.6;
+}
+
+.ai-atlas .so__name {
+    position: absolute;
+    left: 34px;
+    bottom: 34px;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 52%;
+    padding: 7px 13px;
+    border-radius: 999px;
+    border: 1px solid rgba(150, 200, 225, 0.18);
+    background: rgba(6, 10, 15, 0.72);
+    color: #8d99ab;
+    font: 400 11px/1 var(--mono);
+    letter-spacing: 0.06em;
+    text-decoration: none;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    opacity: 0.6;
+    transition: opacity 0.3s ease;
+}
+
+.ai-atlas .so__name:hover {
+    opacity: 1;
+}
+
+.ai-atlas .so__name b {
+    font-weight: 500;
+    color: #eef3f8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ai-atlas .so__name i {
+    font-style: normal;
+    opacity: 0.55;
+}
+
+.ai-atlas .so__loading {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: grid;
+    place-items: center;
+    font: 400 11px/1 var(--mono);
+    letter-spacing: 0.18em;
+    color: var(--dim-2);
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.ai-atlas .so.is-ready .so__loading {
+    opacity: 0;
+}
+
+/* ==========================================================================
+   浅色
+   ========================================================================== */
+
+html[data-theme="light"] .ai-atlas {
+    --bg: #f7edde;
+    --ink: #211d1a;
+    --dim: #6a5c4f;
+    --dim-2: #8a7a69;
+    --accent: #0b6e56;
+    --line: rgba(120, 92, 66, 0.3);
+    --card-a: rgba(255, 253, 248, 0.99);
+    --card-b: rgba(251, 243, 231, 0.99);
+    --card-line: rgba(120, 92, 66, 0.26);
+    --card-name: #241f1a;
+    --card-desc: #5d5145;
+    --plate: #f6ecdc;
+    --plate-veil: rgba(252, 245, 234, 0.9);
+    --veil: 247, 237, 222;
+    --chip: rgba(255, 250, 242, 0.72);
+    --track: rgba(120, 92, 66, 0.2);
+}
+
+html[data-theme="light"] .ai-atlas .brand__name {
+    text-shadow: none;
+}
+
+html[data-theme="light"] .ai-atlas .card__in {
+    box-shadow: 0 16px 38px -22px rgba(120, 92, 66, 0.5);
+}
+
+html[data-theme="light"] .ai-atlas .card:hover .card__in,
+html[data-theme="light"] .ai-atlas .card:focus-visible .card__in {
+    /* 纸上再"提亮"就洗白了：改用木色投影 + 卡片自己的色晕来抬 */
+    filter: none;
+    box-shadow:
+        0 36px 70px -30px rgba(120, 92, 66, 0.55),
+        0 0 50px -14px var(--c);
+}
+
+html[data-theme="light"] .ai-atlas .card__badge {
+    background: rgba(255, 252, 246, 0.8);
+    border-color: rgba(120, 92, 66, 0.2);
+}
+
+html[data-theme="light"] .ai-atlas .card:hover .card__badge {
+    background: rgba(255, 253, 249, 0.95);
+}
+
+html[data-theme="light"] .ai-atlas .card:hover .card__plate canvas {
+    filter: saturate(1.06);
+}
+
+html[data-theme="light"] .ai-atlas .so__scrim {
+    background: rgba(255, 246, 233, 0.82);
+}
+
+html[data-theme="light"] .ai-atlas .so__panel {
+    background: #fffbf3;
+    border-color: rgba(120, 92, 66, 0.22);
+    box-shadow:
+        0 60px 160px -60px rgba(90, 70, 52, 0.55),
+        0 0 90px -40px var(--accent);
+}
+
+html[data-theme="light"] .ai-atlas .so__frame {
+    background: #fff6e9;
+}
+
+html[data-theme="light"] .ai-atlas .so__x {
+    border-color: rgba(120, 92, 66, 0.22);
+    background: rgba(255, 250, 242, 0.82);
+    color: #6f6257;
+}
+
+html[data-theme="light"] .ai-atlas .so__x:hover,
+html[data-theme="light"] .ai-atlas .so__x:focus-visible {
+    color: #211d1a;
+    border-color: rgba(120, 92, 66, 0.45);
+    background: rgba(255, 252, 246, 0.96);
+}
+
+html[data-theme="light"] .ai-atlas .so__name {
+    border-color: rgba(120, 92, 66, 0.18);
+    background: rgba(255, 250, 242, 0.78);
+    color: #6f6257;
+}
+
+html[data-theme="light"] .ai-atlas .so__name b {
+    color: #211d1a;
+}
+
+/* ==========================================================================
+   窄屏
+   ========================================================================== */
+
+@media (max-width: 720px) {
+    /* 卡片在窄屏上只有 ~155 宽：名字两行 + 描述两行 + 页脚放不进桌面的排版，
+       会顶出卡片（demo 版在手机上就是字压字）。这里收掉"编号 / 语言"那一行
+       —— 它是最不重要的信息 —— 再把描述压到 11px，留出页脚的位置。 */
+    .ai-atlas .card__plate {
+        flex-basis: 42%;
+    }
+
+    .ai-atlas .card__body {
+        padding: 9px 11px 10px;
+        gap: 4px;
+    }
+
+    .ai-atlas .card__top {
+        display: none;
+    }
+
+    .ai-atlas .card__name {
+        font-size: 13px;
+    }
+
+    .ai-atlas .card__desc {
+        font-size: 11px;
+        line-height: 1.5;
+    }
+
+    .ai-atlas .card__foot {
+        font-size: 8px;
+    }
+
+    .ai-atlas .brand {
+        top: 14px;
+        max-width: calc(100% - 120px);
+    }
+
+    .ai-atlas .brand__name {
+        font-size: 13px;
+    }
+
+    .ai-atlas .brand__meta {
+        font-size: 9px;
+        letter-spacing: 0.14em;
+        margin-top: 6px;
+    }
+
+    .ai-atlas .veil {
+        height: 78px;
+    }
+
+    .ai-atlas .hint {
+        font-size: 9px;
+        letter-spacing: 0.1em;
+        bottom: 18px;
+    }
+
+    .ai-atlas .scrollbar {
+        right: 6px;
+        top: 110px;
+        bottom: 96px;
+    }
+}
+
+@media (max-width: 640px) {
+    .ai-atlas .so__name {
+        display: none;
+    }
+
+    /* 手机上落地页自己的顶栏（语言/主题/仓库）就在右上角，关闭按钮压上去会
+       挡操作 —— 挪到右下角，拇指也够得着。条带高度自然失效，改成贴底。 */
+    .ai-atlas .so__xwrap {
+        right: 24px;
+        top: auto;
+        bottom: 24px;
+        height: auto;
+    }
+
+    .ai-atlas .so__x {
+        padding: 8px 12px;
+    }
+}

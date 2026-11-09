@@ -251,7 +251,10 @@ export const ROOM_COPY = {
   posts: { zh: '随笔、笔记与长文', en: 'Notes, essays and long reads' },
   videos: { zh: '短片与日常记录', en: 'Short films and everyday records' },
   music: { zh: '自己写的曲子与配乐', en: 'Tunes and scores I wrote myself' },
-  ai: { zh: '自己做的 Skills、工具与应用', en: 'Skills, tools and apps I built' },
+  // 2026-11-09：AI 房间换成「图鉴 · ATLAS」卡片墙（24 件 iskill 工具，
+  // 点卡片就是该项目自己的落地页）。副标题跟着改成"能点开跑"的说法 ——
+  // 房间里写的是 24 件、这里再写"自己做的"等于什么都没说。
+  ai: { zh: '24 件 Skills 与工具，点开就能跑', en: '24 skills and tools, each one runnable' },
   contact: { zh: '联系与社交账号', en: 'Contact and social links' },
 }
 
