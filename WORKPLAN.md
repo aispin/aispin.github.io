@@ -44,30 +44,41 @@
 
 # 📋 待办 WO
 
-### WO-2 · AI 房间改版（原型已出，**等你确认**再进 3D）
+### WO-2 · AI 房间改版（两只原型已出，**等你选**再进 3D）
 
 - **需求原文**：「对这个房间进行重新改版，结合 AI 主题，力求酷炫屌炸天。沿用文稿房间的
   改版思路：先在 `demos/web3d` 下创建适合这个房间的 demo 原型，我确认后再在 3D 房间中编码实现。」
-- **2026-11-08 追加（用户定调）**：「核心目标是项目介绍+项目演示（如有 demoUrl），用户需要
-  一眼看到项目名称、描述，点击可以去演示页、github。**不能为了酷而酷**。」
-  ⇒ 原型按此重做：活体退成包住预览卡的场，中心永远是那一页。
-- **现状**：原型 `public/demos/web3d/ai-symbiosis/index.html` 已可跑
-  （`http://localhost:5199/demos/web3d/ai-symbiosis/`，0 console error，桌面 1440×900 与
-  手机 390×844 两版都验过）。**尚未进 3D 房间**，也没进 `demos.json`（确认后再生成缩略图）。
-- **现在长什么样**：左栏「序号 / 名称 / 描述 / 语言·日期 / 系列六步 / 两个按钮」，
-  右边一张 16:9 卡里**真的在跑这个项目的落地页**（同源 iframe，1440×810 渲染后缩放）。
-  点卡片或「在线试玩」→ 全屏浮层里可交互，Esc 关闭。换一件时活体炸开、卡片换成新页面，
-  炸开那 1.15s 正好盖住 iframe 的加载空窗。
-- **数据事实**（别再过一遍）：24 件**全部**有 `demoUrl`，2026-11-08 逐条 curl 全 200；
-  `爆款短视频工作流 1/6…6/6` 是**六件有顺序的套件**，正好排在 #1–#6。
-- **技术**：裸 WebGL（不引 three），3 个 draw call；相机基向量在 CPU 算、投影写在顶点着色器；
-  输入层复用 `public/demos/_pager.js`（target 给 `body`，否则滚轮落进卡片里收不到）。
-- **确认后要做**：`RoomInterior` 加 `roomId === 'ai'` 分支 + 新建 `rooms/AiSymbiosis.jsx`
+- **2026-11-08 追加**：「核心目标是项目介绍+项目演示（如有 demoUrl），用户需要一眼看到
+  项目名称、描述，点击可以去演示页、github。**不能为了酷而酷**。」
+- **2026-11-09 追加（推翻上一版形态）**：
+  1. 「在线试玩」改「查看详情」；2. **移除右边的真页面**（常驻 iframe 预览卡）；
+  3. 「把这个版本当作 web3d 的其中一个 demo。**但它不适合做 AI 项目展示**。」
+  4. 「重新设计一个 web3d demo，在实用的基础上结合 3D 技术，展示**项目卡片墙**，
+     如有 demoUrl，点击卡片 iframe 全屏（**边距 24px**）展示。」
+- **现在有两只原型，都已在 `demos.json` 里（含缩略图）**：
+
+  | 目录 | 是什么 | 定位 |
+  | --- | --- | --- |
+  | `web3d/ai-symbiosis` | 潜空间里的活体，换作品就炸开重组；左栏文字 + 「查看详情」 | **纯视觉 demo**，不做陈列 |
+  | `web3d/ai-atlas` | 弧形卡片墙，24 件一格一件；点卡片 → 全屏 iframe（24px） | **AI 房间的候选空间语言** |
+
+- **`ai-atlas` 怎么做的**：4/3/2 列网格 → 每列按离视线的横向距离绕 Y 轴转 + 退到后面
+  （柱面）；滚动 = 整面墙在深度里平移；指针视差 ±1.1°；hover 卡片沿 Z 抬 78px。
+  文字是**真 DOM**（CSS 3D 排布，不贴图）⇒ 任何分辨率都清晰；封面是 canvas 按 id 哈希
+  画出来的六种「信号图」，24 张各不相同（零位图）。
+- **共用件** `public/demos/_overlay.js`：全屏 iframe 浮层，`inset:24px` 是唯一常量，
+  FLIP 从卡片矩形展开、Esc、加载条、焦点归位。两个 demo 共用一份。
+- **🔴 3D 里最坑的一条（进房间前必读）**：`.wall` 是 `inset:0` 且 `preserve-3d`，
+  卡片被 `translateZ` 推到 z<0（墙平面之后）⇒ **命中测试认深度，墙把所有点击吃光**
+  （`elementFromPoint` 永远返回 `.wall`，桌面手机都一样）。修法：`.wall{pointer-events:none}`
+  + `.card{pointer-events:auto}`。
+- **确认后要做**：`RoomInterior` 加 `roomId === 'ai'` 分支 + 新建 `rooms/AiAtlas.jsx`
   （走 `rooms/takeover.js` 那套进场节奏，别复制三份）+ `ui/AiHud.jsx` + `.scss`
-  + `ROOM_COPY.ai` 改文案 + `_from.js` 的 ROOMS 加 `ai` + 缩略图 + `build-demos-index.mjs` 重跑。
-  ⚠️ 3D 房间里 iframe 必须放 DOM 层（和 craft 的浮层同一套），不能塞进 WebGL。
+  + `ROOM_COPY.ai` 改文案 + 缩略图与 `demos.json` 已就绪。
+  ⚠️ 3D 房间里的 iframe 必须放 DOM 层（和 craft 的浮层同一套），不能塞进 WebGL。
 - **判据**：`node .workbuddy-ai/harness/probe-room-door.mjs ai` 进场/退场亮度表与
-  career / craft / posts 同形（走廊 ~220 → 房间 ≤20，退场反向），深链 `/ai?noloader=1` 3.2s 内进屋。
+  career / craft / posts 同形（走廊 ~220 → 房间 ≤20，退场反向），深链 `/ai?noloader=1` 3.2s 内进屋；
+  房间里点卡片 → 浮层四边 24px（`getBoundingClientRect` 量）。
 
 ---
 
@@ -109,16 +120,17 @@
 
 - **为什么问**：房间里装的是 AI 相关项目 / AIGC / 人机共创，现名「AI+」是**技术标签**，
   不是这间房在做的事 —— 而且 `+` 在门匾、菜单、`<title>` 里都不好看。
-- **候选**（都能对上 WO-2 那只活体，副标题 `ROOM_COPY.ai` 负责把「AI」讲清楚）：
+- **候选**（副标题 `ROOM_COPY.ai` 负责把「AI」讲清楚；`ai-atlas` 那只卡片墙按「图鉴」做了）：
 
   | 名称 | 英文 | 好在哪 | 风险 |
   | --- | --- | --- | --- |
-  | **共生**（推荐） | SYMBIOSIS | 人机共创本来就是共生；一词、好记、和原型里那只活体是一件事 | 名字里没有「AI」，靠副标题点明 |
+  | **图鉴**（推荐） | ATLAS | 房间里就是 24 件工具的目录，一册图鉴 = 一张张卡片；词短、好记，不装 | 少一点「AI」的气味，靠副标题点明 |
+  | 共生 | SYMBIOSIS | 人机共创本来就是共生；和 `ai-symbiosis` 那只活体是同一件事 | 那只活体已降级成独立 demo，房间里见不到它了 |
   | 共创 | CO-CREATION | 最直白准确 | 平淡，像部门 OKR |
   | 潜空间 | LATENT | 模型内部的空间，酷 | 圈内术语，普通访客不懂 |
-  | 造物 | FABRICATION | 造出来的东西，配活体 | 略生僻，容易读成「造物主」 |
 
-- **当前状态**：等你选。**默认按「共生」**；URL 仍保持 `/ai`（不换路由，免得外链失效）。
+- **当前状态**：等你选。**默认按「图鉴」**（`ai-atlas` 已经按这个名字做了，品牌行是
+  `图鉴 / ATLAS`）；URL 仍保持 `/ai`（不换路由，免得外链失效）。
 - **选定后要改**：`theme.js` 的 `{ id:'ai', zh:'AI+' }`、`useDocumentMeta.js` 的 title/description、
   `ROOM_COPY.ai`、门匾与菜单、`index.html` / `manifest.webmanifest` 里的站点描述。
 
