@@ -4,7 +4,19 @@
 
 - 入口：`index.html`
 - 在线预览：`/demos/web3d/ai-atlas/`
-- 调试参数：`?theme=light|dark`、`?lang=zh|en`（不给就**随系统**）
+- 调试参数：`?theme=light|dark`、`?lang=zh|en`（不给就**随系统**）、`?dust=0`（关掉粒子）
+
+## 背景：一团冷光 + 一层尘
+
+2026-11-09 按用户要求，把原来那条 `sin(p.y*420)` 的横向扫描线换成**飘动的粒子**
+（配方取自 `ai-symbiosis` 的浮尘：每点自己的相位闪烁、近大远小、按深度吃视差）。
+点云铺在"屏高 = 1"的平面上（和背景 shader 同一套坐标），只留一个 depth 做假透视 ——
+卡片墙是平的，粒子真立体了会跟墙打架。滚动时整层按 0.00022 px 上移（比卡片慢，
+所以在卡片后面）；`prefers-reduced-motion` 下整层钉住不动。
+
+混合模式跟主题走：深色 additive（点是光），浅色 normal（点是纸上的墨）——
+additive 在奶油纸上会直接烧白。调密度/大小/速度看 `VS_PTS` 里的
+`ptCount`（`resizeGL`，面积/600）、`gl_PointSize`、`vx/vy`。
 
 ## 主题与语言（搬进 3D 房间前必读）
 
