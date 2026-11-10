@@ -68,13 +68,28 @@ const SELF_READY_IDS = ['gallery', 'contact', 'career', 'craft', 'posts', 'ai', 
  * 壳只在"门开到房间暗下来"的那 1.35s 里看得见 ⇒ 颜色取各自底色稍亮一档就够，
  * 别把它做成第二个视觉。
  */
+/**
+ * 地板相对「走廊地面」再压低多少。
+ *
+ * 🔴 壳的地板是一块 30×25 的大平面，跟着门的**墙角度**转（实测转 60°），
+ *    所以它有一条边会探进走廊 —— 右边缘到 x ≈ +3.78，而走廊墙在 ±3.5。
+ *    原来它比走廊地面高 1mm（壳 −1.749 / 走廊 −1.75）⇒ 重叠处**壳赢**，
+ *    开门那 1.35s 里走廊地板上就多出一条黑带（2026-11-10 用户报的
+ *    「黑色投影，似乎是房间射出来的」；四个接管房间都有，只是 ai 的壳最黑）。
+ *
+ *    压到走廊地面**下面** 6cm 就够了：重叠处走廊地面必胜，而房间底下
+ *    **没有**走廊地面（射线验过：房间中心向下只打到壳自己的地板），
+ *    所以门里不会露出走廊的瓷砖。副作用是门槛处有 6cm 落差，看不见。
+ */
+const SHELL_FLOOR_DROP = 0.06;
+
 const RoomShell = ({ geometries, shell }) => {
     const { roomWidth, roomHeight, roomDepth, corridorHeight, corridorDepth } = ROOM_CONFIG;
     const roomZ = -corridorDepth - roomDepth / 2;
     return (
         <group position={[0, roomHeight / 2 - corridorHeight / 2, roomZ]}>
             <mesh
-                position={[0, -roomHeight / 2, 0]}
+                position={[0, -roomHeight / 2 - SHELL_FLOOR_DROP, 0]}
                 rotation={[-Math.PI / 2, 0, 0]}
                 geometry={geometries.roomFloorCeiling}
                 material={shell.floor}
