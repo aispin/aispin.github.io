@@ -49,8 +49,8 @@ const ROOM_META = {
     },
     ai: {
         path: '/ai',
-        title: 'AI+ · AI Skills — AISPIN',
-        description: 'AI+ 房间：AISPIN 在 GitHub 开源的 iskill 系列技能包与 AI 应用，数据每周自动刷新。',
+        title: 'AI · 工具与项目 — AISPIN',
+        description: 'AI 房间：AISPIN 用 AI 做出来的工具与项目，多数点开就能跑，数据每周自动刷新。',
     },
     contact: {
         path: '/contact',

@@ -234,7 +234,7 @@ export const ROOMS = [
   { id: 'posts', zh: '文稿', en: 'POSTS', door: 3 },
   { id: 'videos', zh: '视频', en: 'VIDEOS', door: 4 },
   { id: 'music', zh: '音乐', en: 'MUSIC', door: 5 },
-  { id: 'ai', zh: 'AI+', en: 'AI+', door: 6 },
+  { id: 'ai', zh: 'AI', en: 'AI', door: 6 },
   { id: 'contact', zh: '联系', en: 'CONTACT', door: 7 },
 ]
 
@@ -251,10 +251,13 @@ export const ROOM_COPY = {
   posts: { zh: '随笔、笔记与长文', en: 'Notes, essays and long reads' },
   videos: { zh: '短片与日常记录', en: 'Short films and everyday records' },
   music: { zh: '自己写的曲子与配乐', en: 'Tunes and scores I wrote myself' },
-  // 2026-11-09：AI 房间换成「图鉴 · ATLAS」卡片墙（24 件 iskill 工具，
-  // 点卡片就是该项目自己的落地页）。副标题跟着改成"能点开跑"的说法 ——
-  // 房间里写的是 24 件、这里再写"自己做的"等于什么都没说。
-  ai: { zh: '24 件 Skills 与工具，点开就能跑', en: '24 skills and tools, each one runnable' },
+  // 2026-11-09：AI 房间换成卡片墙（24 件 iskill 工具，点卡片就是该项目自己的
+  // 落地页）。2026-11-10 房间名从「AI+」改成「AI」——`+` 在门匾/菜单/<title> 里
+  // 都不好看，而「还会加东西」这层意思本来就由 AI 这个词承担。
+  // 🔴 副标题**不许再写死数量和类型**：房间以后还要装不是 skill 的项目/产品，
+  //    写成「24 件 Skills」第二天就过期。也别再写一遍「AI」——菜单里是
+  //    「AI」+ 这行小字，会读成「AI / 用 AI 做的…」。
+  ai: { zh: '工具与项目，多数点开就能跑', en: 'Tools and projects, most of them runnable' },
   contact: { zh: '联系与社交账号', en: 'Contact and social links' },
 }
 

@@ -1,5 +1,5 @@
 /**
- * AI 房间（图鉴 · ATLAS）的程序化美术：色相、封面「信号图」、文案截断。
+ * AI 房间的程序化美术：色相、封面「信号图」、文案截断。
  *
  * 全部逐字搬自 `public/demos/web3d/ai-atlas/index.html` —— 用户 2026-11-09
  * 确认的就是那一版视觉，包括每个常量的具体数值。改这里请**先改 demo**，
@@ -62,7 +62,7 @@ export const accentRGB = (id, light) => hsl2rgb(hueOf(id), light ? 58 : 74, ligh
  * 24 张「信号图」：六种母题 × 每件自己的种子。
  *
  * 它们不是装饰 —— 是同族的证据：同一套底、同一套四角刻度、同一条基线，
- * 只有中间那张图不一样。所以任何一张单看都像"图鉴里的一页"。
+ * 只有中间那张图不一样。所以任何一张单看都像"图册里的一页"。
  *
  * @param {HTMLCanvasElement} cv  480×264 的离屏/行内画布
  * @param {string} id
@@ -193,7 +193,7 @@ export function paintPlate(cv, id, light) {
         }
     }
 
-    /* 同族标记：一条基线 + 四角刻度 —— 24 张都长这个样，才像一册图鉴 */
+    /* 同族标记：一条基线 + 四角刻度 —— 24 张都长这个样，才像同一本图册里的页 */
     g.strokeStyle = light ? 'rgba(120,92,66,.24)' : 'rgba(150,190,220,.13)'
     g.lineWidth = 1
     g.beginPath()

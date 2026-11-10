@@ -163,7 +163,7 @@ const RoomInterior = ({ label, roomId, showRoom, onReady, isExiting }) => {
                 posts: shellMaterials('#2b221b', '#1b1511', '#3a2e25'),
                 career: shellMaterials('#0c0f19', '#05060b', '#151a28'),
                 craft: shellMaterials('#0b0e17', '#04060a', '#131827'),
-                // 图鉴：冷黑底（#05070c）+ 一团青绿冷光 ⇒ 壳取底色的稍亮一档
+                // AI 房间：冷黑底（#05070c）+ 一团青绿冷光 ⇒ 壳取底色的稍亮一档
                 ai: shellMaterials('#0a0f17', '#04060a', '#0d131c'),
             },
         };
@@ -314,7 +314,7 @@ const RoomInterior = ({ label, roomId, showRoom, onReady, isExiting }) => {
                             </Suspense>
                         </>
                     ) : roomId === 'ai' ? (
-                        // === 图鉴 · ATLAS：一面卡片墙 ===
+                        // === AI：一面卡片墙 ===
                         // 自带 Scene + Camera + 接管渲染（rooms/AiAtlas.jsx），
                         // 24 张卡与 iframe 浮层是 DOM（ui/AiAtlasHud.jsx）。
                         <>

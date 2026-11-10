@@ -68,7 +68,7 @@ const ScreenReaderOverlay = () => {
                             </li>
                             <li>
                                 <button onClick={() => teleportTo('ai')} type="button">
-                                    AI+ — AI Skills 与应用
+                                    AI — 工具与项目
                                 </button>
                             </li>
                             <li>

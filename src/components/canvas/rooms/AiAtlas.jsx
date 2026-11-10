@@ -15,7 +15,7 @@ import {
 } from './takeover'
 
 /**
- * AI 房间 —— 「图鉴 · ATLAS」的**环境层**。
+ * AI 房间（房间名就叫「AI」）的**环境层**。
  *
  * 卡片墙、HUD、iframe 浮层全是 DOM（`ui/AiAtlasHud.jsx`），这里只做两件事：
  *   1. 画那块冷黑底（竖向底色 + 一团跟着 hover 换色的冷光 + 暗角 + 颗粒），

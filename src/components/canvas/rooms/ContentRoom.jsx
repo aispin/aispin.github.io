@@ -37,7 +37,7 @@ const ITEM_KIND = {
   labs: { platform: 'LAB', layout: 'editorial' },
   music: { platform: 'MUSIC', layout: 'editorial' },
   videos: { platform: 'VIDEO', layout: 'editorial' },
-  aiProjects: { platform: 'AI+', layout: 'editorial' },
+  aiProjects: { platform: 'AI', layout: 'editorial' },
   experience: { platform: 'EXPERIENCE', layout: 'editorial' },
 }
 
@@ -1010,7 +1010,7 @@ export default function ContentRoom({ roomId, showRoom, onReady }) {
                 accent: item.accent || accent,
                 external: Boolean(item.external),
                 tag: item.tag,
-                // The card's kicker row shows the platform ("POST", "AI+", …),
+                // The card's kicker row shows the platform ("POST", "AI", …),
                 // which lives on ITEM_KIND rather than on the row itself. The
                 // career rows carry their own `kicker` (the date range), which
                 // takes precedence inside the renderer.

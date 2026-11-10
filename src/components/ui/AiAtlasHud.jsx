@@ -16,7 +16,7 @@ import aiAtlasEn from '../../data/aiAtlasEn.json'
 import './AiAtlasHud.scss'
 
 /**
- * AI 房间 —— 「图鉴 · ATLAS」的 **DOM 层**。
+ * AI 房间 —— 卡片墙的 **DOM 层**。
  *
  * 这一层是 `public/demos/web3d/ai-atlas/index.html` 那套东西的移植：24 张项目
  * 卡片排成一面**弧形展墙**，滚动时整面墙在深度里平移，点开就是该项目自己的
@@ -96,8 +96,11 @@ const ITEMS = aiProjects.map((p, i) => ({
 
 const COPY = {
     zh: {
-        brandMain: '图鉴',
-        brandSub: 'ATLAS',
+        /* 房间名叫「AI」（2026-11-10 从「AI+」改过来）。墙上这行不再借比喻：
+           原来写的是「图鉴 / ATLAS」，中文会被读成"图片鉴赏"，而且房间以后要装
+           不是 skill 的项目/产品，任何"目录/图册"的说法都会先过期。 */
+        brandMain: 'AI',
+        brandSub: '',
         meta: (n) => `${n} 件 · 全部可运行`,
         hint: '滚动浏览 · 点卡片查看详情 · Esc 关闭',
         badgeDetail: '↗ 详情',
@@ -110,7 +113,7 @@ const COPY = {
         newTab: '新标签打开 ↗',
     },
     en: {
-        brandMain: 'ATLAS',
+        brandMain: 'AI',
         brandSub: '',
         meta: (n) => `${n} tools · all runnable`,
         hint: 'Scroll to browse · click a card for details · Esc to close',
