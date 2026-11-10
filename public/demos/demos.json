@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-09T12:27:46.775Z",
-  "count": 29,
+  "generatedAt": "2026-11-10T14:27:39.379Z",
+  "count": 30,
   "demos": [
     {
       "id": "door",
@@ -373,6 +373,17 @@
           "url": "/demos/web3d/tree/index01.html"
         }
       ]
+    },
+    {
+      "id": "web3d/vinyl-player",
+      "title": "黑胶 · VINYL — 六首原创音乐唱片机",
+      "description": "一台能真的放歌的唱盘：倾斜的唱片在透视里旋转，唱臂角度就是播放进度（可以直接拖），频谱从唱片边缘长出来。六首原创曲目在右侧成列。纯 canvas + CSS 3D，没有一张位图。",
+      "url": "/demos/web3d/vinyl-player/",
+      "thumb": null,
+      "dir": "public/demos/web3d/vinyl-player",
+      "entry": "index.html",
+      "readme": true,
+      "variants": []
     }
   ]
 }

@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- 主题/语言：默认随系统，宿主（3D 房子）可用 <html data-theme> / ?lang= 覆盖。
+     必须放在样式之前 —— 它同步写 data-theme，首帧就是对的颜色，不会闪一下。 -->
+<script src="../../_env.js"></script>
+<script src="../../_from.js" defer></script>
+<title>黑胶 · VINYL — 六首原创音乐唱片机</title>
+<meta name="description" content="一台能真的放歌的唱盘：倾斜的唱片在透视里旋转，唱臂角度就是播放进度（可以直接拖），频谱从唱片边缘长出来。六首原创曲目在右侧成列。纯 canvas + CSS 3D，没有一张位图。">
+<style>
+@font-face{
+  font-family:'MapleUI';
+  src:url('/fonts/maple-ui.woff2') format('woff2');
+  font-weight:400 500;font-display:swap;
+}
+:root{
+  /* ── 页面（跟随主题） ───────────────────────────────────────────── */
+  --bg:#07080c;
+  --ink:#eef1f6;
+  --dim:#8b93a3;
+  --dim-2:#5a6070;
+  --line:rgba(150,170,200,.15);
+  --line-2:rgba(150,170,200,.3);
+  --chip:rgba(10,13,19,.55);
+  --veil:7,8,12;
+  /* ── 物件（**不跟随主题**） ──────────────────────────────────────
+     唱片永远是黑的、封套永远是纸的 —— 这两个是"拍下来的实物"，
+     换主题只换房间的墙，不换桌上的东西。见文件尾 README 里的说明。 */
+  --vinyl:#0a0b0e;
+  --paper:#F2EADA;
+  --paper-2:#E7DCC8;
+  --paper-ink:#211D1A;
+  --paper-dim:#6d6152;
+  /* ── 每首曲子的主色（JS 写 --h） ───────────────────────────────── */
+  --h:222;
+  --a-ink:hsl(var(--h) 62% 36%);
+  --a-glow:hsl(var(--h) 74% 62%);
+  --accent-text:var(--a-glow);
+  --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --sans:'MapleUI',ui-sans-serif,system-ui,'PingFang SC','Hiragino Sans GB',sans-serif;
+}
+/* ── 浅色：主站的暖纸（纸 #FFF6E9 / 墨 #211D1A / 木色线 #9B755A） ── */
+html[data-theme="light"]{
+  --bg:#F7EDDE;
+  --ink:#211D1A;
+  --dim:#6a5c4f;
+  --dim-2:#9a8877;
+  --line:rgba(120,92,66,.26);
+  --line-2:rgba(120,92,66,.46);
+  --chip:rgba(255,250,242,.72);
+  --veil:247,237,222;
+  --accent-text:var(--a-ink);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--sans);
+  overflow:hidden;
+  overscroll-behavior:none;
+  -webkit-font-smoothing:antialiased;
+  transition:background-color .5s ease,color .5s ease;
+}
+#gl{position:fixed;inset:0;display:block;width:100%;height:100%;z-index:0}
+
+/* ══ 布局 ═══════════════════════════════════════════════════════════ */
+.stage{
+  position:fixed;inset:0;z-index:2;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 372px;
+}
+
+/* ══ 顶部：返回胶囊 + 标题（居中，右上角留给房子的图标栈） ═════════ */
+.lab-back{
+  position:absolute;left:18px;top:16px;z-index:6;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 12px;border-radius:999px;
+  border:1px solid var(--line);
+  color:var(--dim);text-decoration:none;
+  font:400 12px/1 var(--sans);letter-spacing:.04em;
+  background:var(--chip);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  transition:color .22s ease,border-color .22s ease;
+}
+.lab-back:hover{color:var(--ink);border-color:var(--dim-2)}
+.brand{
+  position:absolute;left:50%;top:18px;transform:translateX(-50%);
+  text-align:center;pointer-events:none;z-index:6;
+}
+.brand__name{
+  font:500 15px/1.2 var(--sans);letter-spacing:.14em;color:var(--ink);
+  text-shadow:0 0 22px rgba(0,0,0,.7);
+}
+html[data-theme="light"] .brand__name{text-shadow:none}
+.brand__name i{font-style:normal;color:var(--dim-2);margin:0 .18em}
+.brand__meta{
+  margin-top:6px;font:400 10px/1 var(--mono);letter-spacing:.16em;
+  color:var(--dim);text-transform:uppercase;
+}
+.brand__meta b{color:var(--accent-text);font-weight:500}
+
+/* ══ 左：唱盘 ═══════════════════════════════════════════════════════ */
+.deckwrap{
+  position:relative;
+  display:flex;align-items:center;justify-content:center;
+  min-width:0;min-height:0;
+  padding:60px 0 24px 12px;
+}
+.deck{
+  perspective:1600px;
+  perspective-origin:50% 42%;
+  transform:scale(var(--s,1));
+  transform-origin:50% 50%;
+  will-change:transform;
+}
+/* 整台机器躺在**同一个平面**里：封套、唱片、唱臂都在这块平面上，
+   所以它们共享一次 rotateX —— 各自的透视关系才是对的（不是贴上去的贴纸）。 */
+.deck__plane{
+  position:relative;
+  width:900px;height:900px;
+  transform:rotateX(52deg) rotateZ(-7deg);
+  transform-style:preserve-3d;
+}
+
+/* 封套：唱片压在它上面 —— 只让出顶部一条横带和左边一条竖带，
+   所以封套的**字位在顶部**（见 paintCover 的版式说明）。
+   600 见方、偏移到左上角，唱片盖住的是它的右下大半 —— 这就是
+   "唱片躺在自己封套上"的那张照片。 */
+.sleeve{
+  position:absolute;left:-10px;top:6px;
+  width:600px;height:600px;
+  border-radius:3px;
+  overflow:hidden;
+  box-shadow:0 40px 70px -30px rgba(0,0,0,.85),0 0 0 1px rgba(0,0,0,.35);
+  transform:translateZ(-24px) rotateZ(2.5deg);
+  background:var(--paper);
+}
+.sleeve canvas{display:block;width:100%;height:100%}
+/* 纸角的一点体积感：左上打光 */
+.sleeve::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(150deg,rgba(255,255,255,.28),transparent 46%,rgba(0,0,0,.14));
+  pointer-events:none;
+}
+
+/* 唱片：两块画布叠在一起 —— 底图（沟槽+片芯）按曲目重画一次，
+   频谱环每帧重画。分开是因为底图重绘 ~90 个圆，不该每帧跑。 */
+.disc{
+  position:absolute;left:40px;top:40px;
+  width:820px;height:820px;
+  border-radius:50%;
+  z-index:1;
+}
+.disc canvas{position:absolute;inset:0;width:100%;height:100%}
+#discArt{filter:drop-shadow(0 34px 46px rgba(0,0,0,.6))}
+/* 自转：只有真在放的时候转。用 `animation-play-state` 而不是加/删 class ——
+   暂停时盘停在原来的角度，不会"啪"地弹回 0°（片芯上的字看得出来）。 */
+#discArt{animation:spin 4.2s linear infinite;animation-play-state:paused}
+.disc.is-spinning #discArt{animation-play-state:running}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* 唱臂 */
+.arm{
+  position:absolute;
+  width:0;height:0;
+  transform-origin:0 0;
+  will-change:transform;
+  /* 🔴 必须显式压过唱片一层：`#discArt` 一旦转起来（animation）就自成合成层，
+     在 `preserve-3d` 子树里会**抢走唱臂的命中测试** —— 表现是"放歌的时候就
+     抓不住唱臂了"（暂停时一切正常，所以极容易漏掉）。z-index 把顺序钉死。 */
+  z-index:3;
+}
+/* 抓握区：臂本身只有 6px 高，鼠标要能"抓住"它 —— 透明但可点，比臂宽一圈。
+   touch-action:none 是必须的，否则手指一拖先滚页面。 */
+.arm__hit{
+  position:absolute;left:-18px;top:-24px;
+  width:256px;height:48px;
+  cursor:grab;touch-action:none;
+}
+.arm.is-grab .arm__hit{cursor:grabbing}
+.arm__rod{
+  position:absolute;left:-4px;top:-3px;
+  width:224px;height:6px;border-radius:3px;
+  background:linear-gradient(180deg,#d8d2c6,#8d867a 55%,#5c574e);
+  box-shadow:0 2px 6px rgba(0,0,0,.55);
+}
+.arm__weight{
+  position:absolute;left:-30px;top:-11px;
+  width:30px;height:22px;border-radius:5px;
+  background:linear-gradient(180deg,#b9b2a4,#6f6a60);
+  box-shadow:0 3px 8px rgba(0,0,0,.5);
+}
+.arm__pivot{
+  position:absolute;left:-9px;top:-9px;
+  width:18px;height:18px;border-radius:50%;
+  background:radial-gradient(circle at 35% 32%,#e6e0d3,#6d675c 70%);
+  box-shadow:0 0 0 1px rgba(0,0,0,.4),0 4px 10px rgba(0,0,0,.5);
+}
+.arm__head{
+  position:absolute;left:206px;top:-10px;
+  width:30px;height:20px;border-radius:3px 6px 6px 3px;
+  background:linear-gradient(180deg,#cfc8ba,#7d776b);
+  transform:rotate(14deg);
+  box-shadow:0 3px 8px rgba(0,0,0,.5);
+}
+/* 针尖：落在哪条沟上，靠它才看得出来 */
+.arm__needle{
+  position:absolute;left:22px;top:16px;
+  width:5px;height:5px;border-radius:50%;
+  background:var(--accent-text);
+  box-shadow:0 0 10px 2px var(--accent-text);
+  transition:background-color .5s ease,box-shadow .5s ease;
+}
+/* 唱臂的落点阴影 —— 让"针在盘上"这件事有重量 */
+.arm__shadow{
+  position:absolute;left:200px;top:8px;
+  width:46px;height:12px;border-radius:50%;
+  background:radial-gradient(ellipse,rgba(0,0,0,.55),transparent 70%);
+  opacity:0;transition:opacity .5s ease;
+}
+.deck.is-live .arm__shadow{opacity:1}
+
+/* ══ 右：曲目与走带 ═════════════════════════════════════════════════ */
+.side{
+  position:relative;z-index:4;
+  display:flex;flex-direction:column;
+  padding:96px 34px 30px 8px;
+  min-height:0;
+}
+.side__head{
+  display:flex;align-items:baseline;justify-content:space-between;
+  padding-bottom:12px;border-bottom:1px solid var(--line);
+}
+.side__kicker{
+  font:400 10px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--dim);
+}
+.side__count{font:400 10px/1 var(--mono);letter-spacing:.14em;color:var(--dim-2)}
+
+.tracks{list-style:none;margin-top:6px;overflow-y:auto;min-height:0;flex:0 1 auto}
+.tracks::-webkit-scrollbar{width:6px}
+.tracks::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:3px}
+.track{
+  position:relative;
+  display:grid;
+  grid-template-columns:26px minmax(0,1fr) auto;
+  align-items:baseline;
+  gap:10px;
+  padding:17px 10px 17px 8px;
+  border-bottom:1px solid var(--line);
+  cursor:pointer;
+  transition:background-color .2s ease,padding-left .2s ease;
+}
+.track:hover{background:rgba(255,255,255,.03);padding-left:12px}
+html[data-theme="light"] .track:hover{background:rgba(120,92,66,.06)}
+/* 左侧那根竖线：选中才亮，是这一列唯一的"状态" */
+.track::before{
+  content:'';position:absolute;left:0;top:10px;bottom:10px;width:2px;border-radius:1px;
+  background:var(--accent-text);
+  opacity:0;transform:scaleY(.3);transform-origin:50% 50%;
+  transition:opacity .25s ease,transform .25s ease;
+}
+.track.is-active::before{opacity:1;transform:scaleY(1)}
+.track__no{
+  font:400 10px/1.4 var(--mono);letter-spacing:.06em;color:var(--dim-2);
+  transition:color .25s ease;
+}
+.track.is-active .track__no{color:var(--accent-text)}
+.track__title{
+  display:block;
+  font:500 13.5px/1.35 var(--sans);color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  transition:color .25s ease;
+}
+.track.is-active .track__title{color:var(--accent-text)}
+.track__sub{
+  display:block;
+  margin-top:3px;font:400 10.5px/1.3 var(--sans);color:var(--dim);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.track__meter{
+  display:flex;align-items:flex-end;gap:2px;height:14px;width:22px;
+  justify-content:flex-end;opacity:0;transition:opacity .3s ease;
+}
+.track.is-active .track__meter{opacity:1}
+.track__meter i{
+  display:block;width:2px;border-radius:1px;background:var(--accent-text);
+  height:calc(14px * var(--v,.2));
+  transition:height .08s linear;
+}
+.track:not(.is-active) .track__meter{display:none}
+
+/* 走带 */
+.transport{
+  margin-top:auto;padding-top:18px;border-top:1px solid var(--line);
+}
+.now{min-height:34px}
+.now__title{
+  font:500 14px/1.35 var(--sans);color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.now__sub{margin-top:3px;font:400 10.5px/1.3 var(--sans);color:var(--dim)}
+.bar{
+  position:relative;height:22px;margin:12px 0 2px;cursor:pointer;
+  display:flex;align-items:center;
+  touch-action:none;
+}
+.bar__rail{
+  position:relative;width:100%;height:2px;border-radius:1px;background:var(--line-2);
+  overflow:hidden;
+}
+.bar__fill{
+  position:absolute;left:0;top:0;bottom:0;width:0%;
+  background:var(--accent-text);
+  transition:background-color .5s ease;
+}
+.bar__dot{
+  position:absolute;top:50%;width:9px;height:9px;margin-left:-4.5px;
+  border-radius:50%;background:var(--accent-text);
+  transform:translateY(-50%) scale(.6);
+  box-shadow:0 0 0 0 rgba(0,0,0,0);
+  transition:transform .18s ease,background-color .5s ease;
+}
+.bar:hover .bar__dot,.bar.is-drag .bar__dot{transform:translateY(-50%) scale(1)}
+.time{
+  display:flex;justify-content:space-between;
+  font:400 10px/1 var(--mono);letter-spacing:.08em;color:var(--dim-2);
+}
+.controls{
+  display:flex;align-items:center;gap:14px;margin-top:14px;
+}
+.btn{
+  display:grid;place-items:center;
+  width:34px;height:34px;border-radius:50%;
+  border:1px solid var(--line);background:transparent;color:var(--dim);
+  cursor:pointer;transition:color .2s ease,border-color .2s ease,transform .15s ease;
+}
+.btn:hover{color:var(--ink);border-color:var(--dim-2)}
+.btn:active{transform:scale(.94)}
+.btn--play{
+  width:48px;height:48px;
+  border-color:var(--line-2);color:var(--ink);
+}
+.btn--play:hover{border-color:var(--accent-text);color:var(--accent-text)}
+.btn svg{display:block}
+.controls__spacer{flex:1}
+.src{
+  font:400 10px/1 var(--mono);letter-spacing:.08em;color:var(--dim-2);
+  text-decoration:none;border-bottom:1px solid transparent;
+  transition:color .2s ease,border-color .2s ease;
+}
+.src:hover{color:var(--ink);border-color:var(--dim-2)}
+.hint{
+  margin-top:14px;font:400 10px/1.5 var(--sans);color:var(--dim-2);letter-spacing:.02em;
+}
+.toast{
+  position:absolute;left:50%;bottom:26px;transform:translate(-50%,8px);
+  padding:8px 14px;border-radius:999px;
+  background:var(--chip);border:1px solid var(--line);
+  font:400 11px/1 var(--sans);color:var(--ink);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  opacity:0;pointer-events:none;transition:opacity .3s ease,transform .3s ease;
+  z-index:8;
+}
+.toast.is-on{opacity:1;transform:translate(-50%,0)}
+
+/* ══ 窄屏 ═══════════════════════════════════════════════════════════ */
+@media (max-width:900px){
+  .stage{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto}
+  .deckwrap{padding:52px 0 0}
+  .sleeve{display:none}
+  .side{
+    padding:0 20px calc(18px + env(safe-area-inset-bottom));
+    background:linear-gradient(180deg,transparent,var(--bg) 26%);
+    max-height:52vh;
+  }
+  .tracks{
+    margin-top:2px;
+    /* 列表比面板高：底部用遮罩淡出，别把第 5 行切一半（那看着像坏了） */
+    -webkit-mask-image:linear-gradient(180deg,#000 calc(100% - 22px),transparent);
+    mask-image:linear-gradient(180deg,#000 calc(100% - 22px),transparent);
+  }
+  .track{padding:10px 6px 10px 6px}
+  .track__title{font-size:13px}
+  .side__head{padding-bottom:8px}
+  .hint{display:none}
+  .brand{top:12px}
+  .brand__name{font-size:13px}
+  .lab-back{top:10px;left:10px;font-size:11px;padding:5px 10px}
+}
+@media (max-height:620px) and (min-width:901px){
+  .side{padding-top:74px}
+  .track{padding:9px 8px}
+  .hint{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .disc.is-spinning #discArt{animation:none}
+  *{transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<a class="lab-back" href="/demos/">← Demos</a>
+<header class="brand">
+  <div class="brand__name" id="brandName">黑胶<i>/</i>VINYL</div>
+  <div class="brand__meta" id="brandMeta"><b>06</b> 首 · 全部可播</div>
+</header>
+
+<div class="stage">
+  <!-- ── 左：唱盘 ─────────────────────────────────────────────── -->
+  <div class="deckwrap" id="deckwrap">
+    <div class="deck" id="deck">
+      <div class="deck__plane">
+        <div class="sleeve" id="sleeve"><canvas id="sleeveArt" width="600" height="600"></canvas></div>
+        <div class="disc" id="disc">
+          <canvas id="discArt"></canvas>
+          <canvas id="discRing"></canvas>
+        </div>
+        <div class="arm" id="arm">
+          <div class="arm__hit"></div>
+          <div class="arm__rod"></div>
+          <div class="arm__weight"></div>
+          <div class="arm__pivot"></div>
+          <div class="arm__head"><i class="arm__needle"></i></div>
+          <div class="arm__shadow"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 右：曲目 + 走带 ──────────────────────────────────────── -->
+  <aside class="side">
+    <div class="side__head">
+      <span class="side__kicker" id="kicker">曲目 · TRACKS</span>
+      <span class="side__count" id="count">01 / 06</span>
+    </div>
+    <ol class="tracks" id="tracks"></ol>
+
+    <div class="transport">
+      <div class="now">
+        <div class="now__title" id="nowTitle">—</div>
+        <div class="now__sub" id="nowSub">—</div>
+      </div>
+      <div class="bar" id="bar" role="slider" aria-label="进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
+        <div class="bar__rail"><div class="bar__fill" id="barFill"></div></div>
+        <div class="bar__dot" id="barDot"></div>
+      </div>
+      <div class="time"><span id="tCur">0:00</span><span id="tDur">0:00</span></div>
+      <div class="controls">
+        <button class="btn" id="prev" aria-label="上一首">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2.5 5 7l6 4.5z"/><path d="M3 2.5v9"/></svg>
+        </button>
+        <button class="btn btn--play" id="play" aria-label="播放">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" id="playIcon"><path d="M4.5 2.6 13 8l-8.5 5.4z"/></svg>
+        </button>
+        <button class="btn" id="next" aria-label="下一首">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2.5 9 7l-6 4.5z"/><path d="M11 2.5v9"/></svg>
+        </button>
+        <span class="controls__spacer"></span>
+        <a class="src" id="src" href="https://music.163.com/" target="_blank" rel="noopener noreferrer">网易云 ↗</a>
+      </div>
+      <div class="hint" id="hint">滚轮 / ↑↓ 切换曲目 · 空格播放 · ←→ 快退快进 · 拖动进度条或唱臂</div>
+    </div>
+  </aside>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =============================================================================
+ * 黑胶 · VINYL —— 音乐作品展示 / 播放的**功能性样板**
+ *
+ * 这个 demo 回答的问题和 ai-atlas 不同：那边是"一堆卡片怎么摆"，这边是
+ * **"一首歌怎么被看见"**。所以空间语言不是"墙"，而是**一件实物**：
+ *
+ *   封套（作品）→ 唱片（声音）→ 唱臂（时间）→ 频谱（正在发生的事）
+ *
+ * 三个设计决定，都是"3D 必须有用"而不是"为了酷"：
+ *
+ * 1. **唱臂的角度 = 播放进度**，而且**可以直接拖**。
+ *    真实唱机上，针从盘外圈走到片芯就是一首歌的长度；这里把它做成
+ *    可交互的进度条 —— 时间有了实体。角度不是线性插值，而是用余弦定理
+ *    从"针到圆心的半径"反算（见 armAngle），所以针真的贴着沟走。
+ *
+ * 2. **频谱从唱片边缘长出来**，画在**唱片所在的平面**里（不是贴在屏幕上）。
+ *    因为它和唱片共享同一次 rotateX，所以它是"唱片在震动"，不是"UI 在跳"。
+ *    （这个环是程序化的，不是 FFT —— 外链不给 CORS，见下面「频谱环」那段。）
+ *
+ * 3. **唱片永远是黑的、封套永远是纸的**，只有页面（墙）跟随深浅色。
+ *    这两个是"桌上的实物"，换主题不该把它们也漂白 —— 浅色主题下
+ *    一张黑唱片压在暖纸上，正好是整页的视觉锚点。
+ *
+ * 音频：网易云外链（`music.163.com/song/media/outer/url?id=…`）。
+ * 那个 302 **不带 CORS 头**，所以不能 `crossOrigin`、也拿不到真频谱；
+ * 但播放本身是通的（http 那一跳浏览器会自动升级成 https）。
+ * ========================================================================== */
+
+/* ---------------------------------------------------------------- 数据 */
+/* 与 `src/data/music.json` 同源；demo 是独立页面，读不到 src，所以内联。
+   加曲目 = 这里加一条 + 在 `hue` 上给一个主色。 */
+const TRACKS = [
+  { id:'01.Rooftops-rain',    title:"Bb - Rooftop's rain",                    album:'Phrygian',      date:'2021-11-20', hue:222, sid:'1896609096' },
+  { id:'02.Unreasonable',     title:'Unreasonable',                            album:'黑暗中的黎明',   date:'2023-10-15', hue:32,  sid:'2090922639' },
+  { id:'03.Spinach-Girl',     title:'Spinach girl（波菜女孩）',                 album:'Dancing',       date:'2024-01-10', hue:322, sid:'2118906263' },
+  { id:'04.Plastic-Memories', title:'你会在下一个夏天等我吗(Plastic Memories)', album:'Chill Waves',   date:'2023-08-15', hue:176, sid:'2073594296' },
+  { id:'05.Goodbye',          title:'Goodbye',                                 album:'Round 2',       date:'2023-12-31', hue:348, sid:'2113453159' },
+  { id:'06.levin-thunder',    title:'Levin Thunder',                           album:'Focusing',      date:'2024-01-06', hue:262, sid:'2115612224' },
+];
+const AUTHOR = '柏雯';
+const outerUrl = (t) => `https://music.163.com/song/media/outer/url?id=${t.sid}.mp3`;
+const neteaseUrl = (t) => `https://music.163.com/song?id=${t.sid}`;
+/* 每首曲子一个稳定的"波形种子"：封面母题、片芯花纹、频谱环都从它派生，
+   所以同一首歌每次打开长得一模一样（换个页面刷新不该换一张封面）。 */
+TRACKS.forEach((t) => { t.seed = (hash(t.id) % 4096) / 173.7; });
+
+/* ---------------------------------------------------------------- 文案 */
+const I18N = {
+  zh: {
+    title: '黑胶 · VINYL — 六首原创音乐唱片机',
+    desc: '一台能真的放歌的唱盘：倾斜的唱片在透视里旋转，唱臂角度就是播放进度（可以直接拖），频谱从唱片边缘长出来。六首原创曲目在右侧成列。纯 canvas + CSS 3D，没有一张位图。',
+    brand: '黑胶<i>/</i>VINYL',
+    meta: (n) => `<b>${String(n).padStart(2, '0')}</b> 首 · 全部可播`,
+    kicker: '曲目 · TRACKS',
+    play: '播放', pause: '暂停', prev: '上一首', next: '下一首',
+    hint: '滚轮 / ↑↓ 切换曲目 · 空格播放 · ←→ 快退快进 · 拖动进度条或唱臂',
+    src: '网易云 ↗',
+    fail: '这首暂时播不了，点「网易云」直接听',
+    blocked: '点一下播放键开始',
+    side: 'A 面', rpm: '33⅓ RPM',
+  },
+  en: {
+    title: 'VINYL — six original tracks on a turntable',
+    desc: 'A turntable that actually plays: the record spins in perspective, the tonearm angle IS the playback position (drag it), and the spectrum grows out of the record edge. Six original tracks listed on the right. Pure canvas + CSS 3D, zero bitmaps.',
+    brand: 'VINYL',
+    meta: (n) => `<b>${String(n).padStart(2, '0')}</b> TRACKS · ALL PLAYABLE`,
+    kicker: 'TRACKS',
+    play: 'Play', pause: 'Pause', prev: 'Previous', next: 'Next',
+    hint: 'Wheel / ↑↓ to change track · Space to play · ←→ to seek · drag the bar or the tonearm',
+    src: 'Netease ↗',
+    fail: 'Cannot stream this one — open it on Netease',
+    blocked: 'Press play to start',
+    side: 'SIDE A', rpm: '33⅓ RPM',
+  },
+};
+
+/* ---------------------------------------------------------------- 环境 */
+const $ = (id) => document.getElementById(id);
+let theme = stageEnv.theme, lang = stageEnv.lang, L = I18N[lang];
+
+const DPR = Math.min(2, window.devicePixelRatio || 1);
+const DISC_R = 300;            // 唱片半径（平面坐标，px）
+const DISC_BOX = 820;          // 画布边长：盘 600 + 两侧各 110 给频谱
+const LABEL_R = 104;           // 片芯半径
+const SLEEVE_S = 600;
+
+/* ---------------------------------------------------------------- 画布 */
+const glCanvas = $('gl');
+const artCv = $('discArt');
+const ringCv = $('discRing');
+const sleeveCv = $('sleeveArt');
+artCv.width = ringCv.width = DISC_BOX * DPR;
+artCv.height = ringCv.height = DISC_BOX * DPR;
+sleeveCv.width = sleeveCv.height = SLEEVE_S * DPR;
+const artCtx = artCv.getContext('2d');
+const ringCtx = ringCv.getContext('2d');
+const sleeveCtx = sleeveCv.getContext('2d');
+artCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+ringCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+sleeveCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+/* ---------------------------------------------------------------- 工具 */
+/** 稳定的字符串散列 —— 同一首曲子每次打开画出来的封面必须一样。 */
+function hash(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0);
+}
+/* 主色有两个用途：印在纸上的深色（`--a-ink`）和发光用的亮色（`--a-glow`）。
+   画布上要带透明度的地方用第三个参数 —— 别对字符串做 `.replace('hsl','hsla')`
+   那种事（一旦 CSS 语法换成 `hsl(h s l / a)` 就会悄悄画出黑块）。 */
+const ACCENT_INK = (h, a) => `hsl(${h} 62% 36%${a ? ` / ${a}` : ''})`;
+const ACCENT_GLOW = (h, a) => `hsl(${h} 74% 62%${a ? ` / ${a}` : ''})`;
+
+function fmtTime(sec) {
+  if (!isFinite(sec) || sec < 0) sec = 0;
+  const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+  return m + ':' + String(s).padStart(2, '0');
+}
+
+/* ============================================================================
+ * 封面图案 —— 六种母题，按曲目 id 散列挑一个。
+ * 全部是几何：同心弧 / 正弦场 / 放射线 / 点阵 / 叠圆 / 柱列。
+ * 之所以是"生成"而不是"配图"：站上零位图，而且六张封面要像同一套版式
+ * （同一套底色、同一套边距、同一个字位），只是母题不同 —— 那才是唱片公司的做法。
+ *
+ * 版式：**字在上、图在下**。因为这张封套是压在唱片下面的，唱片只让出
+ * 顶部一条横带和左边一条竖带（见下面 .sleeve 的注释）—— 字放在顶部横带里
+ * 才完整，母题那条往下延伸、被唱片压掉一半，正好是"唱片躺在自己封套上"。
+ * ========================================================================== */
+function paintCover(ctx, w, h, track, opts) {
+  const o = opts || {};
+  const ink = o.ink || '#211D1A';
+  const dim = o.dim || '#6d6152';
+  const accent = o.accent || ACCENT_INK(track.hue);
+  const seed = hash(track.id);
+  const motif = seed % 6;
+
+  ctx.save();
+  ctx.clearRect(0, 0, w, h);
+
+  /* 底：暖纸 + 一点点中心提亮（像印在纸上，不是屏幕发光） */
+  const g = ctx.createLinearGradient(0, 0, w * 0.6, h);
+  g.addColorStop(0, '#F6EFE2');
+  g.addColorStop(1, '#E9DDC8');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+
+  const pad = w * 0.075;
+  const mw = w - pad * 2;
+  const mx = pad;
+
+  /* 字位在最上面（见上面版式说明）：两行标题 + 一行专辑。
+     长标题（"你会在下一个夏天等我吗(Plastic Memories)"）一行塞不下，
+     硬截断会变成"你会在下一个夏天等…"，两行才读得完。 */
+  const titleSize = Math.round(w * 0.052);
+  const subSize = Math.round(w * 0.031);
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = ink;
+  ctx.font = `500 ${titleSize}px 'MapleUI', 'PingFang SC', sans-serif`;
+  const lines = wrapText(ctx, track.title, mw, 2);
+  let ty = pad + titleSize;
+  lines.forEach((ln) => { ctx.fillText(ln, mx, ty); ty += titleSize * 1.22; });
+
+  ctx.fillStyle = dim;
+  ctx.font = `400 ${subSize}px 'MapleUI', 'PingFang SC', sans-serif`;
+  ctx.fillText(`${track.album} · ${track.date.slice(0, 4)}`, mx, ty + subSize * 0.85);
+
+  /* 右上角的主色块：六张封面唯一的"系列标记" */
+  const sw = w * 0.028;
+  ctx.fillStyle = accent;
+  ctx.fillRect(w - pad - sw, pad, sw, sw);
+
+  /* 母题区：从字位下面一直铺到底部版口 */
+  const my = ty + subSize * 2.1;
+  const mh = h - pad - my;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(mx, my, mw, mh);
+  ctx.clip();
+  ctx.lineCap = 'round';
+
+  if (motif === 0) {
+    /* 同心弧：像一段被剪下来的沟槽 */
+    const cx = mx + mw * 0.5, cy = my + mh * 1.05;
+    for (let i = 0; i < 26; i++) {
+      const r = mw * (0.12 + i * 0.038);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, Math.PI * 1.06, Math.PI * 1.94);
+      ctx.strokeStyle = i % 7 === 0 ? accent : 'rgba(33,29,26,.16)';
+      ctx.lineWidth = i % 7 === 0 ? 2.2 : 1;
+      ctx.stroke();
+    }
+  } else if (motif === 1) {
+    /* 正弦场：一堆相位错开的波 */
+    for (let i = 0; i < 22; i++) {
+      const y = my + (i + 0.5) * (mh / 22);
+      const amp = mh * (0.012 + 0.03 * Math.abs(Math.sin(i * 1.7 + seed % 7)));
+      ctx.beginPath();
+      for (let x = 0; x <= mw; x += 3) {
+        const yy = y + Math.sin((x / mw) * Math.PI * 4 + i * 0.55) * amp;
+        x === 0 ? ctx.moveTo(mx + x, yy) : ctx.lineTo(mx + x, yy);
+      }
+      ctx.strokeStyle = i % 6 === 0 ? accent : 'rgba(33,29,26,.17)';
+      ctx.lineWidth = i % 6 === 0 ? 2 : 1;
+      ctx.stroke();
+    }
+  } else if (motif === 2) {
+    /* 放射线 */
+    const cx = mx + mw * 0.5, cy = my + mh * 0.5;
+    for (let i = 0; i < 64; i++) {
+      const a = (i / 64) * Math.PI * 2;
+      const len = mw * (0.18 + 0.3 * Math.abs(Math.sin(i * 2.3 + 1)));
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * mw * 0.06, cy + Math.sin(a) * mw * 0.06);
+      ctx.lineTo(cx + Math.cos(a) * len, cy + Math.sin(a) * len);
+      ctx.strokeStyle = i % 8 === 0 ? accent : 'rgba(33,29,26,.18)';
+      ctx.lineWidth = i % 8 === 0 ? 2 : 0.9;
+      ctx.stroke();
+    }
+  } else if (motif === 3) {
+    /* 点阵：半径按行列起伏 */
+    const n = 13;
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        const x = mx + (c + 0.5) * (mw / n);
+        const y = my + (r + 0.5) * (mh / n);
+        const d = Math.hypot(c - (n - 1) / 2, r - (n - 1) / 2) / (n / 2);
+        const rr = Math.max(0.6, (mw / n) * 0.36 * (1 - d * 0.78));
+        ctx.beginPath();
+        ctx.arc(x, y, rr, 0, Math.PI * 2);
+        ctx.fillStyle = (r * n + c) % 9 === 0 ? accent : 'rgba(33,29,26,.2)';
+        ctx.fill();
+      }
+    }
+  } else if (motif === 4) {
+    /* 叠圆：三个大圆的交集 */
+    const pts = [[0.34, 0.4], [0.66, 0.42], [0.5, 0.68]];
+    pts.forEach((p, i) => {
+      ctx.beginPath();
+      ctx.arc(mx + mw * p[0], my + mh * p[1], mw * 0.27, 0, Math.PI * 2);
+      ctx.strokeStyle = i === 1 ? accent : 'rgba(33,29,26,.2)';
+      ctx.lineWidth = i === 1 ? 2.4 : 1;
+      ctx.stroke();
+    });
+    ctx.beginPath();
+    ctx.arc(mx + mw * 0.5, my + mh * 0.5, mw * 0.085, 0, Math.PI * 2);
+    ctx.fillStyle = accent;
+    ctx.fill();
+  } else {
+    /* 柱列：一段静态频谱 */
+    const n = 30;
+    for (let i = 0; i < n; i++) {
+      const hh = mh * (0.08 + 0.62 * Math.abs(Math.sin(i * 0.9 + seed % 5) * Math.cos(i * 0.31)));
+      const x = mx + (i + 0.5) * (mw / n);
+      ctx.beginPath();
+      ctx.moveTo(x, my + mh * 0.5 - hh / 2);
+      ctx.lineTo(x, my + mh * 0.5 + hh / 2);
+      ctx.strokeStyle = i % 5 === 0 ? accent : 'rgba(33,29,26,.2)';
+      ctx.lineWidth = (mw / n) * 0.34;
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  /* 版口：细边框（封套的"印刷线"） */
+  ctx.strokeStyle = 'rgba(33,29,26,.22)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(mx + 0.5, my + 0.5, mw - 1, mh - 1);
+  ctx.restore();
+}
+
+/** 超长标题折行（最多 maxLines 行，末行省略）。CJK 逐字断，拉丁尽量断在空格。 */
+function wrapText(ctx, text, maxW, maxLines) {
+  const out = [];
+  let rest = text;
+  while (rest && out.length < maxLines) {
+    if (ctx.measureText(rest).width <= maxW) { out.push(rest); rest = ''; break; }
+    let i = 1;
+    while (i < rest.length && ctx.measureText(rest.slice(0, i + 1)).width <= maxW) i++;
+    /* 往回找一个能断的地方：空格 / 中点 / 括号 / 汉字边界都行 */
+    let cut = i;
+    for (let k = i; k > Math.max(2, i - 12); k--) {
+      const ch = rest[k];
+      if (ch === ' ' || ch === '·' || ch === '（' || ch === '(' || /[\u4e00-\u9fff]/.test(rest[k - 1])) { cut = k; break; }
+    }
+    if (out.length === maxLines - 1) {
+      /* 最后一行：留省略号 */
+      let s = rest.slice(0, cut).trim();
+      while (s.length > 2 && ctx.measureText(s + '…').width > maxW) s = s.slice(0, -1);
+      out.push(s + '…');
+      rest = '';
+      break;
+    }
+    out.push(rest.slice(0, cut).trim());
+    rest = rest.slice(cut).trim();
+  }
+  return out;
+}
+
+/* ============================================================================
+ * 唱片底图：沟槽 + 片芯。每换一首重画一次（不每帧）。
+ * ========================================================================== */
+function paintDisc(track) {
+  const S = DISC_BOX, c = S / 2, R = DISC_R;
+  const ctx = artCtx;
+  ctx.clearRect(0, 0, S, S);
+
+  /* 盘体：中心偏左上打光 */
+  const body = ctx.createRadialGradient(c - R * 0.3, c - R * 0.34, R * 0.05, c, c, R);
+  body.addColorStop(0, '#191b21');
+  body.addColorStop(0.55, '#0d0f13');
+  body.addColorStop(1, '#08090c');
+  ctx.beginPath(); ctx.arc(c, c, R, 0, Math.PI * 2);
+  ctx.fillStyle = body; ctx.fill();
+
+  /* 沟槽：一圈一圈，疏密有点起伏（真实的盘也不是均匀的） */
+  ctx.save();
+  ctx.beginPath(); ctx.arc(c, c, R - 2, 0, Math.PI * 2); ctx.clip();
+  for (let r = R - 4; r > LABEL_R + 6; r -= 2.15) {
+    const k = (r - LABEL_R) / (R - LABEL_R);
+    const a = 0.035 + 0.03 * Math.abs(Math.sin(r * 0.42));
+    ctx.beginPath();
+    ctx.arc(c, c, r, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(210,225,245,${a.toFixed(3)})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    /* 两道"曲目间隙"：亮一点，像真实唱片上的分隔带 */
+    if (Math.abs(k - 0.42) < 0.004 || Math.abs(k - 0.72) < 0.004) {
+      ctx.beginPath();
+      ctx.arc(c, c, r, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(220,235,255,.13)';
+      ctx.lineWidth = 3.5;
+      ctx.stroke();
+    }
+  }
+  /* 高光：一条斜扫的柔和反光，唱片才像有弧度 */
+  const sheen = ctx.createLinearGradient(c - R, c - R, c + R * 0.9, c + R);
+  sheen.addColorStop(0, 'rgba(255,255,255,0)');
+  sheen.addColorStop(0.34, 'rgba(255,255,255,.075)');
+  sheen.addColorStop(0.46, 'rgba(255,255,255,.015)');
+  sheen.addColorStop(0.62, 'rgba(255,255,255,.06)');
+  sheen.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = sheen;
+  ctx.fillRect(0, 0, S, S);
+  ctx.restore();
+
+  /* 片芯：纸色 + 母题的一小块 + 两行极小的字 */
+  const accent = ACCENT_INK(track.hue);
+  ctx.beginPath(); ctx.arc(c, c, LABEL_R, 0, Math.PI * 2);
+  ctx.fillStyle = '#F2EADA'; ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,.28)'; ctx.lineWidth = 1; ctx.stroke();
+
+  ctx.save();
+  ctx.beginPath(); ctx.arc(c, c, LABEL_R - 6, 0, Math.PI * 2); ctx.clip();
+  const seed = hash(track.id);
+  for (let i = 0; i < 9; i++) {
+    const a0 = (i / 9) * Math.PI * 2 + (seed % 17) * 0.1;
+    ctx.beginPath();
+    ctx.arc(c, c, LABEL_R * (0.34 + i * 0.062), a0, a0 + Math.PI * 0.72);
+    ctx.strokeStyle = i === 4 ? accent : 'rgba(33,29,26,.2)';
+    ctx.lineWidth = i === 4 ? 2 : 0.9;
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  /* 中心孔 */
+  ctx.beginPath(); ctx.arc(c, c, 4.2, 0, Math.PI * 2);
+  ctx.fillStyle = '#0a0b0e'; ctx.fill();
+
+  ctx.fillStyle = '#211D1A';
+  ctx.font = "500 11px 'MapleUI', sans-serif";
+  ctx.textAlign = 'center';
+  ctx.fillText(AUTHOR, c, c + LABEL_R * 0.74);
+  ctx.font = "400 7.5px ui-monospace, monospace";
+  ctx.fillStyle = '#6d6152';
+  ctx.fillText('SIDE A · ' + L.rpm, c, c + LABEL_R * 0.74 + 13);
+  ctx.textAlign = 'start';
+
+  /* 盘沿：一圈极细的主色，换曲时最先察觉到的信号 */
+  ctx.beginPath(); ctx.arc(c, c, R - 1, 0, Math.PI * 2);
+  ctx.strokeStyle = ACCENT_INK(track.hue, 0.55);
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+}
+
+/* ============================================================================
+ * 频谱环 —— 先说清楚它**不是** FFT
+ *
+ * 本来想挂 AnalyserNode 读真频谱，实测不行：网易云的外链是
+ *   302 music.163.com/song/media/outer/url?id=…  →  http://m701.music.126.net/…
+ * **302 那一跳不带 `Access-Control-Allow-Origin`**（末端 CDN 带，没用），
+ * 所以 `<audio crossOrigin="anonymous">` 直接 ERR_FAILED —— 一挂 CORS 就连
+ * 播放都没了。而一旦 `createMediaElementSource()` 了，非 CORS 的音源按规范
+ * 输出静音 ⇒ 那才是"为了频谱把歌弄哑"。
+ * （顺带：302 指向的是 http，实测在 https 页面上 Chrome 会自动升级成 https，
+ *   所以线上播放没问题 —— 有问题的只有 CORS。）
+ *
+ * 所以这个环是**程序化**的：以曲目 id 为种子、以播放位置为时间轴，
+ * 叠三个不可通约的正弦 + 一个"拍"。它反映的是"针正在沟里走"，
+ * 不是"我在分析音频"。暂停 = 停针 = 环定住，这恰好是对的。
+ * 以后要是把 6 首换成站内文件（同源），把 fft 那段接回来就行。
+ * ========================================================================== */
+const BANDS = 108;
+let level = 0;             // 0..1，低频能量，喂给背景 shader
+
+function bandSignal(i, t, seed) {
+  const p = i / BANDS;
+  const w1 = Math.sin(t * 2.3 + i * 0.42 + seed);
+  const w2 = Math.sin(t * 5.7 - i * 1.13 + seed * 0.7);
+  const w3 = Math.sin(t * 11.3 + i * 0.19 + seed * 1.9);
+  const beat = Math.pow(Math.max(0, Math.sin(t * 6.2 + seed)), 6);
+  const shape = 0.55 + 0.45 * Math.sin(p * Math.PI * 3 + seed);   // 低频肥、高频瘦
+  const v = 0.2 + 0.2 * w1 + 0.15 * w2 + 0.09 * w3 + 0.34 * beat * shape;
+  return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
+function paintRing() {
+  const S = DISC_BOX, c = S / 2, R = DISC_R;
+  ringCtx.clearRect(0, 0, S, S);
+
+  /* 浅色主题下环要用**深**主色：纸上的浅蓝几乎看不见（第一版就这么糊掉了）。
+     但深色在纸上"更重"，所以长度和透明度都收一点，否则像一圈尖刺。 */
+  const light = theme === 'light';
+  const accent = light ? ACCENT_INK(current.hue) : ACCENT_GLOW(current.hue);
+  const reach = light ? 56 : 70;
+  const seed = current.seed;
+  /* 暂停时环定在"针停下的那一刻"，再整体压暗 —— 停针的盘不会自己抖。 */
+  const t = audio.currentTime || 0;
+  const gain = playing ? 1 : 0.42;
+  let low = 0;
+  ringCtx.lineCap = 'round';
+
+  for (let i = 0; i < BANDS; i++) {
+    const v = bandSignal(i, t, seed) * gain;
+    if (i < 14) low += v;
+    const len = 3 + Math.pow(v, 0.8) * reach;
+    const a = (i / BANDS) * Math.PI * 2 - Math.PI / 2;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    const r0 = R + 7;
+    const r1 = r0 + len;
+
+    /* 外层：暗一点的拖尾 */
+    ringCtx.beginPath();
+    ringCtx.moveTo(c + ca * r0, c + sa * r0);
+    ringCtx.lineTo(c + ca * r1, c + sa * r1);
+    ringCtx.strokeStyle = accent;
+    ringCtx.globalAlpha = 0.09 + v * (light ? 0.3 : 0.42);
+    ringCtx.lineWidth = 3.2;
+    ringCtx.stroke();
+
+    /* 内层：亮核 */
+    ringCtx.beginPath();
+    ringCtx.moveTo(c + ca * r0, c + sa * (r0 + len * 0.55));
+    ringCtx.lineTo(c + ca * r1, c + sa * r1);
+    ringCtx.strokeStyle = accent;
+    ringCtx.globalAlpha = 0.24 + v * (light ? 0.56 : 0.72);
+    ringCtx.lineWidth = 1.4;
+    ringCtx.stroke();
+  }
+  ringCtx.globalAlpha = 1;
+  level = Math.min(1, low / 14 * 1.35);
+}
+
+/* ============================================================================
+ * 唱臂几何
+ *
+ * 真实唱机：支点在盘外，针从**外圈**（r≈0.95R）走到**片芯边**（r≈0.38R），
+ * 半径和臂角是余弦定理的关系 —— r² = P² + L² − 2PL·cos θ。
+ * 所以进度 → 半径 → 角度是反解出来的，针才真的贴着沟走，
+ * 而不是"把臂转个固定角度"（那样中间会跑到盘外去）。
+ * ========================================================================== */
+const ARM = { P: 315, L: 216, base: 199.9 };   // 支点距心 / 臂长 / 指向圆心的基准角
+const R_START = 0.95 * DISC_R, R_END = 0.38 * DISC_R;
+
+function armAngle(t) {
+  const r = R_START + (R_END - R_START) * Math.max(0, Math.min(1, t));
+  let cos = (ARM.P * ARM.P + ARM.L * ARM.L - r * r) / (2 * ARM.P * ARM.L);
+  cos = Math.max(-1, Math.min(1, cos));
+  return ARM.base + Math.acos(cos) * 180 / Math.PI;
+}
+
+/* ============================================================================
+ * 音频
+ * 只用 `<audio>` 直出 —— **不设 crossOrigin**（理由见下面「频谱环」那段）。
+ * ========================================================================== */
+const audio = new Audio();
+audio.preload = 'metadata';
+audio.volume = 0.85;
+
+let current = TRACKS[0];
+let playing = false;
+
+/* ============================================================================
+ * 交互
+ * ========================================================================== */
+const tracksEl = $('tracks');
+const armEl = $('arm');
+const discEl = $('disc');
+const deckEl = $('deck');
+const barEl = $('bar');
+const barFill = $('barFill');
+const barDot = $('barDot');
+const playIcon = $('playIcon');
+
+const ICON_PLAY = '<path d="M4.5 2.6 13 8l-8.5 5.4z"/>';
+const ICON_PAUSE = '<path d="M4.6 2.6h2.6v10.8H4.6zM8.8 2.6h2.6v10.8H8.8z"/>';
+
+function buildList() {
+  tracksEl.innerHTML = '';
+  TRACKS.forEach((t, i) => {
+    const li = document.createElement('li');
+    li.className = 'track';
+    li.dataset.i = String(i);
+    li.tabIndex = 0;
+    li.setAttribute('role', 'button');
+    li.innerHTML =
+      `<span class="track__no">${String(i + 1).padStart(2, '0')}</span>` +
+      `<span><span class="track__title">${escapeHtml(t.title)}</span>` +
+      `<span class="track__sub">${escapeHtml(t.album)} · ${t.date.slice(0, 4)}</span></span>` +
+      `<span class="track__meter"><i></i><i></i><i></i><i></i></span>`;
+    li.addEventListener('click', () => select(i, true));
+    li.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(i, true); }
+    });
+    tracksEl.appendChild(li);
+  });
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+let meterEls = [];
+function cacheMeters() {
+  meterEls = [...tracksEl.querySelectorAll('.track__meter')].map((m) => [...m.children]);
+}
+
+/** 选中一首：换盘面 / 换封套 / 换主色 / 换音源。`autoplay` 决定要不要真的响。 */
+function select(i, autoplay) {
+  const t = TRACKS[i];
+  const changed = t !== current || audio.src !== outerUrl(t);
+  current = t;
+
+  document.documentElement.style.setProperty('--h', String(t.hue));
+  $('brandMeta').innerHTML = L.meta(TRACKS.length);
+  $('count').textContent = `${String(i + 1).padStart(2, '0')} / ${String(TRACKS.length).padStart(2, '0')}`;
+  $('nowTitle').textContent = t.title;
+  $('nowSub').textContent = `${t.album} · ${AUTHOR} · ${t.date.slice(0, 4)}`;
+  $('src').href = neteaseUrl(t);
+  $('src').textContent = L.src;
+
+  [...tracksEl.children].forEach((li, k) => li.classList.toggle('is-active', k === i));
+
+  paintDisc(t);
+  paintCover(sleeveCtx, SLEEVE_S, SLEEVE_S, t, { accent: ACCENT_INK(t.hue) });
+
+  if (changed) {
+    audio.src = outerUrl(t);
+    audio.load();
+    level = 0;
+  }
+  if (autoplay) play();
+  else armTarget = armAngle(0);
+}
+
+function play() {
+  const p = audio.play();
+  if (p && p.catch) p.catch(() => toast(L.fail));
+}
+
+function pause() {
+  audio.pause();
+}
+
+function toggle() {
+  if (audio.paused) play(); else pause();
+}
+
+function step(d) {
+  const i = (TRACKS.indexOf(current) + d + TRACKS.length) % TRACKS.length;
+  select(i, true);
+}
+
+function toast(msg) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('is-on');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.classList.remove('is-on'), 2600);
+}
+
+/* 走带状态 → UI。audio 的 pause/play 事件是唯一真源（浏览器会自己暂停）。 */
+audio.addEventListener('play', () => {
+  playing = true;
+  discEl.classList.add('is-spinning');
+  deckEl.classList.add('is-live');
+  playIcon.innerHTML = ICON_PAUSE;
+  $('play').setAttribute('aria-label', L.pause);
+});
+audio.addEventListener('pause', () => {
+  playing = false;
+  discEl.classList.remove('is-spinning');
+  deckEl.classList.remove('is-live');
+  playIcon.innerHTML = ICON_PLAY;
+  $('play').setAttribute('aria-label', L.play);
+});
+audio.addEventListener('ended', () => step(1));
+audio.addEventListener('error', () => { if (audio.src) toast(L.fail); });
+audio.addEventListener('loadedmetadata', () => { $('tDur').textContent = fmtTime(audio.duration); });
+
+/* ── 进度条 / 唱臂：同一个"进度"，两个把手 ─────────────────────── */
+let dragging = false;
+function seekFromEvent(e) {
+  const r = barEl.getBoundingClientRect();
+  const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+  const t = Math.max(0, Math.min(1, x / r.width));
+  if (isFinite(audio.duration)) audio.currentTime = t * audio.duration;
+  paintProgress(t);
+}
+barEl.addEventListener('pointerdown', (e) => {
+  dragging = true; barEl.classList.add('is-drag'); barEl.setPointerCapture(e.pointerId);
+  seekFromEvent(e);
+});
+barEl.addEventListener('pointermove', (e) => { if (dragging) seekFromEvent(e); });
+barEl.addEventListener('pointerup', (e) => { dragging = false; barEl.classList.remove('is-drag'); barEl.releasePointerCapture(e.pointerId); });
+barEl.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') { audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 5); e.preventDefault(); }
+  if (e.key === 'ArrowLeft') { audio.currentTime = Math.max(0, audio.currentTime - 5); e.preventDefault(); }
+});
+
+function paintProgress(t) {
+  const p = Math.max(0, Math.min(1, t)) * 100;
+  barFill.style.width = p + '%';
+  barDot.style.left = p + '%';
+  barEl.setAttribute('aria-valuenow', String(Math.round(p)));
+}
+
+/* 唱臂也能拖：它就在盘上，手自然会去抓它 */
+let armDrag = false;
+
+/* ============================================================================
+ * 屏幕 ↔ 平面
+ *
+ * 平面上的坐标 → 屏幕坐标是一条**透视投影**，不是仿射：
+ *
+ *   A = x·cosZ − y·sinZ          ← 先绕 Z 转 −7°
+ *   B = x·sinZ + y·cosZ
+ *   Y2 = B·cosX ,  Z2 = B·sinX   ← 再绕 X 压 52°（y 朝下，正角 = 上沿往后倒）
+ *   s  = k / (k − Z2)            ← 透视除法，k = 1600（CSS 的 perspective）
+ *
+ * 一开始这里只乘了一个 2×2 矩阵（等于当成正交投影），结果**盘边误差 ~30%**：
+ * 900 见方的平面在 k=1600 下，近端 s≈1.33、远端 s≈0.84 —— 拖唱臂时指针和
+ * 手指会分家。所以下面直接解上面的方程（对 A、B 是一次的，有闭式解）。
+ * 另外 perspective-origin 是 50% 42%（不是中心），差的那 72px 也算进去了。
+ * ========================================================================== */
+const TILT_X = 52 * Math.PI / 180, TILT_Z = -7 * Math.PI / 180;
+const _cz = Math.cos(TILT_Z), _sz = Math.sin(TILT_Z);
+const _cx = Math.cos(TILT_X), _sx = Math.sin(TILT_X);
+const PERSP = 1600;
+const PERSP_DY = 450 - 900 * 0.42;        // 透视原点相对平面中心的 y 偏移 = 72
+let deckScale = 1;
+
+/** 平面坐标（0..900）→ 屏幕坐标。唱臂落点、探针都靠它验。 */
+function planeToScreen(x, y) {
+  const px = x - 450, py = y - 450;
+  const A = px * _cz - py * _sz;
+  const B = px * _sz + py * _cz;
+  const Y2 = B * _cx, Z2 = B * _sx;
+  const s = PERSP / (PERSP - Z2);
+  const r = deckEl.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  return {
+    x: cx + A * s * deckScale,
+    y: cy + ((Y2 + PERSP_DY) * s - PERSP_DY) * deckScale,
+  };
+}
+
+function screenToPlane(clientX, clientY) {
+  const r = deckEl.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const u = (clientX - cx) / deckScale;
+  const v = (clientY - cy) / deckScale + PERSP_DY;
+  const B = PERSP * (v - PERSP_DY) / (PERSP * _cx + v * _sx);
+  const s = PERSP / (PERSP - B * _sx);
+  const A = u / s;
+  return { x: A * _cz + B * _sz + 450, y: -A * _sz + B * _cz + 450 };
+}
+
+/** 支点：在圆心沿 base 方向**外侧** P 处（base 是"支点指向圆心"的角）。 */
+function armPivot() {
+  const rad = ARM.base * Math.PI / 180;
+  return { x: 450 - ARM.P * Math.cos(rad), y: 450 - ARM.P * Math.sin(rad) };
+}
+const PIVOT = armPivot();
+(function placeArm() {
+  armEl.style.left = PIVOT.x + 'px';
+  armEl.style.top = PIVOT.y + 'px';
+})();
+
+/* 拖唱臂 = 改**角度**，不是改半径。
+   手上抓的是臂，臂绕支点转；针到圆心的半径是角度的函数（余弦定理）。
+   早先这里把"指针到支点的距离"直接当成"针到圆心的半径"用 —— 抓针尖会
+   一下子跳到 40%：针离支点 216，离圆心 285，两者根本不是一个量。 */
+function armFromPointer(e) {
+  const p = screenToPlane(e.clientX, e.clientY);
+  let deg = Math.atan2(p.y - PIVOT.y, p.x - PIVOT.x) * 180 / Math.PI;
+  while (deg < ARM.base) deg += 360;                 // 归一到 [base, base+360)
+  const a0 = armAngle(0), a1 = armAngle(1);          // a1 < a0：进度越大角度越小
+  deg = Math.max(a1, Math.min(a0, deg));
+  const rad = (deg - ARM.base) * Math.PI / 180;
+  const r = Math.sqrt(ARM.P * ARM.P + ARM.L * ARM.L - 2 * ARM.P * ARM.L * Math.cos(rad));
+  const t = Math.max(0, Math.min(1, (R_START - r) / (R_START - R_END)));
+  if (isFinite(audio.duration)) audio.currentTime = t * audio.duration;
+  paintProgress(t);
+  armTarget = armNow = deg;                          // 手赢，不做缓动
+  armEl.style.transform = `rotate(${deg}deg)`;
+}
+armEl.addEventListener('pointerdown', (e) => {
+  armDrag = true; armEl.classList.add('is-grab');
+  armEl.setPointerCapture(e.pointerId);
+  armFromPointer(e);
+});
+armEl.addEventListener('pointermove', (e) => { if (armDrag) armFromPointer(e); });
+const endArmDrag = (e) => {
+  armDrag = false; armEl.classList.remove('is-grab');
+  if (armEl.hasPointerCapture?.(e.pointerId)) armEl.releasePointerCapture(e.pointerId);
+};
+armEl.addEventListener('pointerup', endArmDrag);
+armEl.addEventListener('pointercancel', endArmDrag);
+
+/* 臂角不直接写死：走缓动，换曲 / 暂停时不会"啪"地跳一下。
+   停着的时候针**停在最外圈**（= 已经上针、只是没转），不是抬到盘外 ——
+   这样第一眼就能看见"角度 = 进度"这件事。 */
+let armNow = armAngle(0), armTarget = armNow;
+function updateArm(dt) {
+  const dur = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+  armTarget = armAngle(dur ? audio.currentTime / dur : 0);
+  const k = 1 - Math.exp(-dt / 110);
+  armNow += (armTarget - armNow) * k;
+  if (Math.abs(armTarget - armNow) < 0.01) armNow = armTarget;
+  armEl.style.transform = `rotate(${armNow.toFixed(2)}deg)`;
+}
+
+/* ── 键盘 ─────────────────────────────────────────────────────── */
+window.addEventListener('keydown', (e) => {
+  if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+  /* 焦点在按钮/链接/曲目行/进度条上时，键归它们自己 —— 否则空格会既
+     触发按钮又触发全局播放，一次按两下。 */
+  if (e.target && e.target.closest && e.target.closest('button, a, [tabindex]')) return;
+  if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); toggle(); }
+  else if (e.key === 'ArrowRight') { audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 5); }
+  else if (e.key === 'ArrowLeft') { audio.currentTime = Math.max(0, audio.currentTime - 5); }
+  else if (e.key === 'ArrowDown') { e.preventDefault(); step(1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); step(-1); }
+});
+
+/* 滚轮切换曲目：一次手势一格，靠冷却防连跳 */
+let wheelLock = 0;
+window.addEventListener('wheel', (e) => {
+  const now = performance.now();
+  if (now - wheelLock < 620) return;
+  if (Math.abs(e.deltaY) < 6) return;
+  wheelLock = now;
+  step(e.deltaY > 0 ? 1 : -1);
+}, { passive: true });
+
+$('play').addEventListener('click', toggle);
+$('prev').addEventListener('click', () => step(-1));
+$('next').addEventListener('click', () => step(1));
+
+/* ============================================================================
+ * 背景：一圈一圈的沟槽在很远处慢慢转 + 一点主色雾。
+ * 极轻 —— 它是"房间的墙"，不许抢唱盘。
+ * ========================================================================== */
+const gl = glCanvas.getContext('webgl', { antialias: false, alpha: false });
+let glProg = null, glU = {};
+if (gl) {
+  const vs = `attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}`;
+  const fs = `
+    precision mediump float;
+    uniform vec2 uRes; uniform float uTime; uniform vec3 uAccent;
+    uniform float uLevel; uniform float uLight;
+    float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+    void main(){
+      vec2 uv=(gl_FragCoord.xy-0.5*uRes)/uRes.y;
+      /* 圆心跟着唱盘偏左上一点，画面才不是死的对称 */
+      vec2 o=uv-vec2(-0.16,-0.02);
+      float r=length(o);
+      float a=atan(o.y,o.x);
+      /* 远处的沟槽：半径方向的正弦，随时间缓慢转 */
+      float g=sin(r*160.0-a*0.6-uTime*0.10);
+      g=smoothstep(0.72,1.0,abs(g));
+      float fall=exp(-r*1.55);
+      vec3 base=mix(vec3(0.027,0.031,0.047),vec3(0.045,0.050,0.070),uv.y*0.5+0.5);
+      if(uLight>0.5) base=mix(vec3(0.965,0.930,0.878),vec3(0.945,0.900,0.840),uv.y*0.5+0.5);
+      float halo=exp(-r*r*2.6)*(0.10+uLevel*0.55);
+      vec3 col=base;
+      col+=uAccent*halo*(uLight>0.5?0.22:0.55);
+      col+=mix(vec3(0.5),vec3(0.0),uLight)*g*fall*(0.05+uLevel*0.05);
+      /* 一点抖动，压掉渐变的色带 */
+      col+= (hash(gl_FragCoord.xy+fract(uTime)*13.0)-0.5)*0.012;
+      gl_FragColor=vec4(col,1.0);
+    }`;
+  const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); return o; };
+  glProg = gl.createProgram();
+  gl.attachShader(glProg, sh(gl.VERTEX_SHADER, vs));
+  gl.attachShader(glProg, sh(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(glProg);
+  gl.useProgram(glProg);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(glProg, 'p');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  glU = {
+    res: gl.getUniformLocation(glProg, 'uRes'),
+    time: gl.getUniformLocation(glProg, 'uTime'),
+    accent: gl.getUniformLocation(glProg, 'uAccent'),
+    level: gl.getUniformLocation(glProg, 'uLevel'),
+    light: gl.getUniformLocation(glProg, 'uLight'),
+  };
+}
+
+function resizeGL() {
+  if (!gl) return;
+  const w = Math.floor(innerWidth * Math.min(2, DPR));
+  const h = Math.floor(innerHeight * Math.min(2, DPR));
+  if (glCanvas.width !== w || glCanvas.height !== h) {
+    glCanvas.width = w; glCanvas.height = h;
+    gl.viewport(0, 0, w, h);
+  }
+}
+addEventListener('resize', resizeGL, { passive: true });
+resizeGL();
+
+/* ============================================================================
+ * 主循环
+ * ========================================================================== */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(48, now - last); last = now;
+  paintRing();            // 顺便算出 level（背景光晕用）
+
+  /* 唱臂跟着播放头走（拖动时不抢，让手赢） */
+  if (!armDrag) updateArm(dt);
+  if (!dragging) {
+    const t = isFinite(audio.duration) && audio.duration > 0 ? audio.currentTime / audio.duration : 0;
+    paintProgress(t);
+    $('tCur').textContent = fmtTime(audio.currentTime);
+  }
+
+  /* 当前曲目那一行的四条小柱子 */
+  const active = tracksEl.querySelector('.track.is-active .track__meter');
+  if (active) {
+    const kids = active.children;
+    const t0 = audio.currentTime || 0;
+    for (let i = 0; i < kids.length; i++) {
+      const v = bandSignal(i * 9 + 6, t0, current.seed) * (playing ? 1 : 0.45);
+      kids[i].style.setProperty('--v', (0.12 + v * 0.88).toFixed(3));
+    }
+  }
+
+  if (gl && glProg) {
+    const accent = ACCENT_GLOW(current.hue);
+    const m = accent.match(/hsl\((\d+)\s+(\d+)%\s+(\d+)%\)/);
+    let rgb = [0.4, 0.7, 0.9];
+    if (m) rgb = hslToRgb(+m[1] / 360, +m[2] / 100, +m[3] / 100);
+    gl.uniform2f(glU.res, glCanvas.width, glCanvas.height);
+    gl.uniform1f(glU.time, now * 0.001);
+    gl.uniform3f(glU.accent, rgb[0], rgb[1], rgb[2]);
+    gl.uniform1f(glU.level, level);
+    gl.uniform1f(glU.light, theme === 'light' ? 1 : 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+  requestAnimationFrame(frame);
+}
+function hslToRgb(h, s, l) {
+  const f = (n) => {
+    const k = (n + h * 12) % 12;
+    const a = s * Math.min(l, 1 - l);
+    return l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)));
+  };
+  return [f(0), f(8), f(4)];
+}
+
+/* ============================================================================
+ * 尺寸：整台机器是一个 900×900 的平面，按可用空间等比缩放。
+ * 用 transform:scale 而不是改 px —— 里面的几何全按 900 算好，
+ * 改尺寸只需要改一个数，唱臂的逆投影也跟着这个数走。
+ * ========================================================================== */
+function fitDeck() {
+  const wrap = $('deckwrap');
+  const r = wrap.getBoundingClientRect();
+  const visualH = 900 * Math.cos(TILT_X);          // 压扁后的视觉高度
+  /* 1040 = 唱片（820 的框）透视投影后的宽度 ≈ 1015，再留一点边。
+     别用平面本身的 1141 —— 平面四角是空的，裁掉它不要紧。 */
+  const s = Math.min(r.width / 1040, r.height / (visualH * 1.16));
+  deckScale = Math.max(0.34, Math.min(1, s));
+  deckEl.style.setProperty('--s', String(deckScale));
+}
+addEventListener('resize', fitDeck, { passive: true });
+
+/* 探针用：只读地暴露几个几何量。
+   headless 里要验的是"针真的在盘上""拖臂真的改了进度"这种**空间**断言，
+   截图看不出来 —— 有这几个函数就能直接量。 */
+window.__vinyl = {
+  TRACKS, ARM, PIVOT, R_START, R_END, DISC_R, audio,
+  planeToScreen, screenToPlane, armAngle,
+  get state() {
+    return { playing, armNow, armTarget, level, hasArm: !!armEl.style.transform };
+  },
+};
+
+/* ============================================================================
+ * 主题 / 语言切换（宿主会改 data-theme / data-lang，`_env.js` 再通知我们）
+ * ========================================================================== */
+function applyCopy() {
+  document.title = L.title;
+  const d = document.querySelector('meta[name="description"]');
+  if (d) d.setAttribute('content', L.desc);
+  $('brandName').innerHTML = L.brand;
+  $('brandMeta').innerHTML = L.meta(TRACKS.length);
+  $('kicker').textContent = L.kicker;
+  $('hint').textContent = L.hint;
+  $('src').textContent = L.src;
+  $('play').setAttribute('aria-label', playing ? L.pause : L.play);
+  $('prev').setAttribute('aria-label', L.prev);
+  $('next').setAttribute('aria-label', L.next);
+  $('nowSub').textContent = `${current.album} · ${AUTHOR} · ${current.date.slice(0, 4)}`;
+  paintDisc(current);                                // 片芯上有 L.rpm
+  paintCover(sleeveCtx, SLEEVE_S, SLEEVE_S, current, { accent: ACCENT_INK(current.hue) });
+}
+
+stageEnv.onChange(({ theme: t, lang: l }) => {
+  theme = t; lang = l; L = I18N[l];
+  applyCopy();
+  resizeGL();
+});
+
+/* ============================================================================
+ * 启动
+ * ========================================================================== */
+buildList();
+cacheMeters();
+L = I18N[lang];
+select(0, false);
+applyCopy();
+fitDeck();
+armEl.style.transform = `rotate(${armNow}deg)`;
+requestAnimationFrame((t) => { last = t; frame(t); });
+
+/* 字体是异步的：MapleUI 到位之前画出来的封面/片芯用的是回退字形，
+   字宽不一样 ⇒ 排版会错位。等它好了重画一次（两处都是纯 canvas）。 */
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(() => {
+    paintDisc(current);
+    paintCover(sleeveCtx, SLEEVE_S, SLEEVE_S, current, { accent: ACCENT_INK(current.hue) });
+  });
+}
+</script>
+</body>
+</html>
