@@ -69,52 +69,62 @@ const SELF_READY_IDS = ['gallery', 'contact', 'career', 'craft', 'posts', 'ai', 
  * 别把它做成第二个视觉。
  */
 /**
- * 地板相对「走廊地面」再压低多少。
+ * 壳的**宽度取门厅宽度（corridorWidth），不是房间宽度（roomWidth = 30）**。
  *
- * 🔴 壳的地板是一块 30×25 的大平面，跟着门的**墙角度**转（实测转 60°），
- *    所以它有一条边会探进走廊 —— 右边缘到 x ≈ +3.78，而走廊墙在 ±3.5。
- *    原来它比走廊地面高 1mm（壳 −1.749 / 走廊 −1.75）⇒ 重叠处**壳赢**，
- *    开门那 1.35s 里走廊地板上就多出一条黑带（2026-11-10 用户报的
- *    「黑色投影，似乎是房间射出来的」；四个接管房间都有，只是 ai 的壳最黑）。
+ * 🔴 这是 2026-11-10 两个 BUG 的共同根因，别改回去。
  *
- *    压到走廊地面**下面** 6cm 就够了：重叠处走廊地面必胜，而房间底下
- *    **没有**走廊地面（射线验过：房间中心向下只打到壳自己的地板），
- *    所以门里不会露出走廊的瓷砖。副作用是门槛处有 6cm 落差，看不见。
+ * 房间那 30×25 只是"想象中的空间"——接管层会整屏盖住它，没人看得见。壳的
+ * 唯一职责是**把门洞后面填黑**，门洞只有 1.25 宽、2.4 高。
+ *
+ * 用 30 宽会出事：门开在**锯齿墙**上（`CorridorSegment.WALL_ANGLE` ≈ 24°），
+ * 壳跟着门的坐标系转 ⇒ 30×25 的盒子有一角甩进走廊。实测（门在 x −2.34）：
+ *
+ *   · 地板 / 天花板 bbox 到 **x = +3.78**（走廊墙在 −3.5）⇒ 走廊地板上多一块
+ *     黑楔子（用户 11-10 报的"黑色投影"）；
+ *   · 一侧墙 25×20 落在 z ≈ −120…−133 且横跨到 x = +3.78 ⇒ 退出房间时走廊
+ *     远端横着一块黑墙（WO-4）。
+ *
+ * 收成 2.2 宽之后，整个盒子都落在 x < −3.5 一侧（实测最外角 **−3.53**），
+ * 而且**不再和走廊地面重叠** ⇒ 昨天那条「地板压低 6cm」也一并撤掉了。
+ * 那条压低本身又制造了第三个 BUG：背墙底边还留在 −1.75，地板压到 −1.81，
+ * 中间 6cm 的缝直接看到背景 ⇒ 履历房间开门时门里那道**白线**（用户 11-10 报的）。
+ *
+ * ⚠️ 高度仍然留 roomHeight：门洞顶只到 1.2，壳的顶在 18.25 完全看不见，
+ *    但相机穿门时会"在一个大空间里"，比 2.4 高的窄管自然。
  */
-const SHELL_FLOOR_DROP = 0.06;
-
 const RoomShell = ({ geometries, shell }) => {
-    const { roomWidth, roomHeight, roomDepth, corridorHeight, corridorDepth } = ROOM_CONFIG;
+    const { roomHeight, corridorWidth, corridorHeight, roomDepth, corridorDepth } = ROOM_CONFIG;
     const roomZ = -corridorDepth - roomDepth / 2;
+    const shellWidth = corridorWidth;
     return (
         <group position={[0, roomHeight / 2 - corridorHeight / 2, roomZ]}>
             <mesh
-                position={[0, -roomHeight / 2 - SHELL_FLOOR_DROP, 0]}
+                position={[0, -roomHeight / 2, 0]}
                 rotation={[-Math.PI / 2, 0, 0]}
-                geometry={geometries.roomFloorCeiling}
+                geometry={geometries.shellFloorCeiling}
                 material={shell.floor}
             />
             <mesh
                 position={[0, roomHeight / 2, 0]}
                 rotation={[Math.PI / 2, 0, 0]}
-                geometry={geometries.roomFloorCeiling}
+                geometry={geometries.shellFloorCeiling}
                 material={shell.ceiling}
             />
             <mesh
                 position={[0, 0, -roomDepth / 2]}
-                geometry={geometries.roomBackWall}
+                geometry={geometries.shellBackWall}
                 material={shell.wall}
             />
             <mesh
-                position={[-roomWidth / 2, 0, 0]}
+                position={[-shellWidth / 2, 0, 0]}
                 rotation={[0, Math.PI / 2, 0]}
-                geometry={geometries.roomSideWall}
+                geometry={geometries.shellSideWall}
                 material={shell.wall}
             />
             <mesh
-                position={[roomWidth / 2, 0, 0]}
+                position={[shellWidth / 2, 0, 0]}
                 rotation={[0, -Math.PI / 2, 0]}
-                geometry={geometries.roomSideWall}
+                geometry={geometries.shellSideWall}
                 material={shell.wall}
             />
         </group>
@@ -201,7 +211,12 @@ const RoomInterior = ({ label, roomId, showRoom, onReady, isExiting }) => {
         threshold: new THREE.PlaneGeometry(corridorWidth, 0.15),
         roomFloorCeiling: new THREE.PlaneGeometry(roomWidth, roomDepth),
         roomSideWall: new THREE.PlaneGeometry(roomDepth, roomHeight),
-        roomBackWall: new THREE.PlaneGeometry(roomWidth, roomHeight)
+        roomBackWall: new THREE.PlaneGeometry(roomWidth, roomHeight),
+        // 屋子壳的几何：宽度取**门厅宽度**（见 `RoomShell` 上那条红线）。
+        // 和上面三个分开建 —— 那三个是"房间"的，30 宽；壳只有 2.2 宽。
+        shellFloorCeiling: new THREE.PlaneGeometry(corridorWidth, roomDepth),
+        shellSideWall: new THREE.PlaneGeometry(roomDepth, roomHeight),
+        shellBackWall: new THREE.PlaneGeometry(corridorWidth, roomHeight)
     }), [corridorWidth, corridorDepth, corridorHeight, halfDepth]);
 
     const isGallery = roomId === 'gallery';
