@@ -44,6 +44,24 @@
 
 # 📋 待办 WO
 
+### WO-5 · 音乐房间换成唱盘（原型已交，等确认）
+
+- **需求原文**：「目前的音乐房间毫无设计感，需要推翻重新做」
+  「先实现 web3d 的适用于音乐作品展示、播放的 demo」。
+- **原型**：`public/demos/web3d/vinyl-player/`（`25ff73e`）——
+  一台真会响的唱盘：封套是作品、唱片是声音、**唱臂角度 = 播放进度（可直接拖）**、
+  盘沿那圈短针是"正在发生的事"。判据见该目录 README + `harness/probe-vinyl.mjs`（25 条全绿）。
+- **现状**：`ContentRoom` 里 `music: { platform:'MUSIC', layout:'editorial' }`，
+  4×N 贴卡墙，`openItem` 传的是 `url/demoUrl/repository`（**从不传 `item.file`**）⇒
+  点「播放」什么都不会响。整段要删。
+- **改什么**：按接管房间那套做 `RoomMusic`（`useTakeoverStage` + `useFrame(cb,1)`）
+  + `MusicHud`（搬 demo 的 DOM），`shells.music` 已有；`CONTENT_ROOM_IDS` 收成
+  `['videos']`，`SELF_READY_IDS` 加 `'music'`；`ITEM_KIND` / `ROOM_ACCENT.music`
+  一并清掉。
+- **验收判据**：`/music` 深链直接进；6 首都能播；拖唱臂能跳；深浅色 × 中英 4 组
+  截图对得上；退出房间后音频必须停（**别让 BGM 和房间音源打架**，见 `audioManager`）。
+- ⚠️ **先等用户确认这个原型**，再动 3D 房间。
+
 ### WO-1 · `prefers-reduced-motion` 下点履历的门进不去
 
 - **现象**：系统开「减少动态效果」后，走到 `career` 门前点门，相机对上门就
