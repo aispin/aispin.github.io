@@ -352,6 +352,13 @@ html[data-theme="light"] .track:hover{background:rgba(120,92,66,.06)}
   transition:opacity .25s ease,transform .25s ease;
 }
 .track.is-active::before{opacity:1;transform:scaleY(1)}
+/* 最后一行不要下边框：它紧贴着下面 transport 的 `border-top`，会并成双线
+   （曲目少、列表刚好放满时最明显，看着像把列表框死了）。 */
+.track:last-child{border-bottom:0}
+/* 列表溢出时（`.is-scroll`）底部本来就是被裁的内容：容器边上那条是"上一行的
+   边框"，离 transport 的 `border-top` 只有十几像素 ⇒ 又是双线。
+   这时让 transport 那条让路，只留列表自己这一条。 */
+.tracks.is-scroll + .transport{border-top:0}
 .track__no{
   font:400 10px/1.4 var(--mono);letter-spacing:.06em;color:var(--dim-2);
   transition:color .25s ease;
@@ -586,7 +593,7 @@ html[data-theme="light"] .track:hover{background:rgba(120,92,66,.06)}
         <span class="controls__spacer"></span>
         <a class="src" id="src" href="https://music.163.com/" target="_blank" rel="noopener noreferrer">网易云 ↗</a>
       </div>
-      <div class="hint" id="hint">滚轮 / ↑↓ 切换曲目 · 空格播放 · ←→ 快退快进 · 拖动进度条或唱臂</div>
+      <div class="hint" id="hint">点曲目 / ↑↓ 切换 · 空格播放 · ←→ 快退快进 · 拖动进度条或唱臂</div>
     </div>
   </aside>
 </div>
@@ -664,7 +671,7 @@ const I18N = {
     unit: '首', albumTag: '专辑', allAlbums: '全部',
     kicker: '曲目 · TRACKS',
     play: '播放', pause: '暂停', prev: '上一首', next: '下一首',
-    hint: '滚轮 / ↑↓ 切换曲目 · 空格播放 · ←→ 快退快进 · 拖动进度条或唱臂',
+    hint: '点曲目 / ↑↓ 切换 · 空格播放 · ←→ 快退快进 · 拖动进度条或唱臂',
     src: '网易云 ↗',
     fail: '这首暂时播不了，点「网易云」直接听',
     blocked: '点一下播放键开始',
@@ -679,7 +686,7 @@ const I18N = {
     unit: 'tracks', albumTag: 'ALBUM', allAlbums: 'All',
     kicker: 'TRACKS',
     play: 'Play', pause: 'Pause', prev: 'Previous', next: 'Next',
-    hint: 'Wheel / ↑↓ to change track · Space to play · ←→ to seek · drag the bar or the tonearm',
+    hint: 'Click a track / ↑↓ to change · Space to play · ←→ to seek · drag the bar or the tonearm',
     src: 'Netease ↗',
     fail: 'Cannot stream this one — open it on Netease',
     blocked: 'Press play to start',
@@ -1179,9 +1186,6 @@ function updateHead() {
     : '—';
 }
 
-/* 列表自己的滚动时间戳：给上面那条"滑动别当点击"用 */
-let listScrollAt = 0;
-
 function buildList() {
   tracksEl.innerHTML = '';
   LIST.tracks.forEach((t, i) => {
@@ -1195,12 +1199,10 @@ function buildList() {
       `<span><span class="track__title">${escapeHtml(t.title)}</span>` +
       `<span class="track__sub">${escapeHtml(t.album)}${t.date ? ' · ' + t.date.slice(0, 4) : ''}</span></span>` +
       `<span class="track__meter"><i></i><i></i><i></i><i></i></span>`;
-    li.addEventListener('click', () => {
-      /* 触摸屏上"滑完列表手指抬起"会被派成 click（惯性滚动时更明显）——
-         刚滚过就当成滑动，不选曲。鼠标不受影响。 */
-      if (performance.now() - lastTouchAt < 900 && performance.now() - listScrollAt < 350) return;
-      select(i, true);
-    });
+    /* 行点击就是选曲。触摸屏上滑完列表抬手也会派一次 click —— 但那条路
+       （以前靠 `listScrollAt` 挡）现在不需要了：没有 wheel 换曲，列表滚动
+       本身不会改变当前曲目，抬手落在哪一行就是用户真的点了哪一行。 */
+    li.addEventListener('click', () => select(i, true));
     li.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(i, true); }
     });
@@ -1576,58 +1578,10 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowUp') { e.preventDefault(); step(-1); }
 });
 
-/* 手指在屏幕上划过 = 滚页面，不是"换曲"。
-   🔴 触摸屏上 Chrome 会把**手指的滑动也派成 wheel**（Windows 触屏、部分 WebView），
-   用 `sourceCapabilities.firesTouchEvents` 标出来 —— 光判"能不能滚"挡不住它：
-   手指划在唱盘那块（不可滚）上照样会跳歌。
-   没有 sourceCapabilities 的引擎退回"刚有手指动过"这条时间判据。 */
-let lastTouchAt = 0;
-const markTouch = () => { lastTouchAt = performance.now(); };
-addEventListener('touchstart', markTouch, { passive: true, capture: true });
-addEventListener('touchmove', markTouch, { passive: true, capture: true });
-function fromFinger(e) {
-  if (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return true;
-  return performance.now() - lastTouchAt < 800;
-}
-
-/* 滚轮切换曲目：一次手势一格，靠冷却防连跳。
-   🔴 先让给可滚的容器 —— 指针在歌单条 / 曲目列表上时，滚轮是在滚内容，
-   不是"下一首"（以前滚曲目列表会跳歌，这是 bug）。 */
-let wheelLock = 0;
-window.addEventListener('wheel', (e) => {
-  if (fromFinger(e)) return;
-  const sc = wheelScroller(e);
-  if (sc) {
-    /* 只能横向滚的条（专辑那排）：**Chrome 不会把竖滚轮转成横滚**，
-       自己转，否则鼠标用户在那一排上滚 = 什么都没发生（死区）。 */
-    if (!sc.canY && sc.canX && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-      e.preventDefault();
-      sc.el.scrollLeft += e.deltaY;
-    }
-    return;
-  }
-  const now = performance.now();
-  if (now - wheelLock < 620) return;
-  if (Math.abs(e.deltaY) < 6) return;
-  wheelLock = now;
-  step(e.deltaY > 0 ? 1 : -1);
-}, { passive: false });
-
-/** 指针这一路祖先里第一个"还能滚"的容器（以及它能滚哪根轴）。
- *  有 ⇒ 这个滚轮属于它，别再拿去换曲。 */
-function wheelScroller(e) {
-  for (let el = e.target; el && el !== document.body; el = el.parentElement) {
-    if (el.nodeType !== 1) continue;
-    const st = getComputedStyle(el);
-    const canY = /auto|scroll/.test(st.overflowY) && el.scrollHeight - el.clientHeight >= 2;
-    const canX = /auto|scroll/.test(st.overflowX) && el.scrollWidth - el.clientWidth >= 2;
-    if (canY || canX) return { el, canY, canX };
-  }
-  return null;
-}
-
-/* 列表滚过就记一笔（配合行点击里那条"滑动别当点击"） */
-tracksEl.addEventListener('scroll', () => { listScrollAt = performance.now(); }, { passive: true });
+/* 🔴 这里**没有**滚轮换曲。原先 `window` 上挂了一个"滚轮 = 下一首"，出过两次事故：
+   ① 鼠标在曲目列表上滚 → 跳歌；② 触摸屏滑动被 Chrome 派成 wheel（划在不可滚的
+   唱盘上也算）→ 还是跳歌。两次都是"猜用户意图"，两次都没猜对。
+   换曲就是明确的动作：点曲目行、↑↓、上一首/下一首、放完自动下一首。 */
 
 $('play').addEventListener('click', toggle);
 $('prev').addEventListener('click', () => step(-1));
