@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-11T03:03:37.599Z",
-  "count": 30,
+  "generatedAt": "2026-11-11T23:37:25.129Z",
+  "count": 31,
   "demos": [
     {
       "id": "door",
@@ -278,6 +278,17 @@
           "url": "/demos/web3d/career/index02.html"
         }
       ]
+    },
+    {
+      "id": "web3d/gallery",
+      "title": "接触印相 · CONTACT SHEET — 一间摄影房",
+      "description": "一条悬在暗房里的接触印相带：十二帧按真实画幅（3:4 / 4:3 / 16:9）排在透视深处，滚轮或拖动沿带走，点一帧把它抬起来看大图与展签。照片来自 Pixabay，构建时抓取。纯 CSS 3D + canvas，没有一张占位图。",
+      "url": "/demos/web3d/gallery/",
+      "thumb": "/demos/thumbs/web3d/gallery.webp",
+      "dir": "public/demos/web3d/gallery",
+      "entry": "index.html",
+      "readme": true,
+      "variants": []
     },
     {
       "id": "web3d/life-meaning",
