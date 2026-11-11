@@ -51,7 +51,7 @@
 - **原型**：`public/demos/web3d/vinyl-player/`（`25ff73e` + `9101beb`）——
   一台真会响的唱盘：封套是作品、唱片是声音、**唱臂角度 = 播放进度（可直接拖）**、
   盘沿那圈短针是"正在发生的事"。右侧是**精选 / 最新 / 最热三张列表 + 一排最新专辑**
-  （点专辑 = 整张上盘）。判据见该目录 README + `harness/probe-vinyl.mjs`（40 条全绿）。
+  （点专辑 = 整张上盘）。判据见该目录 README + `harness/probe-vinyl.mjs`（53 条全绿）。
 - **数据**：`packages/netease-artist/`（`@aispin/netease-artist`，零依赖）+
   `npm run data:music` ⇒ `public/data/netease-music-zeo.json`（艺人 `49232788`，
   最新 12 / 最热 12 / 最新 4 张专辑）。**页面不碰接口**，只 fetch 这份 JSON；
@@ -68,6 +68,33 @@
   点专辑能整张上盘；拖唱臂能跳；深浅色 × 中英 4 组截图对得上；
   退出房间后音频必须停（**别让 BGM 和房间音源打架**，见 `audioManager`）。
 - ⚠️ **先等用户确认这个原型**，再动 3D 房间。
+
+### WO-6 · 摄影房间换成「接触印相带」（原型已交，等确认）
+
+- **需求原文**：「开始重新设计 Gallery 和 Videos 房间，一样的思路，先出 web3d 的
+  demo，先出 Gallery 的，放 demos/web3d/gallery 目录」。
+- **原型**：`public/demos/web3d/gallery/`（`8be015a`）—— 一条**环状印相带**，
+  12 张按真实画幅（3:4 / 4:3 / 16:9）排开、在深度里退远，滚轮/拖动沿带走，
+  点一帧抬起来看大图 + 展签。判据 `harness/probe-gallery.mjs`（23 条全绿，dev+dist）。
+- **数据**：`public/data/pixabay-aispin.json`（`npm run data:photos`，
+  来自 `packages/pixabay-user`）。房间直接读这份 JSON。
+- **现状**：`ContentRoom` 里 `gallery` 走 `GalleryRoom.jsx`（8 张 canvas 占位画），
+  作品是 `src/data/photos.json`（原 `photography.json`）里手写的 8 条，**没有真照片**。
+- **改什么**：`RoomGallery`（`useTakeoverStage` + `useFrame(cb,1)`）+ `GalleryHud`
+  （搬 demo 的 DOM），`CONTENT_ROOM_IDS` 再收一格；`GalleryRoom.jsx` /
+  `photoPlaceholder.js` / `texturePreloadList` 里那套 canvas 占位画可以整段退场。
+- **验收判据**：`/gallery` 深链直接进；12 帧都在、按真实画幅；滚轮/拖动/键盘都能走；
+  点帧开大图带展签与外链；深浅色 × 中英 4 组对得上；**退出房间不留定时器**。
+- ⚠️ **先等用户确认这个原型**，再动 3D 房间。Videos 房间的同款原型还没做。
+
+### WO-7 · Videos 房间的 web3d 原型（未开始）
+
+- **需求原文**：同 WO-6，「先出 Gallery 的」⇒ Videos 排在其后。
+- **数据**：`public/data/pixabay-aispin.json` 的 `latestVideos`（**当前是空数组** ——
+  aispin 账号在 Pixabay 上没有视频，`packages/pixabay-user` 的抓取路径已验证会
+  识别 `/videos/` 卡片，只是没数据）。所以这个房间要先决定「没有视频时显示什么」，
+  或者等真的传了视频再做。
+- **待你拍板**：空数据时是「放一段说明 + 引导去 B 站/YouTube」，还是干脆先不做。
 
 ### WO-1 · `prefers-reduced-motion` 下点履历的门进不去
 
