@@ -27,7 +27,7 @@ export const contentStore = store
 
 export function getLocalizedCollection(key, locale = 'zh') {
   const rows = Array.isArray(store[key]) ? store[key] : []
-  if (key === 'music' || key === 'photography' || key === 'aiProjects' || key === 'videos') return rows
+  if (key === 'music' || key === 'photos' || key === 'aiProjects' || key === 'videos') return rows
   const localized = rows.filter(item => item.locale === locale)
   return localized.length ? localized : rows.filter(item => item.locale === 'zh')
 }
@@ -49,8 +49,8 @@ function isFilled(value) {
   return Array.isArray(value) ? value.length > 0 : Boolean(value)
 }
 
-// Gallery / photography cards: { id, title, description, url, front, painted }
-const projects = isFilled(store.photography) ? store.photography : null
+// Gallery cards: { id, title, description, url, front, painted }
+const projects = isFilled(store.photos) ? store.photos : null
 
 // Studio monitors: { id, platform, title, description, url, frontTexture, paintedFrontTexture }
 const content = isFilled(store.studioContent)

@@ -98,14 +98,14 @@ export const GALLERY_TEXTURES_VERSIONED = [
     // `bioprzod` (+ `_painted`) dropped off here on 2026-10-06. Those eight
     // files fed the `fileTextures` branch of GalleryRoom, which only runs for
     // projects WITHOUT a `placeholder` — and every record in
-    // src/data/photography.json has one, so the branch is unreachable and the
+    // src/data/photos.json has one, so the branch is unreachable and the
     // eight requests were wasted on every cold start. The four
     // FALLBACK_PROJECTS entries now carry a `placeholder` too, so the fallback
     // path is procedural as well.
     // NOTE: `przyciskdotylukartki` (the "OPEN PROJECT" button plate, 2 files /
     // 74 KB) dropped off this list when the gallery card stopped turning over:
     // the button lived on the back and its `window.open(project.url)` pointed at
-    // an empty string for every record in src/data/photography.json. Nothing
+    // an empty string for every record in src/data/photos.json. Nothing
     // references the plates any more — see the texture audit for deletion.
     // NOTE: the ten tech-stack logos (csslogo / elementorlogo / firebaselogo /
     // htmllogo / jslogo / netlifylogo / phplogo / reactlogo / tailwindlogo /

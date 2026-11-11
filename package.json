@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "data:music": "node packages/netease-artist/src/cli.js --id 49232788 --latest 12 --hot 12 --albums 4 --out public/data/netease-music-zeo.json"
+    "data:music": "node packages/netease-artist/src/cli.js --id 49232788 --latest 12 --hot 12 --albums 4 --out public/data/netease-music-zeo.json",
+    "data:photos": "node packages/pixabay-user/src/cli.js -u aispin-40699950 --latest 12 -o public/data/pixabay-aispin.json"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

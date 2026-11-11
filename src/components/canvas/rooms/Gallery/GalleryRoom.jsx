@@ -60,7 +60,7 @@ export const GALLERY_INTERACTION_AUDIO_SETTINGS = {
 const FALLBACK_PROJECTS = [
     // These four records carry a `placeholder` because that is the ONLY path
     // this array ever takes — `activeProjects` is `sanityProjects || this`, and
-    // src/data/photography.json always supplies eight records, so the array is
+    // src/data/photos.json always supplies eight records, so the array is
     // effectively unreachable. It is kept as a shape reference for the JSON.
     //
     // They used to point at `/textures/gallery/<name>przod.webp` (+ `_painted`),
@@ -1122,7 +1122,7 @@ const ProjectCard = memo(forwardRef(({ index, project, clothespinTexture, curren
 
                 {/* The card BACK is now plain paper. It used to carry two blocks
                     here — an "OPEN PROJECT" button (which pointed at
-                    `project.url`, and every record in src/data/photography.json
+                    `project.url`, and every record in src/data/photos.json
                     ships `url: ""`, so it opened nothing) and a
                     "PROJECT DETAILS" heading + description. Clicking a card no
                     longer turns it over, so both became unreachable and were

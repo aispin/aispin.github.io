@@ -296,7 +296,7 @@ function finish(ctx, rnd, { vignette = 0.1 } = {}) {
 }
 
 /* ------------------------------------------------------------------ *
- * Scenes — one per photography card
+ * Scenes — one per photo card
  * ------------------------------------------------------------------ */
 
 function sceneMorning(ctx, rnd) {
