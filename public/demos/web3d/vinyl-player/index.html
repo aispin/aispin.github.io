@@ -1179,6 +1179,9 @@ function updateHead() {
     : '—';
 }
 
+/* 列表自己的滚动时间戳：给上面那条"滑动别当点击"用 */
+let listScrollAt = 0;
+
 function buildList() {
   tracksEl.innerHTML = '';
   LIST.tracks.forEach((t, i) => {
@@ -1192,7 +1195,12 @@ function buildList() {
       `<span><span class="track__title">${escapeHtml(t.title)}</span>` +
       `<span class="track__sub">${escapeHtml(t.album)}${t.date ? ' · ' + t.date.slice(0, 4) : ''}</span></span>` +
       `<span class="track__meter"><i></i><i></i><i></i><i></i></span>`;
-    li.addEventListener('click', () => select(i, true));
+    li.addEventListener('click', () => {
+      /* 触摸屏上"滑完列表手指抬起"会被派成 click（惯性滚动时更明显）——
+         刚滚过就当成滑动，不选曲。鼠标不受影响。 */
+      if (performance.now() - lastTouchAt < 900 && performance.now() - listScrollAt < 350) return;
+      select(i, true);
+    });
     li.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(i, true); }
     });
@@ -1568,11 +1576,26 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowUp') { e.preventDefault(); step(-1); }
 });
 
+/* 手指在屏幕上划过 = 滚页面，不是"换曲"。
+   🔴 触摸屏上 Chrome 会把**手指的滑动也派成 wheel**（Windows 触屏、部分 WebView），
+   用 `sourceCapabilities.firesTouchEvents` 标出来 —— 光判"能不能滚"挡不住它：
+   手指划在唱盘那块（不可滚）上照样会跳歌。
+   没有 sourceCapabilities 的引擎退回"刚有手指动过"这条时间判据。 */
+let lastTouchAt = 0;
+const markTouch = () => { lastTouchAt = performance.now(); };
+addEventListener('touchstart', markTouch, { passive: true, capture: true });
+addEventListener('touchmove', markTouch, { passive: true, capture: true });
+function fromFinger(e) {
+  if (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return true;
+  return performance.now() - lastTouchAt < 800;
+}
+
 /* 滚轮切换曲目：一次手势一格，靠冷却防连跳。
    🔴 先让给可滚的容器 —— 指针在歌单条 / 曲目列表上时，滚轮是在滚内容，
    不是"下一首"（以前滚曲目列表会跳歌，这是 bug）。 */
 let wheelLock = 0;
 window.addEventListener('wheel', (e) => {
+  if (fromFinger(e)) return;
   const sc = wheelScroller(e);
   if (sc) {
     /* 只能横向滚的条（专辑那排）：**Chrome 不会把竖滚轮转成横滚**，
@@ -1602,6 +1625,9 @@ function wheelScroller(e) {
   }
   return null;
 }
+
+/* 列表滚过就记一笔（配合行点击里那条"滑动别当点击"） */
+tracksEl.addEventListener('scroll', () => { listScrollAt = performance.now(); }, { passive: true });
 
 $('play').addEventListener('click', toggle);
 $('prev').addEventListener('click', () => step(-1));
