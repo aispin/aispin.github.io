@@ -174,4 +174,21 @@ export default defineConfig([
       }],
     },
   },
+
+  // ---------------------------------------------------------------------
+  // `packages/` 是**独立发布**的小包（`@aispin/netease-artist`）：跑在 Node 里，
+  // 零依赖、零 React、不进站点 bundle。拿浏览器的 globals 去量它，`process` /
+  // `Buffer` 全是误报 —— 给它自己的环境。
+  // ---------------------------------------------------------------------
+  {
+    files: ['packages/**/*.js'],
+    languageOptions: {
+      globals: globals.node,
+      parserOptions: { sourceType: 'module' },
+    },
+    rules: {
+      // 包里没有组件，这条只管 HMR 粒度，对它是纯噪音
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

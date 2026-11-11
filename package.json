@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "data:music": "node packages/netease-artist/src/cli.js --id 49232788 --latest 12 --hot 12 --albums 4 --out public/data/netease-music-zeo.json"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

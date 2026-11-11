@@ -1,0 +1,21 @@
+{
+  "name": "@aispin/netease-artist",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "把网易云音乐人的公开数据抓成一份静态 JSON：基本信息 / 最新 N 首 / 最热 N 首 / 最新 N 张专辑",
+  "keywords": ["netease", "music", "artist", "static-data"],
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "bin": {
+    "netease-artist": "./src/cli.js"
+  },
+  "files": ["src", "README.md"],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build:zeo": "node src/cli.js --id 49232788 --latest 12 --hot 12 --albums 4 --out ../../public/data/netease-music-zeo.json"
+  }
+}
