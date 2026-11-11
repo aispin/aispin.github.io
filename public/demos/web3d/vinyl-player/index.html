@@ -7,8 +7,8 @@
      必须放在样式之前 —— 它同步写 data-theme，首帧就是对的颜色，不会闪一下。 -->
 <script src="../../_env.js"></script>
 <script src="../../_from.js" defer></script>
-<title>黑胶 · VINYL — 六首原创音乐唱片机</title>
-<meta name="description" content="一台能真的放歌的唱盘：倾斜的唱片在透视里旋转，唱臂角度就是播放进度（可以直接拖），频谱从唱片边缘长出来。六首原创曲目在右侧成列。纯 canvas + CSS 3D，没有一张位图。">
+<title>黑胶 · VINYL — ZEO 的音乐唱片机</title>
+<meta name="description" content="一台能真的放歌的唱盘：倾斜的唱片在透视里旋转，唱臂角度就是播放进度（可以直接拖），频谱从唱片边缘长出来。精选集、最新、最热三张列表与最新专辑在右侧。纯 canvas + CSS 3D，没有一张位图。">
 <style>
 @font-face{
   font-family:'MapleUI';
@@ -241,7 +241,72 @@ html[data-theme="light"] .brand__name{text-shadow:none}
 }
 .side__count{font:400 10px/1 var(--mono);letter-spacing:.14em;color:var(--dim-2)}
 
+/* 三张列表切换：精选（手挑）/ 最新 / 最热。
+   下划线而不是填充块 —— 这一栏已经很密，再加色块就吵了。 */
+.tabs{display:flex;gap:4px;margin:9px 0 2px}
+.tab{
+  position:relative;appearance:none;background:none;border:0;
+  padding:5px 8px 7px;cursor:pointer;
+  font:400 11px/1 var(--sans);letter-spacing:.06em;color:var(--dim);
+  transition:color .2s ease;
+}
+.tab:hover:not(:disabled){color:var(--ink)}
+.tab.is-on{color:var(--accent-text)}
+.tab.is-on::after{
+  content:'';position:absolute;left:8px;right:8px;bottom:2px;height:1px;
+  background:currentColor;border-radius:1px;
+}
+.tab:disabled{opacity:.3;cursor:default}
+
+/* 最新专辑：一排纸卡。**不用封面位图** —— 站上零位图，专辑卡靠版式和
+   主色条区分，和唱片封套是同一套语言（封套是纸的，专辑卡也是纸的）。 */
+.albums{margin-top:14px;padding-top:13px;border-top:1px solid var(--line)}
+.albums[hidden]{display:none}
+.albums__head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:9px}
+.albums__title{font:400 10px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
+.albums__more{
+  font:400 10px/1 var(--mono);letter-spacing:.1em;color:var(--dim-2);
+  text-decoration:none;transition:color .2s ease;
+}
+.albums__more:hover{color:var(--accent-text)}
+.albums__row{
+  display:flex;gap:8px;overflow-x:auto;padding-bottom:3px;
+  scrollbar-width:none;overscroll-behavior-x:contain;
+}
+.albums__row::-webkit-scrollbar{display:none}
+.album{
+  position:relative;flex:0 0 auto;width:76px;height:94px;
+  display:flex;flex-direction:column;justify-content:space-between;
+  padding:9px 8px 8px;text-align:left;cursor:pointer;
+  background:var(--chip);border:1px solid var(--line);border-radius:3px;
+  color:var(--ink);font-family:var(--sans);
+  transition:border-color .2s ease,transform .2s ease;
+}
+.album:hover{transform:translateY(-2px);border-color:var(--dim-2)}
+.album.is-on{border-color:var(--accent-text)}
+/* 主色条：和唱片封套右上角那个"系列标记"是同一个东西 */
+.album__bar{position:absolute;left:8px;top:9px;width:12px;height:2px;border-radius:1px;background:var(--accent-text)}
+.album__name{
+  margin-top:9px;
+  font:500 11px/1.24 var(--sans);color:var(--ink);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  word-break:break-word;
+}
+.album__meta{
+  /* line-height 别贴着 1：这里 overflow:hidden（为了省略号），行高太紧会把
+     字的下半截切掉 —— 8px 的字最容易中招 */
+  margin-top:5px;font:400 8px/1.5 var(--mono);letter-spacing:.04em;
+  text-transform:uppercase;color:var(--dim-2);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+
 .tracks{list-style:none;margin-top:6px;overflow-y:auto;min-height:0;flex:0 1 auto}
+/* 装不下时最后一行是被裁的（最新/最热有 12 首）。给它一道渐隐，
+   读起来才是"下面还有"，而不是"排版断了"。列表短时不加这个类，末行边框保持完整。 */
+.tracks.is-scroll{
+  -webkit-mask-image:linear-gradient(to bottom,#000 0,#000 calc(100% - 26px),transparent 100%);
+  mask-image:linear-gradient(to bottom,#000 0,#000 calc(100% - 26px),transparent 100%);
+}
 .tracks::-webkit-scrollbar{width:6px}
 .tracks::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:3px}
 .track{
@@ -386,6 +451,10 @@ html[data-theme="light"] .track:hover{background:rgba(120,92,66,.06)}
   }
   .track{padding:10px 6px 10px 6px}
   .track__title{font-size:13px}
+  /* 窄屏先让专辑条让路：曲目列表只剩一行，比"少一个入口"糟得多。
+     专辑还能从「最新 / 最热」里点到。 */
+  .albums{display:none}
+  .tracks{min-height:120px}
   .side__head{padding-bottom:8px}
   .hint{display:none}
   .brand{top:12px}
@@ -433,13 +502,29 @@ html[data-theme="light"] .track:hover{background:rgba(120,92,66,.06)}
     </div>
   </div>
 
-  <!-- ── 右：曲目 + 走带 ──────────────────────────────────────── -->
+  <!-- ── 右：曲目 + 专辑 + 走带 ────────────────────────────────── -->
   <aside class="side">
     <div class="side__head">
-      <span class="side__kicker" id="kicker">曲目 · TRACKS</span>
-      <span class="side__count" id="count">01 / 06</span>
+      <span class="side__kicker" id="kicker">精选 · SELECTED</span>
+      <span class="side__count" id="count">—</span>
     </div>
+
+    <!-- 三张列表：精选集（手挑）/ 最新 / 最热。后两个要等 JSON 到位才亮 -->
+    <div class="tabs" id="tabs" role="tablist">
+      <button class="tab is-on" type="button" role="tab" data-list="curated">精选</button>
+      <button class="tab" type="button" role="tab" data-list="latest" disabled>最新</button>
+      <button class="tab" type="button" role="tab" data-list="hot" disabled>最热</button>
+    </div>
+
     <ol class="tracks" id="tracks"></ol>
+
+    <div class="albums" id="albums" hidden>
+      <div class="albums__head">
+        <span class="albums__title" id="albumsTitle">最新专辑 · ALBUMS</span>
+        <a class="albums__more" id="albumsMore" href="https://music.163.com/#/artist?id=49232788" target="_blank" rel="noopener noreferrer">全部 ↗</a>
+      </div>
+      <div class="albums__row" id="albumRow"></div>
+    </div>
 
     <div class="transport">
       <div class="now">
@@ -501,9 +586,10 @@ html[data-theme="light"] .track:hover{background:rgba(120,92,66,.06)}
  * ========================================================================== */
 
 /* ---------------------------------------------------------------- 数据 */
-/* 与 `src/data/music.json` 同源；demo 是独立页面，读不到 src，所以内联。
-   加曲目 = 这里加一条 + 在 `hue` 上给一个主色。 */
-const TRACKS = [
+/* **精选集** = `src/data/music.json`（手挑的那几首）。demo 是独立页面读不到
+   src，所以内联一份；将来搬进 3D 房间直接 import 那个 json 就行。
+   加曲目 = 这里加一条 + 给一个主色。 */
+const CURATED = [
   { id:'01.Rooftops-rain',    title:"Bb - Rooftop's rain",                    album:'Phrygian',      date:'2021-11-20', hue:222, sid:'1896609096' },
   { id:'02.Unreasonable',     title:'Unreasonable',                            album:'黑暗中的黎明',   date:'2023-10-15', hue:32,  sid:'2090922639' },
   { id:'03.Spinach-Girl',     title:'Spinach girl（波菜女孩）',                 album:'Dancing',       date:'2024-01-10', hue:322, sid:'2118906263' },
@@ -511,20 +597,35 @@ const TRACKS = [
   { id:'05.Goodbye',          title:'Goodbye',                                 album:'Round 2',       date:'2023-12-31', hue:348, sid:'2113453159' },
   { id:'06.levin-thunder',    title:'Levin Thunder',                           album:'Focusing',      date:'2024-01-06', hue:262, sid:'2115612224' },
 ];
-const AUTHOR = '柏雯';
+const AUTHOR = 'ZEO';
+
+/* 最新 / 最热 / 最新专辑来自**构建产物**（`npm run data:music` →
+   `public/data/netease-music-zeo.json`，由 packages/netease-artist 抓取）。
+   页面只读同源静态 JSON：不打接口、不会被 Referer / 限流 / 跨域卡住。
+   拉不到就只显示精选集 —— 这个 demo 在没有网的时候也得能看。 */
+const LIB_URL = '../../../data/netease-music-zeo.json';
+/* 非精选曲目没有手挑的主色，从这一组里按名字散列取一个：
+   直接用 `hash % 360` 会撞出脏色（土黄、荧光绿），限定色板才不会破版式。 */
+const HUE_POOL = [222, 32, 322, 176, 348, 262, 196, 12];
+
 const outerUrl = (t) => `https://music.163.com/song/media/outer/url?id=${t.sid}.mp3`;
 const neteaseUrl = (t) => `https://music.163.com/song?id=${t.sid}`;
 /* 每首曲子一个稳定的"波形种子"：封面母题、片芯花纹、频谱环都从它派生，
    所以同一首歌每次打开长得一模一样（换个页面刷新不该换一张封面）。 */
-TRACKS.forEach((t) => { t.seed = (hash(t.id) % 4096) / 173.7; });
+const seedOf = (key) => (hash(key) % 4096) / 173.7;
+CURATED.forEach((t) => { t.seed = seedOf(t.id); });
 
 /* ---------------------------------------------------------------- 文案 */
 const I18N = {
   zh: {
-    title: '黑胶 · VINYL — 六首原创音乐唱片机',
-    desc: '一台能真的放歌的唱盘：倾斜的唱片在透视里旋转，唱臂角度就是播放进度（可以直接拖），频谱从唱片边缘长出来。六首原创曲目在右侧成列。纯 canvas + CSS 3D，没有一张位图。',
+    title: '黑胶 · VINYL — ZEO 的音乐唱片机',
+    desc: '一台能真的放歌的唱盘：倾斜的唱片在透视里旋转，唱臂角度就是播放进度（可以直接拖），频谱从唱片边缘长出来。精选集、最新、最热三张列表与最新专辑在右侧。纯 canvas + CSS 3D，没有一张位图。',
     brand: '黑胶<i>/</i>VINYL',
-    meta: (n) => `<b>${String(n).padStart(2, '0')}</b> 首 · 全部可播`,
+    /* 不写死曲目数：作品会一直加，这个位置只放"是谁的唱片" */
+    meta: 'ZEO · 精选集',
+    listCurated: '精选', listLatest: '最新', listHot: '最热',
+    albums: '最新专辑 · ALBUMS',
+    albumsMore: '全部 ↗',
     kicker: '曲目 · TRACKS',
     play: '播放', pause: '暂停', prev: '上一首', next: '下一首',
     hint: '滚轮 / ↑↓ 切换曲目 · 空格播放 · ←→ 快退快进 · 拖动进度条或唱臂',
@@ -534,10 +635,13 @@ const I18N = {
     side: 'A 面', rpm: '33⅓ RPM',
   },
   en: {
-    title: 'VINYL — six original tracks on a turntable',
-    desc: 'A turntable that actually plays: the record spins in perspective, the tonearm angle IS the playback position (drag it), and the spectrum grows out of the record edge. Six original tracks listed on the right. Pure canvas + CSS 3D, zero bitmaps.',
+    title: 'VINYL — ZEO on a turntable',
+    desc: 'A turntable that actually plays: the record spins in perspective, the tonearm angle IS the playback position (drag it), and the spectrum grows out of the record edge. Selected, latest and top lists plus the newest albums on the right. Pure canvas + CSS 3D, zero bitmaps.',
     brand: 'VINYL',
-    meta: (n) => `<b>${String(n).padStart(2, '0')}</b> TRACKS · ALL PLAYABLE`,
+    meta: 'ZEO · SELECTED',
+    listCurated: 'Selected', listLatest: 'Latest', listHot: 'Top',
+    albums: 'LATEST ALBUMS',
+    albumsMore: 'All ↗',
     kicker: 'TRACKS',
     play: 'Play', pause: 'Pause', prev: 'Previous', next: 'Next',
     hint: 'Wheel / ↑↓ to change track · Space to play · ←→ to seek · drag the bar or the tonearm',
@@ -963,8 +1067,12 @@ const audio = new Audio();
 audio.preload = 'metadata';
 audio.volume = 0.85;
 
-let current = TRACKS[0];
+let current = CURATED[0];
 let playing = false;
+/* 当前在放的是哪张列表（精选 / 最新 / 最热 / 某张专辑）。
+   列表只是"曲目的来源"，播放器只有一个 —— 换列表不打断正在放的那首。 */
+let LIB = null;                                       // netease-music-zeo.json
+let LIST = { key: 'curated', kind: 'curated', tracks: CURATED };
 
 /* ============================================================================
  * 交互
@@ -982,18 +1090,68 @@ const playIcon = $('playIcon');
 const ICON_PLAY = '<path d="M4.5 2.6 13 8l-8.5 5.4z"/>';
 const ICON_PAUSE = '<path d="M4.6 2.6h2.6v10.8H4.6zM8.8 2.6h2.6v10.8H8.8z"/>';
 
+/* ============================================================================
+ * 列表：精选 / 最新 / 最热 / 某张专辑
+ *
+ * 三个来源里只有「精选」是站内手挑的（`src/data/music.json`），另外两个和
+ * 「最新专辑」都来自构建产物 —— 页面自己不碰接口。
+ * ========================================================================== */
+
+/** 网易云的曲目 → 播放器认的形状。`sid` 是唯一身份（跨列表比较都用它）。 */
+function fromNet(s) {
+  return {
+    id: 'net.' + s.id,
+    title: s.name,
+    album: s.album || '',
+    date: s.publishedAt || '',
+    hue: HUE_POOL[hash(s.name + s.id) % HUE_POOL.length],
+    sid: s.id,
+    seed: seedOf('net.' + s.id),
+  };
+}
+
+function listFor(key) {
+  if (key === 'curated') return { key, kind: 'curated', tracks: CURATED };
+  if (!LIB) return null;
+  if (key === 'latest') return { key, kind: 'latest', tracks: LIB.latestSongs.map(fromNet) };
+  if (key === 'hot') return { key, kind: 'hot', tracks: LIB.hotSongs.map(fromNet) };
+  if (key.startsWith('album:')) {
+    const al = (LIB.latestAlbums || []).find((a) => 'album:' + a.id === key);
+    return al ? { key, kind: 'album', album: al, tracks: al.tracks.map(fromNet) } : null;
+  }
+  return null;
+}
+
+/* 换列表会重新 fromNet 一遍（对象是新造的），所以不能用 `===` 认曲目 —— 用 sid。 */
+const sameTrack = (a, b) => !!a && !!b && String(a.sid) === String(b.sid);
+
+function listLabel() {
+  if (LIST.kind === 'album') return LIST.album.name;
+  return { curated: L.listCurated, latest: L.listLatest, hot: L.listHot }[LIST.kind] || L.listCurated;
+}
+
+/** 表头：左边是"这是哪张列表"，右边是"放到第几首 / 共几首"。 */
+function updateHead() {
+  const n = LIST.tracks.length;
+  const i = LIST.tracks.findIndex((t) => sameTrack(t, current));
+  $('kicker').textContent = listLabel();
+  $('count').textContent = n
+    ? `${i < 0 ? '—' : String(i + 1).padStart(2, '0')} / ${String(n).padStart(2, '0')}`
+    : '—';
+}
+
 function buildList() {
   tracksEl.innerHTML = '';
-  TRACKS.forEach((t, i) => {
+  LIST.tracks.forEach((t, i) => {
     const li = document.createElement('li');
-    li.className = 'track';
+    li.className = 'track' + (sameTrack(t, current) ? ' is-active' : '');
     li.dataset.i = String(i);
     li.tabIndex = 0;
     li.setAttribute('role', 'button');
     li.innerHTML =
       `<span class="track__no">${String(i + 1).padStart(2, '0')}</span>` +
       `<span><span class="track__title">${escapeHtml(t.title)}</span>` +
-      `<span class="track__sub">${escapeHtml(t.album)} · ${t.date.slice(0, 4)}</span></span>` +
+      `<span class="track__sub">${escapeHtml(t.album)}${t.date ? ' · ' + t.date.slice(0, 4) : ''}</span></span>` +
       `<span class="track__meter"><i></i><i></i><i></i><i></i></span>`;
     li.addEventListener('click', () => select(i, true));
     li.addEventListener('keydown', (e) => {
@@ -1001,7 +1159,58 @@ function buildList() {
     });
     tracksEl.appendChild(li);
   });
+  cacheMeters();
+  updateHead();
+  syncOverflow();
 }
+
+/** 列表是否溢出：溢出才给末行加渐隐（见 .tracks.is-scroll）。 */
+function syncOverflow() {
+  tracksEl.classList.toggle('is-scroll', tracksEl.scrollHeight - tracksEl.clientHeight > 2);
+}
+
+function setList(key) {
+  const next = listFor(key);
+  if (!next || !next.tracks.length) return;
+  LIST = next;
+  buildList();
+  renderTabs();
+  renderAlbums();
+}
+
+function renderTabs() {
+  [...$('tabs').children].forEach((b) => {
+    const key = b.dataset.list;
+    b.classList.toggle('is-on', LIST.kind === key);
+    /* 没拿到 JSON 时「最新 / 最热」是灰的 —— 与其点了没反应，不如明说没有 */
+    b.disabled = key !== 'curated' && !LIB;
+  });
+}
+
+/** 最新专辑：一排纸卡。点一张 = 把整张专辑放上唱盘（列表换成它的曲目）。 */
+function renderAlbums() {
+  const albums = (LIB && LIB.latestAlbums) || [];
+  $('albums').hidden = !albums.length;
+  $('albumsTitle').textContent = L.albums;
+  $('albumsMore').textContent = L.albumsMore;
+  if (LIB && LIB.artist && LIB.artist.url) $('albumsMore').href = LIB.artist.url;
+
+  const row = $('albumRow');
+  row.innerHTML = '';
+  albums.forEach((a) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'album' + (LIST.key === 'album:' + a.id ? ' is-on' : '');
+    b.title = a.description ? a.description.split('\n')[0] : a.name;
+    b.innerHTML =
+      `<span class="album__bar"></span>` +
+      `<span class="album__name">${escapeHtml(a.name)}</span>` +
+      `<span class="album__meta">${escapeHtml(a.type)} · ${a.year}</span>`;
+    b.addEventListener('click', () => { setList('album:' + a.id); select(0, true); });
+    row.appendChild(b);
+  });
+}
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
@@ -1013,19 +1222,19 @@ function cacheMeters() {
 
 /** 选中一首：换盘面 / 换封套 / 换主色 / 换音源。`autoplay` 决定要不要真的响。 */
 function select(i, autoplay) {
-  const t = TRACKS[i];
-  const changed = t !== current || audio.src !== outerUrl(t);
+  const t = LIST.tracks[i];
+  if (!t) return;
+  const changed = !sameTrack(t, current) || audio.src !== outerUrl(t);
   current = t;
 
   document.documentElement.style.setProperty('--h', String(t.hue));
-  $('brandMeta').innerHTML = L.meta(TRACKS.length);
-  $('count').textContent = `${String(i + 1).padStart(2, '0')} / ${String(TRACKS.length).padStart(2, '0')}`;
   $('nowTitle').textContent = t.title;
-  $('nowSub').textContent = `${t.album} · ${AUTHOR} · ${t.date.slice(0, 4)}`;
+  $('nowSub').textContent = [t.album, AUTHOR, (t.date || '').slice(0, 4)].filter(Boolean).join(' · ');
   $('src').href = neteaseUrl(t);
   $('src').textContent = L.src;
 
   [...tracksEl.children].forEach((li, k) => li.classList.toggle('is-active', k === i));
+  updateHead();
 
   paintDisc(t);
   paintCover(sleeveCtx, SLEEVE_S, SLEEVE_S, t, { accent: ACCENT_INK(t.hue) });
@@ -1053,8 +1262,27 @@ function toggle() {
 }
 
 function step(d) {
-  const i = (TRACKS.indexOf(current) + d + TRACKS.length) % TRACKS.length;
-  select(i, true);
+  const n = LIST.tracks.length;
+  if (!n) return;
+  const i = LIST.tracks.findIndex((t) => sameTrack(t, current));
+  select(((i < 0 ? 0 : i) + d + n) % n, true);
+}
+
+/* 构建产物：拉不到就只显示精选集（离线 / 部署漏了文件都不该白屏）。 */
+async function loadLibrary() {
+  try {
+    const res = await fetch(LIB_URL, { cache: 'no-cache' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!data || !Array.isArray(data.latestSongs) || !Array.isArray(data.latestAlbums)) {
+      throw new Error('payload 结构不对');
+    }
+    LIB = data;
+  } catch (err) {
+    LIB = null;
+  }
+  renderTabs();
+  renderAlbums();
 }
 
 function toast(msg) {
@@ -1286,6 +1514,11 @@ window.addEventListener('wheel', (e) => {
 $('play').addEventListener('click', toggle);
 $('prev').addEventListener('click', () => step(-1));
 $('next').addEventListener('click', () => step(1));
+$('tabs').addEventListener('click', (e) => {
+  const b = e.target.closest('.tab');
+  if (!b || b.disabled) return;
+  setList(b.dataset.list);
+});
 
 /* ============================================================================
  * 背景：一圈一圈的沟槽在很远处慢慢转 + 一点主色雾。
@@ -1418,14 +1651,16 @@ function fitDeck() {
   deckScale = Math.max(0.34, Math.min(1, s));
   deckEl.style.setProperty('--s', String(deckScale));
 }
-addEventListener('resize', fitDeck, { passive: true });
+addEventListener('resize', () => { fitDeck(); syncOverflow(); }, { passive: true });
 
 /* 探针用：只读地暴露几个几何量。
    headless 里要验的是"针真的在盘上""拖臂真的改了进度"这种**空间**断言，
    截图看不出来 —— 有这几个函数就能直接量。 */
 window.__vinyl = {
-  TRACKS, ARM, PIVOT, R_START, R_END, DISC_R, audio,
-  planeToScreen, screenToPlane, armAngle,
+  CURATED, ARM, PIVOT, R_START, R_END, DISC_R, audio,
+  planeToScreen, screenToPlane, armAngle, setList, listFor,
+  get LIB() { return LIB; },
+  get LIST() { return LIST; },
   get state() {
     return { playing, armNow, armTarget, level, hasArm: !!armEl.style.transform };
   },
@@ -1434,19 +1669,24 @@ window.__vinyl = {
 /* ============================================================================
  * 主题 / 语言切换（宿主会改 data-theme / data-lang，`_env.js` 再通知我们）
  * ========================================================================== */
+const TAB_LABEL = { curated: 'listCurated', latest: 'listLatest', hot: 'listHot' };
+
 function applyCopy() {
   document.title = L.title;
   const d = document.querySelector('meta[name="description"]');
   if (d) d.setAttribute('content', L.desc);
   $('brandName').innerHTML = L.brand;
-  $('brandMeta').innerHTML = L.meta(TRACKS.length);
-  $('kicker').textContent = L.kicker;
+  $('brandMeta').textContent = L.meta;
   $('hint').textContent = L.hint;
   $('src').textContent = L.src;
+  [...$('tabs').children].forEach((b) => { b.textContent = L[TAB_LABEL[b.dataset.list]]; });
+  updateHead();
+  renderAlbums();                                    // 专辑卡的 meta 里也有文案
   $('play').setAttribute('aria-label', playing ? L.pause : L.play);
   $('prev').setAttribute('aria-label', L.prev);
   $('next').setAttribute('aria-label', L.next);
-  $('nowSub').textContent = `${current.album} · ${AUTHOR} · ${current.date.slice(0, 4)}`;
+  $('nowSub').textContent = [current.album, AUTHOR, (current.date || '').slice(0, 4)]
+    .filter(Boolean).join(' · ');
   paintDisc(current);                                // 片芯上有 L.rpm
   paintCover(sleeveCtx, SLEEVE_S, SLEEVE_S, current, { accent: ACCENT_INK(current.hue) });
 }
@@ -1461,10 +1701,11 @@ stageEnv.onChange(({ theme: t, lang: l }) => {
  * 启动
  * ========================================================================== */
 buildList();
-cacheMeters();
 L = I18N[lang];
 select(0, false);
 applyCopy();
+renderTabs();
+loadLibrary();          // 异步：拉不到就只留精选集，不挡首屏
 fitDeck();
 armEl.style.transform = `rotate(${armNow}deg)`;
 requestAnimationFrame((t) => { last = t; frame(t); });
@@ -1475,6 +1716,7 @@ if (document.fonts && document.fonts.ready) {
   document.fonts.ready.then(() => {
     paintDisc(current);
     paintCover(sleeveCtx, SLEEVE_S, SLEEVE_S, current, { accent: ACCENT_INK(current.hue) });
+    syncOverflow();      // 换字体后行高会变，溢出与否要重算
   });
 }
 </script>
