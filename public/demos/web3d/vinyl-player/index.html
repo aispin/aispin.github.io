@@ -241,53 +241,60 @@ html[data-theme="light"] .brand__name{text-shadow:none}
 }
 .side__count{font:400 10px/1 var(--mono);letter-spacing:.14em;color:var(--dim-2)}
 
-/* 三张列表切换：精选（手挑）/ 最新 / 最热。
-   下划线而不是填充块 —— 这一栏已经很密，再加色块就吵了。 */
-.tabs{display:flex;gap:4px;margin:9px 0 2px}
-.tab{
-  position:relative;appearance:none;background:none;border:0;
-  padding:5px 8px 7px;cursor:pointer;
-  font:400 11px/1 var(--sans);letter-spacing:.06em;color:var(--dim);
-  transition:color .2s ease;
-}
-.tab:hover:not(:disabled){color:var(--ink)}
-.tab.is-on{color:var(--accent-text)}
-.tab.is-on::after{
-  content:'';position:absolute;left:8px;right:8px;bottom:2px;height:1px;
-  background:currentColor;border-radius:1px;
-}
-.tab:disabled{opacity:.3;cursor:default}
-
-/* 最新专辑：一排纸卡。**不用封面位图** —— 站上零位图，专辑卡靠版式和
-   主色条区分，和唱片封套是同一套语言（封套是纸的，专辑卡也是纸的）。 */
-.albums{margin-top:14px;padding-top:13px;border-top:1px solid var(--line)}
-.albums[hidden]{display:none}
-.albums__head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:9px}
-.albums__title{font:400 10px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
-.albums__more{
-  font:400 10px/1 var(--mono);letter-spacing:.1em;color:var(--dim-2);
-  text-decoration:none;transition:color .2s ease;
-}
-.albums__more:hover{color:var(--accent-text)}
-.albums__row{
-  display:flex;gap:8px;overflow-x:auto;padding-bottom:3px;
+/* ── 歌单条 ──────────────────────────────────────────────────────────
+   精选 / 最新 / 最热 和「最新专辑」放在**同一块**里 —— 它们本来就是一
+   类东西（"一整张要放上盘的东西"），分上下两处就得来回找。
+   但 7 张 76px 的卡塞不进 274px 的一行（塞进去的结果是专辑全被推到
+   横向滚动后面，等于没有），所以分两层，同一块、两种卡：
+     · 上层：三张等宽歌单卡（名字 + 大数字 = 这张列表多少首）
+     · 下层：专辑卡（主色条 + 右上角「专辑」角标 + 名 + 类型·年份），多了横向滚
+   ─────────────────────────────────────────────────────────────────── */
+.shelf{display:flex;flex-direction:column;gap:9px;margin-top:8px}
+.shelf__lists{display:flex;gap:8px}
+.shelf__row{
+  display:flex;gap:8px;overflow-x:auto;
+  /* 上边留 4px：卡片 hover 抬起 2px，不留就会被 overflow 裁掉**顶边**（就是那个 bug） */
+  padding:4px 0 4px;
   scrollbar-width:none;overscroll-behavior-x:contain;
 }
-.albums__row::-webkit-scrollbar{display:none}
-.album{
-  position:relative;flex:0 0 auto;width:76px;height:94px;
-  display:flex;flex-direction:column;justify-content:space-between;
-  padding:9px 8px 8px;text-align:left;cursor:pointer;
+.shelf__row::-webkit-scrollbar{display:none}
+.shelf__row[hidden]{display:none}
+
+.pl,.album{
+  position:relative;flex:0 0 auto;
+  display:flex;flex-direction:column;
+  text-align:left;cursor:pointer;
   background:var(--chip);border:1px solid var(--line);border-radius:3px;
   color:var(--ink);font-family:var(--sans);
   transition:border-color .2s ease,transform .2s ease;
 }
-.album:hover{transform:translateY(-2px);border-color:var(--dim-2)}
+.pl:hover,.album:hover{transform:translateY(-2px)}
+.pl:hover{border-color:var(--line-2)}
+.pl.is-on{border-color:var(--accent-text)}
+.pl.is-on .pl__name{color:var(--accent-text)}
+.pl:disabled{opacity:.3;cursor:default}
+.pl:disabled:hover{transform:none;border-color:var(--line)}
+
+/* 歌单卡：横着排满一行、矮，和下面那排竖着的专辑卡明显不是一类东西 */
+.pl{flex:1 1 0;min-width:0;height:58px;padding:8px 9px 7px}
+.pl__name{font:500 11px/1.2 var(--sans);letter-spacing:.02em;color:var(--ink)}
+.pl__num{margin-top:auto;display:flex;align-items:baseline;gap:3px}
+.pl__num b{font:400 19px/1 var(--mono);letter-spacing:-.02em;color:var(--ink)}
+.pl__num i{font:400 8px/1 var(--mono);font-style:normal;letter-spacing:.06em;color:var(--dim-2)}
+
+/* 专辑卡：边框比歌单卡重一档 + 角标，扫一眼就知道"这张是一整张专辑" */
+.album{width:76px;height:94px;padding:9px 8px 8px;border-color:var(--line-2)}
+.album:hover{border-color:var(--dim-2)}
 .album.is-on{border-color:var(--accent-text)}
+.album__top{display:flex;align-items:center;justify-content:space-between;height:9px}
 /* 主色条：和唱片封套右上角那个"系列标记"是同一个东西 */
-.album__bar{position:absolute;left:8px;top:9px;width:12px;height:2px;border-radius:1px;background:var(--accent-text)}
+.album__bar{width:12px;height:2px;border-radius:1px;background:var(--accent-text)}
+.album__tag{
+  font:400 8px/1 var(--mono);letter-spacing:.08em;color:var(--dim-2);
+}
+.album.is-on .album__tag{color:var(--accent-text)}
 .album__name{
-  margin-top:9px;
+  margin-top:auto;
   font:500 11px/1.24 var(--sans);color:var(--ink);
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
   word-break:break-word;
@@ -300,12 +307,27 @@ html[data-theme="light"] .brand__name{text-shadow:none}
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 
+/* 排在最后的那张虚线卡 = 「全部」外链 */
+.shelf__more{
+  flex:0 0 auto;width:58px;height:94px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  border:1px dashed var(--line-2);border-radius:3px;
+  font:400 9px/1 var(--mono);letter-spacing:.12em;color:var(--dim-2);
+  text-decoration:none;transition:color .2s ease,border-color .2s ease;
+}
+.shelf__more i{font-style:normal;font-size:12px;line-height:1}
+.shelf__more:hover{color:var(--accent-text);border-color:var(--accent-text)}
+.shelf__more[hidden]{display:none}
+
 .tracks{list-style:none;margin-top:6px;overflow-y:auto;min-height:0;flex:0 1 auto}
 /* 装不下时最后一行是被裁的（最新/最热有 12 首）。给它一道渐隐，
    读起来才是"下面还有"，而不是"排版断了"。列表短时不加这个类，末行边框保持完整。 */
 .tracks.is-scroll{
-  -webkit-mask-image:linear-gradient(to bottom,#000 0,#000 calc(100% - 26px),transparent 100%);
-  mask-image:linear-gradient(to bottom,#000 0,#000 calc(100% - 26px),transparent 100%);
+  /* 只压最后 10px：`.track` 的 padding 是 17px，行被裁时标题正好落在
+     10~30px 那一段 —— 渐隐一长（试过 26 / 16）整行标题就糊成"幽灵"，
+     看着像渲染坏了。10px 只柔化裁口，标题还是清楚的。 */
+  -webkit-mask-image:linear-gradient(to bottom,#000 0,#000 calc(100% - 10px),transparent 100%);
+  mask-image:linear-gradient(to bottom,#000 0,#000 calc(100% - 10px),transparent 100%);
 }
 .tracks::-webkit-scrollbar{width:6px}
 .tracks::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:3px}
@@ -441,7 +463,10 @@ html[data-theme="light"] .track:hover{background:rgba(120,92,66,.06)}
   .side{
     padding:0 20px calc(18px + env(safe-area-inset-bottom));
     background:linear-gradient(180deg,transparent,var(--bg) 26%);
-    max-height:52vh;
+    /* 56 而不是 52：歌单卡比原来的 tab 高 30px，面板不长高就得从曲目列表里扣，
+       而列表已经只剩三行 —— 唱盘那边是**宽度**限死的（fitDeck 取 min），
+       多给它 30px 高度也不会变小。 */
+    max-height:56vh;
   }
   .tracks{
     margin-top:2px;
@@ -451,9 +476,13 @@ html[data-theme="light"] .track:hover{background:rgba(120,92,66,.06)}
   }
   .track{padding:10px 6px 10px 6px}
   .track__title{font-size:13px}
-  /* 窄屏先让专辑条让路：曲目列表只剩一行，比"少一个入口"糟得多。
-     专辑还能从「最新 / 最热」里点到。 */
-  .albums{display:none}
+  /* 窄屏：歌单卡再压矮一档；专辑那一层整层让路 ——
+     52vh 的面板里多 100px 卡片，曲目列表就只剩一行半，
+     比"少一个入口"糟得多（专辑本来也是从最新/最热里听到的）。 */
+  .shelf{margin-top:6px;gap:7px}
+  .shelf__row{display:none}
+  .pl{height:50px;padding:7px 9px 6px}
+  .pl__num b{font-size:17px}
   .tracks{min-height:120px}
   .side__head{padding-bottom:8px}
   .hint{display:none}
@@ -509,22 +538,30 @@ html[data-theme="light"] .track:hover{background:rgba(120,92,66,.06)}
       <span class="side__count" id="count">—</span>
     </div>
 
-    <!-- 三张列表：精选集（手挑）/ 最新 / 最热。后两个要等 JSON 到位才亮 -->
-    <div class="tabs" id="tabs" role="tablist">
-      <button class="tab is-on" type="button" role="tab" data-list="curated">精选</button>
-      <button class="tab" type="button" role="tab" data-list="latest" disabled>最新</button>
-      <button class="tab" type="button" role="tab" data-list="hot" disabled>最热</button>
+    <!-- 歌单条：上层三张歌单卡（精选/最新/最热），下层最新专辑卡 + 「全部」。
+         切歌单和挑专辑在**同一块**里，不用上下两处来回找。 -->
+    <div class="shelf">
+      <div class="shelf__lists" id="shelfLists" role="tablist">
+        <button class="pl is-on" type="button" role="tab" data-list="curated">
+          <span class="pl__name">精选</span>
+          <span class="pl__num"><b>—</b><i>首</i></span>
+        </button>
+        <button class="pl" type="button" role="tab" data-list="latest" disabled>
+          <span class="pl__name">最新</span>
+          <span class="pl__num"><b>—</b><i>首</i></span>
+        </button>
+        <button class="pl" type="button" role="tab" data-list="hot" disabled>
+          <span class="pl__name">最热</span>
+          <span class="pl__num"><b>—</b><i>首</i></span>
+        </button>
+      </div>
+      <div class="shelf__row" id="shelf" hidden>
+        <!-- 专辑卡由 renderAlbums() 插到「全部」前面 -->
+        <a class="shelf__more" id="allAlbums" href="https://music.163.com/#/artist?id=49232788" target="_blank" rel="noopener noreferrer">全部<i>↗</i></a>
+      </div>
     </div>
 
     <ol class="tracks" id="tracks"></ol>
-
-    <div class="albums" id="albums" hidden>
-      <div class="albums__head">
-        <span class="albums__title" id="albumsTitle">最新专辑 · ALBUMS</span>
-        <a class="albums__more" id="albumsMore" href="https://music.163.com/#/artist?id=49232788" target="_blank" rel="noopener noreferrer">全部 ↗</a>
-      </div>
-      <div class="albums__row" id="albumRow"></div>
-    </div>
 
     <div class="transport">
       <div class="now">
@@ -624,8 +661,7 @@ const I18N = {
     /* 不写死曲目数：作品会一直加，这个位置只放"是谁的唱片" */
     meta: 'ZEO · 精选集',
     listCurated: '精选', listLatest: '最新', listHot: '最热',
-    albums: '最新专辑 · ALBUMS',
-    albumsMore: '全部 ↗',
+    unit: '首', albumTag: '专辑', allAlbums: '全部',
     kicker: '曲目 · TRACKS',
     play: '播放', pause: '暂停', prev: '上一首', next: '下一首',
     hint: '滚轮 / ↑↓ 切换曲目 · 空格播放 · ←→ 快退快进 · 拖动进度条或唱臂',
@@ -640,8 +676,7 @@ const I18N = {
     brand: 'VINYL',
     meta: 'ZEO · SELECTED',
     listCurated: 'Selected', listLatest: 'Latest', listHot: 'Top',
-    albums: 'LATEST ALBUMS',
-    albumsMore: 'All ↗',
+    unit: 'tracks', albumTag: 'ALBUM', allAlbums: 'All',
     kicker: 'TRACKS',
     play: 'Play', pause: 'Pause', prev: 'Previous', next: 'Next',
     hint: 'Wheel / ↑↓ to change track · Space to play · ←→ to seek · drag the bar or the tonearm',
@@ -1078,6 +1113,10 @@ let LIST = { key: 'curated', kind: 'curated', tracks: CURATED };
  * 交互
  * ========================================================================== */
 const tracksEl = $('tracks');
+const shelfBoxEl = document.querySelector('.shelf');   // 两层卡的整体（点击委托挂这里）
+const shelfEl = $('shelf');                            // 只有专辑那一层会横向滚
+const plEls = [...$('shelfLists').querySelectorAll('.pl')];
+let albumEls = [];
 const armEl = $('arm');
 const discEl = $('disc');
 const deckEl = $('deck');
@@ -1174,41 +1213,68 @@ function setList(key) {
   if (!next || !next.tracks.length) return;
   LIST = next;
   buildList();
-  renderTabs();
+  renderPlaylists();
   renderAlbums();
+  revealActiveCard();
 }
 
-function renderTabs() {
-  [...$('tabs').children].forEach((b) => {
+/** 三张歌单卡：名字 + 这首列表多少首（数字是算出来的，不是写死的）。 */
+function renderPlaylists() {
+  plEls.forEach((b) => {
     const key = b.dataset.list;
-    b.classList.toggle('is-on', LIST.kind === key);
+    const list = listFor(key);
+    const on = LIST.kind === key;
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-selected', String(on));       // role="tab" 得配这个
     /* 没拿到 JSON 时「最新 / 最热」是灰的 —— 与其点了没反应，不如明说没有 */
     b.disabled = key !== 'curated' && !LIB;
+    b.querySelector('.pl__name').textContent = L[TAB_LABEL[key]];
+    b.querySelector('.pl__num b').textContent = list && list.tracks.length
+      ? String(list.tracks.length).padStart(2, '0')
+      : '—';
+    b.querySelector('.pl__num i').textContent = L.unit;
   });
 }
 
-/** 最新专辑：一排纸卡。点一张 = 把整张专辑放上唱盘（列表换成它的曲目）。 */
+/** 最新专辑：同一排里的纸卡。点一张 = 把整张专辑放上唱盘（列表换成它的曲目）。 */
 function renderAlbums() {
   const albums = (LIB && LIB.latestAlbums) || [];
-  $('albums').hidden = !albums.length;
-  $('albumsTitle').textContent = L.albums;
-  $('albumsMore').textContent = L.albumsMore;
-  if (LIB && LIB.artist && LIB.artist.url) $('albumsMore').href = LIB.artist.url;
+  /* 一张专辑都没有时整层收起来，别留一条空白 */
+  shelfEl.hidden = !albums.length;
+  $('allAlbums').innerHTML = `${L.allAlbums}<i>↗</i>`;
+  if (LIB && LIB.artist && LIB.artist.url) $('allAlbums').href = LIB.artist.url;
 
-  const row = $('albumRow');
-  row.innerHTML = '';
-  albums.forEach((a) => {
+  albumEls.forEach((el) => el.remove());
+  albumEls = albums.map((a) => {
     const b = document.createElement('button');
     b.type = 'button';
+    b.dataset.id = String(a.id);
     b.className = 'album' + (LIST.key === 'album:' + a.id ? ' is-on' : '');
     b.title = a.description ? a.description.split('\n')[0] : a.name;
+    /* 角标已经写了「专辑」，meta 里就别再重复一遍「专辑 · 2026」——
+       EP / 单曲 才写出来（那是**子类**，和角标不是一回事）。 */
+    const kind = a.type && a.type !== '专辑' && a.type !== L.albumTag ? a.type : '';
     b.innerHTML =
-      `<span class="album__bar"></span>` +
+      `<span class="album__top"><span class="album__bar"></span>` +
+      `<span class="album__tag">${escapeHtml(L.albumTag)}</span></span>` +
       `<span class="album__name">${escapeHtml(a.name)}</span>` +
-      `<span class="album__meta">${escapeHtml(a.type)} · ${a.year}</span>`;
+      `<span class="album__meta">${escapeHtml([kind, a.year].filter(Boolean).join(' · '))}</span>`;
     b.addEventListener('click', () => { setList('album:' + a.id); select(0, true); });
-    row.appendChild(b);
+    shelfEl.insertBefore(b, $('allAlbums'));
+    return b;
   });
+}
+
+/** 歌单条比卡片多时会横向滚：把当前选中的那张滚进来，别让它待在视口外。 */
+function revealActiveCard() {
+  const card = document.querySelector('.pl.is-on, .album.is-on');
+  if (!card) return;
+  const row = card.parentElement;          // 歌单那层不滚，专辑那层才滚
+  if (!row || row.scrollWidth - row.clientWidth < 2) return;
+  const r = row.getBoundingClientRect();
+  const c = card.getBoundingClientRect();
+  if (c.left < r.left) row.scrollLeft -= r.left - c.left + 10;
+  else if (c.right > r.right) row.scrollLeft += c.right - r.right + 10;
 }
 
 function escapeHtml(s) {
@@ -1281,8 +1347,9 @@ async function loadLibrary() {
   } catch (err) {
     LIB = null;
   }
-  renderTabs();
+  renderPlaylists();
   renderAlbums();
+  revealActiveCard();
 }
 
 function toast(msg) {
@@ -1501,23 +1568,55 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowUp') { e.preventDefault(); step(-1); }
 });
 
-/* 滚轮切换曲目：一次手势一格，靠冷却防连跳 */
+/* 滚轮切换曲目：一次手势一格，靠冷却防连跳。
+   🔴 先让给可滚的容器 —— 指针在歌单条 / 曲目列表上时，滚轮是在滚内容，
+   不是"下一首"（以前滚曲目列表会跳歌，这是 bug）。 */
 let wheelLock = 0;
 window.addEventListener('wheel', (e) => {
+  const sc = wheelScroller(e);
+  if (sc) {
+    /* 只能横向滚的条（专辑那排）：**Chrome 不会把竖滚轮转成横滚**，
+       自己转，否则鼠标用户在那一排上滚 = 什么都没发生（死区）。 */
+    if (!sc.canY && sc.canX && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      e.preventDefault();
+      sc.el.scrollLeft += e.deltaY;
+    }
+    return;
+  }
   const now = performance.now();
   if (now - wheelLock < 620) return;
   if (Math.abs(e.deltaY) < 6) return;
   wheelLock = now;
   step(e.deltaY > 0 ? 1 : -1);
-}, { passive: true });
+}, { passive: false });
+
+/** 指针这一路祖先里第一个"还能滚"的容器（以及它能滚哪根轴）。
+ *  有 ⇒ 这个滚轮属于它，别再拿去换曲。 */
+function wheelScroller(e) {
+  for (let el = e.target; el && el !== document.body; el = el.parentElement) {
+    if (el.nodeType !== 1) continue;
+    const st = getComputedStyle(el);
+    const canY = /auto|scroll/.test(st.overflowY) && el.scrollHeight - el.clientHeight >= 2;
+    const canX = /auto|scroll/.test(st.overflowX) && el.scrollWidth - el.clientWidth >= 2;
+    if (canY || canX) return { el, canY, canX };
+  }
+  return null;
+}
 
 $('play').addEventListener('click', toggle);
 $('prev').addEventListener('click', () => step(-1));
 $('next').addEventListener('click', () => step(1));
-$('tabs').addEventListener('click', (e) => {
-  const b = e.target.closest('.tab');
-  if (!b || b.disabled) return;
-  setList(b.dataset.list);
+/* 歌单条上的点击：歌单卡换列表，专辑卡整张上盘。用事件委托 ——
+   专辑卡是异步插进来的，逐个挂监听会漏。 */
+shelfBoxEl.addEventListener('click', (e) => {
+  const pl = e.target.closest('.pl');
+  if (pl) {
+    if (pl.disabled) return;
+    setList(pl.dataset.list);
+    return;
+  }
+  const al = e.target.closest('.album');
+  if (al) { setList('album:' + al.dataset.id); select(0, true); }
 });
 
 /* ============================================================================
@@ -1679,7 +1778,7 @@ function applyCopy() {
   $('brandMeta').textContent = L.meta;
   $('hint').textContent = L.hint;
   $('src').textContent = L.src;
-  [...$('tabs').children].forEach((b) => { b.textContent = L[TAB_LABEL[b.dataset.list]]; });
+  renderPlaylists();                                 // 歌单卡上的名字和单位也要换
   updateHead();
   renderAlbums();                                    // 专辑卡的 meta 里也有文案
   $('play').setAttribute('aria-label', playing ? L.pause : L.play);
@@ -1704,7 +1803,6 @@ buildList();
 L = I18N[lang];
 select(0, false);
 applyCopy();
-renderTabs();
 loadLibrary();          // 异步：拉不到就只留精选集，不挡首屏
 fitDeck();
 armEl.style.transform = `rotate(${armNow}deg)`;
