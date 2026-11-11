@@ -108,7 +108,11 @@ html[data-theme="light"] .brand__name{text-shadow:none}
   display:flex;align-items:center;justify-content:center;
   min-width:0;min-height:0;
   padding:60px 0 24px 12px;
+  /* 拖唱臂的监听挂在这一层（普通 2D 元素，命中可靠），手指拖盘面别滚页面 */
+  touch-action:none;
 }
+.deckwrap.can-grab{cursor:grab}
+.deckwrap.is-grab{cursor:grabbing}
 .deck{
   perspective:1600px;
   perspective-origin:50% 42%;
@@ -137,6 +141,7 @@ html[data-theme="light"] .brand__name{text-shadow:none}
   box-shadow:0 40px 70px -30px rgba(0,0,0,.85),0 0 0 1px rgba(0,0,0,.35);
   transform:translateZ(-24px) rotateZ(2.5deg);
   background:var(--paper);
+  pointer-events:none;   /* 同 `.disc`：桌上这两件都不接事件，事件只归唱臂 */
 }
 .sleeve canvas{display:block;width:100%;height:100%}
 /* 纸角的一点体积感：左上打光 */
@@ -153,6 +158,11 @@ html[data-theme="light"] .brand__name{text-shadow:none}
   width:820px;height:820px;
   border-radius:50%;
   z-index:1;
+  /* 🔴 唱片**不接受指针事件**。父级 `.deck__plane` 是 preserve-3d，在那里
+     `z-index` 不参与排序（按 3D 深度排），所以盘面这两块画布会盖在唱臂上面
+     接走 pointerdown —— 表现就是"放歌的时候抓不住唱臂"（指针落在盘上，
+     事件给了 canvas）。唱片本来就没有任何交互，直接让开最稳。 */
+  pointer-events:none;
 }
 .disc canvas{position:absolute;inset:0;width:100%;height:100%}
 #discArt{filter:drop-shadow(0 34px 46px rgba(0,0,0,.6))}
@@ -162,25 +172,17 @@ html[data-theme="light"] .brand__name{text-shadow:none}
 .disc.is-spinning #discArt{animation-play-state:running}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-/* 唱臂 */
+/* 唱臂：纯展示，**不接指针事件**（命中判定在 JS 里算，见 nearArm）。
+   `preserve-3d` 子树里的命中测试和绘制顺序对不上：实测 elementFromPoint 报
+   `.arm__rod`，真正的 pointerdown 却落到 `.deck__plane` —— 所以不能靠它。 */
 .arm{
   position:absolute;
   width:0;height:0;
   transform-origin:0 0;
   will-change:transform;
-  /* 🔴 必须显式压过唱片一层：`#discArt` 一旦转起来（animation）就自成合成层，
-     在 `preserve-3d` 子树里会**抢走唱臂的命中测试** —— 表现是"放歌的时候就
-     抓不住唱臂了"（暂停时一切正常，所以极容易漏掉）。z-index 把顺序钉死。 */
   z-index:3;
+  pointer-events:none;
 }
-/* 抓握区：臂本身只有 6px 高，鼠标要能"抓住"它 —— 透明但可点，比臂宽一圈。
-   touch-action:none 是必须的，否则手指一拖先滚页面。 */
-.arm__hit{
-  position:absolute;left:-18px;top:-24px;
-  width:256px;height:48px;
-  cursor:grab;touch-action:none;
-}
-.arm.is-grab .arm__hit{cursor:grabbing}
 .arm__rod{
   position:absolute;left:-4px;top:-3px;
   width:224px;height:6px;border-radius:3px;
@@ -421,7 +423,6 @@ html[data-theme="light"] .track:hover{background:rgba(120,92,66,.06)}
           <canvas id="discRing"></canvas>
         </div>
         <div class="arm" id="arm">
-          <div class="arm__hit"></div>
           <div class="arm__rod"></div>
           <div class="arm__weight"></div>
           <div class="arm__pivot"></div>
@@ -972,6 +973,7 @@ const tracksEl = $('tracks');
 const armEl = $('arm');
 const discEl = $('disc');
 const deckEl = $('deck');
+const deckWrapEl = $('deckwrap');
 const barEl = $('bar');
 const barFill = $('barFill');
 const barDot = $('barDot');
@@ -1184,23 +1186,66 @@ function armFromPointer(e) {
   const rad = (deg - ARM.base) * Math.PI / 180;
   const r = Math.sqrt(ARM.P * ARM.P + ARM.L * ARM.L - 2 * ARM.P * ARM.L * Math.cos(rad));
   const t = Math.max(0, Math.min(1, (R_START - r) / (R_START - R_END)));
-  if (isFinite(audio.duration)) audio.currentTime = t * audio.duration;
+  if (isFinite(audio.duration) && audio.duration > 0) audio.currentTime = t * audio.duration;
   paintProgress(t);
+  $('tCur').textContent = fmtTime(audio.currentTime);
   armTarget = armNow = deg;                          // 手赢，不做缓动
   armEl.style.transform = `rotate(${deg}deg)`;
 }
-armEl.addEventListener('pointerdown', (e) => {
-  armDrag = true; armEl.classList.add('is-grab');
-  armEl.setPointerCapture(e.pointerId);
+
+/* 拖针的时候**先暂停**：不停的话播放头还在往前走，每挪一像素又 seek 一次，
+   两边互相拽 —— 手感就是"拖着拖着被弹回去"（这正是"播放时拖不动"的主因之一）。
+   松手再接着放，和真实唱机按住唱片挪针一个道理。 */
+let armWasPlaying = false;
+
+/* 命中判定**自己算**，不交给 CSS 3D。
+   `preserve-3d` 子树里指针命中测试和绘制顺序对不上：实测 elementFromPoint
+   报的是 `.arm__rod`，真正的 pointerdown 却落到 `.deck__plane` 上（只有
+   臂两端那两个自带层的小块能命中）。所以监听挂在**平面的父级**（普通 2D
+   元素，命中可靠），再把指针换算成平面坐标，量它到"支点 → 针尖"这条线段
+   的距离。距离够近就算抓住唱臂 —— 顺带把容错从"6px 宽的杆"放大到 26px。 */
+const ARM_GRAB_R = 26;     // 平面坐标 px（针尖还挂在杆下面 17px，所以给得宽）
+const ARM_BACK = 34;       // 配重那一段（支点后面）也要能抓
+
+function nearArm(clientX, clientY) {
+  const p = screenToPlane(clientX, clientY);
+  const rad = armNow * Math.PI / 180;
+  const dx = Math.cos(rad), dy = Math.sin(rad);
+  const vx = p.x - PIVOT.x, vy = p.y - PIVOT.y;
+  const along = Math.max(-ARM_BACK, Math.min(ARM.L, vx * dx + vy * dy));
+  return Math.hypot(vx - dx * along, vy - dy * along) <= ARM_GRAB_R;
+}
+
+function armDown(e) {
+  armDrag = true;
+  deckWrapEl.classList.add('is-grab');
+  try { deckWrapEl.setPointerCapture(e.pointerId); } catch { /* 没有捕获也不致命 */ }
+  armWasPlaying = !audio.paused;
+  if (armWasPlaying) audio.pause();
+  e.preventDefault();                                // 别让浏览器顺手开始选字/拖图
   armFromPointer(e);
+}
+function endArmDrag(e) {
+  if (!armDrag) return;
+  armDrag = false;
+  deckWrapEl.classList.remove('is-grab');
+  if (deckWrapEl.hasPointerCapture?.(e.pointerId)) deckWrapEl.releasePointerCapture(e.pointerId);
+  if (armWasPlaying) { armWasPlaying = false; play(); }
+}
+
+deckWrapEl.addEventListener('pointerdown', (e) => {
+  if (e.button != null && e.button !== 0) return;
+  if (!nearArm(e.clientX, e.clientY)) return;
+  armDown(e);
 });
-armEl.addEventListener('pointermove', (e) => { if (armDrag) armFromPointer(e); });
-const endArmDrag = (e) => {
-  armDrag = false; armEl.classList.remove('is-grab');
-  if (armEl.hasPointerCapture?.(e.pointerId)) armEl.releasePointerCapture(e.pointerId);
-};
-armEl.addEventListener('pointerup', endArmDrag);
-armEl.addEventListener('pointercancel', endArmDrag);
+deckWrapEl.addEventListener('pointermove', (e) => {
+  if (armDrag) { armFromPointer(e); return; }
+  deckWrapEl.classList.toggle('can-grab', nearArm(e.clientX, e.clientY));
+});
+deckWrapEl.addEventListener('pointerup', endArmDrag);
+deckWrapEl.addEventListener('pointercancel', endArmDrag);
+deckWrapEl.addEventListener('lostpointercapture', endArmDrag);
+deckWrapEl.addEventListener('pointerleave', () => deckWrapEl.classList.remove('can-grab'));
 
 /* 臂角不直接写死：走缓动，换曲 / 暂停时不会"啪"地跳一下。
    停着的时候针**停在最外圈**（= 已经上针、只是没转），不是抬到盘外 ——
@@ -1318,7 +1363,7 @@ function frame(now) {
 
   /* 唱臂跟着播放头走（拖动时不抢，让手赢） */
   if (!armDrag) updateArm(dt);
-  if (!dragging) {
+  if (!dragging && !armDrag) {
     const t = isFinite(audio.duration) && audio.duration > 0 ? audio.currentTime / audio.duration : 0;
     paintProgress(t);
     $('tCur').textContent = fmtTime(audio.currentTime);
