@@ -14,8 +14,5 @@
   "files": ["src", "README.md"],
   "engines": {
     "node": ">=18"
-  },
-  "scripts": {
-    "build:zeo": "node src/cli.js --id 49232788 --latest 12 --hot 12 --albums 4 --out ../../public/data/netease-music-zeo.json"
   }
 }
