@@ -44,31 +44,6 @@
 
 # 📋 待办 WO
 
-### WO-5 · 音乐房间换成唱盘（原型已交，等确认）
-
-- **需求原文**：「目前的音乐房间毫无设计感，需要推翻重新做」
-  「先实现 web3d 的适用于音乐作品展示、播放的 demo」。
-- **原型**：`public/demos/web3d/vinyl-player/`（`25ff73e` + `9101beb`）——
-  一台真会响的唱盘：封套是作品、唱片是声音、**唱臂角度 = 播放进度（可直接拖）**、
-  盘沿那圈短针是"正在发生的事"。右侧是**精选 / 最新 / 最热三张列表 + 一排最新专辑**
-  （点专辑 = 整张上盘）。判据见该目录 README + `harness/probe-vinyl.mjs`（53 条全绿）。
-- **数据**：`packages/netease-artist/`（`@aispin/netease-artist`，零依赖）+
-  `npm run data:music` ⇒ `public/data/netease-music-zeo.json`（艺人 `49232788`，
-  最新 12 / 最热 12 / 最新 4 张专辑）。**页面不碰接口**，只 fetch 这份 JSON；
-  拿不到就只剩精选集、最新/最热置灰。
-- **现状**：`ContentRoom` 里 `music: { platform:'MUSIC', layout:'editorial' }`，
-  4×N 贴卡墙，`openItem` 传的是 `url/demoUrl/repository`（**从不传 `item.file`**）⇒
-  点「播放」什么都不会响。整段要删。
-- **改什么**：按接管房间那套做 `RoomMusic`（`useTakeoverStage` + `useFrame(cb,1)`）
-  + `MusicHud`（搬 demo 的 DOM），`shells.music` 已有；`CONTENT_ROOM_IDS` 收成
-  `['videos']`，`SELF_READY_IDS` 加 `'music'`；`ITEM_KIND` / `ROOM_ACCENT.music`
-  一并清掉。房间里的列表/专辑数据同样读 `public/data/netease-music-zeo.json`
-  （构建时生成，不新增运行时依赖）。
-- **验收判据**：`/music` 深链直接进；精选 6 首 + 最新/最热各 12 首都能播；
-  点专辑能整张上盘；拖唱臂能跳；深浅色 × 中英 4 组截图对得上；
-  退出房间后音频必须停（**别让 BGM 和房间音源打架**，见 `audioManager`）。
-- ⚠️ **先等用户确认这个原型**，再动 3D 房间。
-
 ### WO-6 · 摄影房间换成「接触印相带」（原型已交，等确认）
 
 - **需求原文**：「开始重新设计 Gallery 和 Videos 房间，一样的思路，先出 web3d 的
