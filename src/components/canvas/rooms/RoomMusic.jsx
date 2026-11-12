@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import * as THREE from 'three'
 import { useScene } from '../../../context/SceneContext'
+import { useSitePreferences } from '../../../context/SitePreferences'
 import { musicStage } from '../../../state/musicRoom'
 import {
     createScreenQuad,
@@ -130,8 +130,20 @@ void main() {
 }
 `
 
-/** 只在"真的进了房间"时挂载 —— 见文件头关于接管的说明。 */
-function VinylRenderer({ sceneRef, cameraRef, quadRef, stage, theme }) {
+/** 只在"真的进了房间"时挂载 —— 见文件头关于接管的说明。
+ *
+ *  🔴 **主题自己读，不走 props**（2026-11-12 修「music 房间没有 light 模式」）。
+ *  原来 `RoomMusic({ theme = 'dark' })` 靠 `RoomInterior` 传，那边**从来没传过**
+ *  ⇒ 永远 'dark' ⇒ 着色器里的暗房永远是暗的；而 DOM 层（`MusicHud.scss`）是
+ *  真的跟着 `html[data-theme]` 变的 ⇒ 浅色下就成了「深色墙 + 深墨文字」，
+ *  看起来像"这间房没有浅色模式"。
+ *  现在和 `AiAtlas` 同一套做法：`useSitePreferences()` 在这里读，帧循环每帧同步。
+ */
+function VinylRenderer({ sceneRef, cameraRef, quadRef, stage }) {
+    const { theme } = useSitePreferences()
+    const lightRef = useRef(theme === 'light')
+    useEffect(() => { lightRef.current = theme === 'light' }, [theme])
+
     useFrame((state, delta) => {
         /* 🔴 用 `state.gl` 而不是 `useThree(s => s.gl)`：后者被 lint 判成
            "不可修改的值"（react-hooks/immutability），而这里要临时改 autoClear。 */
@@ -152,7 +164,11 @@ function VinylRenderer({ sceneRef, cameraRef, quadRef, stage, theme }) {
            慢速跟随，避免暂停时反光"啪"一下停住。 */
         const target = musicStage.spinning ? 1 : 0
         mat.uniforms.uSpin.value += (target - mat.uniforms.uSpin.value) * 0.06
-        mat.uniforms.uLight.value = theme === 'light' ? 1 : 0
+        /* 明暗**也慢速跟随**（0.14）：直接赋 0/1 会让整面墙在两帧之间跳变，
+           而 DOM 层那边的 `background-color` 是 0.5s 过渡 —— 两边节奏要对得上，
+           否则切主题的一瞬间会看到"墙先跳、字后到"。 */
+        const lightTarget = lightRef.current ? 1 : 0
+        mat.uniforms.uLight.value += (lightTarget - mat.uniforms.uLight.value) * 0.14
 
         /* 🔴 alpha 必须在**画之前**更新。放到另一个更高优先级的 useFrame 里
            会晚一帧，进场收尾那一下会闪。 */
@@ -170,10 +186,13 @@ function VinylRenderer({ sceneRef, cameraRef, quadRef, stage, theme }) {
  * @param {object}  p
  * @param {Function} p.onReady    场景搭好、门可以开了
  * @param {boolean} p.isExiting   正在退场
- * @param {'dark'|'light'} p.theme
+ *
+ * ⚠️ **不收 `theme`**：明暗由 `VinylRenderer` 自己从 `useSitePreferences()` 读。
+ * 收 props 的那一版被 `RoomInterior` 漏传了，症状是"这间房只有暗色"。
  */
-const RoomMusic = ({ onReady, isExiting = false, theme = 'dark' }) => {
+const RoomMusic = ({ onReady, isExiting = false }) => {
     const { currentRoom, isTeleporting } = useScene()
+    const { theme } = useSitePreferences()
     const sceneRef = useRef(null)
     const cameraRef = useRef(null)
     const quadRef = useRef(null)
@@ -220,7 +239,6 @@ const RoomMusic = ({ onReady, isExiting = false, theme = 'dark' }) => {
             cameraRef={cameraRef}
             quadRef={quadRef}
             stage={stage}
-            theme={theme}
         />
     )
 }

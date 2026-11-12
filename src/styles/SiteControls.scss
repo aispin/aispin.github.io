@@ -5,6 +5,45 @@
 
 .site-controls {
   // Layout (fixed, top-right, vertical) comes from `.hud-cluster`.
+  //
+  // 房间里"让开"（`is-hidden`，见 SiteControls.jsx）。
+  //
+  // 🔴 **不能用 `display:none` / `visibility:hidden`**：
+  //    · `display:none` 会让整列从布局里消失，随后 `Tab` 也跳不进去 ——
+  //      键盘用户就永远调不到设置和音量了；
+  //    · `visibility:hidden` 同理（不可聚焦）。
+  //   所以用 `opacity + transform` 淡出，**并且同时 `pointer-events:none`**：
+  //   不加后者的话，透明的一列仍然会吃掉下面歌单末端的点击（那正是要修的东西）。
+  //
+  // 召回有两条路，都写在组件里：指针靠近右上角热区、或 Tab 聚焦进来。
+  transition: opacity .34s ease, transform .34s cubic-bezier(.2, .8, .2, 1);
+
+  &.is-hidden {
+    opacity: 0;
+    transform: translateY(-8px);
+    pointer-events: none;
+
+    // 🔴 **必须连按钮一起关**：`.hud-cluster` 本来就 `pointer-events:none`，
+    //    但每颗 `.hud-btn` 自己写了 `auto` —— 父级 none + 子级 auto 的子元素
+    //    **照样可点**。只关父级的话，透明的一列仍然会吃掉歌单末端的点击，
+    //    等于什么都没修（而且更难查：看得见的问题消失了，看不见的还在）。
+    .hud-btn,
+    .site-controls__burger {
+      pointer-events: none;
+    }
+  }
+
+  // 键盘兜底：万一焦点还是进到了隐藏列里（浏览器允许 focus 不可见过渡中的
+  // 元素），立刻把它显回来 —— 不能出现"焦点在这里但什么都看不见"。
+  &.is-hidden:focus-within {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-controls { transition: none; }
 }
 
 // The burger is only used here; it morphs into an X while the map is open.

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSitePreferences } from '../../context/SitePreferences'
 import { useAudio } from '../../context/AudioManager'
+import { useScene } from '../../context/SceneContext'
 import '../../styles/SiteControls.scss'
 
 /**
@@ -23,16 +24,55 @@ import '../../styles/SiteControls.scss'
  * 2026-10-09：第 3 个按钮由「明暗模式」改为「设置」——明暗与四季都进了设置
  * 面板，见 NavigationUI 的 settings panel。主题偏好由 SitePreferences 提供，
  * 面板直接读它，这里不再需要 theme/toggleTheme。
+ *
+ * 2026-11-12：**房间里这一列会淡出**（用户要求「进入房间后，3D 房子右上角的
+ * 图标隐藏掉」）。原因是它在房间里是**挡内容**的：音乐房间的歌单面板铺到
+ * `right:34px`，而这一列从 `right:18px` 起、宽 46 ⇒ 实测压住歌单右边缘 **30px**
+ * （1440 下 `.side` 1068→1440、列 1376→1422）。其他接管房间（craft / posts /
+ * ai）也各有自己的右上角。
+ *
+ * 🔴 **不是 `display:none`，是"淡出 + 热区召回"**：
+ *   这一列里有**设置**和**音频**，房间里照样要用（音乐房间尤其 —— 用户正在
+ *   听东西，想调音量不该被迫先退出房间）。所以做成播放器那种自动隐藏：
+ *   静止 2.4s 后淡到 0（`pointer-events:none`），指针移到右上角热区就回来；
+ *   键盘 Tab 聚焦到里面任何一颗按钮时也回来（`:focus-within`）。
+ *   面板开着时**不隐藏** —— 那是用户正在用的东西。
  */
 
 /** Panel ids, in the order they appear as buttons. */
 const PANEL_IDS = ['map', 'settings', 'audio', 'achievements']
 
+/**
+ * 房间里静止多久之后把这一列淡出（ms）。
+ *
+ * 2400 是"看完一屏内容"的量级：进场动画 + 扫一眼唱盘/歌单大约就是这个时间，
+ * 再短会在人还在看的时候就消失，再长就白占了内容。
+ */
+const HIDE_AFTER = 2400
+
+/**
+ * 指针进入"角落热区"的判据（px）。取 16 = 按钮自己的 18px 内缩再往里一点，
+ * 所以鼠标**还没碰到按钮**时它就已经淡回来了，不用瞄。
+ */
+const CORNER_SLACK = 16
+
 export default function SiteControls() {
   const { language, toggleLanguage } = useSitePreferences()
   const { isMuted } = useAudio()
+  const { isInRoom } = useScene()
   const [updateReady, setUpdateReady] = useState(null)
   const [openPanel, setOpenPanel] = useState(null)
+
+  /**
+   * 房间里这一列"让开"的开关。
+   *
+   * 🔴 只有 `isInRoom` 时才会为 true：走廊和院子里这一列**永远在**（那里没有
+   * 内容会跟它抢位置，而且它是"进屋"的主要入口之一）。
+   */
+  const [hidden, setHidden] = useState(false)
+  const clusterRef = useRef(null)
+  /* 每次"有动作"就把这个数 +1，effect 重挂定时器 —— 比手动 clearTimeout 少一处漏。 */
+  const [poke, setPoke] = useState(0)
 
   /**
    * 音乐是不是"开着"。**默认 false** —— 这是有意的。
@@ -85,6 +125,54 @@ export default function SiteControls() {
     []
   )
 
+  /**
+   * 房间里"让开"：进房间先亮一会儿（给人看清还有哪些控件），静止 `HIDE_AFTER`
+   * 之后淡出；指针滑到右上角、或者键盘聚焦进来，又淡回来。
+   *
+   * 🔴 **面板开着时一律不隐藏** —— 那是用户正在用的东西，藏掉等于抢走。
+   *
+   * 两个"复位"放在**渲染期**做，不塞进 effect：effect 里同步 `setState` 会触发
+   * 级联渲染（`react-hooks/set-state-in-effect`），而且这里本来就是
+   * React 文档里那个「随 prop 变化调整 state」的标准写法。
+   */
+  const [wasInRoom, setWasInRoom] = useState(isInRoom)
+  if (wasInRoom !== isInRoom) {
+    // 进/出房间：复位（回走廊时隐藏态绝不能漏出去）
+    setWasInRoom(isInRoom)
+    setHidden(false)
+  }
+  if (openPanel && hidden) {
+    setHidden(false)
+  }
+
+  useEffect(() => {
+    if (!isInRoom || openPanel) return undefined
+    const timer = window.setTimeout(() => setHidden(true), HIDE_AFTER)
+    return () => window.clearTimeout(timer)
+    // `poke` 只是用来"重置计时器"，本身不参与判断
+  }, [isInRoom, openPanel, poke])
+
+  /**
+   * 右上角热区：指针靠近就淡回来。
+   *
+   * 用**一个大一点的方形热区**而不是"鼠标进入这一列"——后者要求瞄准那 46px 宽的
+   * 按钮，而它们此刻是 `pointer-events:none`（隐形的），根本进不去。
+   * 判据放在 `window` 的 pointermove 上，隐藏时才挂，显示时不花代价。
+   */
+  useEffect(() => {
+    if (!hidden) return undefined
+    const onMove = (event) => {
+      const x = window.innerWidth - event.clientX
+      const y = event.clientY
+      if (x <= 18 + 46 + CORNER_SLACK && y <= 18 + 42 * 5 + 8 * 4 + CORNER_SLACK) {
+        setHidden(false)
+        setPoke((n) => n + 1)
+      }
+    }
+    window.addEventListener('pointermove', onMove, { passive: true })
+    return () => window.removeEventListener('pointermove', onMove)
+  }, [hidden])
+
   // Staggered drop-in: each button starts a little after the one above it, so
   // the column pulls down out of the top edge instead of appearing all at once.
   const dropDelay = (index) => ({ animationDelay: `${index * 70}ms` })
@@ -107,8 +195,19 @@ export default function SiteControls() {
         </div>
       )}
       <div
-        className="hud-cluster hud-cluster--right site-controls"
+        className={`hud-cluster hud-cluster--right site-controls ${hidden ? 'is-hidden' : ''}`}
         aria-label={zh ? '站点设置' : 'Site preferences'}
+        ref={clusterRef}
+        /* 键盘用户：Tab 进来一颗按钮就把它叫回来（`:focus-within` 负责视觉，
+           这里只是提前把 `is-hidden` 摘掉，否则 `pointer-events:none` 下
+           焦点能进但看不见按钮）。 */
+        onFocusCapture={() => {
+          if (!hidden) return
+          setHidden(false)
+          setPoke((n) => n + 1)
+        }}
+        /* 每次点按都是"还在用"，重新计时 */
+        onClickCapture={() => setPoke((n) => n + 1)}
       >
         {/* 1 · Map */}
         <button

@@ -22,7 +22,7 @@ const PANEL_IDS = ['map', 'audio', 'achievements', 'settings'];
 const NavigationUI = () => {
     const { currentRoom, isInRoom, requestExit, hasEntered, teleportTo, isTeleporting, markEntered, requestHouseExit, doorBusy } = useScene();
     const { globalVolume, setGlobalVolume, isMuted, toggleMute, ambienceOn, toggleAmbience } = useAudio();
-    const { showTutorial } = useAchievements();
+    const { showTutorial, hidePopup } = useAchievements();
     const { language, theme, setTheme, season, setSeason } = useSitePreferences();
     // 解析后的季节（'auto' 时按月份算出来的那个）。只用于面板底部那句提示。
     const resolvedSeason = useSeason();
@@ -122,6 +122,19 @@ const NavigationUI = () => {
             showTutorial('corridor_explore');
         }
     }, [hasEntered, isTeleporting, isInRoom, showTutorial]);
+
+    /**
+     * 进房间时把那颗教程胶囊收掉。
+     *
+     * 🔴 原来**没人负责收**：`showTutorial` 只负责"显示"，而 `corridor_enter`
+     * 的 `unlockAchievement` 是由**推门**触发的 —— 走深链 / 传送 / 菜单直接进房间
+     * 时那件事根本不发生 ⇒ 胶囊一直挂着，文案还写着「Click a door to enter」，
+     * 而用户已经在房间里了（8 个房间全中，2026-11-12 在音乐房间的截图里发现）。
+     * 它还是 `pointer-events: auto` 的，压在画面下方正中。
+     */
+    useEffect(() => {
+        if (isInRoom) hidePopup();
+    }, [isInRoom, hidePopup]);
 
     // Close menu when entering a room or starting teleport
     useEffect(() => {
