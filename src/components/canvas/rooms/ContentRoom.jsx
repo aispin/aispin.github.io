@@ -35,7 +35,6 @@ const ITEM_KIND = {
   articles: { platform: 'POST', layout: 'editorial' },
   projects: { platform: 'PROJECT', layout: 'editorial' },
   labs: { platform: 'LAB', layout: 'editorial' },
-  music: { platform: 'MUSIC', layout: 'editorial' },
   videos: { platform: 'VIDEO', layout: 'editorial' },
   aiProjects: { platform: 'AI', layout: 'editorial' },
   experience: { platform: 'EXPERIENCE', layout: 'editorial' },
@@ -191,7 +190,6 @@ const ACCENT = {
   studio: '#7FB3A0',
   posts: '#D9908F',
   videos: '#8FA8D9',
-  music: '#C39BD9',
   ai: '#D9BE79',
 }
 
@@ -225,7 +223,7 @@ function openItem(openOverlay, item, kind, labels) {
     date: item.publishedAt || item.startDate || '',
     platformConfig: { label: config.platform },
     layout: config.layout,
-    actionLabel: kind === 'music' ? labels.play : kind === 'aiProjects' ? labels.repo : labels.read,
+    actionLabel: kind === 'aiProjects' ? labels.repo : labels.read,
   })
 }
 
@@ -837,7 +835,6 @@ export default function ContentRoom({ roomId, showRoom, onReady }) {
       })
     }
     if (roomId === 'videos') return getLocalizedCollection('videos', language)
-    if (roomId === 'music') return getLocalizedCollection('music', language)
     if (roomId === 'ai') return getLocalizedCollection('aiProjects', language)
     return []
   }, [roomId, language])
@@ -894,7 +891,6 @@ export default function ContentRoom({ roomId, showRoom, onReady }) {
     // 小说卡 2026-11-07 下架（`NOVELS` 还在 `config/theme.js` 里留着，等连载
     // 发布后再挂回来）⇒ 这里不再有 `category === 'novel'` 这一档。
     if (item.category === 'experience') return 'experience'
-    if (roomId === 'music') return 'music'
     if (roomId === 'videos') return 'videos'
     if (roomId === 'ai') return 'aiProjects'
     return 'projects'

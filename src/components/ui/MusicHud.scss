@@ -1,0 +1,514 @@
+/**
+ * 音乐房间 · 唱盘的 DOM 层。
+ *
+ * 🔴 这份样式**不是重新设计的**，是从 `public/demos/web3d/vinyl-player/index.html`
+ *    的 <style> 块搬过来的。搬家时只做了四件事（和 `PostsHud.scss` 同一套规矩）：
+ *      1. 所有规则嵌进 `.music-room`（原来是全局的，`.stage` / `.side` /
+ *         `.deck` 这些类名会污染整个站）
+ *      2. 丢掉页面级的 `:root` / `*` / `html,body` / `body` / `#gl`
+ *         （底色由 3D 那层画，见 `canvas/rooms/RoomMusic.jsx`）
+ *      3. 变量从 `:root` 挪到 `.music-room` 上
+ *      4. `position:fixed` → `absolute`：这一层是房间里的一块，不是整个视口
+ *    改视觉请**两边一起改**，或者干脆改完 demo 再搬一次。
+ *
+ * ⚠️ 没有语言/主题切换器 —— 和 `posts` / `craft` / `ai` 一样跟随房子。
+ */
+
+
+@font-face{
+  font-family:'MapleUI';
+  src:url('/fonts/maple-ui.woff2') format('woff2');
+  font-weight:400 500;font-display:swap;
+}
+.music-room{
+  /* ── 页面（跟随主题） ───────────────────────────────────────────── */
+  --bg:#07080c;
+  --ink:#eef1f6;
+  --dim:#8b93a3;
+  --dim-2:#5a6070;
+  --line:rgba(150,170,200,.15);
+  --line-2:rgba(150,170,200,.3);
+  --chip:rgba(10,13,19,.55);
+  --veil:7,8,12;
+  /* ── 物件（**不跟随主题**） ──────────────────────────────────────
+     唱片永远是黑的、封套永远是纸的 —— 这两个是"拍下来的实物"，
+     换主题只换房间的墙，不换桌上的东西。见文件尾 README 里的说明。 */
+  --vinyl:#0a0b0e;
+  --paper:#F2EADA;
+  --paper-2:#E7DCC8;
+  --paper-ink:#211D1A;
+  --paper-dim:#6d6152;
+  /* ── 每首曲子的主色（JS 写 --h） ───────────────────────────────── */
+  --h:222;
+  --a-ink:hsl(var(--h) 62% 36%);
+  --a-glow:hsl(var(--h) 74% 62%);
+  --accent-text:var(--a-glow);
+  --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --sans:'MapleUI',ui-sans-serif,system-ui,'PingFang SC','Hiragino Sans GB',sans-serif;
+}
+/* ── 浅色：主站的暖纸（纸 #FFF6E9 / 墨 #211D1A / 木色线 #9B755A） ── */
+html[data-theme="light"] .music-room{
+  --bg:#F7EDDE;
+  --ink:#211D1A;
+  --dim:#6a5c4f;
+  --dim-2:#9a8877;
+  --line:rgba(120,92,66,.26);
+  --line-2:rgba(120,92,66,.46);
+  --chip:rgba(255,250,242,.72);
+  --veil:247,237,222;
+  --accent-text:var(--a-ink);
+}
+.music-room,
+.music-room *{box-sizing:border-box}
+.music-room{
+  background:transparent;   /* 底色由 3D 那层画（canvas/rooms/RoomMusic.jsx） */
+  position:absolute;inset:0;
+  /* 和 `PostsHud` / `CraftHud` 一致：**低于**站内导航（`.navigation-ui` 100），
+     退出房间只走那颗返回键，本层不再自己画一颗。 */
+  z-index:90;
+  color:var(--ink);
+  font-family:var(--sans);
+  overflow:hidden;
+  overscroll-behavior:none;
+  -webkit-font-smoothing:antialiased;
+  transition:background-color .5s ease,color .5s ease;
+}
+
+/* ══ 布局 ═══════════════════════════════════════════════════════════ */
+.stage{
+  position:absolute;inset:0;z-index:2;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 372px;
+}
+
+/* ══ 顶部：返回胶囊 + 标题（居中，右上角留给房子的图标栈） ═════════ */
+.lab-back{
+  position:absolute;left:18px;top:16px;z-index:6;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 12px;border-radius:999px;
+  border:1px solid var(--line);
+  color:var(--dim);text-decoration:none;
+  font:400 12px/1 var(--sans);letter-spacing:.04em;
+  background:var(--chip);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  transition:color .22s ease,border-color .22s ease;
+}
+.music-room .lab-back:hover {color:var(--ink);border-color:var(--dim-2)}
+.music-room .brand {
+  position:absolute;left:50%;top:18px;transform:translateX(-50%);
+  text-align:center;pointer-events:none;z-index:6;
+}
+.music-room .brand__name {
+  font:500 15px/1.2 var(--sans);letter-spacing:.14em;color:var(--ink);
+  text-shadow:0 0 22px rgba(0,0,0,.7);
+}
+html[data-theme="light"] .music-room .brand__name {text-shadow:none}
+.music-room .brand__name i {font-style:normal;color:var(--dim-2);margin:0 .18em}
+.music-room .brand__meta {
+  margin-top:6px;font:400 10px/1 var(--mono);letter-spacing:.16em;
+  color:var(--dim);text-transform:uppercase;
+}
+.music-room .brand__meta b {color:var(--accent-text);font-weight:500}
+
+/* ══ 左：唱盘 ═══════════════════════════════════════════════════════ */
+.deckwrap{
+  position:relative;
+  display:flex;align-items:center;justify-content:center;
+  min-width:0;min-height:0;
+  padding:60px 0 24px 12px;
+  /* 拖唱臂的监听挂在这一层（普通 2D 元素，命中可靠），手指拖盘面别滚页面 */
+  touch-action:none;
+}
+.music-room .deckwrap.can-grab {cursor:grab}
+.music-room .deckwrap.is-grab {cursor:grabbing}
+.music-room .deck {
+  perspective:1600px;
+  perspective-origin:50% 42%;
+  transform:scale(var(--s,1));
+  transform-origin:50% 50%;
+  will-change:transform;
+}
+/* 整台机器躺在**同一个平面**里：封套、唱片、唱臂都在这块平面上，
+   所以它们共享一次 rotateX —— 各自的透视关系才是对的（不是贴上去的贴纸）。 */
+.deck__plane{
+  position:relative;
+  width:900px;height:900px;
+  transform:rotateX(52deg) rotateZ(-7deg);
+  transform-style:preserve-3d;
+}
+
+/* 封套：唱片压在它上面 —— 只让出顶部一条横带和左边一条竖带，
+   所以封套的**字位在顶部**（见 paintCover 的版式说明）。
+   600 见方、偏移到左上角，唱片盖住的是它的右下大半 —— 这就是
+   "唱片躺在自己封套上"的那张照片。 */
+.sleeve{
+  position:absolute;left:-10px;top:6px;
+  width:600px;height:600px;
+  border-radius:3px;
+  overflow:hidden;
+  box-shadow:0 40px 70px -30px rgba(0,0,0,.85),0 0 0 1px rgba(0,0,0,.35);
+  transform:translateZ(-24px) rotateZ(2.5deg);
+  background:var(--paper);
+  pointer-events:none;   /* 同 `.disc`：桌上这两件都不接事件，事件只归唱臂 */
+}
+.music-room .sleeve canvas {display:block;width:100%;height:100%}
+/* 纸角的一点体积感：左上打光 */
+.sleeve::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(150deg,rgba(255,255,255,.28),transparent 46%,rgba(0,0,0,.14));
+  pointer-events:none;
+}
+
+/* 唱片：两块画布叠在一起 —— 底图（沟槽+片芯）按曲目重画一次，
+   频谱环每帧重画。分开是因为底图重绘 ~90 个圆，不该每帧跑。 */
+.disc{
+  position:absolute;left:40px;top:40px;
+  width:820px;height:820px;
+  border-radius:50%;
+  z-index:1;
+  /* 🔴 唱片**不接受指针事件**。父级 `.deck__plane` 是 preserve-3d，在那里
+     `z-index` 不参与排序（按 3D 深度排），所以盘面这两块画布会盖在唱臂上面
+     接走 pointerdown —— 表现就是"放歌的时候抓不住唱臂"（指针落在盘上，
+     事件给了 canvas）。唱片本来就没有任何交互，直接让开最稳。 */
+  pointer-events:none;
+}
+.music-room .disc canvas {position:absolute;inset:0;width:100%;height:100%}
+.music-room #discArt {filter:drop-shadow(0 34px 46px rgba(0,0,0,.6))}
+/* 自转：只有真在放的时候转。用 `animation-play-state` 而不是加/删 class ——
+   暂停时盘停在原来的角度，不会"啪"地弹回 0°（片芯上的字看得出来）。 */
+#discArt{animation:spin 4.2s linear infinite;animation-play-state:paused}
+.music-room .disc.is-spinning #discArt {animation-play-state:running}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* 唱臂：纯展示，**不接指针事件**（命中判定在 JS 里算，见 nearArm）。
+   `preserve-3d` 子树里的命中测试和绘制顺序对不上：实测 elementFromPoint 报
+   `.arm__rod`，真正的 pointerdown 却落到 `.deck__plane` —— 所以不能靠它。 */
+.arm{
+  position:absolute;
+  width:0;height:0;
+  transform-origin:0 0;
+  will-change:transform;
+  z-index:3;
+  pointer-events:none;
+}
+.music-room .arm__rod {
+  position:absolute;left:-4px;top:-3px;
+  width:224px;height:6px;border-radius:3px;
+  background:linear-gradient(180deg,#d8d2c6,#8d867a 55%,#5c574e);
+  box-shadow:0 2px 6px rgba(0,0,0,.55);
+}
+.music-room .arm__weight {
+  position:absolute;left:-30px;top:-11px;
+  width:30px;height:22px;border-radius:5px;
+  background:linear-gradient(180deg,#b9b2a4,#6f6a60);
+  box-shadow:0 3px 8px rgba(0,0,0,.5);
+}
+.music-room .arm__pivot {
+  position:absolute;left:-9px;top:-9px;
+  width:18px;height:18px;border-radius:50%;
+  background:radial-gradient(circle at 35% 32%,#e6e0d3,#6d675c 70%);
+  box-shadow:0 0 0 1px rgba(0,0,0,.4),0 4px 10px rgba(0,0,0,.5);
+}
+.music-room .arm__head {
+  position:absolute;left:206px;top:-10px;
+  width:30px;height:20px;border-radius:3px 6px 6px 3px;
+  background:linear-gradient(180deg,#cfc8ba,#7d776b);
+  transform:rotate(14deg);
+  box-shadow:0 3px 8px rgba(0,0,0,.5);
+}
+/* 针尖：落在哪条沟上，靠它才看得出来 */
+.arm__needle{
+  position:absolute;left:22px;top:16px;
+  width:5px;height:5px;border-radius:50%;
+  background:var(--accent-text);
+  box-shadow:0 0 10px 2px var(--accent-text);
+  transition:background-color .5s ease,box-shadow .5s ease;
+}
+/* 唱臂的落点阴影 —— 让"针在盘上"这件事有重量 */
+.arm__shadow{
+  position:absolute;left:200px;top:8px;
+  width:46px;height:12px;border-radius:50%;
+  background:radial-gradient(ellipse,rgba(0,0,0,.55),transparent 70%);
+  opacity:0;transition:opacity .5s ease;
+}
+.music-room .deck.is-live .arm__shadow {opacity:1}
+
+/* ══ 右：曲目与走带 ═════════════════════════════════════════════════ */
+.side{
+  position:relative;z-index:4;
+  display:flex;flex-direction:column;
+  padding:96px 34px 30px 8px;
+  min-height:0;
+}
+.music-room .side__head {
+  display:flex;align-items:baseline;justify-content:space-between;
+  padding-bottom:12px;border-bottom:1px solid var(--line);
+}
+.music-room .side__kicker {
+  font:400 10px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--dim);
+}
+.music-room .side__count {font:400 10px/1 var(--mono);letter-spacing:.14em;color:var(--dim-2)}
+
+/* ── 歌单条 ──────────────────────────────────────────────────────────
+   精选 / 最新 / 最热 和「最新专辑」放在**同一块**里 —— 它们本来就是一
+   类东西（"一整张要放上盘的东西"），分上下两处就得来回找。
+   但 7 张 76px 的卡塞不进 274px 的一行（塞进去的结果是专辑全被推到
+   横向滚动后面，等于没有），所以分两层，同一块、两种卡：
+     · 上层：三张等宽歌单卡（名字 + 大数字 = 这张列表多少首）
+     · 下层：专辑卡（主色条 + 右上角「专辑」角标 + 名 + 类型·年份），多了横向滚
+   ─────────────────────────────────────────────────────────────────── */
+.shelf{display:flex;flex-direction:column;gap:9px;margin-top:8px}
+.music-room .shelf__lists {display:flex;gap:8px}
+.music-room .shelf__row {
+  display:flex;gap:8px;overflow-x:auto;
+  /* 上边留 4px：卡片 hover 抬起 2px，不留就会被 overflow 裁掉**顶边**（就是那个 bug） */
+  padding:4px 0 4px;
+  scrollbar-width:none;overscroll-behavior-x:contain;
+}
+.music-room .shelf__row::-webkit-scrollbar {display:none}
+.music-room .shelf__row[hidden] {display:none}
+.music-room .pl, .music-room .album {
+  position:relative;flex:0 0 auto;
+  display:flex;flex-direction:column;
+  text-align:left;cursor:pointer;
+  background:var(--chip);border:1px solid var(--line);border-radius:3px;
+  color:var(--ink);font-family:var(--sans);
+  transition:border-color .2s ease,transform .2s ease;
+}
+.music-room .pl:hover, .music-room .album:hover {transform:translateY(-2px)}
+.music-room .pl:hover {border-color:var(--line-2)}
+.music-room .pl.is-on {border-color:var(--accent-text)}
+.music-room .pl.is-on .pl__name {color:var(--accent-text)}
+.music-room .pl:disabled {opacity:.3;cursor:default}
+.music-room .pl:disabled:hover {transform:none;border-color:var(--line)}
+
+/* 歌单卡：横着排满一行、矮，和下面那排竖着的专辑卡明显不是一类东西 */
+.pl{flex:1 1 0;min-width:0;height:58px;padding:8px 9px 7px}
+.music-room .pl__name {font:500 11px/1.2 var(--sans);letter-spacing:.02em;color:var(--ink)}
+.music-room .pl__num {margin-top:auto;display:flex;align-items:baseline;gap:3px}
+.music-room .pl__num b {font:400 19px/1 var(--mono);letter-spacing:-.02em;color:var(--ink)}
+.music-room .pl__num i {font:400 8px/1 var(--mono);font-style:normal;letter-spacing:.06em;color:var(--dim-2)}
+
+/* 专辑卡：边框比歌单卡重一档 + 角标，扫一眼就知道"这张是一整张专辑" */
+.album{width:76px;height:94px;padding:9px 8px 8px;border-color:var(--line-2)}
+.music-room .album:hover {border-color:var(--dim-2)}
+.music-room .album.is-on {border-color:var(--accent-text)}
+.music-room .album__top {display:flex;align-items:center;justify-content:space-between;height:9px}
+/* 主色条：和唱片封套右上角那个"系列标记"是同一个东西 */
+.album__bar{width:12px;height:2px;border-radius:1px;background:var(--accent-text)}
+.music-room .album__tag {
+  font:400 8px/1 var(--mono);letter-spacing:.08em;color:var(--dim-2);
+}
+.music-room .album.is-on .album__tag {color:var(--accent-text)}
+.music-room .album__name {
+  margin-top:auto;
+  font:500 11px/1.24 var(--sans);color:var(--ink);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  word-break:break-word;
+}
+.music-room .album__meta {
+  /* line-height 别贴着 1：这里 overflow:hidden（为了省略号），行高太紧会把
+     字的下半截切掉 —— 8px 的字最容易中招 */
+  margin-top:5px;font:400 8px/1.5 var(--mono);letter-spacing:.04em;
+  text-transform:uppercase;color:var(--dim-2);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+
+/* 排在最后的那张虚线卡 = 「全部」外链 */
+.shelf__more{
+  flex:0 0 auto;width:58px;height:94px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  border:1px dashed var(--line-2);border-radius:3px;
+  font:400 9px/1 var(--mono);letter-spacing:.12em;color:var(--dim-2);
+  text-decoration:none;transition:color .2s ease,border-color .2s ease;
+}
+.music-room .shelf__more i {font-style:normal;font-size:12px;line-height:1}
+.music-room .shelf__more:hover {color:var(--accent-text);border-color:var(--accent-text)}
+.music-room .shelf__more[hidden] {display:none}
+.music-room .tracks {list-style:none;margin-top:6px;overflow-y:auto;min-height:0;flex:0 1 auto}
+/* 装不下时最后一行是被裁的（最新/最热有 12 首）。给它一道渐隐，
+   读起来才是"下面还有"，而不是"排版断了"。列表短时不加这个类，末行边框保持完整。 */
+.tracks.is-scroll{
+  /* 只压最后 10px：`.track` 的 padding 是 17px，行被裁时标题正好落在
+     10~30px 那一段 —— 渐隐一长（试过 26 / 16）整行标题就糊成"幽灵"，
+     看着像渲染坏了。10px 只柔化裁口，标题还是清楚的。 */
+  -webkit-mask-image:linear-gradient(to bottom,#000 0,#000 calc(100% - 10px),transparent 100%);
+  mask-image:linear-gradient(to bottom,#000 0,#000 calc(100% - 10px),transparent 100%);
+}
+.music-room .tracks::-webkit-scrollbar {width:6px}
+.music-room .tracks::-webkit-scrollbar-thumb {background:var(--line-2);border-radius:3px}
+.music-room .track {
+  position:relative;
+  display:grid;
+  grid-template-columns:26px minmax(0,1fr) auto;
+  align-items:baseline;
+  gap:10px;
+  padding:17px 10px 17px 8px;
+  border-bottom:1px solid var(--line);
+  cursor:pointer;
+  transition:background-color .2s ease,padding-left .2s ease;
+}
+.music-room .track:hover {background:rgba(255,255,255,.03);padding-left:12px}
+html[data-theme="light"] .music-room .track:hover {background:rgba(120,92,66,.06)}
+/* 左侧那根竖线：选中才亮，是这一列唯一的"状态" */
+.track::before{
+  content:'';position:absolute;left:0;top:10px;bottom:10px;width:2px;border-radius:1px;
+  background:var(--accent-text);
+  opacity:0;transform:scaleY(.3);transform-origin:50% 50%;
+  transition:opacity .25s ease,transform .25s ease;
+}
+.music-room .track.is-active::before {opacity:1;transform:scaleY(1)}
+/* 最后一行不要下边框：它紧贴着下面 transport 的 `border-top`，会并成双线
+   （曲目少、列表刚好放满时最明显，看着像把列表框死了）。 */
+.track:last-child{border-bottom:0}
+/* 列表溢出时（`.is-scroll`）底部本来就是被裁的内容：容器边上那条是"上一行的
+   边框"，离 transport 的 `border-top` 只有十几像素 ⇒ 又是双线。
+   这时让 transport 那条让路，只留列表自己这一条。 */
+.tracks.is-scroll + .transport{border-top:0}
+.music-room .track__no {
+  font:400 10px/1.4 var(--mono);letter-spacing:.06em;color:var(--dim-2);
+  transition:color .25s ease;
+}
+.music-room .track.is-active .track__no {color:var(--accent-text)}
+.music-room .track__title {
+  display:block;
+  font:500 13.5px/1.35 var(--sans);color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  transition:color .25s ease;
+}
+.music-room .track.is-active .track__title {color:var(--accent-text)}
+.music-room .track__sub {
+  display:block;
+  margin-top:3px;font:400 10.5px/1.3 var(--sans);color:var(--dim);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.music-room .track__meter {
+  display:flex;align-items:flex-end;gap:2px;height:14px;width:22px;
+  justify-content:flex-end;opacity:0;transition:opacity .3s ease;
+}
+.music-room .track.is-active .track__meter {opacity:1}
+.music-room .track__meter i {
+  display:block;width:2px;border-radius:1px;background:var(--accent-text);
+  height:calc(14px * var(--v,.2));
+  transition:height .08s linear;
+}
+.music-room .track:not(.is-active) .track__meter {display:none}
+
+/* 走带 */
+.transport{
+  margin-top:auto;padding-top:18px;border-top:1px solid var(--line);
+}
+.music-room .now {min-height:34px}
+.music-room .now__title {
+  font:500 14px/1.35 var(--sans);color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.music-room .now__sub {margin-top:3px;font:400 10.5px/1.3 var(--sans);color:var(--dim)}
+.music-room .bar {
+  position:relative;height:22px;margin:12px 0 2px;cursor:pointer;
+  display:flex;align-items:center;
+  touch-action:none;
+}
+.music-room .bar__rail {
+  position:relative;width:100%;height:2px;border-radius:1px;background:var(--line-2);
+  overflow:hidden;
+}
+.music-room .bar__fill {
+  position:absolute;left:0;top:0;bottom:0;width:0%;
+  background:var(--accent-text);
+  transition:background-color .5s ease;
+}
+.music-room .bar__dot {
+  position:absolute;top:50%;width:9px;height:9px;margin-left:-4.5px;
+  border-radius:50%;background:var(--accent-text);
+  transform:translateY(-50%) scale(.6);
+  box-shadow:0 0 0 0 rgba(0,0,0,0);
+  transition:transform .18s ease,background-color .5s ease;
+}
+.music-room .bar:hover .bar__dot, .music-room .bar.is-drag .bar__dot {transform:translateY(-50%) scale(1)}
+.music-room .time {
+  display:flex;justify-content:space-between;
+  font:400 10px/1 var(--mono);letter-spacing:.08em;color:var(--dim-2);
+}
+.music-room .controls {
+  display:flex;align-items:center;gap:14px;margin-top:14px;
+}
+.music-room .btn {
+  display:grid;place-items:center;
+  width:34px;height:34px;border-radius:50%;
+  border:1px solid var(--line);background:transparent;color:var(--dim);
+  cursor:pointer;transition:color .2s ease,border-color .2s ease,transform .15s ease;
+}
+.music-room .btn:hover {color:var(--ink);border-color:var(--dim-2)}
+.music-room .btn:active {transform:scale(.94)}
+.music-room .btn--play {
+  width:48px;height:48px;
+  border-color:var(--line-2);color:var(--ink);
+}
+.music-room .btn--play:hover {border-color:var(--accent-text);color:var(--accent-text)}
+.music-room .btn svg {display:block}
+.music-room .controls__spacer {flex:1}
+.music-room .src {
+  font:400 10px/1 var(--mono);letter-spacing:.08em;color:var(--dim-2);
+  text-decoration:none;border-bottom:1px solid transparent;
+  transition:color .2s ease,border-color .2s ease;
+}
+.music-room .src:hover {color:var(--ink);border-color:var(--dim-2)}
+.music-room .hint {
+  margin-top:14px;font:400 10px/1.5 var(--sans);color:var(--dim-2);letter-spacing:.02em;
+}
+.music-room .toast {
+  position:absolute;left:50%;bottom:26px;transform:translate(-50%,8px);
+  padding:8px 14px;border-radius:999px;
+  background:var(--chip);border:1px solid var(--line);
+  font:400 11px/1 var(--sans);color:var(--ink);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  opacity:0;pointer-events:none;transition:opacity .3s ease,transform .3s ease;
+  z-index:8;
+}
+.music-room .toast.is-on {opacity:1;transform:translate(-50%,0)}
+
+/* ══ 窄屏 ═══════════════════════════════════════════════════════════ */
+@media (max-width:900px){
+  .stage{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto}
+  .deckwrap{padding:52px 0 0}
+  .sleeve{display:none}
+  .side{
+    padding:0 20px calc(18px + env(safe-area-inset-bottom));
+    background:linear-gradient(180deg,transparent,var(--bg) 26%);
+    /* 56 而不是 52：歌单卡比原来的 tab 高 30px，面板不长高就得从曲目列表里扣，
+       而列表已经只剩三行 —— 唱盘那边是**宽度**限死的（fitDeck 取 min），
+       多给它 30px 高度也不会变小。 */
+    max-height:56vh;
+  }
+  .tracks{
+    margin-top:2px;
+    /* 列表比面板高：底部用遮罩淡出，别把第 5 行切一半（那看着像坏了） */
+    -webkit-mask-image:linear-gradient(180deg,#000 calc(100% - 22px),transparent);
+    mask-image:linear-gradient(180deg,#000 calc(100% - 22px),transparent);
+  }
+  .track{padding:10px 6px 10px 6px}
+  .track__title{font-size:13px}
+  /* 窄屏：歌单卡再压矮一档；专辑那一层整层让路 ——
+     52vh 的面板里多 100px 卡片，曲目列表就只剩一行半，
+     比"少一个入口"糟得多（专辑本来也是从最新/最热里听到的）。 */
+  .shelf{margin-top:6px;gap:7px}
+  .shelf__row{display:none}
+  .pl{height:50px;padding:7px 9px 6px}
+  .pl__num b{font-size:17px}
+  .tracks{min-height:120px}
+  .side__head{padding-bottom:8px}
+  .hint{display:none}
+  .brand{top:12px}
+  .brand__name{font-size:13px}
+  .lab-back{top:10px;left:10px;font-size:11px;padding:5px 10px}
+}
+@media (max-height:620px) and (min-width:901px){
+  .side{padding-top:74px}
+  .track{padding:9px 8px}
+  .hint{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .disc.is-spinning #discArt{animation:none}
+  *{transition-duration:.01ms!important}
+}

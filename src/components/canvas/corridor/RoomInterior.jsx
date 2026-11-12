@@ -14,6 +14,7 @@ import {
 import GalleryRoom from '../rooms/Gallery/GalleryRoom';
 import ContactRoom from '../rooms/Contact/ContactRoom';
 import ContentRoom from '../rooms/ContentRoom';
+import RoomMusic from '../rooms/RoomMusic';
 import CareerTunnel from '../rooms/CareerTunnel';
 import CraftRing from '../rooms/CraftRing';
 import PostsFold from '../rooms/PostsFold';
@@ -45,13 +46,15 @@ const SUBTITLES = {
 // `posts` 同理：2026-11-06 换成一条**接管渲染**的经折（rooms/PostsFold.jsx），
 // 折页与 HUD 是 DOM（ui/PostsHud.jsx）。
 // `ai` 同理：2026-11-09 换成一面**接管渲染**的卡片墙（rooms/AiAtlas.jsx），
-// 24 张卡与 iframe 浮层是 DOM（ui/AiAtlasHud.jsx）。至此 8 个房间里有 4 个是
-// 独立空间，只剩 videos / music 还走 ContentRoom。
-const CONTENT_ROOM_IDS = ['videos', 'music'];
+// 24 张卡与 iframe 浮层是 DOM（ui/AiAtlasHud.jsx）。
+// `music` 同理：2026-11-12 换成一台**接管渲染**的唱盘（rooms/RoomMusic.jsx），
+// 唱盘与歌单是 DOM（ui/MusicHud.jsx），引擎在 ui/vinylEngine.js（demo 的移植）。
+// 至此 8 个房间里有 6 个是独立空间，只剩 videos 还走 ContentRoom。
+const CONTENT_ROOM_IDS = ['videos'];
 
 // 自己会喊 `onReady` 的房间。必须在下面的兜底里排除掉，否则门会在房间还没
 // 搭好时就打开 —— 隧道尤其明显：先开到一片空白，再"啪"地出现。
-const SELF_READY_IDS = ['gallery', 'contact', 'career', 'craft', 'posts', 'ai', ...CONTENT_ROOM_IDS];
+const SELF_READY_IDS = ['gallery', 'contact', 'career', 'craft', 'posts', 'ai', 'music', ...CONTENT_ROOM_IDS];
 
 /**
  * 接管渲染房间的「屋子壳」（floor / ceiling / 背墙 / 左右墙，正面敞开）。
@@ -190,6 +193,8 @@ const RoomInterior = ({ label, roomId, showRoom, onReady, isExiting }) => {
                 craft: shellMaterials('#0b0e17', '#04060a', '#131827'),
                 // AI 房间：冷黑底（#05070c）+ 一团青绿冷光 ⇒ 壳取底色的稍亮一档
                 ai: shellMaterials('#0a0f17', '#04060a', '#0d131c'),
+                // 音乐房间：暖黑（#0b0908）+ 顶灯一团暖光 ⇒ 壳取底色稍亮一档
+                music: shellMaterials('#14100d', '#0a0807', '#1a1512'),
             },
         };
     }, [corridorWidth, corridorDepth, corridorHeight]);
@@ -351,6 +356,16 @@ const RoomInterior = ({ label, roomId, showRoom, onReady, isExiting }) => {
                             <RoomShell geometries={geometries} shell={materials.shells.ai} />
                             <Suspense fallback={null}>
                                 <AiAtlas onReady={onReady} isExiting={isExiting} />
+                            </Suspense>
+                        </>
+                    ) : roomId === 'music' ? (
+                        // === 音乐：一台唱盘 ===
+                        // 自带 Scene + Camera + 接管渲染（rooms/RoomMusic.jsx），
+                        // 唱盘、歌单与播放控制是 DOM（ui/MusicHud.jsx）。
+                        <>
+                            <RoomShell geometries={geometries} shell={materials.shells.music} />
+                            <Suspense fallback={null}>
+                                <RoomMusic onReady={onReady} isExiting={isExiting} />
                             </Suspense>
                         </>
                     ) : CONTENT_ROOM_IDS.includes(roomId) ? (

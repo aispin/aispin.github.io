@@ -15,6 +15,7 @@ import CareerHud from './components/ui/CareerHud';
 import CraftHud from './components/ui/CraftHud';
 import PostsHud from './components/ui/PostsHud';
 import AiAtlasHud from './components/ui/AiAtlasHud';
+import MusicHud from './components/ui/MusicHud';
 import ScreenReaderOverlay from './components/ui/ScreenReaderOverlay';
 import Toast from './components/ui/Toast';
 import { useDocumentMeta, getInitialRoomFromUrl } from './hooks/useDocumentMeta';
@@ -328,6 +329,7 @@ function AppContent() {
               <CraftHud />
               <PostsHud />
               <AiAtlasHud />
+              <MusicHud />
               <GlobalOverlay />
               <ScreenReaderOverlay />
             </>
