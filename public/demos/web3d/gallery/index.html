@@ -83,6 +83,26 @@ body{
   cursor:grab;
 }
 .stage.is-drag{cursor:grabbing}
+/* 挂线层：铺满视口、不吃鼠标、在带子后面 */
+.rig{
+  position:absolute;inset:0;width:100%;height:100%;
+  z-index:1;pointer-events:none;
+  color:var(--ink);
+  /* 深色下细线要几乎看不见才自然；浅色下反而要更淡 */
+  opacity:.5;
+}
+html[data-theme="light"] .rig{opacity:.42}
+.rig line{
+  stroke:currentColor;stroke-width:1;
+  vector-effect:non-scaling-stroke;
+}
+/* 横梁：比吊线亮一点，让人看出"这是根杆子" */
+.rig line[id^="rail"]{stroke-width:1.2;stroke-opacity:.42}
+/* 吊线：纯色、很淡。**不要用渐变** —— 第一版用了从梁到帧顶的 rodFade，
+   结果线的末端（正好落在帧顶，本该"抓住"照片的地方）几乎全透明，
+   看起来像线没接上。 */
+.rig line[id^="wire"]{stroke-width:1;stroke-opacity:.30}
+
 .strip{
   position:absolute;left:50%;top:50%;
   width:0;height:0;
@@ -159,7 +179,7 @@ html[data-theme="light"] .frame.is-active .frame__tag b{color:#8a5a2b}
   padding:0 26px 20px;gap:20px;pointer-events:none;
 }
 .hud__hint{
-  font:400 10px/1.6 var(--mono);letter-spacing:.08em;color:var(--dim-2);
+  font:400 10px/1.6 var(--mono);letter-spacing:.08em;color:var(--dim);
   pointer-events:none;
 }
 /* 浅色下 --dim-2 在暖纸上几乎看不见（实测像一行脏点），换 --dim */
@@ -323,6 +343,23 @@ html[data-theme="light"] .hud__hint{color:var(--dim)}
 <canvas id="gl"></canvas>
 
 <div class="stage" id="stage">
+  <!-- 挂线：顶上两根横梁 + 从梁上垂下来吊住印相带的两根细线。
+       它们**随带子一起移动**（JS 每帧改吊点 x），所以"带子是挂着的"有依据。
+       纯 SVG，因为这是矢量线条：用 GLSL 画一条 1px 的直线要抗锯齿 + 收边，
+       不值得；用 DOM 画又会被 .stage 的 perspective 影响。 -->
+  <svg class="rig" id="rig" aria-hidden="true">
+    <defs>
+      <linearGradient id="rodFade" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="currentColor" stop-opacity=".55"/>
+        <stop offset="1" stop-color="currentColor" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <!-- 一根横梁（两根挨太近会读成一条粗线，试过） -->
+    <line id="railB" x1="0" y1="0" x2="0" y2="0"/>
+    <!-- 两根吊线 -->
+    <line id="wireL" x1="0" y1="0" x2="0" y2="0"/>
+    <line id="wireR" x1="0" y1="0" x2="0" y2="0"/>
+  </svg>
   <div class="strip" id="strip"></div>
 </div>
 
@@ -435,6 +472,7 @@ const DATA_URL = '../../../data/pixabay-aispin.json';
 /* ---------------------------------------------------------------- 状态 */
 const stageEl = $('stage');
 const stripEl = $('strip');
+const rigEl = $('rig');
 const viewEl = $('view');
 let FRAMES = [];         // { id, title, desc, tags, url, src, w, h, ... }
 let cur = 0;
@@ -459,36 +497,169 @@ const LAY = {
 /* 视口参数：由 resize 写 */
 let VW = 0, VH = 0;
 
-/* ---------------------------------------------------------------- 印相背景
- * 一层极简的 GLSL：暗房的红灯 + 极慢的呼吸 + 颗粒。没有它，深色底是一块死黑。
+/* ---------------------------------------------------------------- 暗房
+ * 背景不是"铺一层渐变"——那只是壁纸，撑不起空间。
+ * 这里是**一间房**，用三层叠出来：
+ *   ① GLSL 画的房间本身：透视地面（地砖往远处收）、后墙、从顶上打下来的一束光锥、
+ *      空气里的尘埃（随带子移动产生视差）、暗角。
+ *   ② SVG 画的**挂线**：顶上两根横梁 + 两条从梁上垂下来吊住印相带的细线，
+ *      它们随带子一起移动 —— 于是"带子是挂着的"这件事有了依据。
+ *   ③ 帧自己的 z 递退 + .stage 的 perspective：印相带在房间的深度里。
+ * 三层各管一件事，缺一层都能明显看出"平"。
  */
 let gl, glProg, glU = {}, glCanvas;
 const VERT = `attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}`;
+
 const FRAG = `
 precision highp float;
-uniform vec2 uRes;uniform float uTime;uniform float uLight;
-/* 暗房对位：深色是红光（安全灯），浅色是暖纸上的光斑 */
+uniform vec2 uRes;
+uniform float uTime;
+uniform float uLight;   /* 0 = 暗房（深色）, 1 = 明室（浅色） */
+uniform float uTravel;  /* 带子走到第几帧（连续），用来做视差 */
+
+/* 一个便宜但够用的哈希噪声 */
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  f = f*f*(3.0-2.0*f);
+  float a = hash(i), b = hash(i+vec2(1,0));
+  float c = hash(i+vec2(0,1)), d = hash(i+vec2(1,1));
+  return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
+}
+
 void main(){
   vec2 uv = gl_FragCoord.xy / uRes;
-  vec2 c = uv - vec2(0.5, 0.46);
-  c.x *= uRes.x / uRes.y;
-  float r = length(c);
-  /* 中心一团极弱的暖光，往下压得快 */
-  float core = exp(-r * 2.4);
-  vec3 warm = mix(vec3(0.075, 0.045, 0.036), vec3(0.02, 0.019, 0.021), uv.y);
-  vec3 paper = vec3(0.968, 0.928, 0.868);
-  vec3 base = mix(warm, paper, uLight);
-  /* 安全灯呼吸：极慢，几乎察觉不到，但静止画面就不会"死" */
-  float pulse = 0.5 + 0.5 * sin(uTime * 0.22);
-  /* 浅色下这团光曾经把画面中间洗白（纸色 0.968 + 光 + 边缘压暗 之后
-     照片的纸边和墙分不开）⇒ 浅色时几乎不给光，只留一点层次。 */
-  vec3 glow = mix(vec3(0.42, 0.16, 0.10), vec3(0.72, 0.60, 0.44), uLight);
-  vec3 col = base + glow * core * mix(0.10 + 0.05 * pulse, 0.02, uLight);
-  /* 边缘压暗（暗房的四角本来就照不到） */
-  col *= 1.0 - 0.42 * smoothstep(0.35, 1.05, r);
-  /* 颗粒：细，且随主题变淡 */
-  float g = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
-  col += (g - 0.5) * mix(0.030, 0.014, uLight);
+  /* 以画面中心为原点的纵横比校正坐标 */
+  vec2 p = (gl_FragCoord.xy - 0.5*uRes) / uRes.y;
+
+  /* ── 地平线 ──
+     深色：0.02，地面只占画面下方一条，剩下的空间留给光锥和尘。
+     🔴 浅色：**-1.2，等于没有地面**。试过 -0.30（一条深色地板压在底部）
+     和 0.055（一片亮格子地毯）、浅地砖 0.80 / 0.76 两档压暗 —— 都不行：
+     浅色下这块地面要么太亮压照片、要么太暗像一条黑边。明室的照片应该
+     "挂在墙上"，而不是"摆在地上"，所以干脆不要地面。 */
+  float horizon = mix(0.02, -1.2, uLight);
+
+  /* ───────── 后墙 ─────────
+     暗房不是全黑：墙要有一点点来自光锥的反射，远到近有个极缓的梯度。 */
+  vec3 wallDark  = vec3(0.055, 0.048, 0.050);
+  /* 墙 0.94（不是纸色的 0.968）：比相纸白一档还不够，墙必须**比纸暗**，
+     印相才浮得起来。相纸浅色下是 #FFFCF6 ≈ 0.996。 */
+  vec3 wallLight = vec3(0.930, 0.896, 0.846);
+  vec3 wall = mix(wallDark, wallLight, uLight);
+  /* 墙面质感：暗房里是显影液的水渍，明室里是纸张的纤维。
+     浅色下单纯一层噪声会显脏，所以再叠一组**极细的竖纹**（纤维方向），
+     让它读成"纸"而不是"灰"；深色下只要低频斑驳就够。 */
+  float blot = noise(p * 2.6 + vec2(uTravel * 0.02, 0.0)) * 0.5
+             + noise(p * 6.1) * 0.25;
+  float fiber = noise(vec2(p.x * 46.0, p.y * 3.2)) * 0.5
+              + noise(vec2(p.x * 128.0, p.y * 7.0)) * 0.25;
+  float grain = mix(blot, blot * 0.55 + fiber * 0.45, uLight);
+  wall *= 1.0 + (grain - 0.375) * mix(0.35, 0.16, uLight);
+  /* 后墙比画面顶端更深一点（离光锥远） */
+  wall *= mix(1.0, 0.72, smoothstep(0.05, 0.62, p.y));
+
+  vec3 col = wall;
+
+  /* ───────── 地面 ─────────
+     p.y < horizon 的部分是地面。用 1/(horizon - y) 做透视压缩：
+     越靠近地平线，砖缝越密 —— 这就是"地在前方延伸"的全部秘密。 */
+  if (p.y < horizon) {
+    float d = horizon - p.y;                    /* 0 在地平线，越大越近 */
+    float z = 1.0 / max(d, 0.0015);             /* 深度 */
+    /* 纵向往远处收的砖缝 */
+    /* 缝要**细**。第一版 smoothstep(0.62,1.0) ⇒ 缝占格子宽度的 19%，
+       浅色下就成了"白色磨砂玻璃上的粗灰条"。收到 0.90 起 ⇒ 只有 5%。 */
+    float rows = z * 0.85;
+    float ribR = smoothstep(0.90, 1.0, abs(fract(rows) - 0.5) * 2.0);
+    /* 横向缝：等距的线，被透视压扁 */
+    float cols = p.x * z * 0.42;
+    float ribC = smoothstep(0.93, 1.0, abs(fract(cols) - 0.5) * 2.0);
+    float seam = max(ribR, ribC);
+    /* 缝本身会随距离变细：远到一定程度就交给雾气，不然会有摩尔纹 */
+    seam *= smoothstep(46.0, 6.0, z);
+
+    /* 浅色地面别用 0.885 —— 那比墙（0.962）暗不了多少，但砖缝一加就成了一片
+       亮格子地毯，把照片压住了。压到 0.80，让地面明显比墙暗一档。 */
+    vec3 floorDark  = vec3(0.030, 0.026, 0.028);
+    vec3 floorLight = vec3(0.760, 0.722, 0.666);
+    vec3 floorCol = mix(floorDark, floorLight, uLight);
+    /* 靠近地平线的地面要更暗/更亮地"糊"过去，别出现一条硬线 */
+    floorCol *= 1.0 - mix(0.55, 0.80, uLight) * smoothstep(mix(0.16, 0.30, uLight), 0.0, d);
+    /* 深色下缝是**亮**的（光从缝里透出来），浅色下缝只能是**暗**的细线 */
+    floorCol *= 1.0 - seam * mix(0.0, 0.16, uLight);
+    floorCol *= 1.0 + seam * mix(1.05, 0.0, uLight);
+    /* 地面和墙在地平线处融合 —— 用 0.012 的窄带做抗锯齿 */
+    float blend = smoothstep(0.0, 0.012, d);
+    col = mix(wall, floorCol, blend);
+  }
+
+  /* ───────── 光锥 ─────────
+     顶上一盏灯斜着打下来，照亮带子所在的那一带。
+     用"两个三角形的交"做一个软锥：不要硬边，硬边像贴纸。 */
+  vec2 lampAt = vec2(-0.02 + uTravel * 0.004, 0.78);   /* 灯在天花板偏后 */
+  vec2 dir = p - lampAt;
+  /* 锥角：往下 26° 左右张开 */
+  float ang = atan(dir.x, -dir.y);          /* 0 = 正下方 */
+  float cone = exp(-ang * ang * 22.0);
+  /* 沿灯到地面的距离衰减 */
+  float reach = exp(-length(dir) * 1.15);
+  float beam = cone * reach;
+
+  /* 灯本身（一个很柔的亮点，别做成"太阳"） */
+  float bulb = exp(-length(p - lampAt) * 26.0);
+
+  /* 光色：暗房是安全灯（偏红），明室是白炽灯的暖白 */
+  vec3 lampCol = mix(vec3(0.95, 0.44, 0.28), vec3(1.0, 0.93, 0.80), uLight);
+  /* 浅色下这团灯曾经把后墙洗成一块白（0.962 的纸色 + 0.30 的光 ⇒ 溢出）。
+     明室的灯只要"看得出有光源"就够，不要真的照亮整面墙。 */
+  col += lampCol * beam * mix(0.30, 0.07, uLight);
+  col += lampCol * bulb * mix(0.55, 0.14, uLight);
+
+  /* ───────── 尘埃 ─────────
+     空间感最便宜的来源：空气里看得见的浮尘。但**尺度必须很小**：
+     第一版 size=0.06~0.15、阈值 0.82，结果是一屏十几像素的虚团，
+     读起来是"下雪"不是"浮尘"，还把照片压住了。
+     现在：格子更密、点更小、只留 6% 的格子，并且**只在光锥里才亮**
+     —— 这才是"看得见空气"，而不是"画了一堆圆"。 */
+  /* ⚠️ 两组就够，别三组：三组各自 6% 的命中率叠起来是 ~17% 的格子有尘，
+     一屏几十颗，还是"雪"。两组 + 0.975 阈值 ⇒ ~5%。
+     而且尘**必须靠光锥点亮**：暗处那 95% 的格子不应该有任何贡献。 */
+  float dust = 0.0;
+  for (int k = 0; k < 2; k++) {
+    float fk = float(k);
+    float sc = 40.0 + fk * 34.0;
+    vec2 off = vec2(uTravel * (0.11 + fk * 0.09), uTime * (0.008 + fk * 0.005));
+    vec2 q = p * sc + off;
+    vec2 cell = floor(q);
+    vec2 f = fract(q) - 0.5;
+    float rnd = hash(cell + fk * 17.0);
+    if (rnd > 0.975) {
+      float size = 0.28 + 0.20 * (rnd - 0.975) / 0.025;
+      dust += smoothstep(size, 0.0, length(f)) * (0.3 + 0.7 * rnd);
+    }
+  }
+  float dustLit = 0.04 + beam * 2.6 + bulb * 0.4;
+  vec3 dustCol = mix(vec3(1.0, 0.88, 0.76), vec3(0.38, 0.30, 0.22), uLight);
+  col += dustCol * dust * mix(0.26, 0.14, uLight) * dustLit;
+
+  /* ───────── 顶光 ─────────
+     浅色明室里没有光锥，但得有"光从上面来"这件事，否则整面墙是均匀的纸，
+     更空。用一条从顶部往下衰减的柔光带。深色下这层关掉（有光锥就够）。 */
+  float topLight = exp(-(0.52 - p.y) * 2.6) * uLight;
+  col += vec3(1.0, 0.97, 0.90) * topLight * 0.055;
+
+  /* ───────── 暗角 ───────── */
+  /* 浅色下暗角要更狠（0.30 → 0.46）：地面是竖着延伸到画面底边的，
+     不压的话右下角一片发白，照片就"泡"在光里。 */
+  float vig = 1.0 - mix(0.62, 0.46, uLight) * smoothstep(0.34, 1.12, length(p * vec2(0.90, 1.0)));
+  col *= vig;
+
+  /* ───────── 胶片颗粒 ─────────
+     固定图案会"爬"，所以带时间偏移，但只偏移一点（大片颗粒会闪）。 */
+  float g = hash(gl_FragCoord.xy + fract(uTime) * 61.0);
+  col += (g - 0.5) * mix(0.026, 0.013, uLight);
+
   gl_FragColor = vec4(col, 1.0);
 }`;
 
@@ -516,8 +687,10 @@ function initGL() {
   glU.res = gl.getUniformLocation(glProg, 'uRes');
   glU.time = gl.getUniformLocation(glProg, 'uTime');
   glU.light = gl.getUniformLocation(glProg, 'uLight');
+  glU.travel = gl.getUniformLocation(glProg, 'uTravel');
   resizeGL();
 }
+
 function resizeGL() {
   if (!gl) return;
   const dpr = Math.min(2, devicePixelRatio || 1);
@@ -672,7 +845,56 @@ function layout(dt) {
     el.classList.toggle('is-active', i === ((cur % n) + n) % n);
   });
 
+  paintRig(frames, xsFromLoop(frames));
   paintHUD();
+}
+
+/** 每帧的"带子坐标 x"（相对视口中心的屏幕 x），给挂线用。
+ *  复用 layout 里的那套环计算 —— 不要另写一份，否则线会飘。 */
+function xsFromLoop(frames) {
+  const n = frames.length;
+  const C = circumference(frames);
+  const ox = stripX(travel, frames, C);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    let x = stripX(i, frames, C) - ox;
+    if (x > C / 2) x -= C;
+    if (x < -C / 2) x += C;
+    out.push(x);
+  }
+  return out;
+}
+
+/** 挂线：两根横梁 + 两根从梁上吊住**当前焦点帧**的细线。
+ *  只吊焦点帧（不是每帧都吊）—— 每帧都吊会变成"晾衣绳"，画面立刻乱。
+ *  吊点的 x 跟着焦点帧走，所以走带子时线跟着滑，空间就活了。 */
+function paintRig(frames, xs) {
+  if (!rigEl) return;
+  const i = Math.max(0, Math.min(frames.length - 1, cur));
+  /* 焦点帧在屏幕上的中心（视口坐标） */
+  const cx = VW / 2 + xs[i];
+  /* 焦点帧顶部（它是 translate 到 strip 原点上的） */
+  const fh = frames[i].offsetHeight || BASE_H;
+  const top = VH / 2 - 10 - fh / 2;
+
+  /* 横梁：贴在帧顶上方 46px，留出吊线的一点长度（太近就看不出是"吊"的） */
+  const yB = Math.max(20, top - 46);
+  const pad = Math.max(48, VW * 0.06);
+
+  setLine('railB', pad, yB, VW - pad, yB);
+  /* 两根吊线挂在焦点帧左右各 26% 宽处，垂到帧顶 */
+  const half = Math.max(24, (frames[i].offsetWidth || BASE_W) * 0.26);
+  setLine('wireL', cx - half, yB, cx - half, top);
+  setLine('wireR', cx + half, yB, cx + half, top);
+}
+
+function setLine(id, x1, y1, x2, y2) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.setAttribute('x1', x1.toFixed(1));
+  el.setAttribute('y1', y1.toFixed(1));
+  el.setAttribute('x2', x2.toFixed(1));
+  el.setAttribute('y2', y2.toFixed(1));
 }
 
 function paintHUD() {
@@ -695,6 +917,7 @@ function frame(now) {
     gl.uniform2f(glU.res, glCanvas.width, glCanvas.height);
     gl.uniform1f(glU.time, now * 0.001);
     gl.uniform1f(glU.light, theme === 'light' ? 1 : 0);
+    gl.uniform1f(glU.travel, travel);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
   requestAnimationFrame(frame);
